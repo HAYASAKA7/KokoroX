@@ -23,7 +23,7 @@
     "schema_version": {"const": "1.0"},
     "artifact_id": {
       "type": "string",
-      "pattern": "^[a-z0-9][a-z0-9._/-]{0,127}(?![\\s\\S])"
+      "pattern": "^[a-z0-9][a-z0-9._/-]{0,137}(?![\\s\\S])"
     },
     "created_by": {"$ref": "#/$defs/created_by"},
     "character_id": {"$ref": "#/$defs/slug_id"},
@@ -99,7 +99,7 @@
     },
     "trait_map": {
       "type": "object",
-      "maxProperties": 128,
+      "maxProperties": 256,
       "additionalProperties": false,
       "propertyNames": {"$ref": "#/$defs/semantic_id"},
       "patternProperties": {
@@ -121,7 +121,7 @@
     "provenance": {
       "type": "object",
       "minProperties": 1,
-      "maxProperties": 128,
+      "maxProperties": 256,
       "additionalProperties": false,
       "propertyNames": {"$ref": "#/$defs/semantic_id"},
       "patternProperties": {

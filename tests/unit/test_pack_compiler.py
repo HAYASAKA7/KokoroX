@@ -96,6 +96,44 @@ def test_compile_pack_builds_runtime_metadata() -> None:
     assert compiled["character_version"] == "1.0.0"
 
 
+def test_compile_pack_accepts_source_boundary_namespace_and_character_id() -> None:
+    source = load_rin_source()
+    source["namespace"] = "n" * 64
+    source["character_id"] = "c" * 64
+    source["artifact_id"] = "source"
+
+    SCHEMAS.validate("character-source", source)
+    compiled = compile_pack(source, SCHEMAS)
+
+    assert compiled["artifact_id"] == f"{'n' * 64}/{'c' * 64}/compiled"
+    assert len(compiled["artifact_id"]) == 138
+
+
+def test_compile_pack_preserves_the_full_disjoint_trait_union() -> None:
+    source = load_rin_source()
+    source["derived_profile"]["traits"] = {
+        f"derived{index:03d}": 0.25 for index in range(128)
+    }
+    source["overrides"]["values"] = {
+        f"override{index:03d}": 0.75 for index in range(128)
+    }
+
+    SCHEMAS.validate("character-source", source)
+    compiled = compile_pack(source, SCHEMAS)
+
+    assert len(compiled["effective_profile"]) == 256
+    assert len(compiled["provenance"]) == 256
+    assert compiled["effective_profile"]["derived000"] == 0.25
+    assert compiled["effective_profile"]["override000"] == 0.75
+    assert compiled["provenance"]["derived000"] == {
+        "selected_layer": "derived_profile"
+    }
+    assert compiled["provenance"]["override000"] == {
+        "selected_layer": "user_override"
+    }
+    SCHEMAS.validate("compiled-pack", compiled)
+
+
 def test_compile_pack_validates_exactly_once_and_propagates_schema_error() -> None:
     source = load_rin_source()
     expected = KokoroError("SCHEMA_VALIDATION_FAILED", "invalid compiled pack")
@@ -167,6 +205,18 @@ def test_canonical_bytes_rejects_cycles_without_recursing() -> None:
 
     assert raised.value.code == "INVALID_PACK_DATA"
     assert "Cyclic" in raised.value.message
+
+
+def test_canonical_bytes_rejects_shared_fanout_dag_without_expanding_it() -> None:
+    shared: list[Any] = ["leaf"]
+    for _ in range(20):
+        shared = [shared, shared]
+
+    with pytest.raises(KokoroError) as raised:
+        canonical_bytes({"fanout": shared})
+
+    assert raised.value.code == "INVALID_PACK_DATA"
+    assert raised.value.message == "Shared containers are not valid JSON artifacts."
 
 
 @pytest.mark.parametrize(

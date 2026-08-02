@@ -495,6 +495,48 @@ def test_compiled_pack_schema_rejects_invalid_source_hash() -> None:
 
 
 @pytest.mark.parametrize(
+    ("length", "accepted"), [(138, True), (139, False)]
+)
+def test_compiled_pack_schema_has_the_runtime_artifact_id_boundary(
+    length: int, accepted: bool
+) -> None:
+    document = valid_compiled_pack()
+    document["artifact_id"] = "a" * length
+
+    if accepted:
+        SchemaRegistry(Path("schemas/v1")).validate("compiled-pack", document)
+    else:
+        with pytest.raises(KokoroError) as raised:
+            SchemaRegistry(Path("schemas/v1")).validate("compiled-pack", document)
+
+        assert raised.value.code == "SCHEMA_VALIDATION_FAILED"
+
+
+@pytest.mark.parametrize(
+    ("count", "accepted"), [(256, True), (257, False)]
+)
+def test_compiled_pack_schema_has_the_effective_profile_union_boundary(
+    count: int, accepted: bool
+) -> None:
+    document = valid_compiled_pack()
+    document["effective_profile"] = {
+        f"trait{index:03d}": 0.5 for index in range(count)
+    }
+    document["provenance"] = {
+        f"trait{index:03d}": {"selected_layer": "derived_profile"}
+        for index in range(count)
+    }
+
+    if accepted:
+        SchemaRegistry(Path("schemas/v1")).validate("compiled-pack", document)
+    else:
+        with pytest.raises(KokoroError) as raised:
+            SchemaRegistry(Path("schemas/v1")).validate("compiled-pack", document)
+
+        assert raised.value.code == "SCHEMA_VALIDATION_FAILED"
+
+
+@pytest.mark.parametrize(
     "non_finite",
     [
         json.loads('{"value": NaN}')["value"],
@@ -609,7 +651,7 @@ def test_character_source_schema_rejects_excessive_nesting() -> None:
     ]
 
 
-def test_character_source_schema_allows_shared_acyclic_alias() -> None:
+def test_character_source_schema_rejects_shared_acyclic_alias() -> None:
     document = load_fixture("valid-character-source.json")
     aliases = yaml.safe_load(
         "worldview: &values [evidence_before_confidence]\n"
@@ -619,7 +661,27 @@ def test_character_source_schema_allows_shared_acyclic_alias() -> None:
     document["identity"]["worldview"] = aliases["worldview"]
     document["identity"]["non_negotiables"] = aliases["non_negotiables"]
 
-    SchemaRegistry(Path("schemas/v1")).validate("character-source", document)
+    with pytest.raises(KokoroError) as raised:
+        SchemaRegistry(Path("schemas/v1")).validate("character-source", document)
+
+    assert raised.value.code == "SCHEMA_VALIDATION_FAILED"
+    assert raised.value.message == "Shared containers are not valid JSON artifacts."
+    assert raised.value.details["path"] == ["identity", "worldview"]
+
+
+def test_character_source_schema_rejects_unpaired_surrogate_key_without_path_leak() -> None:
+    document = load_fixture("valid-character-source.json")
+    document["overrides"]["values"] = {"\ud800": 0.5}
+
+    with pytest.raises(KokoroError) as raised:
+        SchemaRegistry(Path("schemas/v1")).validate("character-source", document)
+
+    assert raised.value.code == "SCHEMA_VALIDATION_FAILED"
+    assert raised.value.message == "JSON strings must be valid UTF-8."
+    assert raised.value.details == {
+        "schema": "character-source",
+        "path": ["overrides", "values"],
+    }
 
 
 def test_character_source_schema_rejects_noncanonical_growth_stage() -> None:
