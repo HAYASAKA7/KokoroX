@@ -25,13 +25,20 @@ def canonical_bytes(value: Any) -> bytes:
             message,
             details={"path": path},
         )
-    return json.dumps(
-        value,
-        ensure_ascii=False,
-        sort_keys=True,
-        separators=(",", ":"),
-        allow_nan=False,
-    ).encode("utf-8")
+    try:
+        return json.dumps(
+            value,
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+            allow_nan=False,
+        ).encode("utf-8")
+    except (TypeError, ValueError, UnicodeEncodeError) as error:
+        raise KokoroError(
+            "INVALID_PACK_DATA",
+            "Artifact cannot be represented as canonical JSON.",
+            details={"path": []},
+        ) from error
 
 
 def compile_pack(source: dict[str, Any], schemas: SchemaRegistry) -> dict[str, Any]:
@@ -89,7 +96,11 @@ def _find_json_incompatibility(
             active_container_ids.remove(id(current))
             continue
 
-        if current is None or isinstance(current, (bool, int, str)):
+        if current is None or isinstance(current, (bool, int)):
+            continue
+        if isinstance(current, str):
+            if not _is_utf8_encodable(current):
+                return list(path), "JSON strings must be valid UTF-8."
             continue
         if isinstance(current, float):
             if not math.isfinite(current):
@@ -107,6 +118,8 @@ def _find_json_incompatibility(
         if isinstance(current, dict):
             if any(not isinstance(key, str) for key in current):
                 return list(path), "JSON artifact object keys must be strings."
+            if any(not _is_utf8_encodable(key) for key in current):
+                return list(path), "JSON strings must be valid UTF-8."
             children = [
                 (True, current[key], (*path, key), depth + 1)
                 for key in reversed(sorted(current))
@@ -122,3 +135,11 @@ def _find_json_incompatibility(
         stack.extend(children)
 
     return None
+
+
+def _is_utf8_encodable(value: str) -> bool:
+    try:
+        value.encode("utf-8")
+    except UnicodeEncodeError:
+        return False
+    return True

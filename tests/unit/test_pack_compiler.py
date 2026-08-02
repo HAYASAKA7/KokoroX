@@ -34,6 +34,15 @@ def test_canonical_bytes_are_compact_utf8_and_independent_of_mapping_order() -> 
     assert list(first) == ["z", "a"]
 
 
+def test_canonical_bytes_preserves_valid_multilingual_non_bmp_text_as_utf8() -> None:
+    value = {"message": "日本語😀原因已经明确。"}
+
+    encoded = canonical_bytes(value)
+
+    assert "日本語😀原因已经明确。".encode("utf-8") in encoded
+    assert b"\\u" not in encoded
+
+
 def test_compile_rin_pack_is_deterministic_valid_and_excludes_authoring_only_data() -> None:
     source = load_rin_source()
 
@@ -158,3 +167,24 @@ def test_canonical_bytes_rejects_cycles_without_recursing() -> None:
 
     assert raised.value.code == "INVALID_PACK_DATA"
     assert "Cyclic" in raised.value.message
+
+
+@pytest.mark.parametrize(
+    ("value", "expected_path"),
+    [
+        ({"value": "\ud800"}, ["value"]),
+        ({"nested": {"value": "\udfff"}}, ["nested", "value"]),
+        ({"\ud800": "value"}, []),
+        ({"nested": {"\udfff": "value"}}, ["nested"]),
+    ],
+)
+def test_canonical_bytes_rejects_unpaired_surrogates_without_leaking_unicode_errors(
+    value: dict[str, Any], expected_path: list[str]
+) -> None:
+    with pytest.raises(KokoroError) as raised:
+        canonical_bytes(value)
+
+    assert raised.value.code == "INVALID_PACK_DATA"
+    assert raised.value.message == "JSON strings must be valid UTF-8."
+    assert raised.value.details == {"path": expected_path}
+    assert "surrogates not allowed" not in raised.value.message
