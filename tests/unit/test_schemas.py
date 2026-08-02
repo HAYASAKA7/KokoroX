@@ -2,6 +2,7 @@ import json
 from pathlib import Path
 
 import pytest
+import yaml
 from jsonschema import Draft202012Validator
 
 from kokoroarc.errors import KokoroError
@@ -76,6 +77,48 @@ def test_compiled_pack_schema_rejects_invalid_source_hash() -> None:
         SchemaRegistry(Path("schemas/v1")).validate("compiled-pack", document)
 
     assert raised.value.code == "SCHEMA_VALIDATION_FAILED"
+
+
+def test_character_source_schema_rejects_json_nan_trait() -> None:
+    document = load_fixture("valid-character-source.json")
+    document["derived_profile"]["traits"]["composure"] = json.loads(
+        '{"value": NaN}'
+    )["value"]
+
+    with pytest.raises(KokoroError) as raised:
+        SchemaRegistry(Path("schemas/v1")).validate("character-source", document)
+
+    assert raised.value.code == "SCHEMA_VALIDATION_FAILED"
+    assert raised.value.details["path"] == [
+        "derived_profile",
+        "traits",
+        "composure",
+    ]
+
+
+def test_character_source_schema_rejects_yaml_nan_growth_threshold() -> None:
+    document = load_fixture("valid-character-source.json")
+    document["growth"]["stages"] = {
+        "unknown": {"enter_familiarity": yaml.safe_load("value: .nan")["value"]}
+    }
+
+    with pytest.raises(KokoroError) as raised:
+        SchemaRegistry(Path("schemas/v1")).validate("character-source", document)
+
+    assert raised.value.code == "SCHEMA_VALIDATION_FAILED"
+    assert raised.value.details["path"] == [
+        "growth",
+        "stages",
+        "unknown",
+        "enter_familiarity",
+    ]
+
+
+def test_character_source_schema_accepts_finite_trait_boundary() -> None:
+    document = load_fixture("valid-character-source.json")
+    document["derived_profile"]["traits"]["composure"] = 1.0
+
+    SchemaRegistry(Path("schemas/v1")).validate("character-source", document)
 
 
 def test_registry_rejects_missing_artifact_metadata(tmp_path: Path) -> None:

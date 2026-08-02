@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import math
 from pathlib import Path
 import re
 from typing import Any
@@ -13,6 +14,24 @@ from kokoroarc.errors import KokoroError
 
 _DRAFT_2020_12 = "https://json-schema.org/draft/2020-12/schema"
 _SCHEMA_NAME_PATTERN = re.compile(r"[a-z0-9][a-z0-9._-]{0,127}")
+
+
+def _find_non_finite_path(
+    value: Any, path: tuple[str | int, ...] = ()
+) -> list[str | int] | None:
+    if isinstance(value, float) and not math.isfinite(value):
+        return list(path)
+    if isinstance(value, dict):
+        for key in sorted(value):
+            found = _find_non_finite_path(value[key], (*path, key))
+            if found is not None:
+                return found
+    elif isinstance(value, list):
+        for index, item in enumerate(value):
+            found = _find_non_finite_path(item, (*path, index))
+            if found is not None:
+                return found
+    return None
 
 
 class SchemaRegistry:
@@ -103,8 +122,17 @@ class SchemaRegistry:
         return schema
 
     def validate(self, name: str, instance: Any) -> None:
+        schema = self.load(name)
+        non_finite_path = _find_non_finite_path(instance)
+        if non_finite_path is not None:
+            raise KokoroError(
+                "SCHEMA_VALIDATION_FAILED",
+                "Non-finite numbers are not valid JSON artifacts.",
+                details={"schema": name, "path": non_finite_path},
+            )
+
         errors = sorted(
-            Draft202012Validator(self.load(name)).iter_errors(instance),
+            Draft202012Validator(schema).iter_errors(instance),
             key=lambda error: list(error.absolute_path),
         )
         if errors:
