@@ -102,6 +102,41 @@ def test_immutable_persona_intensity_remains_the_base_value() -> None:
     assert resolved == {"persona_intensity": "immersive"}
 
 
+def test_immutable_intensity_ignores_invalid_user_and_host_values() -> None:
+    present = resolve_profile(
+        base={"persona_intensity": "immersive"},
+        user={"persona_intensity": object()},
+        host_caps={"persona_intensity": object()},
+        immutable={"persona_intensity"},
+    )
+    absent = resolve_profile(
+        base={},
+        user={"persona_intensity": object()},
+        host_caps={"persona_intensity": object()},
+        immutable={"persona_intensity"},
+    )
+
+    assert present == {"persona_intensity": "immersive"}
+    assert absent == {}
+
+
+def test_invalid_immutable_base_intensity_is_rejected_because_it_is_retained() -> None:
+    with pytest.raises(KokoroError) as raised:
+        resolve_profile(
+            base={"persona_intensity": object()},
+            user={"persona_intensity": "neutral"},
+            host_caps={"persona_intensity": "balanced"},
+            immutable={"persona_intensity"},
+        )
+
+    assert raised.value.code == "INVALID_PROFILE_VALUE"
+    assert raised.value.details == {
+        "field": "persona_intensity",
+        "source": "base",
+        "reason": "expected_string",
+    }
+
+
 def test_valid_intensity_is_preserved_without_a_host_cap() -> None:
     assert resolve_profile(
         base={"persona_intensity": "immersive"},

@@ -150,6 +150,8 @@ class FailingFile:
         return int(self._handle.write(payload))
 
     def flush(self) -> None:
+        if self._operation == "flush":
+            raise self._expected
         self._handle.flush()
 
     def fileno(self) -> int:
@@ -161,7 +163,7 @@ class FailingFile:
             raise self._expected
 
 
-@pytest.mark.parametrize("operation", ["write", "close"])
+@pytest.mark.parametrize("operation", ["write", "flush", "close"])
 def test_file_operation_failure_cleans_staging_and_preserves_existing_target(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, operation: str
 ) -> None:
@@ -207,6 +209,78 @@ def test_os_failure_cleans_staging_and_preserves_existing_target(
 
     assert raised.value is expected
     assert target.read_bytes() == b"existing\n"
+    assert temp_files(tmp_path) == []
+
+
+@pytest.mark.parametrize("winerror", [5, 32])
+def test_transient_permission_error_is_retried_until_replace_succeeds(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, winerror: int
+) -> None:
+    target = tmp_path / "compiled.json"
+    attempts = 0
+    expected = PermissionError(f"transient WinError {winerror}")
+    expected.winerror = winerror  # type: ignore[attr-defined]
+    real_replace = compiler.os.replace
+
+    def transient_replace(source: str | Path, destination: str | Path) -> None:
+        nonlocal attempts
+        attempts += 1
+        if attempts <= 2:
+            raise expected
+        real_replace(source, destination)
+
+    monkeypatch.setattr(compiler.os, "replace", transient_replace)
+
+    write_compiled_pack({"complete": True}, target)
+
+    assert attempts == 3
+    assert target.read_bytes() == b'{"complete":true}\n'
+    assert temp_files(tmp_path) == []
+
+
+def test_permanent_permission_error_exhausts_retries_and_reraises_latest_error(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    target = tmp_path / "compiled.json"
+    target.write_bytes(b"existing\n")
+    errors: list[PermissionError] = []
+
+    def permanent_replace(_source: str | Path, _destination: str | Path) -> None:
+        error = PermissionError(f"attempt {len(errors) + 1}")
+        error.winerror = 5  # type: ignore[attr-defined]
+        errors.append(error)
+        raise error
+
+    monkeypatch.setattr(compiler.os, "replace", permanent_replace)
+
+    with pytest.raises(PermissionError) as raised:
+        write_compiled_pack({"new": True}, target)
+
+    assert len(errors) == 5
+    assert raised.value is errors[-1]
+    assert target.read_bytes() == b"existing\n"
+    assert temp_files(tmp_path) == []
+
+
+def test_non_permission_replace_error_is_not_retried(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    target = tmp_path / "compiled.json"
+    expected = OSError("replace failed")
+    attempts = 0
+
+    def fail_replace(_source: str | Path, _destination: str | Path) -> None:
+        nonlocal attempts
+        attempts += 1
+        raise expected
+
+    monkeypatch.setattr(compiler.os, "replace", fail_replace)
+
+    with pytest.raises(OSError) as raised:
+        write_compiled_pack({"new": True}, target)
+
+    assert attempts == 1
+    assert raised.value is expected
     assert temp_files(tmp_path) == []
 
 

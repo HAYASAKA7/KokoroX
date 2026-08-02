@@ -58,7 +58,10 @@ def resolve_profile(
         requested = _validate_intensity(resolved["persona_intensity"], source)
 
     cap: str | None = None
-    if "persona_intensity" in host_caps:
+    if (
+        "persona_intensity" in host_caps
+        and "persona_intensity" not in immutable
+    ):
         cap = _validate_intensity(host_caps["persona_intensity"], "host_caps")
 
     for key, value in host_caps.items():

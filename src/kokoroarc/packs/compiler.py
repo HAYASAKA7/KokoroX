@@ -7,12 +7,17 @@ import json
 import os
 from pathlib import Path
 import tempfile
+import time
 from typing import Any, cast
 
 from kokoroarc import __version__
 from kokoroarc.errors import KokoroError
 from kokoroarc.json_compat import find_json_incompatibility
 from kokoroarc.schemas import SchemaRegistry
+
+
+_ATOMIC_REPLACE_RETRY_DELAYS = (0.0, 0.001, 0.002, 0.004)
+_ATOMIC_REPLACE_ATTEMPTS = len(_ATOMIC_REPLACE_RETRY_DELAYS) + 1
 
 
 def canonical_bytes(value: Any) -> bytes:
@@ -41,6 +46,18 @@ def canonical_bytes(value: Any) -> bytes:
         ) from error
 
 
+def _replace_atomically(staging: Path, target: Path) -> None:
+    """Replace *target*, retrying transient permission races for a short bound."""
+    for attempt in range(_ATOMIC_REPLACE_ATTEMPTS):
+        try:
+            os.replace(staging, target)
+            return
+        except PermissionError:
+            if attempt == _ATOMIC_REPLACE_ATTEMPTS - 1:
+                raise
+            time.sleep(_ATOMIC_REPLACE_RETRY_DELAYS[attempt])
+
+
 def write_compiled_pack(value: dict[str, Any], target: Path) -> None:
     """Atomically publish a canonical compiled-pack document at *target*."""
     payload = canonical_bytes(value) + b"\n"
@@ -59,7 +76,7 @@ def write_compiled_pack(value: dict[str, Any], target: Path) -> None:
         handle.flush()
         os.fsync(handle.fileno())
         handle.close()
-        os.replace(staging, target)
+        _replace_atomically(staging, target)
     except BaseException:
         try:
             if not handle.closed:
