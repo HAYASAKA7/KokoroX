@@ -59,6 +59,11 @@
       "maxLength": 64,
       "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
     },
+    "semantic_id": {
+      "type": "string",
+      "maxLength": 128,
+      "pattern": "^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$"
+    },
     "character_version": {
       "type": "string",
       "minLength": 1,
@@ -93,6 +98,7 @@
       "type": "object",
       "maxProperties": 128,
       "additionalProperties": false,
+      "propertyNames": {"$ref": "#/$defs/semantic_id"},
       "patternProperties": {
         "^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$": {
           "type": "number",
@@ -114,6 +120,7 @@
       "minProperties": 1,
       "maxProperties": 128,
       "additionalProperties": false,
+      "propertyNames": {"$ref": "#/$defs/semantic_id"},
       "patternProperties": {
         "^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$": {
           "$ref": "#/$defs/provenance_entry"
@@ -173,12 +180,13 @@
         "stages": {
           "type": "object",
           "minProperties": 1,
-          "maxProperties": 32,
+          "maxProperties": 4,
           "additionalProperties": false,
-          "patternProperties": {
-            "^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$": {
-              "$ref": "#/$defs/stage_thresholds"
-            }
+          "properties": {
+            "unknown": {"$ref": "#/$defs/stage_thresholds"},
+            "acquainted": {"$ref": "#/$defs/stage_thresholds"},
+            "familiar": {"$ref": "#/$defs/stage_thresholds"},
+            "trusted": {"$ref": "#/$defs/stage_thresholds"}
           }
         }
       }
@@ -208,6 +216,7 @@
       "minProperties": 1,
       "maxProperties": 256,
       "additionalProperties": false,
+      "propertyNames": {"$ref": "#/$defs/semantic_id"},
       "patternProperties": {
         "^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$": {
           "$ref": "#/$defs/expression_locale_set"
@@ -261,6 +270,7 @@
       "minProperties": 1,
       "maxProperties": 128,
       "additionalProperties": false,
+      "propertyNames": {"$ref": "#/$defs/semantic_id"},
       "patternProperties": {
         "^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$": {"$ref": "#/$defs/scenario"}
       }

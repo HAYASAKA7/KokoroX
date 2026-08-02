@@ -1,3 +1,4 @@
+from copy import deepcopy
 import json
 from pathlib import Path
 
@@ -55,12 +56,20 @@ def test_character_source_schema_accepts_original_pack() -> None:
 
 
 def test_character_source_schema_rejects_executable_hook() -> None:
+    valid = load_fixture("valid-character-source.json")
+    invalid = load_fixture("invalid-character-source.json")
+    without_hook = deepcopy(invalid)
+    without_hook.pop("post_load_hook")
+
+    assert without_hook == valid
+
     with pytest.raises(KokoroError) as raised:
         SchemaRegistry(Path("schemas/v1")).validate(
-            "character-source", load_fixture("invalid-character-source.json")
+            "character-source", invalid
         )
 
     assert raised.value.code == "SCHEMA_VALIDATION_FAILED"
+    assert raised.value.details["path"] == []
 
 
 def test_compiled_pack_schema_accepts_compiler_output() -> None:
@@ -119,6 +128,100 @@ def test_character_source_schema_accepts_finite_trait_boundary() -> None:
     document["derived_profile"]["traits"]["composure"] = 1.0
 
     SchemaRegistry(Path("schemas/v1")).validate("character-source", document)
+
+
+def test_character_source_schema_rejects_noncanonical_growth_stage() -> None:
+    document = load_fixture("valid-character-source.json")
+    document["growth"]["stages"] = {
+        "best_friend": {"enter_familiarity": 80}
+    }
+
+    with pytest.raises(KokoroError) as raised:
+        SchemaRegistry(Path("schemas/v1")).validate("character-source", document)
+
+    assert raised.value.code == "SCHEMA_VALIDATION_FAILED"
+    assert raised.value.details["path"] == ["growth", "stages"]
+
+
+def test_compiled_pack_schema_rejects_noncanonical_growth_stage() -> None:
+    document = valid_compiled_pack()
+    document["growth"]["stages"] = {
+        "best_friend": {"enter_familiarity": 80}
+    }
+
+    with pytest.raises(KokoroError) as raised:
+        SchemaRegistry(Path("schemas/v1")).validate("compiled-pack", document)
+
+    assert raised.value.code == "SCHEMA_VALIDATION_FAILED"
+    assert raised.value.details["path"] == ["growth", "stages"]
+
+
+def test_character_source_schema_rejects_overlong_expression_intent_id() -> None:
+    document = load_fixture("valid-character-source.json")
+    overlong_id = "a_" + "b" * 127
+    expression = document["expressions"].pop("restrained_diagnosis")
+    document["expressions"][overlong_id] = expression
+
+    with pytest.raises(KokoroError) as raised:
+        SchemaRegistry(Path("schemas/v1")).validate("character-source", document)
+
+    assert raised.value.code == "SCHEMA_VALIDATION_FAILED"
+
+
+@pytest.mark.parametrize("dynamic_map", ["traits", "scenarios"])
+def test_character_source_schema_rejects_other_overlong_dynamic_ids(
+    dynamic_map: str,
+) -> None:
+    document = load_fixture("valid-character-source.json")
+    overlong_id = "a_" + "b" * 127
+    if dynamic_map == "traits":
+        document["derived_profile"]["traits"] = {overlong_id: 0.5}
+    else:
+        document["scenarios"] = {overlong_id: {"intensity_cap": "balanced"}}
+
+    with pytest.raises(KokoroError) as raised:
+        SchemaRegistry(Path("schemas/v1")).validate("character-source", document)
+
+    assert raised.value.code == "SCHEMA_VALIDATION_FAILED"
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    [
+        lambda document: document.update({"evidence": {}}),
+        lambda document: document.update({"derived_profile": {}}),
+        lambda document: document.update({"post_load_hook": "run this hook"}),
+        lambda document: document["identity"].update({"unknown_field": True}),
+        lambda document: document["effective_profile"].update({"composure": 1.1}),
+        lambda document: document["effective_profile"].update({"Bad-Key": 0.5}),
+        lambda document: document["provenance"]["composure"].update(
+            {"selected_layer": "raw_source"}
+        ),
+        lambda document: document["provenance"]["composure"].update(
+            {"extra": True}
+        ),
+        lambda document: document["growth"]["dimensions"].append("familiarity"),
+    ],
+    ids=[
+        "raw-evidence",
+        "raw-derived-profile",
+        "unknown-root",
+        "unknown-nested",
+        "trait-above-one",
+        "invalid-trait-id",
+        "invalid-selected-layer",
+        "extra-provenance-field",
+        "duplicate-dimension",
+    ],
+)
+def test_compiled_pack_schema_rejects_forbidden_or_invalid_data(mutation) -> None:
+    document = deepcopy(valid_compiled_pack())
+    mutation(document)
+
+    with pytest.raises(KokoroError) as raised:
+        SchemaRegistry(Path("schemas/v1")).validate("compiled-pack", document)
+
+    assert raised.value.code == "SCHEMA_VALIDATION_FAILED"
 
 
 def test_registry_rejects_missing_artifact_metadata(tmp_path: Path) -> None:
