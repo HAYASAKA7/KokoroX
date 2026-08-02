@@ -4,6 +4,9 @@ from __future__ import annotations
 
 from hashlib import sha256
 import json
+import os
+from pathlib import Path
+import tempfile
 from typing import Any, cast
 
 from kokoroarc import __version__
@@ -36,6 +39,38 @@ def canonical_bytes(value: Any) -> bytes:
             "Artifact cannot be represented as canonical JSON.",
             details={"path": []},
         ) from error
+
+
+def write_compiled_pack(value: dict[str, Any], target: Path) -> None:
+    """Atomically publish a canonical compiled-pack document at *target*."""
+    payload = canonical_bytes(value) + b"\n"
+    target.parent.mkdir(parents=True, exist_ok=True)
+
+    handle = tempfile.NamedTemporaryFile(
+        mode="wb",
+        dir=target.parent,
+        prefix=f".{target.name}.",
+        suffix=".tmp",
+        delete=False,
+    )
+    staging = Path(handle.name)
+    try:
+        handle.write(payload)
+        handle.flush()
+        os.fsync(handle.fileno())
+        handle.close()
+        os.replace(staging, target)
+    except BaseException:
+        try:
+            if not handle.closed:
+                handle.close()
+        except BaseException:
+            pass
+        try:
+            os.unlink(staging)
+        except OSError:
+            pass
+        raise
 
 
 def compile_pack(source: dict[str, Any], schemas: SchemaRegistry) -> dict[str, Any]:
