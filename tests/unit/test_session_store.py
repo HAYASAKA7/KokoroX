@@ -1,5 +1,9 @@
 import json
+import multiprocessing
+import threading
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -60,6 +64,32 @@ def canonical_file(value: dict) -> bytes:
     )
 
 
+def _process_start_worker(data_root: str, barrier, results) -> None:
+    from kokoroarc.errors import KokoroError
+    from kokoroarc.state import store as process_store_module
+    from kokoroarc.state.store import SessionStore
+
+    real_write = process_store_module._atomic_write_json
+
+    def synchronized_write(value: dict, target: Path) -> None:
+        if target.parent.name == "state":
+            try:
+                barrier.wait(timeout=0.75)
+            except threading.BrokenBarrierError:
+                pass
+        real_write(value, target)
+
+    process_store_module._atomic_write_json = synchronized_write
+    try:
+        SessionStore(Path(data_root)).start(
+            "session-1", "rin-aster", "1.2.3", HASH
+        )
+    except KokoroError as error:
+        results.put(("error", error.code))
+    else:
+        results.put(("ok", None))
+
+
 def test_start_creates_exact_manifest_and_initial_state(tmp_path: Path) -> None:
     store = SessionStore(tmp_path)
 
@@ -73,6 +103,7 @@ def test_start_creates_exact_manifest_and_initial_state(tmp_path: Path) -> None:
     schemas = SchemaRegistry(Path("schemas/v1"))
     schemas.validate("session-manifest", manifest)
     schemas.validate("relationship-state", json.loads(state_path.read_bytes()))
+    assert (tmp_path / "session-locks" / "session-1.lock").read_bytes() == b"\0"
     assert not list(tmp_path.rglob("*.tmp"))
 
 
@@ -91,6 +122,70 @@ def test_start_writes_state_before_publishing_active_manifest(
     SessionStore(tmp_path).start("session-1", "rin-aster", "1.2.3", HASH)
 
     assert writes == [("state", False), ("sessions", True)]
+
+
+def test_concurrent_starts_across_store_instances_are_serialized(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    barrier = threading.Barrier(2)
+    real_write = store_module._atomic_write_json
+
+    def synchronized_write(value: dict, target: Path) -> None:
+        if target.parent.name == "state":
+            try:
+                barrier.wait(timeout=0.5)
+            except threading.BrokenBarrierError:
+                pass
+        real_write(value, target)
+
+    monkeypatch.setattr(store_module, "_atomic_write_json", synchronized_write)
+
+    def start(store: SessionStore) -> tuple[str, str | None]:
+        try:
+            store.start("session-1", "rin-aster", "1.2.3", HASH)
+        except KokoroError as error:
+            return "error", error.code
+        return "ok", None
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        results = list(
+            executor.map(start, [SessionStore(tmp_path), SessionStore(tmp_path)])
+        )
+
+    assert sorted(results) == [
+        ("error", "SESSION_ALREADY_ACTIVE"),
+        ("ok", None),
+    ]
+    assert SessionStore(tmp_path).load("session-1") == expected_manifest()
+
+
+def test_concurrent_starts_across_processes_are_serialized(
+    tmp_path: Path,
+) -> None:
+    context = multiprocessing.get_context("spawn")
+    barrier = context.Barrier(2)
+    results = context.Queue()
+    processes = [
+        context.Process(
+            target=_process_start_worker,
+            args=(str(tmp_path), barrier, results),
+        )
+        for _ in range(2)
+    ]
+
+    for process in processes:
+        process.start()
+    for process in processes:
+        process.join(timeout=15)
+
+    assert all(not process.is_alive() for process in processes)
+    assert [process.exitcode for process in processes] == [0, 0]
+    observed = sorted(results.get(timeout=2) for _ in range(2))
+    assert observed == [
+        ("error", "SESSION_ALREADY_ACTIVE"),
+        ("ok", None),
+    ]
+    assert SessionStore(tmp_path).load("session-1") == expected_manifest()
 
 
 def test_duplicate_active_start_rejects_without_writes_or_content_changes(
@@ -282,20 +377,63 @@ def test_load_rejects_non_strict_json_manifest(
     assert raised.value.details == {}
 
 
+def test_load_accepts_manifest_at_exact_byte_limit(tmp_path: Path) -> None:
+    contents = canonical_file(expected_manifest())
+    contents += b" " * (store_module.SESSION_MANIFEST_MAX_BYTES - len(contents))
+    manifest_path = tmp_path / "sessions" / "session-1.json"
+    manifest_path.parent.mkdir(parents=True)
+    manifest_path.write_bytes(contents)
+
+    assert len(contents) == store_module.SESSION_MANIFEST_MAX_BYTES
+    assert SessionStore(tmp_path).load("session-1") == expected_manifest()
+
+
+def test_load_rejects_oversized_manifest_before_json_parsing(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    manifest_path = tmp_path / "sessions" / "session-1.json"
+    manifest_path.parent.mkdir(parents=True)
+    manifest_path.write_bytes(b" " * (store_module.SESSION_MANIFEST_MAX_BYTES + 1))
+    monkeypatch.setattr(
+        store_module.json,
+        "loads",
+        lambda *_args, **_kwargs: pytest.fail("oversized JSON was parsed"),
+    )
+
+    with pytest.raises(KokoroError) as raised:
+        SessionStore(tmp_path).load("session-1")
+
+    assert raised.value.code == "SESSION_DATA_INVALID"
+    assert raised.value.details == {}
+
+
+def test_load_sanitizes_deeply_nested_manifest(tmp_path: Path) -> None:
+    manifest_path = tmp_path / "sessions" / "session-1.json"
+    manifest_path.parent.mkdir(parents=True)
+    manifest_path.write_bytes(b"[" * 2000 + b"]" * 2000)
+
+    with pytest.raises(KokoroError) as raised:
+        SessionStore(tmp_path).load("session-1")
+
+    assert raised.value.code == "SESSION_DATA_INVALID"
+    assert "recursion" not in str(raised.value).lower()
+    assert raised.value.details == {}
+
+
 def test_load_sanitizes_manifest_read_failure(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     store = SessionStore(tmp_path)
     store.start("session-1", "rin-aster", "1.2.3", HASH)
     manifest_path = tmp_path / "sessions" / "session-1.json"
-    real_read_bytes = Path.read_bytes
+    real_open = Path.open
 
-    def denied_read(path: Path) -> bytes:
+    def denied_open(path: Path, *args, **kwargs):
         if path == manifest_path:
             raise PermissionError("secret operating-system detail")
-        return real_read_bytes(path)
+        return real_open(path, *args, **kwargs)
 
-    monkeypatch.setattr(Path, "read_bytes", denied_read)
+    monkeypatch.setattr(Path, "open", denied_open)
 
     with pytest.raises(KokoroError) as raised:
         store.load("session-1")
@@ -461,6 +599,108 @@ def test_start_rejects_directory_reported_as_redirect(
         SessionStore(tmp_path).start("session-1", "rin-aster", "1.2.3", HASH)
 
     assert raised.value.code == "SESSION_PATH_UNSAFE"
+
+
+def test_path_redirect_detection_covers_junction_branch(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(Path, "is_symlink", lambda _path: False)
+    monkeypatch.setattr(Path, "is_junction", lambda _path: True, raising=False)
+
+    assert store_module._path_is_redirect(tmp_path / "candidate") is True
+
+
+def test_path_redirect_detection_covers_reparse_attribute(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    reparse_flag = 0x400
+    fake_stat = SimpleNamespace(st_file_attributes=reparse_flag)
+    monkeypatch.setattr(Path, "is_symlink", lambda _path: False)
+    monkeypatch.setattr(Path, "is_junction", lambda _path: False, raising=False)
+    monkeypatch.setattr(
+        Path,
+        "stat",
+        lambda _path, *, follow_symlinks=True: fake_stat,
+    )
+    monkeypatch.setattr(
+        store_module.stat,
+        "FILE_ATTRIBUTE_REPARSE_POINT",
+        reparse_flag,
+        raising=False,
+    )
+
+    assert store_module._path_is_redirect(tmp_path / "candidate") is True
+
+
+@pytest.mark.parametrize("redirect_kind", ["directory", "target"])
+def test_start_rejects_redirected_session_lock_path(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    redirect_kind: str,
+) -> None:
+    writes: list[Path] = []
+    real_redirect_check = store_module._path_is_redirect
+
+    def lock_path_is_redirect(path: Path) -> bool:
+        if redirect_kind == "directory" and path.name == "session-locks":
+            return True
+        if (
+            redirect_kind == "target"
+            and path.parent.name == "session-locks"
+            and path.suffix == ".lock"
+        ):
+            return True
+        return real_redirect_check(path)
+
+    monkeypatch.setattr(store_module, "_path_is_redirect", lock_path_is_redirect)
+    monkeypatch.setattr(
+        store_module,
+        "_atomic_write_json",
+        lambda _document, target: writes.append(target),
+    )
+
+    with pytest.raises(KokoroError) as raised:
+        SessionStore(tmp_path).start("session-1", "rin-aster", "1.2.3", HASH)
+
+    assert raised.value.code == "SESSION_PATH_UNSAFE"
+    assert writes == []
+
+
+def test_start_sanitizes_os_lock_failure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        store_module,
+        "_acquire_os_file_lock",
+        lambda _handle: (_ for _ in ()).throw(
+            PermissionError("secret operating-system detail")
+        ),
+    )
+
+    with pytest.raises(KokoroError) as raised:
+        SessionStore(tmp_path).start("session-1", "rin-aster", "1.2.3", HASH)
+
+    assert raised.value.code == "SESSION_LOCK_FAILED"
+    assert "secret" not in str(raised.value)
+    assert raised.value.details == {}
+
+
+def test_start_has_bounded_os_lock_timeout(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(store_module, "_SESSION_LOCK_TIMEOUT_SECONDS", 0.0)
+    monkeypatch.setattr(
+        store_module,
+        "_try_acquire_os_file_lock",
+        lambda _handle: False,
+    )
+
+    with pytest.raises(KokoroError) as raised:
+        SessionStore(tmp_path).start("session-1", "rin-aster", "1.2.3", HASH)
+
+    assert raised.value.code == "SESSION_LOCK_TIMEOUT"
+    assert raised.value.retryable is True
+    assert raised.value.details == {}
 
 
 def test_load_rejects_in_root_manifest_file_symlink(tmp_path: Path) -> None:

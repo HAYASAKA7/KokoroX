@@ -2,11 +2,16 @@
 
 from __future__ import annotations
 
+import errno
 import json
+import os
 import re
 import stat
+import threading
+import time
+from contextlib import contextmanager
 from pathlib import Path
-from typing import Any
+from typing import Any, BinaryIO, Iterator
 
 from kokoroarc import __version__
 from kokoroarc.errors import KokoroError
@@ -25,6 +30,11 @@ _SEMVER = re.compile(
     r"(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?"
 )
 _COMPILED_PACK_HASH = re.compile(r"[a-f0-9]{64}")
+SESSION_MANIFEST_MAX_BYTES = 64 * 1024
+_SESSION_LOCK_TIMEOUT_SECONDS = 5.0
+_SESSION_LOCK_POLL_SECONDS = 0.01
+_THREAD_LOCKS: dict[tuple[str, str], threading.Lock] = {}
+_THREAD_LOCKS_GUARD = threading.Lock()
 _MANIFEST_KEYS = frozenset(
     {
         "schema_version",
@@ -92,6 +102,66 @@ def _strict_json_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
 
 def _reject_json_constant(_value: str) -> None:
     raise ValueError("non-finite JSON number")
+
+
+def _thread_lock_for(data_root: Path, session_id: str) -> threading.Lock:
+    key = (os.path.normcase(str(data_root)), session_id)
+    with _THREAD_LOCKS_GUARD:
+        return _THREAD_LOCKS.setdefault(key, threading.Lock())
+
+
+def _try_acquire_os_file_lock(handle: BinaryIO) -> bool:
+    handle.seek(0)
+    if os.name == "nt":
+        import msvcrt
+
+        try:
+            msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK, 1)
+        except OSError as error:
+            if error.errno in {errno.EACCES, errno.EAGAIN}:
+                return False
+            raise
+        return True
+
+    import fcntl
+
+    try:
+        fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError:
+        return False
+    return True
+
+
+def _acquire_os_file_lock(handle: BinaryIO) -> None:
+    deadline = time.monotonic() + _SESSION_LOCK_TIMEOUT_SECONDS
+    while not _try_acquire_os_file_lock(handle):
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise KokoroError(
+                "SESSION_LOCK_TIMEOUT",
+                "Session lock acquisition timed out.",
+                retryable=True,
+            )
+        time.sleep(min(_SESSION_LOCK_POLL_SECONDS, remaining))
+
+
+def _release_os_file_lock(handle: BinaryIO) -> None:
+    handle.seek(0)
+    if os.name == "nt":
+        import msvcrt
+
+        msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, 1)
+        return
+
+    import fcntl
+
+    fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+
+
+def _session_lock_failed() -> KokoroError:
+    return KokoroError(
+        "SESSION_LOCK_FAILED", "Session lock operation failed."
+    )
 
 
 def _validate_session_id(session_id: object) -> str:
@@ -181,9 +251,16 @@ class SessionStore:
             )
         return directory
 
-    def _target_path(self, area: str, session_id: str, *, create: bool) -> Path:
+    def _target_path(
+        self,
+        area: str,
+        session_id: str,
+        *,
+        create: bool,
+        suffix: str = ".json",
+    ) -> Path:
         directory = self._storage_directory(area, create=create)
-        target = directory / f"{session_id}.json"
+        target = directory / f"{session_id}{suffix}"
         if _path_is_redirect(target):
             raise KokoroError(
                 "SESSION_PATH_UNSAFE", "Session storage path is unsafe."
@@ -204,10 +281,71 @@ class SessionStore:
             )
         return target
 
+    @contextmanager
+    def _session_lock(self, session_id: str) -> Iterator[None]:
+        thread_lock = _thread_lock_for(self.data_root, session_id)
+        if not thread_lock.acquire(timeout=_SESSION_LOCK_TIMEOUT_SECONDS):
+            raise KokoroError(
+                "SESSION_LOCK_TIMEOUT",
+                "Session lock acquisition timed out.",
+                retryable=True,
+            )
+        try:
+            lock_path = self._target_path(
+                "session-locks",
+                session_id,
+                create=True,
+                suffix=".lock",
+            )
+            handle: BinaryIO | None = None
+            try:
+                handle = lock_path.open("a+b")
+                handle.seek(0, os.SEEK_END)
+                if handle.tell() == 0:
+                    handle.write(b"\0")
+                    handle.flush()
+                _acquire_os_file_lock(handle)
+            except KokoroError:
+                if handle is not None:
+                    try:
+                        handle.close()
+                    except OSError:
+                        pass
+                raise
+            except OSError as error:
+                if handle is not None:
+                    try:
+                        handle.close()
+                    except OSError:
+                        pass
+                raise _session_lock_failed() from error
+
+            assert handle is not None
+            body_failed = True
+            cleanup_error: OSError | None = None
+            try:
+                yield
+                body_failed = False
+            finally:
+                try:
+                    _release_os_file_lock(handle)
+                except OSError as error:
+                    cleanup_error = error
+                try:
+                    handle.close()
+                except OSError as error:
+                    if cleanup_error is None:
+                        cleanup_error = error
+                if cleanup_error is not None and not body_failed:
+                    raise _session_lock_failed() from cleanup_error
+        finally:
+            thread_lock.release()
+
     def _read_manifest(self, session_id: str) -> dict[str, Any]:
         target = self._target_path("sessions", session_id, create=False)
         try:
-            contents = target.read_bytes()
+            with target.open("rb") as handle:
+                contents = handle.read(SESSION_MANIFEST_MAX_BYTES + 1)
         except FileNotFoundError as error:
             raise KokoroError(
                 "SESSION_NOT_FOUND", "Session was not found."
@@ -216,18 +354,24 @@ class SessionStore:
             raise KokoroError(
                 "SESSION_READ_FAILED", "Session data could not be read."
             ) from error
+        if len(contents) > SESSION_MANIFEST_MAX_BYTES:
+            raise _invalid_session_data()
         try:
             manifest = json.loads(
                 contents.decode("utf-8"),
                 object_pairs_hook=_strict_json_object,
                 parse_constant=_reject_json_constant,
             )
-        except (UnicodeDecodeError, json.JSONDecodeError, ValueError) as error:
+            compatible = find_json_incompatibility(manifest) is None
+            valid = self._manifest_is_valid(manifest, session_id)
+        except (
+            UnicodeDecodeError,
+            json.JSONDecodeError,
+            RecursionError,
+            ValueError,
+        ) as error:
             raise _invalid_session_data() from error
-        if (
-            find_json_incompatibility(manifest) is not None
-            or not self._manifest_is_valid(manifest, session_id)
-        ):
+        if not compatible or not valid:
             raise _invalid_session_data()
         return manifest
 
@@ -279,50 +423,51 @@ class SessionStore:
         character_version = _validate_character_version(character_version)
         compiled_pack_hash = _validate_compiled_pack_hash(compiled_pack_hash)
 
-        try:
-            existing = self._read_manifest(session_id)
-        except KokoroError as error:
-            if error.code != "SESSION_NOT_FOUND":
-                raise
-        else:
-            if existing["active"]:
-                raise KokoroError(
-                    "SESSION_ALREADY_ACTIVE", "Session is already active."
-                )
+        with self._session_lock(session_id):
+            try:
+                existing = self._read_manifest(session_id)
+            except KokoroError as error:
+                if error.code != "SESSION_NOT_FOUND":
+                    raise
+            else:
+                if existing["active"]:
+                    raise KokoroError(
+                        "SESSION_ALREADY_ACTIVE", "Session is already active."
+                    )
 
-        manifest = {
-            "schema_version": "1.0",
-            "artifact_id": f"session/{session_id}",
-            "created_by": {"component": "kokoroarc", "version": __version__},
-            "session_id": session_id,
-            "character_id": character_id,
-            "character_version": character_version,
-            "compiled_pack_hash": compiled_pack_hash,
-            "scope": "session",
-            "state_revision": 0,
-            "active": True,
-        }
-        state = {
-            "schema_version": "1.0",
-            "artifact_id": f"state/{session_id}",
-            "created_by": {"component": "kokoroarc", "version": __version__},
-            "revision": 0,
-            "turn_index": 0,
-            "dimensions": {
-                "familiarity": 0.0,
-                "trust": 0.0,
-                "collaboration": 0.0,
-                "tension": 0.0,
-            },
-            "stage": "unknown",
-            "applied_event_ids": [],
-            "recent_novelty": {},
-        }
-        state_path = self._target_path("state", session_id, create=True)
-        manifest_path = self._target_path("sessions", session_id, create=True)
-        _atomic_write_json(state, state_path)
-        _atomic_write_json(manifest, manifest_path)
-        return manifest
+            manifest = {
+                "schema_version": "1.0",
+                "artifact_id": f"session/{session_id}",
+                "created_by": {"component": "kokoroarc", "version": __version__},
+                "session_id": session_id,
+                "character_id": character_id,
+                "character_version": character_version,
+                "compiled_pack_hash": compiled_pack_hash,
+                "scope": "session",
+                "state_revision": 0,
+                "active": True,
+            }
+            state = {
+                "schema_version": "1.0",
+                "artifact_id": f"state/{session_id}",
+                "created_by": {"component": "kokoroarc", "version": __version__},
+                "revision": 0,
+                "turn_index": 0,
+                "dimensions": {
+                    "familiarity": 0.0,
+                    "trust": 0.0,
+                    "collaboration": 0.0,
+                    "tension": 0.0,
+                },
+                "stage": "unknown",
+                "applied_event_ids": [],
+                "recent_novelty": {},
+            }
+            state_path = self._target_path("state", session_id, create=True)
+            manifest_path = self._target_path("sessions", session_id, create=True)
+            _atomic_write_json(state, state_path)
+            _atomic_write_json(manifest, manifest_path)
+            return manifest
 
     def load(self, session_id: str) -> dict[str, Any]:
         """Load an existing session manifest as a fresh object."""
@@ -332,12 +477,13 @@ class SessionStore:
     def end(self, session_id: str) -> dict[str, Any]:
         """End a session without altering its relationship state."""
         session_id = _validate_session_id(session_id)
-        manifest = self._read_manifest(session_id)
-        if not manifest["active"]:
-            return manifest
+        with self._session_lock(session_id):
+            manifest = self._read_manifest(session_id)
+            if not manifest["active"]:
+                return manifest
 
-        ended = dict(manifest)
-        ended["active"] = False
-        target = self._target_path("sessions", session_id, create=False)
-        _atomic_write_json(ended, target)
-        return ended
+            ended = dict(manifest)
+            ended["active"] = False
+            target = self._target_path("sessions", session_id, create=False)
+            _atomic_write_json(ended, target)
+            return ended
