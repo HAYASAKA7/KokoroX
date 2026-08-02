@@ -1,9 +1,14 @@
 from copy import deepcopy
+from pathlib import Path
 
 import pytest
 
 from kokoroarc.errors import KokoroError
+from kokoroarc.schemas import SchemaRegistry
 from kokoroarc.state.transitions import apply_event, derive_stage
+
+
+SCHEMAS = SchemaRegistry(Path(__file__).parents[2] / "schemas" / "v1")
 
 
 def state(
@@ -92,6 +97,7 @@ def test_repeated_novelty_key_does_not_grind_score() -> None:
     [
         ("trusted", 0.0, 42.0, 40.0, "trusted"),
         ("trusted", 35.0, 41.999, 35.0, "familiar"),
+        ("trusted", 0.0, 42.0, 40.001, "unknown"),
         ("trusted", 0.0, 50.0, 35.0, "trusted"),
         ("unknown", 0.0, 50.0, 35.0, "trusted"),
         ("unknown", 30.0, 50.0, 35.001, "familiar"),
@@ -251,3 +257,161 @@ def test_repetition_window_boundary(
 
     assert result["dimensions"]["trust"] == expected_trust
     assert result["recent_novelty"]["windowed-novelty"] == current_turn + 1
+
+
+def schema_state(
+    *,
+    applied_event_ids: list[str] | None = None,
+    recent_novelty: dict[str, int] | None = None,
+    turn_index: int = 0,
+) -> dict:
+    return {
+        "schema_version": "1.0",
+        "artifact_id": "state/session-1",
+        "created_by": {
+            "component": "kokoroarc",
+            "version": "0.0.0.dev0",
+        },
+        "revision": 0,
+        "turn_index": turn_index,
+        "dimensions": {
+            "familiarity": 0.0,
+            "trust": 0.0,
+            "collaboration": 0.0,
+            "tension": 0.0,
+        },
+        "stage": "unknown",
+        "applied_event_ids": applied_event_ids or [],
+        "recent_novelty": recent_novelty or {},
+    }
+
+
+def schema_event(event_id: str, novelty_key: str) -> dict:
+    return {
+        "schema_version": "1.0",
+        "artifact_id": f"event/{event_id}",
+        "created_by": {
+            "component": "kokoroarc",
+            "version": "0.0.0.dev0",
+        },
+        "event_id": event_id,
+        "turn_id": "turn-1",
+        "origin": "verified_task_outcome",
+        "novelty_key": novelty_key,
+        "expected_state_revision": 0,
+        "evaluator_version": "interaction-v1",
+        "evidence": {
+            "kind": "test_result",
+            "reference": "pytest-run-1",
+        },
+        "confidence": 1.0,
+        "effects": {"trust": 1.0},
+    }
+
+
+def test_capacity_boundary_additions_preserve_schema_validity() -> None:
+    original_state = schema_state(
+        applied_event_ids=[f"event-{index}" for index in range(9_999)],
+        recent_novelty={
+            f"novelty-{index}": 0 for index in range(9_999)
+        },
+    )
+    interaction = schema_event("event-9999", "novelty-9999")
+    SCHEMAS.validate("relationship-state", original_state)
+    SCHEMAS.validate("interaction-event", interaction)
+
+    result = apply_event(original_state, interaction, max_delta=4.0)
+
+    assert len(result["applied_event_ids"]) == 10_000
+    assert len(result["recent_novelty"]) == 10_000
+    SCHEMAS.validate("relationship-state", result)
+
+
+def test_new_event_is_rejected_at_applied_event_id_capacity() -> None:
+    original_state = schema_state(
+        applied_event_ids=[f"event-{index}" for index in range(10_000)]
+    )
+    interaction = schema_event("event-overflow", "new-novelty")
+    state_before = deepcopy(original_state)
+    event_before = deepcopy(interaction)
+    SCHEMAS.validate("relationship-state", original_state)
+    SCHEMAS.validate("interaction-event", interaction)
+
+    with pytest.raises(KokoroError) as raised:
+        apply_event(original_state, interaction, max_delta=4.0)
+
+    assert raised.value.code == "STATE_CAPACITY_EXCEEDED"
+    assert raised.value.retryable is False
+    assert raised.value.details == {
+        "field": "applied_event_ids",
+        "limit": 10_000,
+    }
+    assert original_state == state_before
+    assert interaction == event_before
+
+
+def test_duplicate_event_at_capacity_remains_idempotent() -> None:
+    original_state = schema_state(
+        applied_event_ids=[f"event-{index}" for index in range(10_000)],
+        recent_novelty={
+            f"novelty-{index}": 0 for index in range(10_000)
+        },
+    )
+    interaction = schema_event("event-9999", "brand-new-novelty")
+    SCHEMAS.validate("relationship-state", original_state)
+    SCHEMAS.validate("interaction-event", interaction)
+
+    result = apply_event(original_state, interaction, max_delta=4.0)
+
+    assert result == original_state
+    assert result is not original_state
+    SCHEMAS.validate("relationship-state", result)
+
+
+def test_new_novelty_key_is_rejected_at_novelty_capacity() -> None:
+    original_state = schema_state(
+        recent_novelty={
+            f"novelty-{index}": 0 for index in range(10_000)
+        }
+    )
+    interaction = schema_event("new-event", "brand-new-novelty")
+    state_before = deepcopy(original_state)
+    event_before = deepcopy(interaction)
+    SCHEMAS.validate("relationship-state", original_state)
+    SCHEMAS.validate("interaction-event", interaction)
+
+    with pytest.raises(KokoroError) as raised:
+        apply_event(original_state, interaction, max_delta=4.0)
+
+    assert raised.value.code == "STATE_CAPACITY_EXCEEDED"
+    assert raised.value.retryable is False
+    assert raised.value.details == {
+        "field": "recent_novelty",
+        "limit": 10_000,
+    }
+    assert original_state == state_before
+    assert interaction == event_before
+
+
+def test_existing_novelty_key_can_refresh_at_novelty_capacity() -> None:
+    original_state = schema_state(
+        recent_novelty={
+            f"novelty-{index}": 0 for index in range(10_000)
+        },
+        turn_index=3,
+    )
+    interaction = schema_event("new-event", "novelty-9999")
+    SCHEMAS.validate("relationship-state", original_state)
+    SCHEMAS.validate("interaction-event", interaction)
+
+    result = apply_event(
+        original_state,
+        interaction,
+        max_delta=4.0,
+        repetition_window=3,
+    )
+
+    assert len(result["recent_novelty"]) == 10_000
+    assert result["recent_novelty"]["novelty-9999"] == 4
+    assert result["dimensions"]["trust"] == 1.0
+    SCHEMAS.validate("relationship-state", result)

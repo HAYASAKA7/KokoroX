@@ -7,6 +7,18 @@ import copy
 from kokoroarc.errors import KokoroError
 
 
+MAX_APPLIED_EVENT_IDS = 10_000
+MAX_RECENT_NOVELTY_KEYS = 10_000
+
+
+def _capacity_exceeded(field: str, limit: int) -> KokoroError:
+    return KokoroError(
+        "STATE_CAPACITY_EXCEEDED",
+        "Relationship state capacity was exceeded.",
+        details={"field": field, "limit": limit},
+    )
+
+
 def apply_event(
     state: dict,
     event: dict,
@@ -19,8 +31,22 @@ def apply_event(
     if event_id in result["applied_event_ids"]:
         return result
 
-    confidence = min(max(float(event["confidence"]), 0.0), 1.0)
     novelty_key = event["novelty_key"]
+    if len(result["applied_event_ids"]) >= MAX_APPLIED_EVENT_IDS:
+        raise _capacity_exceeded(
+            "applied_event_ids",
+            MAX_APPLIED_EVENT_IDS,
+        )
+    if (
+        novelty_key not in result["recent_novelty"]
+        and len(result["recent_novelty"]) >= MAX_RECENT_NOVELTY_KEYS
+    ):
+        raise _capacity_exceeded(
+            "recent_novelty",
+            MAX_RECENT_NOVELTY_KEYS,
+        )
+
+    confidence = min(max(float(event["confidence"]), 0.0), 1.0)
     last_seen = result["recent_novelty"].get(novelty_key)
     repeated = (
         last_seen is not None
