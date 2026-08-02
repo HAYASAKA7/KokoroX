@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path, PurePosixPath, PureWindowsPath
+import re
 from typing import Any, cast
 
 import yaml
@@ -12,6 +13,31 @@ from kokoroarc.schemas import SchemaRegistry
 
 
 _REFERENCE_SECTIONS = ("files", "locale_files", "scenario_files")
+_REQUIRED_COMPONENTS = frozenset(
+    {
+        "identity",
+        "evidence",
+        "derived_profile",
+        "overrides",
+        "behavior",
+        "growth",
+        "expressions",
+    }
+)
+_REQUIRED_LOCALES = frozenset({"zh-CN", "en-US", "ja-JP"})
+_SCENARIO_NAME_PATTERN = re.compile(r"[a-z][a-z0-9]*(?:_[a-z0-9]+)*")
+_WINDOWS_RESERVED_NAMES = frozenset(
+    {
+        "con",
+        "prn",
+        "aux",
+        "nul",
+        "conin$",
+        "conout$",
+        *(f"com{digit}" for digit in "123456789¹²³"),
+        *(f"lpt{digit}" for digit in "123456789¹²³"),
+    }
+)
 
 
 class _UniqueKeySafeLoader(yaml.SafeLoader):
@@ -21,9 +47,12 @@ class _UniqueKeySafeLoader(yaml.SafeLoader):
 def _construct_unique_mapping(
     loader: _UniqueKeySafeLoader, node: yaml.MappingNode, deep: bool = False
 ) -> dict[Any, Any]:
-    loader.flatten_mapping(node)
     mapping: dict[Any, Any] = {}
     for key_node, value_node in node.value:
+        if key_node.tag == "tag:yaml.org,2002:merge":
+            raise ConstructorError(
+                None, None, "mapping merge keys are disabled", key_node.start_mark
+            )
         key = loader.construct_object(key_node, deep=deep)
         try:
             duplicate = key in mapping
@@ -53,10 +82,12 @@ def resolve_pack_file(root: Path, relative: str) -> Path:
     windows_path = PureWindowsPath(relative)
     if (
         "\\" in relative
+        or ":" in relative
         or posix_path.is_absolute()
         or windows_path.drive
         or windows_path.root
         or ".." in posix_path.parts
+        or any(_is_unsafe_windows_component(part) for part in posix_path.parts)
         or not relative.endswith((".yaml", ".yml"))
     ):
         raise _unsafe_pack_path("reference is not a pack-relative YAML path")
@@ -71,6 +102,13 @@ def resolve_pack_file(root: Path, relative: str) -> Path:
     return resolved
 
 
+def _is_unsafe_windows_component(component: str) -> bool:
+    if component.endswith((" ", ".")):
+        return True
+    device_name = component.split(".", 1)[0].rstrip(" ").casefold()
+    return device_name in _WINDOWS_RESERVED_NAMES
+
+
 def load_yaml(path: Path) -> dict[str, Any]:
     try:
         contents = path.read_text(encoding="utf-8")
@@ -81,6 +119,7 @@ def load_yaml(path: Path) -> dict[str, Any]:
 
     loader: _UniqueKeySafeLoader | None = None
     try:
+        _reject_alias_events(contents)
         loader = _UniqueKeySafeLoader(contents)
         document = loader.get_single_data()
     except (RecursionError, yaml.YAMLError) as error:
@@ -96,9 +135,33 @@ def load_yaml(path: Path) -> dict[str, Any]:
     return cast(dict[str, Any], document)
 
 
+def _reject_alias_events(contents: str) -> None:
+    events = yaml.parse(contents, Loader=yaml.SafeLoader)
+    try:
+        for event in events:
+            if isinstance(event, yaml.events.AliasEvent):
+                raise ConstructorError(
+                    None, None, "YAML aliases are disabled", event.start_mark
+                )
+    finally:
+        events.close()
+
+
 def load_source_pack(root: Path, schemas: SchemaRegistry) -> dict[str, Any]:
-    scan_pack(root, PackLimits())
-    manifest = load_yaml(resolve_pack_file(root, "character.yaml"))
+    scanned_files = frozenset(scan_pack(root, PackLimits()))
+    cache: dict[Path, dict[str, Any]] = {}
+
+    def load_reference(relative: str) -> dict[str, Any]:
+        path = resolve_pack_file(root, relative)
+        if path not in scanned_files:
+            raise _invalid_pack_data(
+                "Character pack reference was not found.", "unscanned_reference"
+            )
+        if path not in cache:
+            cache[path] = load_yaml(path)
+        return cache[path]
+
+    manifest = load_reference("character.yaml")
     if any(not isinstance(key, str) for key in manifest):
         raise _invalid_pack_data(
             "Character pack manifest is invalid.", "invalid_manifest_key"
@@ -108,19 +171,20 @@ def load_source_pack(root: Path, schemas: SchemaRegistry) -> dict[str, Any]:
         section: _manifest_reference_items(manifest, section)
         for section in _REFERENCE_SECTIONS
     }
+    _validate_reference_names(references)
     assembled = {
         key: manifest[key]
         for key in sorted(manifest)
         if key not in _REFERENCE_SECTIONS
     }
     for component, relative in references["files"]:
-        assembled[component] = load_yaml(resolve_pack_file(root, relative))
+        assembled[component] = load_reference(relative)
     assembled["locales"] = {
-        locale: load_yaml(resolve_pack_file(root, relative))
+        locale: load_reference(relative)
         for locale, relative in references["locale_files"]
     }
     assembled["scenarios"] = {
-        scenario: load_yaml(resolve_pack_file(root, relative))
+        scenario: load_reference(relative)
         for scenario, relative in references["scenario_files"]
     }
     schemas.validate("character-source", assembled)
@@ -144,6 +208,33 @@ def _manifest_reference_items(
             "Character pack manifest is invalid.", "invalid_reference_value"
         )
     return sorted(references.items())
+
+
+def _validate_reference_names(
+    references: dict[str, list[tuple[str, str]]],
+) -> None:
+    component_names = {name for name, _relative in references["files"]}
+    locale_names = {name for name, _relative in references["locale_files"]}
+    scenario_names = {name for name, _relative in references["scenario_files"]}
+    if component_names != _REQUIRED_COMPONENTS:
+        raise _invalid_pack_data(
+            "Character pack manifest is invalid.", "invalid_component_names"
+        )
+    if locale_names != _REQUIRED_LOCALES:
+        raise _invalid_pack_data(
+            "Character pack manifest is invalid.", "invalid_locale_names"
+        )
+    if (
+        not 1 <= len(scenario_names) <= 128
+        or any(len(name) > 128 for name in scenario_names)
+        or any(
+            _SCENARIO_NAME_PATTERN.fullmatch(name) is None
+            for name in scenario_names
+        )
+    ):
+        raise _invalid_pack_data(
+            "Character pack manifest is invalid.", "invalid_scenario_names"
+        )
 
 
 def _unsafe_pack_path(reason: str) -> KokoroError:

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 import shutil
+from types import SimpleNamespace
 
 import pytest
 
@@ -38,6 +39,42 @@ def assert_unsafe_reference(root: Path, reference: object) -> None:
 )
 def test_resolve_pack_file_rejects_unsafe_references(
     tmp_path: Path, reference: object
+) -> None:
+    assert_unsafe_reference(tmp_path, reference)
+
+
+@pytest.mark.parametrize(
+    "reference",
+    [
+        "host.txt:payload.yaml",
+        "nested/host:payload.yml",
+        "dir./payload.yaml",
+        "dir /payload.yaml",
+    ],
+)
+def test_resolve_pack_file_rejects_windows_namespace_ambiguities(
+    tmp_path: Path, reference: str
+) -> None:
+    assert_unsafe_reference(tmp_path, reference)
+
+
+@pytest.mark.parametrize(
+    "reference",
+    [
+        "CON.yaml",
+        "nested/nUl.yaml",
+        "AUX.profile.yml",
+        "nested/PrN.yaml",
+        "COM1.yaml",
+        "nested/lPt9.backup.yml",
+        "CONIN$.yaml",
+        "nested/conout$.yml",
+        "COM¹.yaml",
+        "nested/lpt³.yml",
+    ],
+)
+def test_resolve_pack_file_rejects_windows_reserved_device_names(
+    tmp_path: Path, reference: str
 ) -> None:
     assert_unsafe_reference(tmp_path, reference)
 
@@ -138,3 +175,24 @@ def test_load_source_pack_schema_rejects_unknown_data_fields(
         load_source_pack(pack, SchemaRegistry(repository_root / "schemas" / "v1"))
 
     assert raised.value.code == "SCHEMA_VALIDATION_FAILED"
+
+
+def test_load_source_pack_rejects_alias_data_before_schema_validation(
+    tmp_path: Path,
+) -> None:
+    repository_root = Path(__file__).resolve().parents[2]
+    pack = tmp_path / "pack"
+    shutil.copytree(
+        repository_root / "characters" / "original" / "rin-aster", pack
+    )
+    (pack / "identity.yaml").write_text(
+        "cycle: &cycle [*cycle]\n", encoding="utf-8"
+    )
+    validations: list[object] = []
+    schemas = SimpleNamespace(validate=lambda *_args: validations.append(_args))
+
+    with pytest.raises(KokoroError) as raised:
+        load_source_pack(pack, schemas)  # type: ignore[arg-type]
+
+    assert raised.value.code == "INVALID_PACK_DATA"
+    assert validations == []
