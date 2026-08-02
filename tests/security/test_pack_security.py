@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 import os
+import stat
 from dataclasses import replace
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
 from kokoroarc.errors import KokoroError
+from kokoroarc.packs import security as pack_security
 from kokoroarc.packs.security import PackLimits, scan_pack
 
 
@@ -14,6 +17,10 @@ def assert_error_code(root: Path, limits: PackLimits, code: str) -> None:
     with pytest.raises(KokoroError) as raised:
         scan_pack(root, limits)
     assert raised.value.code == code
+
+
+def test_pack_limits_default_entry_budget() -> None:
+    assert PackLimits().max_entries == 512
 
 
 def test_scan_rejects_symlink(tmp_path: Path) -> None:
@@ -99,6 +106,96 @@ def test_file_count_limit_boundary(tmp_path: Path) -> None:
 
     (tmp_path / "b.yaml").write_text("b", encoding="utf-8")
     assert_error_code(tmp_path, PackLimits(max_files=1), "PACK_LIMIT_EXCEEDED")
+
+
+@pytest.mark.parametrize("entry_kind", ["file", "directory"])
+def test_zero_entry_limit_allows_only_empty_root(
+    tmp_path: Path, entry_kind: str
+) -> None:
+    assert scan_pack(tmp_path, PackLimits(max_entries=0)) == []
+
+    child = tmp_path / "child"
+    if entry_kind == "file":
+        child.write_bytes(b"")
+    else:
+        child.mkdir()
+    assert_error_code(tmp_path, PackLimits(max_entries=0), "PACK_LIMIT_EXCEEDED")
+
+
+def test_total_entry_limit_boundary_counts_files_and_directories(tmp_path: Path) -> None:
+    directory = tmp_path / "directory"
+    directory.mkdir()
+    nested_file = directory / "nested.yaml"
+    nested_file.write_bytes(b"")
+    root_file = tmp_path / "root.yaml"
+    root_file.write_bytes(b"")
+
+    assert scan_pack(tmp_path, PackLimits(max_entries=3)) == [
+        nested_file.resolve(),
+        root_file.resolve(),
+    ]
+
+    (tmp_path / "extra-directory").mkdir()
+    assert_error_code(tmp_path, PackLimits(max_entries=3), "PACK_LIMIT_EXCEEDED")
+
+
+def test_total_entry_limit_rejects_wide_directory(tmp_path: Path) -> None:
+    for index in range(6):
+        (tmp_path / f"directory-{index}").mkdir()
+
+    assert_error_code(tmp_path, PackLimits(max_entries=5), "PACK_LIMIT_EXCEEDED")
+
+
+def test_total_entry_limit_bounds_empty_directory_tree(tmp_path: Path) -> None:
+    for index in range(3):
+        parent = tmp_path / f"branch-{index}"
+        parent.mkdir()
+        (parent / "empty-child").mkdir()
+
+    limits = PackLimits(
+        max_entries=5,
+        max_files=0,
+        max_file_bytes=0,
+        max_total_bytes=0,
+    )
+    assert_error_code(tmp_path, limits, "PACK_LIMIT_EXCEEDED")
+
+
+def test_entry_limit_stops_scandir_after_first_overflow(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    class CountingScandir:
+        def __init__(self) -> None:
+            self.entries = [
+                SimpleNamespace(name=f"entry-{index}") for index in range(10)
+            ]
+            self.index = 0
+            self.next_calls = 0
+            self.exited = False
+
+        def __enter__(self) -> CountingScandir:
+            return self
+
+        def __exit__(self, *_args: object) -> None:
+            self.exited = True
+
+        def __iter__(self) -> CountingScandir:
+            return self
+
+        def __next__(self) -> SimpleNamespace:
+            if self.index == len(self.entries):
+                raise StopIteration
+            entry = self.entries[self.index]
+            self.index += 1
+            self.next_calls += 1
+            return entry
+
+    iterator = CountingScandir()
+    monkeypatch.setattr(os, "scandir", lambda _path: iterator)
+
+    assert_error_code(tmp_path, PackLimits(max_entries=2), "PACK_LIMIT_EXCEEDED")
+    assert iterator.next_calls == 3
+    assert iterator.exited is True
 
 
 def test_total_size_limit_boundary(tmp_path: Path) -> None:
@@ -187,6 +284,65 @@ def test_scan_rejects_symlinked_directory_without_traversing_it(tmp_path: Path) 
     assert_error_code(tmp_path, PackLimits(), "UNSAFE_PACK_PATH")
 
 
+def test_scan_rejects_root_reported_as_junction(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(pack_security, "_path_is_junction", lambda _path: True)
+    assert_error_code(tmp_path, PackLimits(), "UNSAFE_PACK_PATH")
+
+
+def test_scan_rejects_entry_reported_as_junction(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    (tmp_path / "entry.yaml").write_bytes(b"")
+    calls = 0
+
+    def report_second_path_as_junction(_path: Path) -> bool:
+        nonlocal calls
+        calls += 1
+        return calls == 2
+
+    monkeypatch.setattr(pack_security, "_path_is_junction", report_second_path_as_junction)
+    assert_error_code(tmp_path, PackLimits(), "UNSAFE_PACK_PATH")
+
+
+def test_junction_detection_failure_is_wrapped(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def deny_junction_check(_path: Path) -> bool:
+        raise OSError("sensitive operating system detail")
+
+    monkeypatch.setattr(Path, "is_junction", deny_junction_check, raising=False)
+
+    with pytest.raises(KokoroError) as raised:
+        scan_pack(tmp_path, PackLimits())
+    assert raised.value.code == "PACK_SCAN_FAILED"
+    assert raised.value.details == {"path": str(tmp_path), "reason": "OSError"}
+    assert "sensitive operating system detail" not in raised.value.message
+    assert "sensitive operating system detail" not in repr(raised.value.details)
+
+
+def test_scan_rejects_entry_with_windows_reparse_attribute(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    (tmp_path / "entry.yaml").write_bytes(b"")
+    reparse_flag = 0x400
+    fake_stat = SimpleNamespace(
+        st_mode=stat.S_IFREG,
+        st_size=0,
+        st_file_attributes=reparse_flag,
+    )
+    monkeypatch.setattr(
+        pack_security.stat,
+        "FILE_ATTRIBUTE_REPARSE_POINT",
+        reparse_flag,
+        raising=False,
+    )
+    monkeypatch.setattr(pack_security, "_entry_stat", lambda _entry, _path: fake_stat)
+
+    assert_error_code(tmp_path, PackLimits(), "UNSAFE_PACK_PATH")
+
+
 def test_scan_rejects_windows_junction(tmp_path: Path) -> None:
     if os.name != "nt":
         pytest.skip("Windows junctions are unavailable on this platform")
@@ -202,10 +358,12 @@ def test_scan_rejects_windows_junction(tmp_path: Path) -> None:
         ("max_file_bytes", -1),
         ("max_total_bytes", -1),
         ("max_depth", -1),
+        ("max_entries", -1),
         ("max_files", True),
         ("max_file_bytes", False),
         ("max_total_bytes", 1.5),
         ("max_depth", "1"),
+        ("max_entries", True),
     ],
 )
 def test_scan_rejects_invalid_limits(
@@ -225,3 +383,27 @@ def test_scan_rejects_unsupported_filesystem_entry(tmp_path: Path) -> None:
         pytest.skip(f"The platform cannot create a FIFO fixture: {exc}")
 
     assert_error_code(tmp_path, PackLimits(), "UNSAFE_PACK_PATH")
+
+
+@pytest.mark.parametrize("error_type", [PermissionError, OSError])
+def test_scan_wraps_scandir_filesystem_failure(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    error_type: type[OSError],
+) -> None:
+    resolved_root = tmp_path.resolve()
+
+    def deny_scan(_path: Path) -> None:
+        raise error_type("sensitive operating system detail")
+
+    monkeypatch.setattr(os, "scandir", deny_scan)
+
+    with pytest.raises(KokoroError) as raised:
+        scan_pack(tmp_path, PackLimits())
+    assert raised.value.code == "PACK_SCAN_FAILED"
+    assert raised.value.details == {
+        "path": str(resolved_root),
+        "reason": error_type.__name__,
+    }
+    assert "sensitive operating system detail" not in raised.value.message
+    assert "sensitive operating system detail" not in repr(raised.value.details)

@@ -14,6 +14,7 @@ class PackLimits:
     max_file_bytes: int = 256_000
     max_total_bytes: int = 2_000_000
     max_depth: int = 6
+    max_entries: int = 512
 
 
 def scan_pack(root: Path, limits: PackLimits) -> list[Path]:
@@ -24,11 +25,15 @@ def scan_pack(root: Path, limits: PackLimits) -> list[Path]:
     files: list[Path] = []
     file_count = 0
     total_bytes = 0
+    entry_count = 0
     directories = [resolved_root]
 
     while directories:
         directory = directories.pop()
-        entries = _read_directory(directory)
+        entries, observed_entries = _read_directory(
+            directory, limits.max_entries - entry_count
+        )
+        entry_count += observed_entries
         child_directories: list[Path] = []
 
         for entry in entries:
@@ -80,6 +85,7 @@ def _validate_limits(limits: PackLimits) -> None:
         "max_file_bytes",
         "max_total_bytes",
         "max_depth",
+        "max_entries",
     ):
         value = getattr(limits, field_name)
         if isinstance(value, bool) or not isinstance(value, int) or value < 0:
@@ -115,12 +121,21 @@ def _validate_root(root: Path) -> Path:
         raise _scan_failed(root, exc) from exc
 
 
-def _read_directory(directory: Path) -> list[os.DirEntry[str]]:
+def _read_directory(
+    directory: Path, remaining_entries: int
+) -> tuple[list[os.DirEntry[str]], int]:
+    entries: list[os.DirEntry[str]] = []
+    observed_entries = 0
     try:
         with os.scandir(directory) as iterator:
-            return sorted(iterator, key=lambda entry: entry.name)
+            for entry in iterator:
+                observed_entries += 1
+                if observed_entries > remaining_entries:
+                    raise _limit_exceeded("max_entries")
+                entries.append(entry)
     except OSError as exc:
         raise _scan_failed(directory, exc) from exc
+    return sorted(entries, key=lambda entry: entry.name), observed_entries
 
 
 def _entry_is_symlink(entry: os.DirEntry[str]) -> bool:
