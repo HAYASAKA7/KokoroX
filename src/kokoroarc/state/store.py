@@ -10,6 +10,7 @@ from typing import Any
 
 from kokoroarc import __version__
 from kokoroarc.errors import KokoroError
+from kokoroarc.json_compat import find_json_incompatibility
 from kokoroarc.packs.compiler import write_compiled_pack
 
 
@@ -19,10 +20,25 @@ _SEMVER = re.compile(
     r"(0|[1-9][0-9]*)\."
     r"(0|[1-9][0-9]*)\."
     r"(0|[1-9][0-9]*)"
-    r"(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?"
+    r"(?:-(?:0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*)"
+    r"(?:\.(?:0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*))*)?"
     r"(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?"
 )
 _COMPILED_PACK_HASH = re.compile(r"[a-f0-9]{64}")
+_MANIFEST_KEYS = frozenset(
+    {
+        "schema_version",
+        "artifact_id",
+        "created_by",
+        "session_id",
+        "character_id",
+        "character_version",
+        "compiled_pack_hash",
+        "scope",
+        "state_revision",
+        "active",
+    }
+)
 _WINDOWS_DEVICE_NAMES = frozenset(
     {"con", "prn", "aux", "nul"}
     | {f"com{number}" for number in range(1, 10)}
@@ -59,6 +75,23 @@ def _path_is_redirect(path: Path) -> bool:
 
 def _invalid(code: str, message: str) -> KokoroError:
     return KokoroError(code, message)
+
+
+def _invalid_session_data() -> KokoroError:
+    return KokoroError("SESSION_DATA_INVALID", "Session data is invalid.")
+
+
+def _strict_json_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    value: dict[str, Any] = {}
+    for key, item in pairs:
+        if key in value:
+            raise ValueError("duplicate JSON object key")
+        value[key] = item
+    return value
+
+
+def _reject_json_constant(_value: str) -> None:
+    raise ValueError("non-finite JSON number")
 
 
 def _validate_session_id(session_id: object) -> str:
@@ -151,6 +184,10 @@ class SessionStore:
     def _target_path(self, area: str, session_id: str, *, create: bool) -> Path:
         directory = self._storage_directory(area, create=create)
         target = directory / f"{session_id}.json"
+        if _path_is_redirect(target):
+            raise KokoroError(
+                "SESSION_PATH_UNSAFE", "Session storage path is unsafe."
+            )
         try:
             resolved = target.resolve(strict=False)
         except OSError as error:
@@ -158,6 +195,10 @@ class SessionStore:
                 "SESSION_PATH_UNSAFE", "Session storage path is unsafe."
             ) from error
         if not resolved.is_relative_to(self.data_root):
+            raise KokoroError(
+                "SESSION_PATH_UNSAFE", "Session storage path is unsafe."
+            )
+        if _path_is_redirect(target):
             raise KokoroError(
                 "SESSION_PATH_UNSAFE", "Session storage path is unsafe."
             )
@@ -176,18 +217,55 @@ class SessionStore:
                 "SESSION_READ_FAILED", "Session data could not be read."
             ) from error
         try:
-            manifest = json.loads(contents.decode("utf-8"))
-        except (UnicodeDecodeError, json.JSONDecodeError) as error:
-            raise KokoroError(
-                "SESSION_DATA_INVALID", "Session data is invalid."
-            ) from error
-        if not isinstance(manifest, dict) or not isinstance(
-            manifest.get("active"), bool
-        ):
-            raise KokoroError(
-                "SESSION_DATA_INVALID", "Session data is invalid."
+            manifest = json.loads(
+                contents.decode("utf-8"),
+                object_pairs_hook=_strict_json_object,
+                parse_constant=_reject_json_constant,
             )
+        except (UnicodeDecodeError, json.JSONDecodeError, ValueError) as error:
+            raise _invalid_session_data() from error
+        if (
+            find_json_incompatibility(manifest) is not None
+            or not self._manifest_is_valid(manifest, session_id)
+        ):
+            raise _invalid_session_data()
         return manifest
+
+    @staticmethod
+    def _manifest_is_valid(manifest: Any, session_id: str) -> bool:
+        if not isinstance(manifest, dict) or set(manifest) != _MANIFEST_KEYS:
+            return False
+        created_by = manifest["created_by"]
+        if not isinstance(created_by, dict) or set(created_by) != {
+            "component",
+            "version",
+        }:
+            return False
+        creator_version = created_by["version"]
+        state_revision = manifest["state_revision"]
+        return (
+            manifest["schema_version"] == "1.0"
+            and manifest["artifact_id"] == f"session/{session_id}"
+            and created_by["component"] == "kokoroarc"
+            and isinstance(creator_version, str)
+            and 1 <= len(creator_version) <= 64
+            and manifest["session_id"] == session_id
+            and _SESSION_ID.fullmatch(session_id) is not None
+            and isinstance(manifest["character_id"], str)
+            and len(manifest["character_id"]) <= 64
+            and _CHARACTER_ID.fullmatch(manifest["character_id"]) is not None
+            and isinstance(manifest["character_version"], str)
+            and 1 <= len(manifest["character_version"]) <= 64
+            and _SEMVER.fullmatch(manifest["character_version"]) is not None
+            and isinstance(manifest["compiled_pack_hash"], str)
+            and _COMPILED_PACK_HASH.fullmatch(manifest["compiled_pack_hash"])
+            is not None
+            and manifest["scope"] == "session"
+            and isinstance(state_revision, int)
+            and not isinstance(state_revision, bool)
+            and state_revision >= 0
+            and isinstance(manifest["active"], bool)
+        )
 
     def start(
         self,

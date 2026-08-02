@@ -183,6 +183,105 @@ def test_load_sanitizes_malformed_manifest_data(
     assert raised.value.details == {}
 
 
+@pytest.mark.parametrize(
+    "mutation",
+    [
+        lambda document: document.pop("active"),
+        lambda document: document.update({"unknown": True}),
+        lambda document: document.update({"schema_version": "2.0"}),
+        lambda document: document.update({"artifact_id": "session/other"}),
+        lambda document: document.update({"created_by": []}),
+        lambda document: document["created_by"].update({"unknown": True}),
+        lambda document: document["created_by"].update({"component": "other"}),
+        lambda document: document["created_by"].update({"version": ""}),
+        lambda document: document["created_by"].update({"version": "v" * 65}),
+        lambda document: document.update({"session_id": "other"}),
+        lambda document: document.update({"character_id": "Invalid"}),
+        lambda document: document.update({"character_version": "1.2.3-01"}),
+        lambda document: document.update({"compiled_pack_hash": "A" * 64}),
+        lambda document: document.update({"scope": "global"}),
+        lambda document: document.update({"state_revision": True}),
+        lambda document: document.update({"state_revision": -1}),
+        lambda document: document.update({"active": 1}),
+    ],
+    ids=[
+        "missing-field",
+        "unknown-field",
+        "schema-version",
+        "artifact-binding",
+        "created-by-object",
+        "created-by-extra",
+        "created-by-component",
+        "created-by-empty-version",
+        "created-by-long-version",
+        "session-binding",
+        "character-id",
+        "character-version",
+        "compiled-pack-hash",
+        "scope",
+        "boolean-state-revision",
+        "negative-state-revision",
+        "non-boolean-active",
+    ],
+)
+def test_load_rejects_corrupt_parseable_manifest(
+    tmp_path: Path, mutation
+) -> None:
+    manifest_path = tmp_path / "sessions" / "session-1.json"
+    manifest_path.parent.mkdir(parents=True)
+    document = expected_manifest()
+    mutation(document)
+    manifest_path.write_bytes(canonical_file(document))
+
+    with pytest.raises(KokoroError) as raised:
+        SessionStore(tmp_path).load("session-1")
+
+    assert raised.value.code == "SESSION_DATA_INVALID"
+    assert raised.value.details == {}
+
+
+def test_load_accepts_manifest_created_by_an_older_runtime(tmp_path: Path) -> None:
+    manifest_path = tmp_path / "sessions" / "session-1.json"
+    manifest_path.parent.mkdir(parents=True)
+    document = expected_manifest()
+    document["created_by"]["version"] = "0.0.0-older"
+    manifest_path.write_bytes(canonical_file(document))
+
+    assert SessionStore(tmp_path).load("session-1") == document
+
+
+@pytest.mark.parametrize(
+    "contents",
+    [
+        canonical_file(expected_manifest()).replace(
+            b'"active":true', b'"active":true,"active":false'
+        ),
+        canonical_file(expected_manifest()).replace(
+            b'"state_revision":0', b'"state_revision":NaN'
+        ),
+        canonical_file(expected_manifest()).replace(
+            b'"state_revision":0', b'"state_revision":Infinity'
+        ),
+        canonical_file(expected_manifest()).replace(
+            b'"version":"0.0.0.dev0"', b'"version":"\\ud800"'
+        ),
+    ],
+    ids=["duplicate-key", "nan", "infinity", "unpaired-surrogate"],
+)
+def test_load_rejects_non_strict_json_manifest(
+    tmp_path: Path, contents: bytes
+) -> None:
+    manifest_path = tmp_path / "sessions" / "session-1.json"
+    manifest_path.parent.mkdir(parents=True)
+    manifest_path.write_bytes(contents)
+
+    with pytest.raises(KokoroError) as raised:
+        SessionStore(tmp_path).load("session-1")
+
+    assert raised.value.code == "SESSION_DATA_INVALID"
+    assert raised.value.details == {}
+
+
 def test_load_sanitizes_manifest_read_failure(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -258,6 +357,12 @@ def test_start_rejects_unsafe_session_ids_before_writes(
         ("character_version", True, "INVALID_CHARACTER_VERSION"),
         ("character_version", "1.2", "INVALID_CHARACTER_VERSION"),
         ("character_version", "01.2.3", "INVALID_CHARACTER_VERSION"),
+        ("character_version", "1.2.3-01", "INVALID_CHARACTER_VERSION"),
+        ("character_version", "1.2.3-alpha.01", "INVALID_CHARACTER_VERSION"),
+        ("character_version", "1.2.3-", "INVALID_CHARACTER_VERSION"),
+        ("character_version", "1.2.3-alpha.", "INVALID_CHARACTER_VERSION"),
+        ("character_version", "1.2.3+", "INVALID_CHARACTER_VERSION"),
+        ("character_version", "1.2.3+build.", "INVALID_CHARACTER_VERSION"),
         ("compiled_pack_hash", True, "INVALID_COMPILED_PACK_HASH"),
         ("compiled_pack_hash", "A" * 64, "INVALID_COMPILED_PACK_HASH"),
         ("compiled_pack_hash", "a" * 63, "INVALID_COMPILED_PACK_HASH"),
@@ -291,6 +396,20 @@ def test_start_rejects_invalid_inputs_before_writes(
     assert writes == []
     assert not tmp_path.joinpath("sessions").exists()
     assert not tmp_path.joinpath("state").exists()
+
+
+@pytest.mark.parametrize(
+    "version",
+    ["1.2.3-0", "1.2.3-alpha.0", "1.2.3-01a", "1.2.3+01"],
+)
+def test_start_accepts_strict_semver_representatives(
+    tmp_path: Path, version: str
+) -> None:
+    manifest = SessionStore(tmp_path).start(
+        "session-1", "rin-aster", version, HASH
+    )
+
+    assert manifest["character_version"] == version
 
 
 def test_start_accepts_all_input_boundaries(tmp_path: Path) -> None:
@@ -342,6 +461,51 @@ def test_start_rejects_directory_reported_as_redirect(
         SessionStore(tmp_path).start("session-1", "rin-aster", "1.2.3", HASH)
 
     assert raised.value.code == "SESSION_PATH_UNSAFE"
+
+
+def test_load_rejects_in_root_manifest_file_symlink(tmp_path: Path) -> None:
+    store = SessionStore(tmp_path)
+    store.start("session-1", "rin-aster", "1.2.3", HASH)
+    sessions = tmp_path / "sessions"
+    target = sessions / "other.json"
+    target.write_bytes(canonical_file(expected_manifest()))
+    redirect = sessions / "session-1.json"
+    redirect.unlink()
+    try:
+        redirect.symlink_to(target)
+    except OSError:
+        pytest.skip("The current account cannot create file symlinks")
+
+    with pytest.raises(KokoroError) as raised:
+        store.load("session-1")
+
+    assert raised.value.code == "SESSION_PATH_UNSAFE"
+
+
+@pytest.mark.parametrize("area", ["sessions", "state"])
+def test_start_rejects_final_target_reported_as_redirect(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, area: str
+) -> None:
+    writes: list[Path] = []
+    real_redirect_check = store_module._path_is_redirect
+
+    def target_is_redirect(path: Path) -> bool:
+        if path.name == "session-1.json" and path.parent.name == area:
+            return True
+        return real_redirect_check(path)
+
+    monkeypatch.setattr(store_module, "_path_is_redirect", target_is_redirect)
+    monkeypatch.setattr(
+        store_module,
+        "_atomic_write_json",
+        lambda _document, target: writes.append(target),
+    )
+
+    with pytest.raises(KokoroError) as raised:
+        SessionStore(tmp_path).start("session-1", "rin-aster", "1.2.3", HASH)
+
+    assert raised.value.code == "SESSION_PATH_UNSAFE"
+    assert writes == []
 
 
 def test_atomic_write_failure_preserves_existing_file_and_cleans_staging(

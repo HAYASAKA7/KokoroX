@@ -921,3 +921,53 @@ def test_session_artifact_schemas_reject_generated_maximum_plus_one(
         SchemaRegistry(Path("schemas/v1")).validate(schema_name, document)
 
     assert raised.value.code == "SCHEMA_VALIDATION_FAILED"
+
+
+def character_version_document(schema_name: str) -> dict:
+    if schema_name == "character-source":
+        return load_fixture("valid-character-source.json")
+    if schema_name == "compiled-pack":
+        return valid_compiled_pack()
+    return deepcopy(load_fixture("runtime-artifacts.json")["session_manifest"])
+
+
+@pytest.mark.parametrize(
+    "schema_name", ["character-source", "compiled-pack", "session-manifest"]
+)
+@pytest.mark.parametrize(
+    "version",
+    [
+        "1.2.3-01",
+        "1.2.3-alpha.01",
+        "1.2.3-",
+        "1.2.3-alpha.",
+        "1.2.3-.alpha",
+        "1.2.3+",
+        "1.2.3+build.",
+    ],
+)
+def test_character_version_schemas_reject_invalid_semver(
+    schema_name: str, version: str
+) -> None:
+    document = character_version_document(schema_name)
+    document["character_version"] = version
+
+    with pytest.raises(KokoroError) as raised:
+        SchemaRegistry(Path("schemas/v1")).validate(schema_name, document)
+
+    assert raised.value.code == "SCHEMA_VALIDATION_FAILED"
+
+
+@pytest.mark.parametrize(
+    "schema_name", ["character-source", "compiled-pack", "session-manifest"]
+)
+@pytest.mark.parametrize(
+    "version", ["1.2.3-0", "1.2.3-alpha.0", "1.2.3-01a", "1.2.3+01"]
+)
+def test_character_version_schemas_accept_strict_semver(
+    schema_name: str, version: str
+) -> None:
+    document = character_version_document(schema_name)
+    document["character_version"] = version
+
+    SchemaRegistry(Path("schemas/v1")).validate(schema_name, document)
