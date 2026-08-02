@@ -406,6 +406,7 @@ Each event includes:
 - `event_id`;
 - `turn_id`;
 - event origin;
+- novelty key used by deterministic repetition guards;
 - expected state revision;
 - evaluator version;
 - evidence type and reference;
@@ -494,6 +495,7 @@ kokoro session show
 kokoro session end
 kokoro policy compile
 kokoro runtime context
+kokoro runtime plan
 kokoro runtime validate
 kokoro state preview
 kokoro state apply
