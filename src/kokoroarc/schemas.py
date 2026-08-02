@@ -42,6 +42,16 @@ class SchemaRegistry:
             )
         try:
             contents = path.read_text(encoding="utf-8")
+        except UnicodeDecodeError as error:
+            raise KokoroError(
+                "SCHEMA_INVALID",
+                f"Schema {name!r} contains invalid UTF-8.",
+                details={
+                    "schema": name,
+                    "path": str(path),
+                    "reason": "invalid UTF-8 encoding",
+                },
+            ) from error
         except OSError as error:
             raise KokoroError(
                 "SCHEMA_READ_FAILED",

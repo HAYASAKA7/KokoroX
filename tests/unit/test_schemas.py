@@ -31,6 +31,20 @@ def test_registry_rejects_malformed_schema_json(tmp_path: Path) -> None:
     assert raised.value.code == "SCHEMA_INVALID"
 
 
+def test_registry_rejects_invalid_utf8_schema(tmp_path: Path) -> None:
+    (tmp_path / "bad-utf8.schema.json").write_bytes(b"\xff")
+
+    with pytest.raises(KokoroError) as raised:
+        SchemaRegistry(tmp_path).load("bad-utf8")
+
+    assert raised.value.code == "SCHEMA_INVALID"
+    assert raised.value.details["schema"] == "bad-utf8"
+    assert all(
+        isinstance(raised.value.details[field], str)
+        for field in ("schema", "path", "reason")
+    )
+
+
 def test_registry_rejects_non_object_schema(tmp_path: Path) -> None:
     registry = SchemaRegistry(tmp_path)
     (tmp_path / "array.schema.json").write_text("[]", encoding="utf-8")
