@@ -277,3 +277,41 @@ def test_resolutions_and_selected_keys_do_not_share_mutable_values() -> None:
         "second": {"items": ["original"]},
     }
     assert first["first"] is not first["second"]
+
+
+class CopyProbe:
+    def __init__(self, label: str, calls: list[str], *, fail: bool = False) -> None:
+        self.label = label
+        self.calls = calls
+        self.fail = fail
+
+    def __deepcopy__(self, _memo: dict[int, Any]) -> dict[str, str]:
+        self.calls.append(self.label)
+        if self.fail:
+            raise AssertionError(f"ignored probe copied: {self.label}")
+        return {"copied": self.label}
+
+
+def test_only_final_selected_profile_values_are_copied() -> None:
+    calls: list[str] = []
+    resolved = resolve_profile(
+        base={
+            "winner": CopyProbe("shadowed-base", calls, fail=True),
+            "identity": CopyProbe("immutable-base", calls),
+        },
+        user={
+            "winner": CopyProbe("shadowed-user", calls, fail=True),
+            "identity": CopyProbe("ignored-user", calls, fail=True),
+        },
+        host_caps={
+            "winner": CopyProbe("host-winner", calls),
+            "identity": CopyProbe("ignored-host", calls, fail=True),
+        },
+        immutable={"identity"},
+    )
+
+    assert resolved == {
+        "winner": {"copied": "host-winner"},
+        "identity": {"copied": "immutable-base"},
+    }
+    assert calls == ["host-winner", "immutable-base"]

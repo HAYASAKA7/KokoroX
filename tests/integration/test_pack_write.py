@@ -353,23 +353,45 @@ def test_non_transient_permission_error_is_not_retried_or_slept(
     assert raised.value is expected
 
 
+class CleanupAbort(BaseException):
+    pass
+
+
 @pytest.mark.parametrize(
     "cleanup_error",
-    [OSError("cleanup failed"), RuntimeError("cleanup failed")],
-    ids=["os-error", "runtime-error"],
+    [
+        OSError("cleanup failed"),
+        RuntimeError("cleanup failed"),
+        CleanupAbort("cleanup failed"),
+    ],
+    ids=["os-error", "runtime-error", "base-exception"],
 )
+@pytest.mark.parametrize("original_operation", ["write", "replace"])
 def test_cleanup_failure_does_not_mask_the_original_failure(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
-    cleanup_error: Exception,
+    cleanup_error: BaseException,
+    original_operation: str,
 ) -> None:
     target = tmp_path / "compiled.json"
-    expected = OSError("replace failed")
-    monkeypatch.setattr(
-        compiler.os,
-        "replace",
-        lambda _source, _target: (_ for _ in ()).throw(expected),
-    )
+    expected = OSError(f"{original_operation} failed")
+    if original_operation == "write":
+        real_named_temporary_file = compiler.tempfile.NamedTemporaryFile
+
+        def failing_tempfile(*args: Any, **kwargs: Any) -> FailingFile:
+            return FailingFile(
+                real_named_temporary_file(*args, **kwargs), expected, "write"
+            )
+
+        monkeypatch.setattr(
+            compiler.tempfile, "NamedTemporaryFile", failing_tempfile
+        )
+    else:
+        monkeypatch.setattr(
+            compiler.os,
+            "replace",
+            lambda _source, _target: (_ for _ in ()).throw(expected),
+        )
     monkeypatch.setattr(
         compiler.os,
         "unlink",
@@ -380,6 +402,38 @@ def test_cleanup_failure_does_not_mask_the_original_failure(
         write_compiled_pack({"new": True}, target)
 
     assert raised.value is expected
+
+
+def test_cleanup_unlinks_only_the_generated_staging_path(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    target = tmp_path / "compiled.json"
+    unrelated = tmp_path / "unrelated.tmp"
+    unrelated.write_bytes(b"keep")
+    expected = OSError("replace failed")
+    replacement_sources: list[Path] = []
+    unlinked: list[Path] = []
+    real_unlink = compiler.os.unlink
+
+    def fail_replace(source: str | Path, _target: str | Path) -> None:
+        replacement_sources.append(Path(source))
+        raise expected
+
+    def capture_unlink(path: str | Path) -> None:
+        unlinked.append(Path(path))
+        real_unlink(path)
+
+    monkeypatch.setattr(compiler.os, "replace", fail_replace)
+    monkeypatch.setattr(compiler.os, "unlink", capture_unlink)
+
+    with pytest.raises(OSError) as raised:
+        write_compiled_pack({"new": True}, target)
+
+    assert raised.value is expected
+    assert len(replacement_sources) == 1
+    assert unlinked == replacement_sources
+    assert unrelated.read_bytes() == b"keep"
+    assert temp_files(tmp_path) == [unrelated]
 
 
 def test_concurrent_writers_publish_one_complete_document_without_temp_leaks(

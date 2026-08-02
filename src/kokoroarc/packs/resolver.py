@@ -43,20 +43,24 @@ def resolve_profile(
     immutable: set[str],
 ) -> dict[str, Any]:
     """Resolve base, user, and host layers without overriding immutable fields."""
-    resolved = {key: deepcopy(value) for key, value in base.items()}
+    selected = dict(base)
     for key, value in user.items():
         if key not in immutable:
-            resolved[key] = deepcopy(value)
+            selected[key] = value
+
+    for key, value in host_caps.items():
+        if key != "persona_intensity" and key not in immutable:
+            selected[key] = value
 
     requested: str | None = None
-    if "persona_intensity" in resolved:
+    if "persona_intensity" in selected:
         source = (
             "user"
             if "persona_intensity" in user
             and "persona_intensity" not in immutable
             else "base"
         )
-        requested = _validate_intensity(resolved["persona_intensity"], source)
+        requested = _validate_intensity(selected["persona_intensity"], source)
 
     cap: str | None = None
     if (
@@ -65,14 +69,10 @@ def resolve_profile(
     ):
         cap = _validate_intensity(host_caps["persona_intensity"], "host_caps")
 
-    for key, value in host_caps.items():
-        if key != "persona_intensity" and key not in immutable:
-            resolved[key] = deepcopy(value)
-
     if cap is not None and "persona_intensity" not in immutable:
         effective_request = requested or "balanced"
-        resolved["persona_intensity"] = INTENSITY_ORDER[
+        selected["persona_intensity"] = INTENSITY_ORDER[
             min(INTENSITY_ORDER.index(effective_request), INTENSITY_ORDER.index(cap))
         ]
 
-    return resolved
+    return {key: deepcopy(value) for key, value in selected.items()}
