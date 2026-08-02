@@ -102,6 +102,7 @@ def test_settings_uses_user_installed_schema_when_default_is_missing(
     user_schemas = user_root / "share" / "kokoroarc" / "schemas" / "v1"
     user_schemas.mkdir(parents=True)
     monkeypatch.setattr(config, "__file__", str(package_file))
+    monkeypatch.setattr(config.sysconfig, "get_default_scheme", lambda: "default")
     monkeypatch.setattr(config.sysconfig, "get_preferred_scheme", lambda key: "user")
     monkeypatch.setattr(
         config.sysconfig,
@@ -122,8 +123,100 @@ def test_settings_uses_target_adjacent_schema_when_other_installed_paths_are_mis
     target_schemas = tmp_path / "target" / "share" / "kokoroarc" / "schemas" / "v1"
     target_schemas.mkdir(parents=True)
     monkeypatch.setattr(config, "__file__", str(package_file))
+    monkeypatch.setattr(config.sysconfig, "get_default_scheme", lambda: "default")
     monkeypatch.setattr(config.sysconfig, "get_preferred_scheme", lambda key: "user")
     monkeypatch.setattr(config.sysconfig, "get_path", lambda name, scheme=None: str(default_root))
+
+    settings = Settings.from_env({"KOKOROARC_DATA_DIR": str(tmp_path / "data")})
+
+    assert settings.schema_dir == target_schemas.resolve()
+
+
+def test_settings_prefers_default_schema_for_default_installed_package(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    default_purelib = tmp_path / "default-purelib"
+    user_purelib = tmp_path / "user-purelib"
+    default_data = tmp_path / "default-data"
+    user_data = tmp_path / "user-data"
+    target_schemas = default_purelib / "share" / "kokoroarc" / "schemas" / "v1"
+    default_schemas = default_data / "share" / "kokoroarc" / "schemas" / "v1"
+    user_schemas = user_data / "share" / "kokoroarc" / "schemas" / "v1"
+    for schemas in (target_schemas, default_schemas, user_schemas):
+        schemas.mkdir(parents=True)
+    paths = {
+        "default": {"purelib": default_purelib, "platlib": default_purelib, "data": default_data},
+        "user": {"purelib": user_purelib, "platlib": user_purelib, "data": user_data},
+    }
+    monkeypatch.setattr(config, "__file__", str(default_purelib / "kokoroarc" / "config.py"))
+    monkeypatch.setattr(config.sysconfig, "get_default_scheme", lambda: "default")
+    monkeypatch.setattr(config.sysconfig, "get_preferred_scheme", lambda key: "user")
+    monkeypatch.setattr(
+        config.sysconfig,
+        "get_path",
+        lambda name, scheme=None: str(paths[scheme or "default"][name]),
+    )
+
+    settings = Settings.from_env({"KOKOROARC_DATA_DIR": str(tmp_path / "data")})
+
+    assert settings.schema_dir == default_schemas.resolve()
+
+
+def test_settings_prefers_user_schema_for_user_installed_package(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    default_purelib = tmp_path / "default-purelib"
+    user_purelib = tmp_path / "user-purelib"
+    default_data = tmp_path / "default-data"
+    user_data = tmp_path / "user-data"
+    target_schemas = user_purelib / "share" / "kokoroarc" / "schemas" / "v1"
+    default_schemas = default_data / "share" / "kokoroarc" / "schemas" / "v1"
+    user_schemas = user_data / "share" / "kokoroarc" / "schemas" / "v1"
+    for schemas in (target_schemas, default_schemas, user_schemas):
+        schemas.mkdir(parents=True)
+    paths = {
+        "default": {"purelib": default_purelib, "platlib": default_purelib, "data": default_data},
+        "user": {"purelib": user_purelib, "platlib": user_purelib, "data": user_data},
+    }
+    monkeypatch.setattr(config, "__file__", str(user_purelib / "kokoroarc" / "config.py"))
+    monkeypatch.setattr(config.sysconfig, "get_default_scheme", lambda: "default")
+    monkeypatch.setattr(config.sysconfig, "get_preferred_scheme", lambda key: "user")
+    monkeypatch.setattr(
+        config.sysconfig,
+        "get_path",
+        lambda name, scheme=None: str(paths[scheme or "default"][name]),
+    )
+
+    settings = Settings.from_env({"KOKOROARC_DATA_DIR": str(tmp_path / "data")})
+
+    assert settings.schema_dir == user_schemas.resolve()
+
+
+def test_settings_prefers_target_schema_for_target_installed_package(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    default_purelib = tmp_path / "default-purelib"
+    user_purelib = tmp_path / "user-purelib"
+    default_data = tmp_path / "default-data"
+    user_data = tmp_path / "user-data"
+    target_root = tmp_path / "target"
+    target_schemas = target_root / "share" / "kokoroarc" / "schemas" / "v1"
+    default_schemas = default_data / "share" / "kokoroarc" / "schemas" / "v1"
+    user_schemas = user_data / "share" / "kokoroarc" / "schemas" / "v1"
+    for schemas in (target_schemas, default_schemas, user_schemas):
+        schemas.mkdir(parents=True)
+    paths = {
+        "default": {"purelib": default_purelib, "platlib": default_purelib, "data": default_data},
+        "user": {"purelib": user_purelib, "platlib": user_purelib, "data": user_data},
+    }
+    monkeypatch.setattr(config, "__file__", str(target_root / "kokoroarc" / "config.py"))
+    monkeypatch.setattr(config.sysconfig, "get_default_scheme", lambda: "default")
+    monkeypatch.setattr(config.sysconfig, "get_preferred_scheme", lambda key: "user")
+    monkeypatch.setattr(
+        config.sysconfig,
+        "get_path",
+        lambda name, scheme=None: str(paths[scheme or "default"][name]),
+    )
 
     settings = Settings.from_env({"KOKOROARC_DATA_DIR": str(tmp_path / "data")})
 

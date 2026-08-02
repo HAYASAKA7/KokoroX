@@ -10,21 +10,43 @@ from kokoroarc.errors import KokoroError
 
 def _installed_schema_candidates() -> tuple[Path, ...]:
     suffix = Path("share") / "kokoroarc" / "schemas" / "v1"
-    candidates = [Path(sysconfig.get_path("data")) / suffix]
+    package_file = Path(__file__).resolve()
+    target_candidate = package_file.parents[1] / suffix
+    try:
+        default_scheme = sysconfig.get_default_scheme()
+    except AttributeError:
+        default_scheme = None
 
+    schemes: list[str | None] = [None]
     try:
         user_scheme = sysconfig.get_preferred_scheme("user")
-    except AttributeError:
+    except (AttributeError, KeyError):
         pass
     else:
-        try:
-            candidates.append(
-                Path(sysconfig.get_path("data", scheme=user_scheme)) / suffix
-            )
-        except KeyError:
-            pass
+        if user_scheme != default_scheme:
+            schemes.append(user_scheme)
 
-    candidates.append(Path(__file__).resolve().parents[1] / suffix)
+    matching_candidates: list[Path] = []
+    nonmatching_candidates: list[Path] = []
+    for path_scheme in schemes:
+        try:
+            path_kwargs = {} if path_scheme is None else {"scheme": path_scheme}
+            purelib = Path(sysconfig.get_path("purelib", **path_kwargs)).resolve()
+            platlib = Path(sysconfig.get_path("platlib", **path_kwargs)).resolve()
+            data_candidate = (Path(sysconfig.get_path("data", **path_kwargs)) / suffix).resolve()
+        except KeyError:
+            continue
+
+        if package_file.is_relative_to(purelib) or package_file.is_relative_to(platlib):
+            matching_candidates.append(data_candidate)
+        else:
+            nonmatching_candidates.append(data_candidate)
+
+    if matching_candidates:
+        candidates = [*matching_candidates, target_candidate, *nonmatching_candidates]
+    else:
+        candidates = [target_candidate, *nonmatching_candidates]
+
     return tuple(dict.fromkeys(candidate.resolve() for candidate in candidates))
 
 
