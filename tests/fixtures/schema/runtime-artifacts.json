@@ -1,0 +1,89 @@
+{
+  "language_policy": {
+    "schema_version": "1.0",
+    "artifact_id": "policy/session-1",
+    "created_by": {"component": "kokoroarc", "version": "0.0.0.dev0"},
+    "mode": "mixed",
+    "primary_language": "zh-CN",
+    "channels": {
+      "character_dialogue": "ja-JP",
+      "technical_explanation": "zh-CN",
+      "warnings": "zh-CN",
+      "technical_terms": "preserve",
+      "commands": "preserve",
+      "file_paths": "preserve",
+      "exact_errors": "preserve"
+    },
+    "mixing": {"max_switches": 4, "min_primary_ratio": 0.7},
+    "subtitles": {"enabled": false, "language": null}
+  },
+  "semantic_result": {
+    "schema_version": "1.0",
+    "artifact_id": "semantic/turn-1",
+    "created_by": {"component": "kokoroarc", "version": "0.0.0.dev0"},
+    "scenario": "debugging",
+    "conclusion": "The read path is unprotected.",
+    "explanation": ["Writes are locked while reads are not."],
+    "recommendations": ["Add a failing concurrent test."],
+    "warnings": ["Do not rely on repeated successful runs."],
+    "immutable_spans": ["go test -race ./..."],
+    "format_constraints": ["preserve_code_blocks"]
+  },
+  "render_plan": {
+    "schema_version": "1.0",
+    "artifact_id": "plan/turn-1",
+    "created_by": {"component": "kokoroarc", "version": "0.0.0.dev0"},
+    "primary_language": "zh-CN",
+    "segments": [
+      {"id": "s1", "channel": "character_dialogue", "target_language": "ja-JP", "semantic_keys": ["conclusion"]},
+      {"id": "s2", "channel": "technical_explanation", "target_language": "zh-CN", "semantic_keys": ["explanation"]}
+    ],
+    "protected_spans": ["go test -race ./..."],
+    "max_switches": 4
+  },
+  "validation_result": {
+    "schema_version": "1.0",
+    "artifact_id": "validation/turn-1",
+    "created_by": {"component": "kokoroarc", "version": "0.0.0.dev0"},
+    "valid": true,
+    "violations": [],
+    "fallback_level": null
+  },
+  "interaction_event": {
+    "schema_version": "1.0",
+    "artifact_id": "event/event-1",
+    "created_by": {"component": "kokoroarc", "version": "0.0.0.dev0"},
+    "event_id": "event-1",
+    "turn_id": "turn-1",
+    "origin": "verified_task_outcome",
+    "novelty_key": "completed-shared-test",
+    "expected_state_revision": 0,
+    "evaluator_version": "interaction-v1",
+    "evidence": {"kind": "test_result", "reference": "pytest-run-1"},
+    "confidence": 0.9,
+    "effects": {"trust": 1.0, "collaboration": 1.5}
+  },
+  "relationship_state": {
+    "schema_version": "1.0",
+    "artifact_id": "state/session-1",
+    "created_by": {"component": "kokoroarc", "version": "0.0.0.dev0"},
+    "revision": 0,
+    "turn_index": 0,
+    "dimensions": {"familiarity": 0.0, "trust": 0.0, "collaboration": 0.0, "tension": 0.0},
+    "stage": "unknown",
+    "applied_event_ids": [],
+    "recent_novelty": {}
+  },
+  "session_manifest": {
+    "schema_version": "1.0",
+    "artifact_id": "session/session-1",
+    "created_by": {"component": "kokoroarc", "version": "0.0.0.dev0"},
+    "session_id": "session-1",
+    "character_id": "rin-aster",
+    "character_version": "1.0.0",
+    "compiled_pack_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "scope": "session",
+    "state_revision": 0,
+    "active": true
+  }
+}

@@ -1,0 +1,92 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kokoroarc.local/schemas/v1/validation-result.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "artifact_id",
+    "created_by",
+    "valid",
+    "violations",
+    "fallback_level"
+  ],
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "artifact_id": {"$ref": "#/$defs/artifact_id"},
+    "created_by": {"$ref": "#/$defs/created_by"},
+    "valid": {"type": "boolean"},
+    "violations": {
+      "type": "array",
+      "maxItems": 128,
+      "items": {"$ref": "#/$defs/violation"}
+    },
+    "fallback_level": {"enum": [null, 0, 1, 2, 3]}
+  },
+  "$defs": {
+    "artifact_id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9._/-]{0,127}$"
+    },
+    "created_by": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["component", "version"],
+      "properties": {
+        "component": {"const": "kokoroarc"},
+        "version": {"type": "string", "minLength": 1, "maxLength": 64}
+      }
+    },
+    "bounded_string": {"type": "string", "minLength": 1, "maxLength": 4000},
+    "short_string": {"type": "string", "minLength": 1, "maxLength": 128},
+    "violation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code"],
+      "properties": {
+        "code": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)*$"
+        },
+        "message": {"$ref": "#/$defs/bounded_string"},
+        "segment_id": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^s[1-9][0-9]*$"
+        },
+        "path": {
+          "type": "array",
+          "maxItems": 32,
+          "items": {
+            "oneOf": [
+              {"type": "string", "minLength": 1, "maxLength": 128},
+              {"type": "integer", "minimum": 0}
+            ]
+          }
+        },
+        "details": {"$ref": "#/$defs/details"}
+      }
+    },
+    "detail_value": {
+      "oneOf": [
+        {"type": "null"},
+        {"type": "boolean"},
+        {"type": "number"},
+        {"$ref": "#/$defs/short_string"}
+      ]
+    },
+    "details": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "expected": {"$ref": "#/$defs/detail_value"},
+        "actual": {"$ref": "#/$defs/detail_value"},
+        "limit": {"type": "number"},
+        "observed": {"type": "number"},
+        "semantic_key": {"$ref": "#/$defs/short_string"},
+        "protected_span": {"$ref": "#/$defs/bounded_string"}
+      }
+    }
+  }
+}

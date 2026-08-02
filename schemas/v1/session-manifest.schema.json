@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kokoroarc.local/schemas/v1/session-manifest.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "artifact_id",
+    "created_by",
+    "session_id",
+    "character_id",
+    "character_version",
+    "compiled_pack_hash",
+    "scope",
+    "state_revision",
+    "active"
+  ],
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "artifact_id": {"$ref": "#/$defs/artifact_id"},
+    "created_by": {"$ref": "#/$defs/created_by"},
+    "session_id": {"$ref": "#/$defs/hyphen_id"},
+    "character_id": {"$ref": "#/$defs/hyphen_id"},
+    "character_version": {"type": "string", "minLength": 1, "maxLength": 64},
+    "compiled_pack_hash": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "scope": {"const": "session"},
+    "state_revision": {"type": "integer", "minimum": 0},
+    "active": {"type": "boolean"}
+  },
+  "$defs": {
+    "artifact_id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9._/-]{0,127}$"
+    },
+    "created_by": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["component", "version"],
+      "properties": {
+        "component": {"const": "kokoroarc"},
+        "version": {"type": "string", "minLength": 1, "maxLength": 64}
+      }
+    },
+    "hyphen_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+    }
+  }
+}

@@ -49,6 +49,112 @@ def valid_compiled_pack() -> dict:
     }
 
 
+def _set_nested(document: dict, path: tuple[str | int, ...], value: object) -> None:
+    target = document
+    for key in path[:-1]:
+        target = target[key]
+    target[path[-1]] = value
+
+
+def _delete_nested(document: dict, path: tuple[str | int, ...]) -> None:
+    target = document
+    for key in path[:-1]:
+        target = target[key]
+    del target[path[-1]]
+
+
+def _append_nested(document: dict, path: tuple[str | int, ...], value: object) -> None:
+    target = document
+    for key in path:
+        target = target[key]
+    target.append(value)
+
+
+@pytest.mark.parametrize(
+    "schema_name,fixture_key",
+    [
+        ("language-policy", "language_policy"),
+        ("semantic-result", "semantic_result"),
+        ("render-plan", "render_plan"),
+        ("validation-result", "validation_result"),
+        ("interaction-event", "interaction_event"),
+        ("relationship-state", "relationship_state"),
+        ("session-manifest", "session_manifest"),
+    ],
+)
+def test_runtime_artifact_contracts(schema_name: str, fixture_key: str) -> None:
+    fixture = load_fixture("runtime-artifacts.json")
+    SchemaRegistry(Path("schemas/v1")).validate(schema_name, fixture[fixture_key])
+
+
+@pytest.mark.parametrize(
+    "schema_name,fixture_key,mutation",
+    [
+        ("language-policy", "language_policy", lambda d: _set_nested(d, ("mode",), "adaptive")),
+        ("language-policy", "language_policy", lambda d: _set_nested(d, ("primary_language",), "fr-FR")),
+        ("language-policy", "language_policy", lambda d: _set_nested(d, ("channels", "warnings"), "fr-FR")),
+        ("language-policy", "language_policy", lambda d: _set_nested(d, ("channels", "commands"), "en-US")),
+        ("language-policy", "language_policy", lambda d: _set_nested(d, ("mixing", "max_switches"), -1)),
+        ("language-policy", "language_policy", lambda d: _set_nested(d, ("mixing", "min_primary_ratio"), 1.1)),
+        ("language-policy", "language_policy", lambda d: _set_nested(d, ("unknown",), True)),
+        ("language-policy", "language_policy", lambda d: _set_nested(d, ("channels", "unknown"), "preserve")),
+        ("semantic-result", "semantic_result", lambda d: _set_nested(d, ("unknown",), True)),
+        ("semantic-result", "semantic_result", lambda d: _set_nested(d, ("scenario",), "Invalid-Scenario")),
+        ("semantic-result", "semantic_result", lambda d: _append_nested(d, ("explanation",), 7)),
+        ("render-plan", "render_plan", lambda d: _set_nested(d, ("segments", 0, "channel"), "unknown")),
+        ("render-plan", "render_plan", lambda d: _set_nested(d, ("segments", 0, "id"), "segment-1")),
+        ("render-plan", "render_plan", lambda d: _set_nested(d, ("segments", 0, "semantic_keys"), ["scenario"])),
+        ("render-plan", "render_plan", lambda d: _set_nested(d, ("max_switches",), -1)),
+        ("render-plan", "render_plan", lambda d: _set_nested(d, ("segments", 0, "unknown"), True)),
+        ("validation-result", "validation_result", lambda d: _set_nested(d, ("fallback_level",), 4)),
+        ("validation-result", "validation_result", lambda d: _set_nested(d, ("violations",), [{"code": "bad-code"}])),
+        ("validation-result", "validation_result", lambda d: _set_nested(d, ("violations",), [{"code": "MISSING_WARNING", "unknown": True}])),
+        ("interaction-event", "interaction_event", lambda d: _set_nested(d, ("origin",), "inferred")),
+        ("interaction-event", "interaction_event", lambda d: _set_nested(d, ("novelty_key",), "Completed-Test")),
+        ("interaction-event", "interaction_event", lambda d: _set_nested(d, ("confidence",), 1.1)),
+        ("interaction-event", "interaction_event", lambda d: _set_nested(d, ("effects", "trust"), 4.1)),
+        ("interaction-event", "interaction_event", lambda d: _set_nested(d, ("effects", "unknown"), 1)),
+        ("interaction-event", "interaction_event", lambda d: _set_nested(d, ("expected_state_revision",), -1)),
+        ("interaction-event", "interaction_event", lambda d: _set_nested(d, ("evidence", "unknown"), True)),
+        ("relationship-state", "relationship_state", lambda d: _set_nested(d, ("dimensions", "trust"), 101)),
+        ("relationship-state", "relationship_state", lambda d: _delete_nested(d, ("dimensions", "tension"))),
+        ("relationship-state", "relationship_state", lambda d: _set_nested(d, ("stage",), "best_friend")),
+        ("relationship-state", "relationship_state", lambda d: _set_nested(d, ("revision",), -1)),
+        ("relationship-state", "relationship_state", lambda d: _set_nested(d, ("turn_index",), -1)),
+        ("relationship-state", "relationship_state", lambda d: _set_nested(d, ("applied_event_ids",), ["event-1", "event-1"])),
+        ("relationship-state", "relationship_state", lambda d: _set_nested(d, ("recent_novelty",), {"Invalid-Key": 1})),
+        ("relationship-state", "relationship_state", lambda d: _set_nested(d, ("recent_novelty",), {"completed-test": -1})),
+        ("session-manifest", "session_manifest", lambda d: _set_nested(d, ("compiled_pack_hash",), "A" * 64)),
+        ("session-manifest", "session_manifest", lambda d: _set_nested(d, ("scope",), "global")),
+        ("session-manifest", "session_manifest", lambda d: _set_nested(d, ("state_revision",), -1)),
+        ("session-manifest", "session_manifest", lambda d: _set_nested(d, ("unknown",), True)),
+    ],
+    ids=[
+        "policy-mode", "policy-primary-language", "policy-channel-language",
+        "policy-protected-command", "policy-negative-switches", "policy-ratio",
+        "policy-unknown-root", "policy-unknown-channel", "semantic-unknown-root",
+        "semantic-scenario", "semantic-list-item", "plan-channel", "plan-segment-id",
+        "plan-semantic-key", "plan-negative-switches", "plan-segment-field",
+        "validation-fallback", "validation-code", "validation-violation-field",
+        "event-origin", "event-novelty-key", "event-confidence", "event-effect",
+        "event-dimension", "event-revision", "event-evidence-field", "state-dimension",
+        "state-missing-dimension", "state-stage", "state-revision", "state-turn",
+        "state-duplicate-event", "state-novelty-key", "state-novelty-value",
+        "manifest-hash", "manifest-scope", "manifest-revision", "manifest-unknown-root",
+    ],
+)
+def test_runtime_artifact_schemas_reject_invalid_mutations(
+    schema_name: str, fixture_key: str, mutation
+) -> None:
+    document = deepcopy(load_fixture("runtime-artifacts.json")[fixture_key])
+    mutation(document)
+
+    with pytest.raises(KokoroError) as raised:
+        SchemaRegistry(Path("schemas/v1")).validate(schema_name, document)
+
+    assert raised.value.code == "SCHEMA_VALIDATION_FAILED"
+
+
 def test_character_source_schema_accepts_original_pack() -> None:
     SchemaRegistry(Path("schemas/v1")).validate(
         "character-source", load_fixture("valid-character-source.json")

@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kokoroarc.local/schemas/v1/semantic-result.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "artifact_id",
+    "created_by",
+    "scenario",
+    "conclusion",
+    "explanation",
+    "recommendations",
+    "warnings",
+    "immutable_spans",
+    "format_constraints"
+  ],
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "artifact_id": {"$ref": "#/$defs/artifact_id"},
+    "created_by": {"$ref": "#/$defs/created_by"},
+    "scenario": {"$ref": "#/$defs/semantic_id"},
+    "conclusion": {"$ref": "#/$defs/human_string"},
+    "explanation": {
+      "allOf": [
+        {"$ref": "#/$defs/string_array"},
+        {"minItems": 1}
+      ]
+    },
+    "recommendations": {
+      "allOf": [
+        {"$ref": "#/$defs/string_array"},
+        {"minItems": 1}
+      ]
+    },
+    "warnings": {"$ref": "#/$defs/string_array"},
+    "immutable_spans": {"$ref": "#/$defs/string_array"},
+    "format_constraints": {
+      "type": "array",
+      "maxItems": 64,
+      "uniqueItems": true,
+      "items": {"$ref": "#/$defs/semantic_id"}
+    }
+  },
+  "$defs": {
+    "artifact_id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9._/-]{0,127}$"
+    },
+    "created_by": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["component", "version"],
+      "properties": {
+        "component": {"const": "kokoroarc"},
+        "version": {"type": "string", "minLength": 1, "maxLength": 64}
+      }
+    },
+    "semantic_id": {
+      "type": "string",
+      "maxLength": 128,
+      "pattern": "^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$"
+    },
+    "human_string": {"type": "string", "minLength": 1, "maxLength": 4000},
+    "string_array": {
+      "type": "array",
+      "maxItems": 64,
+      "items": {"$ref": "#/$defs/human_string"}
+    }
+  }
+}

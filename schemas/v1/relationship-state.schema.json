@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kokoroarc.local/schemas/v1/relationship-state.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "artifact_id",
+    "created_by",
+    "revision",
+    "turn_index",
+    "dimensions",
+    "stage",
+    "applied_event_ids",
+    "recent_novelty"
+  ],
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "artifact_id": {"$ref": "#/$defs/artifact_id"},
+    "created_by": {"$ref": "#/$defs/created_by"},
+    "revision": {"type": "integer", "minimum": 0},
+    "turn_index": {"type": "integer", "minimum": 0},
+    "dimensions": {"$ref": "#/$defs/dimensions"},
+    "stage": {"enum": ["unknown", "acquainted", "familiar", "trusted"]},
+    "applied_event_ids": {
+      "type": "array",
+      "maxItems": 10000,
+      "uniqueItems": true,
+      "items": {"$ref": "#/$defs/hyphen_id"}
+    },
+    "recent_novelty": {"$ref": "#/$defs/recent_novelty"}
+  },
+  "$defs": {
+    "artifact_id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9._/-]{0,127}$"
+    },
+    "created_by": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["component", "version"],
+      "properties": {
+        "component": {"const": "kokoroarc"},
+        "version": {"type": "string", "minLength": 1, "maxLength": 64}
+      }
+    },
+    "hyphen_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+    },
+    "dimension_value": {"type": "number", "minimum": 0, "maximum": 100},
+    "dimensions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["familiarity", "trust", "collaboration", "tension"],
+      "properties": {
+        "familiarity": {"$ref": "#/$defs/dimension_value"},
+        "trust": {"$ref": "#/$defs/dimension_value"},
+        "collaboration": {"$ref": "#/$defs/dimension_value"},
+        "tension": {"$ref": "#/$defs/dimension_value"}
+      }
+    },
+    "recent_novelty": {
+      "type": "object",
+      "maxProperties": 10000,
+      "additionalProperties": false,
+      "propertyNames": {"$ref": "#/$defs/hyphen_id"},
+      "patternProperties": {
+        "^[a-z0-9]+(?:-[a-z0-9]+)*$": {"type": "integer", "minimum": 0}
+      }
+    }
+  }
+}

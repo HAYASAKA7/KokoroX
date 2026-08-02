@@ -1,0 +1,95 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kokoroarc.local/schemas/v1/language-policy.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "artifact_id",
+    "created_by",
+    "mode",
+    "primary_language",
+    "channels",
+    "mixing",
+    "subtitles"
+  ],
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "artifact_id": {"$ref": "#/$defs/artifact_id"},
+    "created_by": {"$ref": "#/$defs/created_by"},
+    "mode": {"enum": ["single", "mixed"]},
+    "primary_language": {"$ref": "#/$defs/language"},
+    "channels": {"$ref": "#/$defs/channels"},
+    "mixing": {"$ref": "#/$defs/mixing"},
+    "subtitles": {"$ref": "#/$defs/subtitles"}
+  },
+  "$defs": {
+    "artifact_id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9._/-]{0,127}$"
+    },
+    "created_by": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["component", "version"],
+      "properties": {
+        "component": {"const": "kokoroarc"},
+        "version": {"type": "string", "minLength": 1, "maxLength": 64}
+      }
+    },
+    "language": {"enum": ["zh-CN", "en-US", "ja-JP"]},
+    "channel_language": {"enum": ["zh-CN", "en-US", "ja-JP", "preserve"]},
+    "channels": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "character_dialogue",
+        "technical_explanation",
+        "warnings",
+        "technical_terms",
+        "commands",
+        "file_paths",
+        "exact_errors"
+      ],
+      "properties": {
+        "character_dialogue": {"$ref": "#/$defs/channel_language"},
+        "technical_explanation": {"$ref": "#/$defs/channel_language"},
+        "recommendations": {"$ref": "#/$defs/channel_language"},
+        "warnings": {"$ref": "#/$defs/channel_language"},
+        "technical_terms": {"$ref": "#/$defs/channel_language"},
+        "commands": {"const": "preserve"},
+        "file_paths": {"const": "preserve"},
+        "exact_errors": {"const": "preserve"},
+        "code_identifiers": {"const": "preserve"}
+      }
+    },
+    "mixing": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["max_switches", "min_primary_ratio"],
+      "properties": {
+        "max_switches": {"type": "integer", "minimum": 0},
+        "min_primary_ratio": {"type": "number", "minimum": 0, "maximum": 1}
+      }
+    },
+    "subtitles": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["enabled", "language"],
+      "properties": {
+        "enabled": {"type": "boolean"},
+        "language": {
+          "oneOf": [
+            {"type": "null"},
+            {"$ref": "#/$defs/language"}
+          ]
+        }
+      },
+      "if": {
+        "properties": {"enabled": {"const": true}},
+        "required": ["enabled"]
+      },
+      "then": {"properties": {"language": {"$ref": "#/$defs/language"}}}
+    }
+  }
+}
