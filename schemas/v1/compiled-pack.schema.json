@@ -23,12 +23,15 @@
     "schema_version": {"const": "1.0"},
     "artifact_id": {
       "type": "string",
-      "pattern": "^[a-z0-9][a-z0-9._/-]{0,127}$"
+      "pattern": "^[a-z0-9][a-z0-9._/-]{0,127}(?![\\s\\S])"
     },
     "created_by": {"$ref": "#/$defs/created_by"},
     "character_id": {"$ref": "#/$defs/slug_id"},
     "character_version": {"$ref": "#/$defs/character_version"},
-    "source_hash": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "source_hash": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}(?![\\s\\S])"
+    },
     "identity": {"$ref": "#/$defs/identity"},
     "effective_profile": {
       "allOf": [
@@ -57,18 +60,18 @@
       "type": "string",
       "minLength": 1,
       "maxLength": 64,
-      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*(?![\\s\\S])"
     },
     "semantic_id": {
       "type": "string",
       "maxLength": 128,
-      "pattern": "^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$"
+      "pattern": "^[a-z][a-z0-9]*(?:_[a-z0-9]+)*(?![\\s\\S])"
     },
     "character_version": {
       "type": "string",
       "minLength": 1,
       "maxLength": 64,
-      "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(?:-[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)?(?:\\+[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)?$"
+      "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(?:-[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)?(?:\\+[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)?(?![\\s\\S])"
     },
     "bounded_string": {
       "type": "string",
@@ -100,7 +103,7 @@
       "additionalProperties": false,
       "propertyNames": {"$ref": "#/$defs/semantic_id"},
       "patternProperties": {
-        "^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$": {
+        "^[a-z][a-z0-9]*(?:_[a-z0-9]+)*(?![\\s\\S])": {
           "type": "number",
           "minimum": 0,
           "maximum": 1
@@ -122,7 +125,7 @@
       "additionalProperties": false,
       "propertyNames": {"$ref": "#/$defs/semantic_id"},
       "patternProperties": {
-        "^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$": {
+        "^[a-z][a-z0-9]*(?:_[a-z0-9]+)*(?![\\s\\S])": {
           "$ref": "#/$defs/provenance_entry"
         }
       }
@@ -218,7 +221,7 @@
       "additionalProperties": false,
       "propertyNames": {"$ref": "#/$defs/semantic_id"},
       "patternProperties": {
-        "^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$": {
+        "^[a-z][a-z0-9]*(?:_[a-z0-9]+)*(?![\\s\\S])": {
           "$ref": "#/$defs/expression_locale_set"
         }
       }
@@ -272,7 +275,7 @@
       "additionalProperties": false,
       "propertyNames": {"$ref": "#/$defs/semantic_id"},
       "patternProperties": {
-        "^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$": {"$ref": "#/$defs/scenario"}
+        "^[a-z][a-z0-9]*(?:_[a-z0-9]+)*(?![\\s\\S])": {"$ref": "#/$defs/scenario"}
       }
     }
   }

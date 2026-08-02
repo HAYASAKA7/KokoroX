@@ -21,6 +21,7 @@
       "type": "array",
       "minItems": 1,
       "maxItems": 128,
+      "uniqueItems": true,
       "items": {"$ref": "#/$defs/segment"}
     },
     "protected_spans": {
@@ -34,7 +35,7 @@
   "$defs": {
     "artifact_id": {
       "type": "string",
-      "pattern": "^[a-z0-9][a-z0-9._/-]{0,127}$"
+      "pattern": "^[a-z0-9][a-z0-9._/-]{0,127}(?![\\s\\S])"
     },
     "created_by": {
       "type": "object",
@@ -49,7 +50,7 @@
     "semantic_id": {
       "type": "string",
       "maxLength": 128,
-      "pattern": "^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$"
+      "pattern": "^[a-z][a-z0-9]*(?:_[a-z0-9]+)*(?![\\s\\S])"
     },
     "segment": {
       "type": "object",
@@ -59,7 +60,7 @@
         "id": {
           "type": "string",
           "maxLength": 128,
-          "pattern": "^s[1-9][0-9]*$"
+          "pattern": "^s[1-9][0-9]*(?![\\s\\S])"
         },
         "channel": {
           "enum": [

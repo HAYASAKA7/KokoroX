@@ -33,7 +33,7 @@
   "$defs": {
     "artifact_id": {
       "type": "string",
-      "pattern": "^[a-z0-9][a-z0-9._/-]{0,127}$"
+      "pattern": "^[a-z0-9][a-z0-9._/-]{0,127}(?![\\s\\S])"
     },
     "created_by": {
       "type": "object",
@@ -48,7 +48,7 @@
       "type": "string",
       "minLength": 1,
       "maxLength": 128,
-      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*(?![\\s\\S])"
     },
     "dimension_value": {"type": "number", "minimum": 0, "maximum": 100},
     "dimensions": {
@@ -68,7 +68,7 @@
       "additionalProperties": false,
       "propertyNames": {"$ref": "#/$defs/hyphen_id"},
       "patternProperties": {
-        "^[a-z0-9]+(?:-[a-z0-9]+)*$": {"type": "integer", "minimum": 0}
+        "^[a-z0-9]+(?:-[a-z0-9]+)*(?![\\s\\S])": {"type": "integer", "minimum": 0}
       }
     }
   }

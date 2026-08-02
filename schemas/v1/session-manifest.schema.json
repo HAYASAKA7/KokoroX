@@ -20,9 +20,12 @@
     "artifact_id": {"$ref": "#/$defs/artifact_id"},
     "created_by": {"$ref": "#/$defs/created_by"},
     "session_id": {"$ref": "#/$defs/hyphen_id"},
-    "character_id": {"$ref": "#/$defs/hyphen_id"},
-    "character_version": {"type": "string", "minLength": 1, "maxLength": 64},
-    "compiled_pack_hash": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "character_id": {"$ref": "#/$defs/character_id"},
+    "character_version": {"$ref": "#/$defs/character_version"},
+    "compiled_pack_hash": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}(?![\\s\\S])"
+    },
     "scope": {"const": "session"},
     "state_revision": {"type": "integer", "minimum": 0},
     "active": {"type": "boolean"}
@@ -30,7 +33,7 @@
   "$defs": {
     "artifact_id": {
       "type": "string",
-      "pattern": "^[a-z0-9][a-z0-9._/-]{0,127}$"
+      "pattern": "^[a-z0-9][a-z0-9._/-]{0,127}(?![\\s\\S])"
     },
     "created_by": {
       "type": "object",
@@ -45,7 +48,19 @@
       "type": "string",
       "minLength": 1,
       "maxLength": 128,
-      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*(?![\\s\\S])"
+    },
+    "character_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*(?![\\s\\S])"
+    },
+    "character_version": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(?:-[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)?(?:\\+[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)?(?![\\s\\S])"
     }
   }
 }

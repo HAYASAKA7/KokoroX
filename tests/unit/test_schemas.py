@@ -70,6 +70,27 @@ def _append_nested(document: dict, path: tuple[str | int, ...], value: object) -
     target.append(value)
 
 
+def _append_string_suffix(
+    document: dict, path: tuple[str | int, ...], suffix: str
+) -> None:
+    target = document
+    for key in path[:-1]:
+        target = target[key]
+    target[path[-1]] += suffix
+
+
+def _rename_nested_key(
+    document: dict,
+    path: tuple[str | int, ...],
+    old_key: str,
+    new_key: str,
+) -> None:
+    target = document
+    for key in path:
+        target = target[key]
+    target[new_key] = target.pop(old_key)
+
+
 @pytest.mark.parametrize(
     "schema_name,fixture_key",
     [
@@ -104,6 +125,7 @@ def test_runtime_artifact_contracts(schema_name: str, fixture_key: str) -> None:
         ("semantic-result", "semantic_result", lambda d: _set_nested(d, ("unknown",), True)),
         ("semantic-result", "semantic_result", lambda d: _set_nested(d, ("scenario",), "Invalid-Scenario")),
         ("semantic-result", "semantic_result", lambda d: _append_nested(d, ("explanation",), 7)),
+        ("semantic-result", "semantic_result", lambda d: _append_nested(d, ("immutable_spans",), "go test -race ./...")),
         ("render-plan", "render_plan", lambda d: _set_nested(d, ("segments", 0, "channel"), "unknown")),
         ("render-plan", "render_plan", lambda d: _set_nested(d, ("segments", 0, "id"), "segment-1")),
         ("render-plan", "render_plan", lambda d: _set_nested(d, ("segments", 0, "semantic_keys"), ["scenario"])),
@@ -111,10 +133,13 @@ def test_runtime_artifact_contracts(schema_name: str, fixture_key: str) -> None:
         ("render-plan", "render_plan", lambda d: _set_nested(d, ("segments", 0, "unknown"), True)),
         ("render-plan", "render_plan", lambda d: _set_nested(d, ("segments", 0, "target_language"), "fr-FR")),
         ("render-plan", "render_plan", lambda d: _set_nested(d, ("segments",), [])),
+        ("render-plan", "render_plan", lambda d: _append_nested(d, ("segments",), deepcopy(d["segments"][0]))),
         ("validation-result", "validation_result", lambda d: _set_nested(d, ("fallback_level",), 4)),
-        ("validation-result", "validation_result", lambda d: _set_nested(d, ("violations",), [{"code": "bad-code"}])),
-        ("validation-result", "validation_result", lambda d: _set_nested(d, ("violations",), [{"code": "MISSING_WARNING", "unknown": True}])),
-        ("validation-result", "validation_result", lambda d: _set_nested(d, ("violations",), [{"code": "MISSING_WARNING", "details": {"unknown": True}}])),
+        ("validation-result", "validation_result", lambda d: d.update({"valid": False, "violations": [{"code": "bad-code"}]})),
+        ("validation-result", "validation_result", lambda d: d.update({"valid": False, "violations": [{"code": "MISSING_WARNING", "unknown": True}]})),
+        ("validation-result", "validation_result", lambda d: d.update({"valid": False, "violations": [{"code": "MISSING_WARNING", "details": {"unknown": True}}]})),
+        ("validation-result", "validation_result", lambda d: _set_nested(d, ("violations",), [{"code": "MISSING_WARNING"}])),
+        ("validation-result", "validation_result", lambda d: _set_nested(d, ("valid",), False)),
         ("interaction-event", "interaction_event", lambda d: _set_nested(d, ("origin",), "inferred")),
         ("interaction-event", "interaction_event", lambda d: _set_nested(d, ("novelty_key",), "Completed-Test")),
         ("interaction-event", "interaction_event", lambda d: _set_nested(d, ("confidence",), 1.1)),
@@ -140,6 +165,8 @@ def test_runtime_artifact_contracts(schema_name: str, fixture_key: str) -> None:
         ("session-manifest", "session_manifest", lambda d: _set_nested(d, ("scope",), "global")),
         ("session-manifest", "session_manifest", lambda d: _set_nested(d, ("state_revision",), -1)),
         ("session-manifest", "session_manifest", lambda d: _set_nested(d, ("unknown",), True)),
+        ("session-manifest", "session_manifest", lambda d: _set_nested(d, ("character_id",), "a" * 65)),
+        ("session-manifest", "session_manifest", lambda d: _set_nested(d, ("character_version",), "version-one")),
     ],
     ids=[
         "policy-mode", "policy-primary-language", "policy-channel-language",
@@ -147,11 +174,13 @@ def test_runtime_artifact_contracts(schema_name: str, fixture_key: str) -> None:
         "policy-unknown-root", "policy-unknown-channel",
         "policy-enabled-subtitles-language", "policy-mixing-field", "policy-subtitles-field",
         "semantic-unknown-root", "semantic-scenario", "semantic-list-item",
+        "semantic-duplicate-immutable-span",
         "plan-channel", "plan-segment-id",
         "plan-semantic-key", "plan-negative-switches", "plan-segment-field",
-        "plan-target-language", "plan-empty-segments",
+        "plan-target-language", "plan-empty-segments", "plan-exact-duplicate-segment",
         "validation-fallback", "validation-code", "validation-violation-field",
-        "validation-details-field",
+        "validation-details-field", "validation-valid-with-violation",
+        "validation-invalid-without-violation",
         "event-origin", "event-novelty-key", "event-confidence", "event-effect",
         "event-dimension", "event-revision", "event-evidence-field",
         "event-evidence-kind", "event-empty-effects", "event-confidence-below-zero",
@@ -160,6 +189,7 @@ def test_runtime_artifact_contracts(schema_name: str, fixture_key: str) -> None:
         "state-missing-dimension", "state-stage", "state-revision", "state-turn",
         "state-duplicate-event", "state-novelty-key", "state-novelty-value",
         "manifest-hash", "manifest-scope", "manifest-revision", "manifest-unknown-root",
+        "manifest-character-id-too-long", "manifest-character-version",
     ],
 )
 def test_runtime_artifact_schemas_reject_invalid_mutations(
@@ -219,6 +249,210 @@ def test_runtime_artifact_dynamic_id_length_boundaries(
         with pytest.raises(KokoroError) as raised:
             registry.validate(schema_name, document)
         assert raised.value.code == "SCHEMA_VALIDATION_FAILED"
+
+
+def test_semantic_immutable_spans_are_render_plan_compatible() -> None:
+    fixture = load_fixture("runtime-artifacts.json")
+    semantic = deepcopy(fixture["semantic_result"])
+    render_plan = deepcopy(fixture["render_plan"])
+    render_plan["protected_spans"] = deepcopy(semantic["immutable_spans"])
+
+    registry = SchemaRegistry(Path("schemas/v1"))
+    registry.validate("semantic-result", semantic)
+    registry.validate("render-plan", render_plan)
+
+
+@pytest.mark.parametrize(
+    "valid,violations,fallback_level",
+    [
+        (True, [], 2),
+        (False, [{"code": "MISSING_WARNING"}], None),
+    ],
+    ids=["successful-fallback", "invalid-with-violation"],
+)
+def test_validation_result_accepts_consistent_outcomes(
+    valid: bool, violations: list[dict], fallback_level: int | None
+) -> None:
+    document = deepcopy(load_fixture("runtime-artifacts.json")["validation_result"])
+    document.update(
+        {"valid": valid, "violations": violations, "fallback_level": fallback_level}
+    )
+
+    SchemaRegistry(Path("schemas/v1")).validate("validation-result", document)
+
+
+@pytest.mark.parametrize(
+    "character_id,character_version",
+    [("a" * 64, "1.0.0")],
+    ids=["canonical-boundaries"],
+)
+def test_session_manifest_accepts_upstream_character_constraints(
+    character_id: str, character_version: str
+) -> None:
+    document = deepcopy(load_fixture("runtime-artifacts.json")["session_manifest"])
+    document.update(
+        {"character_id": character_id, "character_version": character_version}
+    )
+
+    SchemaRegistry(Path("schemas/v1")).validate("session-manifest", document)
+
+
+@pytest.mark.parametrize("terminator", ["\n", "\r"], ids=["newline", "carriage-return"])
+@pytest.mark.parametrize(
+    "schema_name,document_factory,mutation",
+    [
+        (
+            "language-policy",
+            lambda: deepcopy(load_fixture("runtime-artifacts.json")["language_policy"]),
+            lambda d, suffix: _append_string_suffix(d, ("artifact_id",), suffix),
+        ),
+        (
+            "semantic-result",
+            lambda: deepcopy(load_fixture("runtime-artifacts.json")["semantic_result"]),
+            lambda d, suffix: _append_string_suffix(d, ("scenario",), suffix),
+        ),
+        (
+            "semantic-result",
+            lambda: deepcopy(load_fixture("runtime-artifacts.json")["semantic_result"]),
+            lambda d, suffix: _append_string_suffix(d, ("format_constraints", 0), suffix),
+        ),
+        (
+            "render-plan",
+            lambda: deepcopy(load_fixture("runtime-artifacts.json")["render_plan"]),
+            lambda d, suffix: _append_string_suffix(d, ("segments", 0, "id"), suffix),
+        ),
+        (
+            "render-plan",
+            lambda: deepcopy(load_fixture("runtime-artifacts.json")["render_plan"]),
+            lambda d, suffix: _set_nested(d, ("segments", 0, "expression_intent"), f"restrained_diagnosis{suffix}"),
+        ),
+        (
+            "validation-result",
+            lambda: deepcopy(load_fixture("runtime-artifacts.json")["validation_result"]),
+            lambda d, suffix: d.update({"valid": False, "violations": [{"code": f"MISSING_WARNING{suffix}"}]}),
+        ),
+        (
+            "validation-result",
+            lambda: deepcopy(load_fixture("runtime-artifacts.json")["validation_result"]),
+            lambda d, suffix: d.update({"valid": False, "violations": [{"code": "MISSING_WARNING", "segment_id": f"s1{suffix}"}]}),
+        ),
+        (
+            "interaction-event",
+            lambda: deepcopy(load_fixture("runtime-artifacts.json")["interaction_event"]),
+            lambda d, suffix: _append_string_suffix(d, ("event_id",), suffix),
+        ),
+        (
+            "interaction-event",
+            lambda: deepcopy(load_fixture("runtime-artifacts.json")["interaction_event"]),
+            lambda d, suffix: _append_string_suffix(d, ("turn_id",), suffix),
+        ),
+        (
+            "interaction-event",
+            lambda: deepcopy(load_fixture("runtime-artifacts.json")["interaction_event"]),
+            lambda d, suffix: _append_string_suffix(d, ("novelty_key",), suffix),
+        ),
+        (
+            "relationship-state",
+            lambda: deepcopy(load_fixture("runtime-artifacts.json")["relationship_state"]),
+            lambda d, suffix: _set_nested(d, ("recent_novelty",), {f"completed-test{suffix}": 0}),
+        ),
+        (
+            "relationship-state",
+            lambda: deepcopy(load_fixture("runtime-artifacts.json")["relationship_state"]),
+            lambda d, suffix: _set_nested(d, ("applied_event_ids",), [f"event-1{suffix}"]),
+        ),
+        (
+            "session-manifest",
+            lambda: deepcopy(load_fixture("runtime-artifacts.json")["session_manifest"]),
+            lambda d, suffix: _append_string_suffix(d, ("session_id",), suffix),
+        ),
+        (
+            "session-manifest",
+            lambda: deepcopy(load_fixture("runtime-artifacts.json")["session_manifest"]),
+            lambda d, suffix: _append_string_suffix(d, ("character_id",), suffix),
+        ),
+        (
+            "session-manifest",
+            lambda: deepcopy(load_fixture("runtime-artifacts.json")["session_manifest"]),
+            lambda d, suffix: _append_string_suffix(d, ("character_version",), suffix),
+        ),
+        (
+            "session-manifest",
+            lambda: deepcopy(load_fixture("runtime-artifacts.json")["session_manifest"]),
+            lambda d, suffix: _append_string_suffix(d, ("compiled_pack_hash",), suffix),
+        ),
+        (
+            "character-source",
+            lambda: load_fixture("valid-character-source.json"),
+            lambda d, suffix: _append_string_suffix(d, ("character_id",), suffix),
+        ),
+        (
+            "compiled-pack",
+            valid_compiled_pack,
+            lambda d, suffix: _append_string_suffix(d, ("character_id",), suffix),
+        ),
+        (
+            "character-source",
+            lambda: load_fixture("valid-character-source.json"),
+            lambda d, suffix: _rename_nested_key(d, ("derived_profile", "traits"), "composure", f"composure{suffix}"),
+        ),
+        (
+            "compiled-pack",
+            valid_compiled_pack,
+            lambda d, suffix: _rename_nested_key(d, ("expressions",), "restrained_diagnosis", f"restrained_diagnosis{suffix}"),
+        ),
+        (
+            "character-source",
+            lambda: load_fixture("valid-character-source.json"),
+            lambda d, suffix: _rename_nested_key(d, ("scenarios",), "debugging", f"debugging{suffix}"),
+        ),
+        (
+            "compiled-pack",
+            valid_compiled_pack,
+            lambda d, suffix: _append_string_suffix(d, ("source_hash",), suffix),
+        ),
+    ],
+    ids=[
+        "artifact-id", "semantic-scenario", "semantic-format", "render-segment",
+        "render-expression", "validation-code", "validation-segment", "event-id",
+        "turn-id", "event-novelty", "state-novelty", "state-applied-event",
+        "session-id", "session-character", "session-character-version", "session-hash",
+        "source-character", "compiled-character", "source-trait", "compiled-expression",
+        "source-scenario", "compiled-source-hash",
+    ],
+)
+def test_identifier_patterns_reject_trailing_line_terminators(
+    schema_name: str, document_factory, mutation, terminator: str
+) -> None:
+    document = document_factory()
+    mutation(document, terminator)
+
+    with pytest.raises(KokoroError) as raised:
+        SchemaRegistry(Path("schemas/v1")).validate(schema_name, document)
+
+    assert raised.value.code == "SCHEMA_VALIDATION_FAILED"
+
+
+@pytest.mark.parametrize("terminator", ["\n", "\r"], ids=["newline", "carriage-return"])
+def test_common_artifact_id_rejects_trailing_line_terminators(
+    terminator: str,
+) -> None:
+    common = SchemaRegistry(Path("schemas/v1")).load("common")
+    metadata = Draft202012Validator(common["$defs"]["metadata"])
+    document = {
+        "schema_version": "1.0",
+        "artifact_id": f"persona/hero.v1{terminator}",
+        "created_by": {"component": "kokoroarc", "version": "1.0.0"},
+    }
+
+    assert not metadata.is_valid(document)
+
+
+def test_identifier_patterns_accept_non_newline_representatives() -> None:
+    document = deepcopy(load_fixture("runtime-artifacts.json")["render_plan"])
+    document["segments"][0]["expression_intent"] = "restrained_diagnosis"
+
+    SchemaRegistry(Path("schemas/v1")).validate("render-plan", document)
 
 
 def test_character_source_schema_accepts_original_pack() -> None:

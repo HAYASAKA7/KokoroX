@@ -23,10 +23,16 @@
     },
     "fallback_level": {"enum": [null, 0, 1, 2, 3]}
   },
+  "if": {
+    "properties": {"valid": {"const": true}},
+    "required": ["valid"]
+  },
+  "then": {"properties": {"violations": {"maxItems": 0}}},
+  "else": {"properties": {"violations": {"minItems": 1}}},
   "$defs": {
     "artifact_id": {
       "type": "string",
-      "pattern": "^[a-z0-9][a-z0-9._/-]{0,127}$"
+      "pattern": "^[a-z0-9][a-z0-9._/-]{0,127}(?![\\s\\S])"
     },
     "created_by": {
       "type": "object",
@@ -47,13 +53,13 @@
         "code": {
           "type": "string",
           "maxLength": 128,
-          "pattern": "^[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)*$"
+          "pattern": "^[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)*(?![\\s\\S])"
         },
         "message": {"$ref": "#/$defs/bounded_string"},
         "segment_id": {
           "type": "string",
           "maxLength": 128,
-          "pattern": "^s[1-9][0-9]*$"
+          "pattern": "^s[1-9][0-9]*(?![\\s\\S])"
         },
         "path": {
           "type": "array",

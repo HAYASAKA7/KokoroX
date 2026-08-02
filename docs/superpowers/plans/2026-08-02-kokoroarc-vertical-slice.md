@@ -1761,7 +1761,7 @@ git commit -m "feat: build deterministic language render plans"
 - Create: `src/kokoroarc/runtime/validation.py`
 - Create: `tests/unit/test_runtime_validation.py`
 
-- [ ] **Step 1: Write failing protected-span, warning, and switch tests**
+- [ ] **Step 1: Write failing protected-span, warning, switch, and segment-ID tests**
 
 ```python
 # tests/unit/test_runtime_validation.py
@@ -1784,6 +1784,22 @@ def test_validation_reports_missing_protected_span_and_warning() -> None:
     assert {item["code"] for item in result["violations"]} == {"MISSING_PROTECTED_SPAN", "MISSING_WARNING"}
     assert fallback_action(attempt=0) == "repair_segments"
     assert fallback_action(attempt=3) == "neutral_renderer"
+
+
+def test_validation_rejects_duplicate_planned_segment_ids_before_matching() -> None:
+    plan = {
+        "max_switches": 4,
+        "segments": [
+            {"id": "s1", "channel": "warnings", "target_language": "zh-CN", "semantic_keys": ["warnings"]},
+            {"id": "s1", "channel": "technical_explanation", "target_language": "en-US", "semantic_keys": ["explanation"]},
+        ],
+    }
+    result = validate_rendered_output(
+        rendered={"text": "", "segments": [], "switch_count": 0},
+        semantic={"immutable_spans": [], "warnings": []},
+        plan=plan,
+    )
+    assert result["violations"][0]["code"] == "DUPLICATE_SEGMENT_ID"
 ```
 
 - [ ] **Step 2: Verify RED**
@@ -1794,7 +1810,7 @@ Expected: FAIL because validation functions do not exist.
 
 - [ ] **Step 3: Implement deterministic checks**
 
-`validate_rendered_output` checks every immutable span as an exact substring, verifies `switch_count <= max_switches`, and verifies each rendered segment ID, declared language, channel, and semantic-key coverage against its planned segment. A missing planned `warnings` segment produces `MISSING_WARNING`; warning translation quality remains a soft evaluation concern. It returns a `validation-result` compatible dictionary with stable ordered violations.
+`validate_rendered_output` checks every immutable span as an exact substring, verifies `switch_count <= max_switches`, and verifies each rendered segment ID, declared language, channel, and semantic-key coverage against its planned segment. Before segment matching, it rejects duplicate planned segment IDs—including same-ID/different-content objects—with stable violation code `DUPLICATE_SEGMENT_ID`. A missing planned `warnings` segment produces `MISSING_WARNING`; warning translation quality remains a soft evaluation concern. It returns a `validation-result` compatible dictionary with stable ordered violations.
 
 Use this bounded fallback table:
 
