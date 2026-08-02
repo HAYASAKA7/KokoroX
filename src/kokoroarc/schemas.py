@@ -14,23 +14,55 @@ from kokoroarc.errors import KokoroError
 
 _DRAFT_2020_12 = "https://json-schema.org/draft/2020-12/schema"
 _SCHEMA_NAME_PATTERN = re.compile(r"[a-z0-9][a-z0-9._-]{0,127}")
+_MAX_JSON_NESTING_DEPTH = 64
 
 
-def _find_non_finite_path(
-    value: Any, path: tuple[str | int, ...] = ()
-) -> list[str | int] | None:
-    if isinstance(value, float) and not math.isfinite(value):
-        return list(path)
-    if isinstance(value, dict):
-        for key in sorted(value):
-            found = _find_non_finite_path(value[key], (*path, key))
-            if found is not None:
-                return found
-    elif isinstance(value, list):
-        for index, item in enumerate(value):
-            found = _find_non_finite_path(item, (*path, index))
-            if found is not None:
-                return found
+def _find_json_incompatibility(
+    value: Any,
+) -> tuple[list[str | int], str] | None:
+    stack: list[tuple[bool, Any, tuple[str | int, ...], int]] = [
+        (True, value, (), 0)
+    ]
+    active_container_ids: set[int] = set()
+
+    while stack:
+        entering, current, path, depth = stack.pop()
+        if not entering:
+            active_container_ids.remove(id(current))
+            continue
+
+        if current is None or isinstance(current, (bool, int, str)):
+            continue
+        if isinstance(current, float):
+            if not math.isfinite(current):
+                return list(path), "Non-finite numbers are not valid JSON artifacts."
+            continue
+        if not isinstance(current, (dict, list)):
+            return list(path), "Artifact contains a value that is not JSON-compatible."
+        if depth >= _MAX_JSON_NESTING_DEPTH:
+            return list(path), "JSON artifact nesting exceeds the maximum depth."
+
+        container_id = id(current)
+        if container_id in active_container_ids:
+            return list(path), "Cyclic containers are not valid JSON artifacts."
+
+        if isinstance(current, dict):
+            if any(not isinstance(key, str) for key in current):
+                return list(path), "JSON artifact object keys must be strings."
+            children = [
+                (True, current[key], (*path, key), depth + 1)
+                for key in reversed(sorted(current))
+            ]
+        else:
+            children = [
+                (True, current[index], (*path, index), depth + 1)
+                for index in reversed(range(len(current)))
+            ]
+
+        active_container_ids.add(container_id)
+        stack.append((False, current, path, depth))
+        stack.extend(children)
+
     return None
 
 
@@ -123,12 +155,13 @@ class SchemaRegistry:
 
     def validate(self, name: str, instance: Any) -> None:
         schema = self.load(name)
-        non_finite_path = _find_non_finite_path(instance)
-        if non_finite_path is not None:
+        incompatibility = _find_json_incompatibility(instance)
+        if incompatibility is not None:
+            path, message = incompatibility
             raise KokoroError(
                 "SCHEMA_VALIDATION_FAILED",
-                "Non-finite numbers are not valid JSON artifacts.",
-                details={"schema": name, "path": non_finite_path},
+                message,
+                details={"schema": name, "path": path},
             )
 
         errors = sorted(

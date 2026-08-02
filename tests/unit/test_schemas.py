@@ -88,11 +88,20 @@ def test_compiled_pack_schema_rejects_invalid_source_hash() -> None:
     assert raised.value.code == "SCHEMA_VALIDATION_FAILED"
 
 
-def test_character_source_schema_rejects_json_nan_trait() -> None:
+@pytest.mark.parametrize(
+    "non_finite",
+    [
+        json.loads('{"value": NaN}')["value"],
+        yaml.safe_load("value: .inf")["value"],
+        yaml.safe_load("value: -.inf")["value"],
+    ],
+    ids=["nan", "positive-infinity", "negative-infinity"],
+)
+def test_character_source_schema_rejects_non_finite_trait(
+    non_finite: float,
+) -> None:
     document = load_fixture("valid-character-source.json")
-    document["derived_profile"]["traits"]["composure"] = json.loads(
-        '{"value": NaN}'
-    )["value"]
+    document["derived_profile"]["traits"]["composure"] = non_finite
 
     with pytest.raises(KokoroError) as raised:
         SchemaRegistry(Path("schemas/v1")).validate("character-source", document)
@@ -126,6 +135,83 @@ def test_character_source_schema_rejects_yaml_nan_growth_threshold() -> None:
 def test_character_source_schema_accepts_finite_trait_boundary() -> None:
     document = load_fixture("valid-character-source.json")
     document["derived_profile"]["traits"]["composure"] = 1.0
+
+    SchemaRegistry(Path("schemas/v1")).validate("character-source", document)
+
+
+def test_character_source_schema_rejects_non_string_mapping_key() -> None:
+    document = load_fixture("valid-character-source.json")
+    document["overrides"]["values"] = yaml.safe_load("1: 0.5")
+
+    with pytest.raises(KokoroError) as raised:
+        SchemaRegistry(Path("schemas/v1")).validate("character-source", document)
+
+    assert raised.value.code == "SCHEMA_VALIDATION_FAILED"
+    assert raised.value.details["path"] == ["overrides", "values"]
+
+
+def test_character_source_schema_rejects_recursive_list_alias() -> None:
+    document = load_fixture("valid-character-source.json")
+    document["identity"]["worldview"] = yaml.safe_load("&loop [*loop]")
+
+    with pytest.raises(KokoroError) as raised:
+        SchemaRegistry(Path("schemas/v1")).validate("character-source", document)
+
+    assert raised.value.code == "SCHEMA_VALIDATION_FAILED"
+    assert raised.value.details["path"] == ["identity", "worldview", 0]
+
+
+def test_character_source_schema_rejects_recursive_mapping_alias() -> None:
+    document = load_fixture("valid-character-source.json")
+    document["overrides"]["values"] = yaml.safe_load("&loop {self: *loop}")
+
+    with pytest.raises(KokoroError) as raised:
+        SchemaRegistry(Path("schemas/v1")).validate("character-source", document)
+
+    assert raised.value.code == "SCHEMA_VALIDATION_FAILED"
+    assert raised.value.details["path"] == ["overrides", "values", "self"]
+
+
+def test_character_source_schema_rejects_non_json_scalar() -> None:
+    document = load_fixture("valid-character-source.json")
+    document["identity"]["declared_age"] = yaml.safe_load("value: 2026-08-02")[
+        "value"
+    ]
+
+    with pytest.raises(KokoroError) as raised:
+        SchemaRegistry(Path("schemas/v1")).validate("character-source", document)
+
+    assert raised.value.code == "SCHEMA_VALIDATION_FAILED"
+    assert raised.value.details["path"] == ["identity", "declared_age"]
+
+
+def test_character_source_schema_rejects_excessive_nesting() -> None:
+    document = load_fixture("valid-character-source.json")
+    nested: object = "too deep"
+    for _ in range(64):
+        nested = [nested]
+    document["identity"]["worldview"] = nested
+
+    with pytest.raises(KokoroError) as raised:
+        SchemaRegistry(Path("schemas/v1")).validate("character-source", document)
+
+    assert raised.value.code == "SCHEMA_VALIDATION_FAILED"
+    assert raised.value.details["path"] == [
+        "identity",
+        "worldview",
+        *([0] * 62),
+    ]
+
+
+def test_character_source_schema_allows_shared_acyclic_alias() -> None:
+    document = load_fixture("valid-character-source.json")
+    aliases = yaml.safe_load(
+        "worldview: &values [evidence_before_confidence]\n"
+        "non_negotiables: *values"
+    )
+    assert aliases["worldview"] is aliases["non_negotiables"]
+    document["identity"]["worldview"] = aliases["worldview"]
+    document["identity"]["non_negotiables"] = aliases["non_negotiables"]
 
     SchemaRegistry(Path("schemas/v1")).validate("character-source", document)
 
