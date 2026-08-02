@@ -881,3 +881,43 @@ def test_common_schema_validates_metadata_and_locales() -> None:
     assert not metadata.is_valid({**valid_metadata, "extra": True})
     assert not metadata.is_valid({**valid_metadata, "artifact_id": "Invalid"})
     assert not locale.is_valid("zh_CN")
+
+
+@pytest.mark.parametrize(
+    ("schema_name", "fixture_key", "prefix", "maximum"),
+    [
+        ("session-manifest", "session_manifest", "session/", 136),
+        ("relationship-state", "relationship_state", "state/", 134),
+    ],
+)
+def test_session_artifact_schemas_accept_exact_generated_maximum(
+    schema_name: str, fixture_key: str, prefix: str, maximum: int
+) -> None:
+    document = deepcopy(load_fixture("runtime-artifacts.json")[fixture_key])
+    session_id = "a" * 128
+    document["artifact_id"] = f"{prefix}{session_id}"
+    if schema_name == "session-manifest":
+        document["session_id"] = session_id
+
+    assert len(document["artifact_id"]) == maximum
+    SchemaRegistry(Path("schemas/v1")).validate(schema_name, document)
+
+
+@pytest.mark.parametrize(
+    ("schema_name", "fixture_key", "prefix", "maximum"),
+    [
+        ("session-manifest", "session_manifest", "session/", 136),
+        ("relationship-state", "relationship_state", "state/", 134),
+    ],
+)
+def test_session_artifact_schemas_reject_generated_maximum_plus_one(
+    schema_name: str, fixture_key: str, prefix: str, maximum: int
+) -> None:
+    document = deepcopy(load_fixture("runtime-artifacts.json")[fixture_key])
+    document["artifact_id"] = f"{prefix}{'a' * 128}a"
+
+    assert len(document["artifact_id"]) == maximum + 1
+    with pytest.raises(KokoroError) as raised:
+        SchemaRegistry(Path("schemas/v1")).validate(schema_name, document)
+
+    assert raised.value.code == "SCHEMA_VALIDATION_FAILED"
