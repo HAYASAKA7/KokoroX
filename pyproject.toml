@@ -22,6 +22,9 @@ kokoro = "kokoroarc.cli:main"
 [tool.setuptools.packages.find]
 where = ["src"]
 
+[tool.setuptools.data-files]
+"share/kokoroarc/schemas/v1" = ["schemas/v1/*.schema.json"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-ra"
