@@ -18,6 +18,8 @@ from kokoroarc.schemas import SchemaRegistry
 
 _ATOMIC_REPLACE_RETRY_DELAYS = (0.0, 0.001, 0.002, 0.004)
 _ATOMIC_REPLACE_ATTEMPTS = len(_ATOMIC_REPLACE_RETRY_DELAYS) + 1
+_REPLACE_OS_NAME = os.name
+_TRANSIENT_REPLACE_WINERRORS = frozenset({5, 32})
 
 
 def canonical_bytes(value: Any) -> bytes:
@@ -46,14 +48,24 @@ def canonical_bytes(value: Any) -> bytes:
         ) from error
 
 
+def _is_transient_replace_error(error: PermissionError) -> bool:
+    return (
+        _REPLACE_OS_NAME == "nt"
+        and getattr(error, "winerror", None) in _TRANSIENT_REPLACE_WINERRORS
+    )
+
+
 def _replace_atomically(staging: Path, target: Path) -> None:
     """Replace *target*, retrying transient permission races for a short bound."""
     for attempt in range(_ATOMIC_REPLACE_ATTEMPTS):
         try:
             os.replace(staging, target)
             return
-        except PermissionError:
-            if attempt == _ATOMIC_REPLACE_ATTEMPTS - 1:
+        except PermissionError as error:
+            if (
+                not _is_transient_replace_error(error)
+                or attempt == _ATOMIC_REPLACE_ATTEMPTS - 1
+            ):
                 raise
             time.sleep(_ATOMIC_REPLACE_RETRY_DELAYS[attempt])
 
@@ -85,7 +97,7 @@ def write_compiled_pack(value: dict[str, Any], target: Path) -> None:
             pass
         try:
             os.unlink(staging)
-        except OSError:
+        except BaseException:
             pass
         raise
 

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from copy import deepcopy
 from typing import Any
 
 from kokoroarc.errors import KokoroError
@@ -42,10 +43,10 @@ def resolve_profile(
     immutable: set[str],
 ) -> dict[str, Any]:
     """Resolve base, user, and host layers without overriding immutable fields."""
-    resolved = dict(base)
+    resolved = {key: deepcopy(value) for key, value in base.items()}
     for key, value in user.items():
         if key not in immutable:
-            resolved[key] = value
+            resolved[key] = deepcopy(value)
 
     requested: str | None = None
     if "persona_intensity" in resolved:
@@ -66,7 +67,7 @@ def resolve_profile(
 
     for key, value in host_caps.items():
         if key != "persona_intensity" and key not in immutable:
-            resolved[key] = value
+            resolved[key] = deepcopy(value)
 
     if cap is not None and "persona_intensity" not in immutable:
         effective_request = requested or "balanced"

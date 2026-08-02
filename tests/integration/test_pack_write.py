@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor
+import errno
 from pathlib import Path
+from threading import Barrier, Lock
 from typing import Any
 
 import pytest
@@ -218,6 +220,7 @@ def test_transient_permission_error_is_retried_until_replace_succeeds(
 ) -> None:
     target = tmp_path / "compiled.json"
     attempts = 0
+    sleeps: list[float] = []
     expected = PermissionError(f"transient WinError {winerror}")
     expected.winerror = winerror  # type: ignore[attr-defined]
     real_replace = compiler.os.replace
@@ -229,11 +232,14 @@ def test_transient_permission_error_is_retried_until_replace_succeeds(
             raise expected
         real_replace(source, destination)
 
+    monkeypatch.setattr(compiler, "_REPLACE_OS_NAME", "nt", raising=False)
     monkeypatch.setattr(compiler.os, "replace", transient_replace)
+    monkeypatch.setattr(compiler.time, "sleep", sleeps.append)
 
     write_compiled_pack({"complete": True}, target)
 
     assert attempts == 3
+    assert sleeps == [0.0, 0.001]
     assert target.read_bytes() == b'{"complete":true}\n'
     assert temp_files(tmp_path) == []
 
@@ -244,6 +250,7 @@ def test_permanent_permission_error_exhausts_retries_and_reraises_latest_error(
     target = tmp_path / "compiled.json"
     target.write_bytes(b"existing\n")
     errors: list[PermissionError] = []
+    sleeps: list[float] = []
 
     def permanent_replace(_source: str | Path, _destination: str | Path) -> None:
         error = PermissionError(f"attempt {len(errors) + 1}")
@@ -251,12 +258,15 @@ def test_permanent_permission_error_exhausts_retries_and_reraises_latest_error(
         errors.append(error)
         raise error
 
+    monkeypatch.setattr(compiler, "_REPLACE_OS_NAME", "nt", raising=False)
     monkeypatch.setattr(compiler.os, "replace", permanent_replace)
+    monkeypatch.setattr(compiler.time, "sleep", sleeps.append)
 
     with pytest.raises(PermissionError) as raised:
         write_compiled_pack({"new": True}, target)
 
     assert len(errors) == 5
+    assert sleeps == [0.0, 0.001, 0.002, 0.004]
     assert raised.value is errors[-1]
     assert target.read_bytes() == b"existing\n"
     assert temp_files(tmp_path) == []
@@ -268,6 +278,7 @@ def test_non_permission_replace_error_is_not_retried(
     target = tmp_path / "compiled.json"
     expected = OSError("replace failed")
     attempts = 0
+    sleeps: list[float] = []
 
     def fail_replace(_source: str | Path, _destination: str | Path) -> None:
         nonlocal attempts
@@ -275,17 +286,82 @@ def test_non_permission_replace_error_is_not_retried(
         raise expected
 
     monkeypatch.setattr(compiler.os, "replace", fail_replace)
+    monkeypatch.setattr(compiler.time, "sleep", sleeps.append)
 
     with pytest.raises(OSError) as raised:
         write_compiled_pack({"new": True}, target)
 
     assert attempts == 1
+    assert sleeps == []
     assert raised.value is expected
     assert temp_files(tmp_path) == []
 
 
+@pytest.mark.parametrize("winerror", [5, 32])
+def test_transient_replace_classifier_accepts_allowed_windows_codes(
+    monkeypatch: pytest.MonkeyPatch, winerror: int
+) -> None:
+    error = PermissionError(f"WinError {winerror}")
+    error.winerror = winerror  # type: ignore[attr-defined]
+    monkeypatch.setattr(compiler, "_REPLACE_OS_NAME", "nt", raising=False)
+
+    assert compiler._is_transient_replace_error(error) is True
+
+
+@pytest.mark.parametrize(
+    ("platform", "winerror", "posix_errno"),
+    [
+        ("nt", None, None),
+        ("nt", 1, None),
+        ("nt", 33, None),
+        ("posix", 5, None),
+        ("posix", 32, None),
+        ("posix", None, errno.EACCES),
+        ("posix", None, errno.EPERM),
+    ],
+)
+def test_non_transient_permission_error_is_not_retried_or_slept(
+    monkeypatch: pytest.MonkeyPatch,
+    platform: str,
+    winerror: int | None,
+    posix_errno: int | None,
+) -> None:
+    expected = (
+        PermissionError(posix_errno, "permission denied")
+        if posix_errno is not None
+        else PermissionError("permission denied")
+    )
+    if winerror is not None:
+        expected.winerror = winerror  # type: ignore[attr-defined]
+    attempts = 0
+    sleeps: list[float] = []
+
+    def fail_replace(_source: str | Path, _destination: str | Path) -> None:
+        nonlocal attempts
+        attempts += 1
+        raise expected
+
+    monkeypatch.setattr(compiler, "_REPLACE_OS_NAME", platform, raising=False)
+    monkeypatch.setattr(compiler.os, "replace", fail_replace)
+    monkeypatch.setattr(compiler.time, "sleep", sleeps.append)
+
+    with pytest.raises(PermissionError) as raised:
+        compiler._replace_atomically(Path("staging.tmp"), Path("target.json"))
+
+    assert attempts == 1
+    assert sleeps == []
+    assert raised.value is expected
+
+
+@pytest.mark.parametrize(
+    "cleanup_error",
+    [OSError("cleanup failed"), RuntimeError("cleanup failed")],
+    ids=["os-error", "runtime-error"],
+)
 def test_cleanup_failure_does_not_mask_the_original_failure(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    cleanup_error: Exception,
 ) -> None:
     target = tmp_path / "compiled.json"
     expected = OSError("replace failed")
@@ -294,7 +370,11 @@ def test_cleanup_failure_does_not_mask_the_original_failure(
         "replace",
         lambda _source, _target: (_ for _ in ()).throw(expected),
     )
-    monkeypatch.setattr(compiler.os, "unlink", lambda _path: (_ for _ in ()).throw(PermissionError("cleanup failed")))
+    monkeypatch.setattr(
+        compiler.os,
+        "unlink",
+        lambda _path: (_ for _ in ()).throw(cleanup_error),
+    )
 
     with pytest.raises(OSError) as raised:
         write_compiled_pack({"new": True}, target)
@@ -303,16 +383,43 @@ def test_cleanup_failure_does_not_mask_the_original_failure(
 
 
 def test_concurrent_writers_publish_one_complete_document_without_temp_leaks(
-    tmp_path: Path,
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     target = tmp_path / "compiled.json"
     values = [
         {"writer": "first", "payload": "a" * 4096},
         {"writer": "second", "payload": "b" * 4096},
     ]
+    barrier = Barrier(2)
+    lock = Lock()
+    first_attempts: set[Path] = set()
+    simultaneous_live_staging: list[bool] = []
+    real_replace = compiler.os.replace
+
+    def overlapping_replace(source: str | Path, destination: str | Path) -> None:
+        staging = Path(source)
+        wait_for_peer = False
+        with lock:
+            if staging not in first_attempts:
+                assert staging.exists()
+                first_attempts.add(staging)
+                simultaneous_live_staging.append(
+                    len(first_attempts) == 2
+                    and all(path.exists() for path in first_attempts)
+                )
+                wait_for_peer = True
+        if wait_for_peer:
+            barrier.wait(timeout=5)
+        real_replace(source, destination)
+
+    monkeypatch.setattr(compiler.os, "replace", overlapping_replace)
 
     with ThreadPoolExecutor(max_workers=2) as executor:
         list(executor.map(lambda value: write_compiled_pack(value, target), values))
 
+    assert len(first_attempts) == 2
+    assert all(path.parent == target.parent for path in first_attempts)
+    assert all(path.suffix == ".tmp" for path in first_attempts)
+    assert any(simultaneous_live_staging)
     assert target.read_bytes() in {canonical_bytes(value) + b"\n" for value in values}
     assert temp_files(tmp_path) == []

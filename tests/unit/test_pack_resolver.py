@@ -221,3 +221,59 @@ def test_resolution_is_deterministic_and_does_not_mutate_inputs() -> None:
     assert first == second
     assert first is not second
     assert (base, user, host_caps, immutable) == originals
+
+
+def test_mutating_selected_nested_values_does_not_mutate_any_input_layer() -> None:
+    base = {
+        "base_nested": {"items": ["base"]},
+        "immutable_nested": {"items": ["identity"]},
+    }
+    user = {"user_nested": {"items": ["user"]}}
+    host_caps = {"host_nested": {"items": ["host"]}}
+    immutable = {"immutable_nested"}
+    originals = deepcopy((base, user, host_caps, immutable))
+
+    resolved = resolve_profile(base, user, host_caps, immutable)
+    for key in ("base_nested", "immutable_nested", "user_nested", "host_nested"):
+        resolved[key]["items"].append("changed")
+
+    assert (base, user, host_caps, immutable) == originals
+
+
+def test_mutating_inputs_after_resolution_does_not_mutate_selected_values() -> None:
+    base = {
+        "base_nested": {"items": ["base"]},
+        "immutable_nested": {"items": ["identity"]},
+    }
+    user = {"user_nested": {"items": ["user"]}}
+    host_caps = {"host_nested": {"items": ["host"]}}
+    immutable = {"immutable_nested"}
+
+    resolved = resolve_profile(base, user, host_caps, immutable)
+    expected = deepcopy(resolved)
+    base["base_nested"]["items"].append("changed")
+    base["immutable_nested"]["items"].append("changed")
+    user["user_nested"]["items"].append("changed")
+    host_caps["host_nested"]["items"].append("changed")
+
+    assert resolved == expected
+
+
+def test_resolutions_and_selected_keys_do_not_share_mutable_values() -> None:
+    shared = {"items": ["original"]}
+    base = {"first": shared, "second": shared}
+
+    first = resolve_profile(base, {}, {}, set())
+    second = resolve_profile(base, {}, {}, set())
+    first["first"]["items"].append("first-result")
+    first["second"]["items"].append("second-key")
+
+    assert base == {
+        "first": {"items": ["original"]},
+        "second": {"items": ["original"]},
+    }
+    assert second == {
+        "first": {"items": ["original"]},
+        "second": {"items": ["original"]},
+    }
+    assert first["first"] is not first["second"]
