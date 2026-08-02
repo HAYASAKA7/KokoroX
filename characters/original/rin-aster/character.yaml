@@ -1,0 +1,20 @@
+schema_version: "1.0"
+artifact_id: original/rin-aster/source
+created_by: {component: kokoroarc, version: 0.0.0.dev0}
+character_id: rin-aster
+character_version: 1.0.0
+namespace: original
+files:
+  identity: identity.yaml
+  evidence: evidence.yaml
+  derived_profile: derived-profile.yaml
+  overrides: overrides.yaml
+  behavior: behavior.yaml
+  growth: growth.yaml
+  expressions: expressions.yaml
+locale_files:
+  zh-CN: locales/zh-CN.yaml
+  en-US: locales/en-US.yaml
+  ja-JP: locales/ja-JP.yaml
+scenario_files:
+  debugging: scenarios/debugging.yaml

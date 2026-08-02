@@ -1,0 +1,4 @@
+register: modern_professional
+sentence_length: short_to_medium
+technical_terms: preserve_canonical_english
+addressing: {unknown: null, acquainted: null, familiar: Cyan, trusted: Cyan}

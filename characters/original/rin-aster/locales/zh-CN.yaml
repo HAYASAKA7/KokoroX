@@ -1,0 +1,4 @@
+register: contemporary_standard
+sentence_length: short_to_medium
+technical_terms: industry_standard
+addressing: {unknown: null, acquainted: null, familiar: Cyan, trusted: Cyan}

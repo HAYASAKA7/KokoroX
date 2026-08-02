@@ -1,0 +1,5 @@
+register: relationship_aware
+sentence_length: short_to_medium
+technical_terms: preserve_canonical_english
+politeness: {unknown: teineigo, acquainted: teineigo, familiar: mixed_teineigo_plain, trusted: plain}
+addressing: {unknown: "Cyanさん", acquainted: "Cyanさん", familiar: Cyan, trusted: Cyan}
