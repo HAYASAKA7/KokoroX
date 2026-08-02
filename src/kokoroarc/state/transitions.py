@@ -31,6 +31,14 @@ def apply_event(
     if event_id in result["applied_event_ids"]:
         return result
 
+    effects = event["effects"]
+    for dimension in effects:
+        if dimension not in result["dimensions"]:
+            raise KokoroError(
+                "INVALID_EVENT",
+                f"Unknown dimension: {dimension}",
+            )
+
     novelty_key = event["novelty_key"]
     if len(result["applied_event_ids"]) >= MAX_APPLIED_EVENT_IDS:
         raise _capacity_exceeded(
@@ -53,12 +61,7 @@ def apply_event(
         and result["turn_index"] - last_seen < repetition_window
     )
 
-    for dimension, proposed in event["effects"].items():
-        if dimension not in result["dimensions"]:
-            raise KokoroError(
-                "INVALID_EVENT",
-                f"Unknown dimension: {dimension}",
-            )
+    for dimension, proposed in effects.items():
         delta = (
             0.0
             if repeated

@@ -368,6 +368,63 @@ def test_duplicate_event_at_capacity_remains_idempotent() -> None:
     SCHEMAS.validate("relationship-state", result)
 
 
+def test_duplicate_event_precedes_malformed_effect_validation_at_capacity() -> None:
+    original_state = schema_state(
+        applied_event_ids=[f"event-{index}" for index in range(10_000)],
+        recent_novelty={
+            f"novelty-{index}": 0 for index in range(10_000)
+        },
+    )
+    interaction = schema_event("event-9999", "brand-new-novelty")
+    interaction["effects"] = {"affection": 1.0}
+    SCHEMAS.validate("relationship-state", original_state)
+
+    result = apply_event(original_state, interaction, max_delta=4.0)
+
+    assert result == original_state
+    assert result is not original_state
+
+
+def test_unknown_dimension_precedes_applied_event_id_capacity() -> None:
+    original_state = schema_state(
+        applied_event_ids=[f"event-{index}" for index in range(10_000)]
+    )
+    interaction = schema_event("event-overflow", "new-novelty")
+    interaction["effects"] = {"affection": 1.0}
+    state_before = deepcopy(original_state)
+    event_before = deepcopy(interaction)
+    SCHEMAS.validate("relationship-state", original_state)
+
+    with pytest.raises(KokoroError) as raised:
+        apply_event(original_state, interaction, max_delta=4.0)
+
+    assert raised.value.code == "INVALID_EVENT"
+    assert str(raised.value) == "Unknown dimension: affection"
+    assert original_state == state_before
+    assert interaction == event_before
+
+
+def test_unknown_dimension_precedes_novelty_capacity() -> None:
+    original_state = schema_state(
+        recent_novelty={
+            f"novelty-{index}": 0 for index in range(10_000)
+        }
+    )
+    interaction = schema_event("new-event", "brand-new-novelty")
+    interaction["effects"] = {"affection": 1.0}
+    state_before = deepcopy(original_state)
+    event_before = deepcopy(interaction)
+    SCHEMAS.validate("relationship-state", original_state)
+
+    with pytest.raises(KokoroError) as raised:
+        apply_event(original_state, interaction, max_delta=4.0)
+
+    assert raised.value.code == "INVALID_EVENT"
+    assert str(raised.value) == "Unknown dimension: affection"
+    assert original_state == state_before
+    assert interaction == event_before
+
+
 def test_new_novelty_key_is_rejected_at_novelty_capacity() -> None:
     original_state = schema_state(
         recent_novelty={
