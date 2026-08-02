@@ -1,0 +1,269 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kokoroarc.local/schemas/v1/compiled-pack.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "artifact_id",
+    "created_by",
+    "character_id",
+    "character_version",
+    "source_hash",
+    "identity",
+    "effective_profile",
+    "provenance",
+    "behavior",
+    "growth",
+    "expressions",
+    "locales",
+    "scenarios"
+  ],
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "artifact_id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9._/-]{0,127}$"
+    },
+    "created_by": {"$ref": "#/$defs/created_by"},
+    "character_id": {"$ref": "#/$defs/slug_id"},
+    "character_version": {"$ref": "#/$defs/character_version"},
+    "source_hash": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "identity": {"$ref": "#/$defs/identity"},
+    "effective_profile": {
+      "allOf": [
+        {"$ref": "#/$defs/trait_map"},
+        {"minProperties": 1}
+      ]
+    },
+    "provenance": {"$ref": "#/$defs/provenance"},
+    "behavior": {"$ref": "#/$defs/behavior"},
+    "growth": {"$ref": "#/$defs/growth"},
+    "expressions": {"$ref": "#/$defs/expressions"},
+    "locales": {"$ref": "#/$defs/locales"},
+    "scenarios": {"$ref": "#/$defs/scenarios"}
+  },
+  "$defs": {
+    "created_by": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["component", "version"],
+      "properties": {
+        "component": {"const": "kokoroarc"},
+        "version": {"type": "string", "minLength": 1, "maxLength": 64}
+      }
+    },
+    "slug_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+    },
+    "character_version": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(?:-[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)?(?:\\+[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)?$"
+    },
+    "bounded_string": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "string_array": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 32,
+      "uniqueItems": true,
+      "items": {"$ref": "#/$defs/bounded_string"}
+    },
+    "identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["display_name", "declared_age", "role", "non_negotiables"],
+      "properties": {
+        "display_name": {"$ref": "#/$defs/bounded_string"},
+        "declared_age": {"$ref": "#/$defs/bounded_string"},
+        "role": {"$ref": "#/$defs/bounded_string"},
+        "worldview": {"$ref": "#/$defs/string_array"},
+        "non_negotiables": {"$ref": "#/$defs/string_array"}
+      }
+    },
+    "trait_map": {
+      "type": "object",
+      "maxProperties": 128,
+      "additionalProperties": false,
+      "patternProperties": {
+        "^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      }
+    },
+    "provenance_entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["selected_layer"],
+      "properties": {
+        "selected_layer": {"enum": ["derived_profile", "user_override"]}
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "minProperties": 1,
+      "maxProperties": 128,
+      "additionalProperties": false,
+      "patternProperties": {
+        "^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$": {
+          "$ref": "#/$defs/provenance_entry"
+        }
+      }
+    },
+    "intensity": {
+      "enum": ["neutral", "subtle", "balanced", "immersive", "performance"]
+    },
+    "behavior": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["default_intensity"],
+      "properties": {
+        "default_intensity": {"$ref": "#/$defs/intensity"},
+        "catchphrase_frequency": {"$ref": "#/$defs/bounded_string"},
+        "correction_style": {"$ref": "#/$defs/bounded_string"},
+        "reassurance_style": {"$ref": "#/$defs/bounded_string"}
+      }
+    },
+    "stage_thresholds": {
+      "type": "object",
+      "additionalProperties": false,
+      "minProperties": 1,
+      "properties": {
+        "enter_familiarity": {"type": "number", "minimum": 0, "maximum": 100},
+        "exit_familiarity": {"type": "number", "minimum": 0, "maximum": 100},
+        "enter_trust": {"type": "number", "minimum": 0, "maximum": 100},
+        "exit_trust": {"type": "number", "minimum": 0, "maximum": 100},
+        "max_tension": {"type": "number", "minimum": 0, "maximum": 100}
+      }
+    },
+    "growth": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["dimensions"],
+      "properties": {
+        "dimensions": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 4,
+          "uniqueItems": true,
+          "items": {
+            "enum": ["familiarity", "trust", "collaboration", "tension"]
+          }
+        },
+        "max_delta_per_event": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 100
+        },
+        "repetition_window_turns": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10000
+        },
+        "stages": {
+          "type": "object",
+          "minProperties": 1,
+          "maxProperties": 32,
+          "additionalProperties": false,
+          "patternProperties": {
+            "^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$": {
+              "$ref": "#/$defs/stage_thresholds"
+            }
+          }
+        }
+      }
+    },
+    "expression_lines": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 32,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 500
+      }
+    },
+    "expression_locale_set": {
+      "type": "object",
+      "additionalProperties": false,
+      "minProperties": 1,
+      "properties": {
+        "zh-CN": {"$ref": "#/$defs/expression_lines"},
+        "en-US": {"$ref": "#/$defs/expression_lines"},
+        "ja-JP": {"$ref": "#/$defs/expression_lines"}
+      }
+    },
+    "expressions": {
+      "type": "object",
+      "minProperties": 1,
+      "maxProperties": 256,
+      "additionalProperties": false,
+      "patternProperties": {
+        "^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$": {
+          "$ref": "#/$defs/expression_locale_set"
+        }
+      }
+    },
+    "relationship_stage_map": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "unknown": {"type": ["string", "null"], "maxLength": 128},
+        "acquainted": {"type": ["string", "null"], "maxLength": 128},
+        "familiar": {"type": ["string", "null"], "maxLength": 128},
+        "trusted": {"type": ["string", "null"], "maxLength": 128}
+      }
+    },
+    "locale_config": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "register": {"$ref": "#/$defs/bounded_string"},
+        "sentence_length": {"$ref": "#/$defs/bounded_string"},
+        "technical_terms": {"$ref": "#/$defs/bounded_string"},
+        "addressing": {"$ref": "#/$defs/relationship_stage_map"},
+        "politeness": {"$ref": "#/$defs/relationship_stage_map"}
+      }
+    },
+    "locales": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["zh-CN", "en-US", "ja-JP"],
+      "properties": {
+        "zh-CN": {"$ref": "#/$defs/locale_config"},
+        "en-US": {"$ref": "#/$defs/locale_config"},
+        "ja-JP": {"$ref": "#/$defs/locale_config"}
+      }
+    },
+    "scenario": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "first_action": {"$ref": "#/$defs/bounded_string"},
+        "hypothesis_style": {"$ref": "#/$defs/bounded_string"},
+        "correction_style": {"$ref": "#/$defs/bounded_string"},
+        "reassurance": {"$ref": "#/$defs/bounded_string"},
+        "intensity_cap": {"$ref": "#/$defs/intensity"}
+      }
+    },
+    "scenarios": {
+      "type": "object",
+      "minProperties": 1,
+      "maxProperties": 128,
+      "additionalProperties": false,
+      "patternProperties": {
+        "^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$": {"$ref": "#/$defs/scenario"}
+      }
+    }
+  }
+}

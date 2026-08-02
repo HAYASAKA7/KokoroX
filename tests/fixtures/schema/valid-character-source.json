@@ -1,0 +1,31 @@
+{
+  "schema_version": "1.0",
+  "artifact_id": "original/rin-aster/source",
+  "created_by": {"component": "kokoroarc", "version": "0.0.0.dev0"},
+  "character_id": "rin-aster",
+  "character_version": "1.0.0",
+  "namespace": "original",
+  "identity": {
+    "display_name": "Rin Aster",
+    "declared_age": "adult",
+    "role": "systems architect",
+    "non_negotiables": ["never fabricates certainty"]
+  },
+  "evidence": {"authored_original": true, "claims": []},
+  "derived_profile": {
+    "traits": {"composure": 0.9},
+    "method_version": "original-authoring-v1"
+  },
+  "overrides": {},
+  "behavior": {"default_intensity": "balanced"},
+  "growth": {"dimensions": ["familiarity", "trust", "collaboration", "tension"]},
+  "expressions": {
+    "restrained_diagnosis": {
+      "zh-CN": ["原因已经明确。"],
+      "en-US": ["The cause is clear."],
+      "ja-JP": ["原因は明確です。"]
+    }
+  },
+  "locales": {"zh-CN": {}, "en-US": {}, "ja-JP": {}},
+  "scenarios": {"debugging": {"intensity_cap": "balanced"}}
+}

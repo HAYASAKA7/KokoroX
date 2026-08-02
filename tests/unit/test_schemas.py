@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 
 import pytest
@@ -5,6 +6,76 @@ from jsonschema import Draft202012Validator
 
 from kokoroarc.errors import KokoroError
 from kokoroarc.schemas import SchemaRegistry
+
+
+def load_fixture(name: str) -> dict:
+    path = Path("tests/fixtures/schema") / name
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def valid_compiled_pack() -> dict:
+    return {
+        "schema_version": "1.0",
+        "artifact_id": "original/rin-aster/compiled",
+        "created_by": {"component": "kokoroarc", "version": "0.0.0.dev0"},
+        "character_id": "rin-aster",
+        "character_version": "1.0.0",
+        "source_hash": "a" * 64,
+        "identity": {
+            "display_name": "Rin Aster",
+            "declared_age": "adult",
+            "role": "systems architect",
+            "non_negotiables": ["never fabricates certainty"],
+        },
+        "effective_profile": {"composure": 0.9},
+        "provenance": {
+            "composure": {"selected_layer": "derived_profile"},
+        },
+        "behavior": {"default_intensity": "balanced"},
+        "growth": {
+            "dimensions": ["familiarity", "trust", "collaboration", "tension"]
+        },
+        "expressions": {
+            "restrained_diagnosis": {
+                "zh-CN": ["原因已经明确。"],
+                "en-US": ["The cause is clear."],
+                "ja-JP": ["原因は明確です。"],
+            }
+        },
+        "locales": {"zh-CN": {}, "en-US": {}, "ja-JP": {}},
+        "scenarios": {"debugging": {"intensity_cap": "balanced"}},
+    }
+
+
+def test_character_source_schema_accepts_original_pack() -> None:
+    SchemaRegistry(Path("schemas/v1")).validate(
+        "character-source", load_fixture("valid-character-source.json")
+    )
+
+
+def test_character_source_schema_rejects_executable_hook() -> None:
+    with pytest.raises(KokoroError) as raised:
+        SchemaRegistry(Path("schemas/v1")).validate(
+            "character-source", load_fixture("invalid-character-source.json")
+        )
+
+    assert raised.value.code == "SCHEMA_VALIDATION_FAILED"
+
+
+def test_compiled_pack_schema_accepts_compiler_output() -> None:
+    SchemaRegistry(Path("schemas/v1")).validate(
+        "compiled-pack", valid_compiled_pack()
+    )
+
+
+def test_compiled_pack_schema_rejects_invalid_source_hash() -> None:
+    document = valid_compiled_pack()
+    document["source_hash"] = "A" * 64
+
+    with pytest.raises(KokoroError) as raised:
+        SchemaRegistry(Path("schemas/v1")).validate("compiled-pack", document)
+
+    assert raised.value.code == "SCHEMA_VALIDATION_FAILED"
 
 
 def test_registry_rejects_missing_artifact_metadata(tmp_path: Path) -> None:
