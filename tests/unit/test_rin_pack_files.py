@@ -1,5 +1,6 @@
-from pathlib import Path
+from pathlib import Path, PurePosixPath, PureWindowsPath
 
+import pytest
 import yaml
 
 from kokoroarc.schemas import SchemaRegistry
@@ -16,6 +17,24 @@ def test_rin_pack_declares_three_locales_and_debugging_scenario() -> None:
         "ja-JP": "locales/ja-JP.yaml",
     }
     assert manifest["scenario_files"] == {"debugging": "scenarios/debugging.yaml"}
+
+
+@pytest.mark.parametrize(
+    ("reference", "expected"),
+    [
+        ("identity.yaml", True),
+        ("locales/zh-CN.yaml", True),
+        ("/outside.yaml", False),
+        ("../escape.yaml", False),
+        (r"C:\outside.yaml", False),
+        (r"\outside.yaml", False),
+        (r"locales\zh-CN.yaml", False),
+    ],
+)
+def test_rin_pack_manifest_reference_path_examples(
+    reference: str, expected: bool
+) -> None:
+    assert _is_relative_posix_manifest_reference(reference) is expected
 
 
 EXPECTED_MANIFEST = {
@@ -186,6 +205,19 @@ def load_yaml(relative_path: str) -> dict:
     return document
 
 
+def _is_relative_posix_manifest_reference(reference: str) -> bool:
+    posix_path = PurePosixPath(reference)
+    windows_path = PureWindowsPath(reference)
+    return (
+        reference == posix_path.as_posix()
+        and reference == windows_path.as_posix()
+        and not posix_path.is_absolute()
+        and not windows_path.drive
+        and not windows_path.root
+        and ".." not in posix_path.parts
+    )
+
+
 def test_rin_pack_yaml_files_are_mappings() -> None:
     for relative_path in ALL_YAML_FILES:
         load_yaml(relative_path)
@@ -266,7 +298,4 @@ def test_rin_pack_manifest_references_are_relative_posix_paths() -> None:
     ]
 
     for reference in references:
-        path = Path(reference)
-        assert not path.is_absolute()
-        assert "\\" not in reference
-        assert ".." not in reference.split("/")
+        assert _is_relative_posix_manifest_reference(reference)
