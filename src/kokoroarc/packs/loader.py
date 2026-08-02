@@ -26,6 +26,7 @@ _REQUIRED_COMPONENTS = frozenset(
 )
 _REQUIRED_LOCALES = frozenset({"zh-CN", "en-US", "ja-JP"})
 _SCENARIO_NAME_PATTERN = re.compile(r"[a-z][a-z0-9]*(?:_[a-z0-9]+)*")
+_WINDOWS_ILLEGAL_CHARACTERS = frozenset('*?"<>|')
 _WINDOWS_RESERVED_NAMES = frozenset(
     {
         "con",
@@ -103,7 +104,10 @@ def resolve_pack_file(root: Path, relative: str) -> Path:
 
 
 def _is_unsafe_windows_component(component: str) -> bool:
-    if component.endswith((" ", ".")):
+    if component.endswith((" ", ".")) or any(
+        character in _WINDOWS_ILLEGAL_CHARACTERS or ord(character) < 32
+        for character in component
+    ):
         return True
     device_name = component.split(".", 1)[0].rstrip(" ").casefold()
     return device_name in _WINDOWS_RESERVED_NAMES
@@ -149,19 +153,12 @@ def _reject_alias_events(contents: str) -> None:
 
 def load_source_pack(root: Path, schemas: SchemaRegistry) -> dict[str, Any]:
     scanned_files = frozenset(scan_pack(root, PackLimits()))
-    cache: dict[Path, dict[str, Any]] = {}
-
-    def load_reference(relative: str) -> dict[str, Any]:
-        path = resolve_pack_file(root, relative)
-        if path not in scanned_files:
-            raise _invalid_pack_data(
-                "Character pack reference was not found.", "unscanned_reference"
-            )
-        if path not in cache:
-            cache[path] = load_yaml(path)
-        return cache[path]
-
-    manifest = load_reference("character.yaml")
+    manifest_path = resolve_pack_file(root, "character.yaml")
+    if manifest_path not in scanned_files:
+        raise _invalid_pack_data(
+            "Character pack reference was not found.", "unscanned_reference"
+        )
+    manifest = load_yaml(manifest_path)
     if any(not isinstance(key, str) for key in manifest):
         raise _invalid_pack_data(
             "Character pack manifest is invalid.", "invalid_manifest_key"
@@ -172,20 +169,23 @@ def load_source_pack(root: Path, schemas: SchemaRegistry) -> dict[str, Any]:
         for section in _REFERENCE_SECTIONS
     }
     _validate_reference_names(references)
+    resolved_references = _resolve_reference_paths(
+        root, references, scanned_files, manifest_path
+    )
     assembled = {
         key: manifest[key]
         for key in sorted(manifest)
         if key not in _REFERENCE_SECTIONS
     }
-    for component, relative in references["files"]:
-        assembled[component] = load_reference(relative)
+    for component, path in resolved_references["files"]:
+        assembled[component] = load_yaml(path)
     assembled["locales"] = {
-        locale: load_reference(relative)
-        for locale, relative in references["locale_files"]
+        locale: load_yaml(path)
+        for locale, path in resolved_references["locale_files"]
     }
     assembled["scenarios"] = {
-        scenario: load_reference(relative)
-        for scenario, relative in references["scenario_files"]
+        scenario: load_yaml(path)
+        for scenario, path in resolved_references["scenario_files"]
     }
     schemas.validate("character-source", assembled)
     return assembled
@@ -235,6 +235,36 @@ def _validate_reference_names(
         raise _invalid_pack_data(
             "Character pack manifest is invalid.", "invalid_scenario_names"
         )
+
+
+def _resolve_reference_paths(
+    root: Path,
+    references: dict[str, list[tuple[str, str]]],
+    scanned_files: frozenset[Path],
+    manifest_path: Path,
+) -> dict[str, list[tuple[str, Path]]]:
+    resolved_references: dict[str, list[tuple[str, Path]]] = {
+        section: [] for section in _REFERENCE_SECTIONS
+    }
+    used_paths = {manifest_path}
+    for section in _REFERENCE_SECTIONS:
+        for name, relative in references[section]:
+            path = resolve_pack_file(root, relative)
+            if path in used_paths:
+                raise _invalid_pack_data(
+                    "Character pack references must be independent.",
+                    "duplicate_reference",
+                )
+            used_paths.add(path)
+            resolved_references[section].append((name, path))
+    for section in _REFERENCE_SECTIONS:
+        for _name, path in resolved_references[section]:
+            if path not in scanned_files:
+                raise _invalid_pack_data(
+                    "Character pack reference was not found.",
+                    "unscanned_reference",
+                )
+    return resolved_references
 
 
 def _unsafe_pack_path(reason: str) -> KokoroError:

@@ -61,6 +61,26 @@ def test_resolve_pack_file_rejects_windows_namespace_ambiguities(
 @pytest.mark.parametrize(
     "reference",
     [
+        "star*.yaml",
+        "nested/query?.yaml",
+        'quote"name.yaml',
+        "nested/less<than.yml",
+        "greater>than.yaml",
+        "nested/pipe|name.yaml",
+        "control\x01.yaml",
+        "nested/tab\tname.yml",
+        "nul\x00name.yaml",
+    ],
+)
+def test_resolve_pack_file_rejects_portable_windows_illegal_characters(
+    tmp_path: Path, reference: str
+) -> None:
+    assert_unsafe_reference(tmp_path, reference)
+
+
+@pytest.mark.parametrize(
+    "reference",
+    [
         "CON.yaml",
         "nested/nUl.yaml",
         "AUX.profile.yml",
@@ -135,26 +155,40 @@ def test_load_source_pack_rejects_duplicate_manifest_reference_map(
     assert raised.value.code == "INVALID_PACK_DATA"
 
 
-@pytest.mark.parametrize("kind", ["missing", "directory", "invalid-utf8"])
+@pytest.mark.parametrize(
+    ("kind", "reason"),
+    [
+        ("missing", "unscanned_reference"),
+        ("directory", "unscanned_reference"),
+        ("invalid-utf8", "read_failed"),
+    ],
+)
 def test_load_source_pack_wraps_referenced_target_failures(
-    tmp_path: Path, kind: str
+    tmp_path: Path, kind: str, reason: str
 ) -> None:
-    (tmp_path / "character.yaml").write_text(
-        "files: {identity: sensitive-target.yaml}\n"
-        "locale_files: {}\n"
-        "scenario_files: {}\n",
+    repository_root = Path(__file__).resolve().parents[2]
+    pack = tmp_path / "pack"
+    shutil.copytree(
+        repository_root / "characters" / "original" / "rin-aster", pack
+    )
+    manifest_path = pack / "character.yaml"
+    manifest_path.write_text(
+        manifest_path.read_text(encoding="utf-8").replace(
+            "identity: identity.yaml", "identity: sensitive-target.yaml"
+        ),
         encoding="utf-8",
     )
-    target = tmp_path / "sensitive-target.yaml"
+    target = pack / "sensitive-target.yaml"
     if kind == "directory":
         target.mkdir()
     elif kind == "invalid-utf8":
         target.write_bytes(b"\xff")
 
     with pytest.raises(KokoroError) as raised:
-        load_source_pack(tmp_path, SchemaRegistry(Path("schemas/v1")))
+        load_source_pack(pack, SchemaRegistry(repository_root / "schemas" / "v1"))
 
     assert raised.value.code == "INVALID_PACK_DATA"
+    assert raised.value.details == {"reason": reason}
     assert "sensitive-target" not in raised.value.message
     assert "sensitive-target" not in repr(raised.value.details)
 

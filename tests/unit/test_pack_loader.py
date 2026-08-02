@@ -26,10 +26,28 @@ REQUIRED_LOCALES = {"zh-CN", "en-US", "ja-JP"}
 
 def valid_reference_manifest() -> dict[str, Any]:
     return {
-        "files": {name: "payload.yaml" for name in REQUIRED_COMPONENTS},
-        "locale_files": {name: "payload.yaml" for name in REQUIRED_LOCALES},
-        "scenario_files": {"debugging": "payload.yaml"},
+        "files": {
+            name: f"components/{name}.yaml" for name in REQUIRED_COMPONENTS
+        },
+        "locale_files": {
+            name: f"locales/{name}.yaml" for name in REQUIRED_LOCALES
+        },
+        "scenario_files": {"debugging": "scenarios/debugging.yaml"},
     }
+
+
+def scanned_manifest_paths(
+    root: Path, manifest: dict[str, Any]
+) -> list[Path]:
+    references = {
+        relative
+        for section in ("files", "locale_files", "scenario_files")
+        for relative in manifest[section].values()
+    }
+    return [
+        (root / "character.yaml").resolve(),
+        *((root / relative).resolve() for relative in sorted(references)),
+    ]
 
 
 def test_resolve_pack_file_accepts_nested_yaml_path(tmp_path: Path) -> None:
@@ -278,10 +296,7 @@ def test_load_source_pack_propagates_schema_error_after_exactly_one_validation(
         validations.append((name, value))
         raise expected
 
-    scanned = [
-        (tmp_path / "character.yaml").resolve(),
-        (tmp_path / "payload.yaml").resolve(),
-    ]
+    scanned = scanned_manifest_paths(tmp_path, manifest)
     monkeypatch.setattr(pack_loader, "scan_pack", lambda *_args: scanned)
 
     def fake_load(path: Path) -> dict[str, Any]:
@@ -301,18 +316,38 @@ def test_load_source_pack_propagates_schema_error_after_exactly_one_validation(
 
 
 @pytest.mark.parametrize(
-    ("section", "names"),
+    ("section", "names", "reason"),
     [
-        ("files", REQUIRED_COMPONENTS - {"identity"}),
-        ("files", REQUIRED_COMPONENTS | {"unknown"}),
-        ("locale_files", REQUIRED_LOCALES - {"ja-JP"}),
-        ("locale_files", REQUIRED_LOCALES | {"fr-FR"}),
-        ("scenario_files", set()),
-        ("scenario_files", {f"scenario_{index}" for index in range(129)}),
-        ("scenario_files", {"Debugging"}),
-        ("scenario_files", {"bad-name"}),
-        ("scenario_files", {"9invalid"}),
-        ("scenario_files", {"a" * 129}),
+        (
+            "files",
+            REQUIRED_COMPONENTS - {"identity"},
+            "invalid_component_names",
+        ),
+        (
+            "files",
+            REQUIRED_COMPONENTS | {"unknown"},
+            "invalid_component_names",
+        ),
+        (
+            "locale_files",
+            REQUIRED_LOCALES - {"ja-JP"},
+            "invalid_locale_names",
+        ),
+        (
+            "locale_files",
+            REQUIRED_LOCALES | {"fr-FR"},
+            "invalid_locale_names",
+        ),
+        ("scenario_files", set(), "invalid_scenario_names"),
+        (
+            "scenario_files",
+            {f"scenario_{index}" for index in range(129)},
+            "invalid_scenario_names",
+        ),
+        ("scenario_files", {"Debugging"}, "invalid_scenario_names"),
+        ("scenario_files", {"bad-name"}, "invalid_scenario_names"),
+        ("scenario_files", {"9invalid"}, "invalid_scenario_names"),
+        ("scenario_files", {"a" * 129}, "invalid_scenario_names"),
     ],
 )
 def test_load_source_pack_validates_all_reference_names_before_target_reads(
@@ -320,8 +355,13 @@ def test_load_source_pack_validates_all_reference_names_before_target_reads(
     monkeypatch: pytest.MonkeyPatch,
     section: str,
     names: set[str],
+    reason: str,
 ) -> None:
     manifest = valid_reference_manifest()
+    for reference_section in ("files", "locale_files", "scenario_files"):
+        manifest[reference_section] = {
+            name: "payload.yaml" for name in manifest[reference_section]
+        }
     manifest[section] = {name: "payload.yaml" for name in names}
     reads: list[str] = []
 
@@ -329,7 +369,10 @@ def test_load_source_pack_validates_all_reference_names_before_target_reads(
         reads.append(path.name)
         return manifest if path.name == "character.yaml" else {}
 
-    scanned = [(tmp_path / "character.yaml").resolve()]
+    scanned = [
+        (tmp_path / "character.yaml").resolve(),
+        (tmp_path / "payload.yaml").resolve(),
+    ]
     monkeypatch.setattr(pack_loader, "scan_pack", lambda *_args: scanned)
     monkeypatch.setattr(pack_loader, "load_yaml", fake_load)
     schemas = SimpleNamespace(validate=lambda *_args: None)
@@ -338,6 +381,7 @@ def test_load_source_pack_validates_all_reference_names_before_target_reads(
         load_source_pack(tmp_path, schemas)  # type: ignore[arg-type]
 
     assert raised.value.code == "INVALID_PACK_DATA"
+    assert raised.value.details == {"reason": reason}
     assert reads == ["character.yaml"]
 
 
@@ -346,7 +390,8 @@ def test_load_source_pack_does_not_read_target_missing_from_scan_allowlist(
 ) -> None:
     manifest = valid_reference_manifest()
     character_path = tmp_path / "character.yaml"
-    target_path = tmp_path / "payload.yaml"
+    target_path = tmp_path / "components" / "identity.yaml"
+    target_path.parent.mkdir()
     character_path.write_text("manifest: placeholder\n", encoding="utf-8")
     target_path.write_text("payload: present\n", encoding="utf-8")
     reads: list[Path] = []
@@ -355,8 +400,102 @@ def test_load_source_pack_does_not_read_target_missing_from_scan_allowlist(
         reads.append(path)
         return manifest if path == character_path.resolve() else {}
 
+    scanned = set(scanned_manifest_paths(tmp_path, manifest))
+    scanned.remove(target_path.resolve())
+    monkeypatch.setattr(pack_loader, "scan_pack", lambda *_args: sorted(scanned))
+    monkeypatch.setattr(pack_loader, "load_yaml", fake_load)
+    schemas = SimpleNamespace(validate=lambda *_args: None)
+
+    with pytest.raises(KokoroError) as raised:
+        load_source_pack(tmp_path, schemas)  # type: ignore[arg-type]
+
+    assert raised.value.code == "INVALID_PACK_DATA"
+    assert raised.value.details == {"reason": "unscanned_reference"}
+    assert reads == [character_path.resolve()]
+
+
+@pytest.mark.parametrize(
+    ("first", "second"),
+    [
+        ("shared.yaml", "shared.yaml"),
+        ("nested/shared.yaml", "nested//shared.yaml"),
+    ],
+)
+def test_load_source_pack_rejects_duplicate_canonical_references_before_reads(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    first: str,
+    second: str,
+) -> None:
+    manifest = valid_reference_manifest()
+    manifest["locale_files"]["en-US"] = first
+    manifest["locale_files"]["ja-JP"] = second
+    character_path = (tmp_path / "character.yaml").resolve()
+    reads: list[Path] = []
+
+    def fake_load(path: Path) -> dict[str, Any]:
+        reads.append(path)
+        return manifest if path == character_path else {}
+
+    scanned = scanned_manifest_paths(tmp_path, manifest)
+    monkeypatch.setattr(pack_loader, "scan_pack", lambda *_args: scanned)
+    monkeypatch.setattr(pack_loader, "load_yaml", fake_load)
+    validations: list[object] = []
+    schemas = SimpleNamespace(validate=lambda *_args: validations.append(_args))
+
+    with pytest.raises(KokoroError) as raised:
+        load_source_pack(tmp_path, schemas)  # type: ignore[arg-type]
+
+    assert raised.value.code == "INVALID_PACK_DATA"
+    assert raised.value.details == {"reason": "duplicate_reference"}
+    assert reads == [character_path]
+    assert validations == []
+
+
+def test_load_source_pack_reports_duplicate_reference_before_missing_allowlist(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    manifest = valid_reference_manifest()
+    manifest["locale_files"]["en-US"] = "missing.yaml"
+    manifest["locale_files"]["ja-JP"] = "missing.yaml"
+    character_path = (tmp_path / "character.yaml").resolve()
+    missing_path = (tmp_path / "missing.yaml").resolve()
+    reads: list[Path] = []
+
+    def fake_load(path: Path) -> dict[str, Any]:
+        reads.append(path)
+        return manifest if path == character_path else {}
+
+    scanned = set(scanned_manifest_paths(tmp_path, manifest))
+    scanned.remove(missing_path)
+    monkeypatch.setattr(pack_loader, "scan_pack", lambda *_args: sorted(scanned))
+    monkeypatch.setattr(pack_loader, "load_yaml", fake_load)
+    schemas = SimpleNamespace(validate=lambda *_args: None)
+
+    with pytest.raises(KokoroError) as raised:
+        load_source_pack(tmp_path, schemas)  # type: ignore[arg-type]
+
+    assert raised.value.code == "INVALID_PACK_DATA"
+    assert raised.value.details == {"reason": "duplicate_reference"}
+    assert reads == [character_path]
+
+
+def test_load_source_pack_rejects_character_manifest_as_component_reference(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    manifest = valid_reference_manifest()
+    manifest["files"]["identity"] = "character.yaml"
+    character_path = (tmp_path / "character.yaml").resolve()
+    reads: list[Path] = []
+
+    def fake_load(path: Path) -> dict[str, Any]:
+        reads.append(path)
+        return manifest if path == character_path else {}
+
     monkeypatch.setattr(
-        pack_loader, "scan_pack", lambda *_args: [character_path.resolve()]
+        pack_loader,
+        "scan_pack",
+        lambda *_args: scanned_manifest_paths(tmp_path, manifest),
     )
     monkeypatch.setattr(pack_loader, "load_yaml", fake_load)
     schemas = SimpleNamespace(validate=lambda *_args: None)
@@ -365,25 +504,25 @@ def test_load_source_pack_does_not_read_target_missing_from_scan_allowlist(
         load_source_pack(tmp_path, schemas)  # type: ignore[arg-type]
 
     assert raised.value.code == "INVALID_PACK_DATA"
-    assert reads == [character_path.resolve()]
+    assert raised.value.details == {"reason": "duplicate_reference"}
+    assert reads == [character_path]
 
 
-def test_load_source_pack_caches_repeated_canonical_target(
+def test_load_source_pack_keeps_accepted_reference_documents_independent(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     manifest = valid_reference_manifest()
     character_path = (tmp_path / "character.yaml").resolve()
-    target_path = (tmp_path / "payload.yaml").resolve()
     load_counts: dict[Path, int] = {}
 
     def fake_load(path: Path) -> dict[str, Any]:
         load_counts[path] = load_counts.get(path, 0) + 1
-        if path == character_path:
-            return manifest
-        return {"parse_number": load_counts[path]}
+        return manifest if path == character_path else {"path": str(path)}
 
     monkeypatch.setattr(
-        pack_loader, "scan_pack", lambda *_args: [character_path, target_path]
+        pack_loader,
+        "scan_pack",
+        lambda *_args: scanned_manifest_paths(tmp_path, manifest),
     )
     monkeypatch.setattr(pack_loader, "load_yaml", fake_load)
     validations: list[object] = []
@@ -391,8 +530,12 @@ def test_load_source_pack_caches_repeated_canonical_target(
 
     assembled = load_source_pack(tmp_path, schemas)  # type: ignore[arg-type]
 
-    assert load_counts == {character_path: 1, target_path: 1}
-    assert assembled["identity"] is assembled["evidence"]
-    assert assembled["identity"] is assembled["locales"]["en-US"]
-    assert assembled["identity"] is assembled["scenarios"]["debugging"]
+    documents = [
+        *(assembled[name] for name in sorted(REQUIRED_COMPONENTS)),
+        *(assembled["locales"][name] for name in sorted(REQUIRED_LOCALES)),
+        *assembled["scenarios"].values(),
+    ]
+    assert len({id(document) for document in documents}) == len(documents)
+    assert set(load_counts) == set(scanned_manifest_paths(tmp_path, manifest))
+    assert all(count == 1 for count in load_counts.values())
     assert len(validations) == 1
