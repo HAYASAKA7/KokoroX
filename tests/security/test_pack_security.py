@@ -47,6 +47,40 @@ def test_scan_returns_resolved_files_in_deterministic_order(tmp_path: Path) -> N
     assert scan_pack(tmp_path, PackLimits()) == [first.resolve(), second.resolve()]
 
 
+def test_scan_accepts_complete_rin_pack_under_default_limits() -> None:
+    repository_root = Path(__file__).resolve().parents[2]
+    pack_root = (repository_root / "characters" / "original" / "rin-aster").resolve(
+        strict=True
+    )
+    expected_relative_paths = {
+        "behavior.yaml",
+        "character.yaml",
+        "derived-profile.yaml",
+        "evidence.yaml",
+        "expressions.yaml",
+        "growth.yaml",
+        "identity.yaml",
+        "locales/en-US.yaml",
+        "locales/ja-JP.yaml",
+        "locales/zh-CN.yaml",
+        "overrides.yaml",
+        "scenarios/debugging.yaml",
+        "tests/multilingual.yaml",
+        "tests/protected-spans.yaml",
+    }
+
+    files = scan_pack(pack_root, PackLimits())
+
+    assert len(files) == 14
+    assert files == sorted(files, key=lambda path: path.as_posix())
+    assert all(path.is_absolute() for path in files)
+    assert all(path == path.resolve(strict=True) and path.is_file() for path in files)
+    assert all(path.is_relative_to(pack_root) for path in files)
+    assert {
+        path.relative_to(pack_root).as_posix() for path in files
+    } == expected_relative_paths
+
+
 def test_file_size_limit_boundary(tmp_path: Path) -> None:
     file_path = tmp_path / "pack.yaml"
     file_path.write_bytes(b"x" * 32)
