@@ -12,9 +12,9 @@ from kokoroarc.errors import KokoroError
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="kokoro")
     parser.add_argument("--version", action="version", version=f"kokoro {__version__}")
-    commands = parser.add_subparsers(dest="command")
+    commands = parser.add_subparsers(dest="command", required=True)
     session = commands.add_parser("session")
-    session_commands = session.add_subparsers(dest="session_command")
+    session_commands = session.add_subparsers(dest="session_command", required=True)
     show = session_commands.add_parser("show")
     show.add_argument("--json", action="store_true", required=True)
     return parser

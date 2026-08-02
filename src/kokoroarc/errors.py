@@ -11,6 +11,9 @@ class KokoroError(Exception):
     retryable: bool = False
     details: dict[str, Any] = field(default_factory=dict)
 
+    def __str__(self) -> str:
+        return self.message
+
     def envelope(self) -> dict[str, Any]:
         return {
             "ok": False,

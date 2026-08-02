@@ -8,6 +8,26 @@ from typing import Mapping
 from kokoroarc.errors import KokoroError
 
 
+def _installed_schema_candidates() -> tuple[Path, ...]:
+    suffix = Path("share") / "kokoroarc" / "schemas" / "v1"
+    candidates = [Path(sysconfig.get_path("data")) / suffix]
+
+    try:
+        user_scheme = sysconfig.get_preferred_scheme("user")
+    except AttributeError:
+        pass
+    else:
+        try:
+            candidates.append(
+                Path(sysconfig.get_path("data", scheme=user_scheme)) / suffix
+            )
+        except KeyError:
+            pass
+
+    candidates.append(Path(__file__).resolve().parents[1] / suffix)
+    return tuple(dict.fromkeys(candidate.resolve() for candidate in candidates))
+
+
 @dataclass(frozen=True, slots=True)
 class Settings:
     data_dir: Path
@@ -23,12 +43,16 @@ class Settings:
             )
         repository_root = Path(__file__).resolve().parents[2]
         repository_schemas = (repository_root / "schemas" / "v1").resolve()
-        installed_schemas = (
-            Path(sysconfig.get_path("data")) / "share" / "kokoroarc" / "schemas" / "v1"
-        ).resolve()
+        installed_schemas = _installed_schema_candidates()
+        schema_dir = repository_schemas
+        if not schema_dir.is_dir():
+            schema_dir = next(
+                (candidate for candidate in installed_schemas if candidate.is_dir()),
+                installed_schemas[0],
+            )
         return cls(
             data_dir=Path(raw_data_dir).expanduser().resolve(),
-            schema_dir=repository_schemas if repository_schemas.is_dir() else installed_schemas,
+            schema_dir=schema_dir,
         )
 
     def ensure_directories(self) -> None:
