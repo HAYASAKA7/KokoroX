@@ -224,6 +224,57 @@ def test_planned_warning_is_required_when_semantic_warning_list_is_empty() -> No
     assert_schema_valid(result)
 
 
+def test_each_planned_warning_requires_its_own_rendered_segment_id() -> None:
+    warnings = [
+        {
+            "id": "s1",
+            "channel": "warnings",
+            "target_language": "en-US",
+            "semantic_keys": ["warnings"],
+        },
+        {
+            "id": "s2",
+            "channel": "warnings",
+            "target_language": "en-US",
+            "semantic_keys": ["warnings"],
+        },
+    ]
+    one_rendered = rendered(segments=[deepcopy(warnings[0])])
+
+    result = validate_rendered_output(
+        one_rendered, semantic(warnings=[]), plan(segments=warnings)
+    )
+
+    assert codes(result) == ["MISSING_WARNING"]
+    assert result["violations"][0]["segment_id"] == "s2"
+    assert_schema_valid(result)
+
+
+def test_each_missing_planned_warning_has_one_ordered_violation() -> None:
+    warnings = [
+        {
+            "id": "s1",
+            "channel": "warnings",
+            "target_language": "en-US",
+            "semantic_keys": ["warnings"],
+        },
+        {
+            "id": "s2",
+            "channel": "warnings",
+            "target_language": "zh-CN",
+            "semantic_keys": ["warnings"],
+        },
+    ]
+
+    result = validate_rendered_output(
+        rendered(segments=[]), semantic(warnings=[]), plan(segments=warnings)
+    )
+
+    assert codes(result) == ["MISSING_WARNING", "MISSING_WARNING"]
+    assert [item["segment_id"] for item in result["violations"]] == ["s1", "s2"]
+    assert_schema_valid(result)
+
+
 def test_nonempty_warning_requires_a_planned_warning_route() -> None:
     no_warning_plan = plan(segments=[plan()["segments"][0]])
 
@@ -232,6 +283,7 @@ def test_nonempty_warning_requires_a_planned_warning_route() -> None:
     )
 
     assert codes(result) == ["MISSING_WARNING"]
+    assert "segment_id" not in result["violations"][0]
 
 
 def test_warning_match_requires_warning_channel_and_semantic_key() -> None:

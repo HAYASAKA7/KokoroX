@@ -487,22 +487,24 @@ def validate_rendered_output(
             "A planned rendered segment is missing.",
             segment_id=expected["id"],
         )
-    warning_matches = [
-        actual
-        for actual in valid_rendered
-        if any(actual["id"] == expected["id"] for expected in warning_plans)
-        and actual["channel"] == "warnings"
-        and "warnings" in actual["semantic_keys"]
-    ]
-    if (warning_plans and not warning_matches) or (
-        warnings_required and not warning_plans
-    ):
-        warning_id = warning_plans[0]["id"] if warning_plans else None
+    if not warning_plans and warnings_required:
         violations.add(
             "MISSING_WARNING",
             "Required warning route or content is missing.",
-            segment_id=warning_id,
         )
+    for expected in warning_plans:
+        matched = any(
+            actual["id"] == expected["id"]
+            and actual["channel"] == "warnings"
+            and "warnings" in actual["semantic_keys"]
+            for actual in valid_rendered
+        )
+        if not matched:
+            violations.add(
+                "MISSING_WARNING",
+                "Required warning route or content is missing.",
+                segment_id=expected["id"],
+            )
 
     valid = not violations.items
     return {
