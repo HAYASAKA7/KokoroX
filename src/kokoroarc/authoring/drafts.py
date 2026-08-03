@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from hashlib import sha256
+import json
 from typing import Any
 
 from kokoroarc import __version__
@@ -49,8 +50,8 @@ def build_character_draft(
             "source_pack": "source-pack",
             "validation_report": "validation-report.json",
         },
-        "locale_coverage": report["locale_coverage"],
-        "provenance_counts": report["provenance_counts"],
+        "locale_coverage": _canonical_clone(report["locale_coverage"]),
+        "provenance_counts": _canonical_clone(report["provenance_counts"]),
         "unresolved_warnings": sorted(
             {
                 finding["code"]
@@ -62,3 +63,7 @@ def build_character_draft(
 
 def _canonical_hash(value: Any) -> str:
     return sha256(canonical_bytes(value)).hexdigest()
+
+
+def _canonical_clone(value: Any) -> Any:
+    return json.loads(canonical_bytes(value))

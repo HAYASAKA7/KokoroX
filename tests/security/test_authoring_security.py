@@ -3,6 +3,7 @@ from __future__ import annotations
 from copy import deepcopy
 import os
 from pathlib import Path
+import shutil
 from typing import Any
 
 import pytest
@@ -11,6 +12,8 @@ from kokoroarc.authoring import storage
 from kokoroarc.authoring.drafts import build_character_draft
 from kokoroarc.authoring.storage import publish_draft_bundle
 from kokoroarc.errors import KokoroError
+from kokoroarc.packs.loader import load_source_pack
+from kokoroarc.schemas import SchemaRegistry
 
 
 @pytest.fixture
@@ -30,11 +33,10 @@ def artifacts() -> tuple[dict[str, Any], dict[str, Any], dict[str, Any], dict[st
         "inputs": [{"type": "creative_brief", "content": "Original."}],
         "requested_visibility": "private",
     }
-    source = {
-        "namespace": "original",
-        "character_id": "rin-aster",
-        "character_version": "1.0.0",
-    }
+    source = load_source_pack(
+        Path("characters/original/rin-aster"),
+        SchemaRegistry(Path("schemas/v1")),
+    )
     report = {
         "schema_version": "1.0",
         "artifact_id": "original/rin-aster/build-validation",
@@ -55,8 +57,7 @@ def artifacts() -> tuple[dict[str, Any], dict[str, Any], dict[str, Any], dict[st
 @pytest.fixture
 def source_root(tmp_path: Path) -> Path:
     root = tmp_path / "source"
-    root.mkdir()
-    (root / "character.yaml").write_bytes(b"name: Rin\n")
+    shutil.copytree(Path("characters/original/rin-aster"), root)
     return root
 
 
@@ -270,6 +271,87 @@ def test_destination_junction_component_is_rejected_without_capability_dependenc
 
     assert caught.value.code == "UNSAFE_DRAFT_PATH"
     assert caught.value.details["reason"] == "junction"
+
+
+def test_unsafe_final_never_reaps_the_only_complete_recovery_backup(
+    tmp_path: Path,
+    source_root: Path,
+    artifacts: tuple[dict[str, Any], dict[str, Any], dict[str, Any], dict[str, Any]],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    published = _publish(tmp_path, source_root, artifacts)
+    backup = published.parent / f".{published.name}.backup-{'b' * 24}"
+    os.replace(published, backup)
+    marker = backup / "previous.txt"
+    marker.write_bytes(b"only complete recovery copy")
+    published.mkdir()
+    real_is_junction = getattr(Path, "is_junction", lambda _path: False)
+
+    def mark_final_as_junction(path: Path) -> bool:
+        return path == published or bool(real_is_junction(path))
+
+    monkeypatch.setattr(Path, "is_junction", mark_final_as_junction, raising=False)
+
+    with pytest.raises(KokoroError) as caught:
+        _publish(tmp_path, source_root, artifacts)
+
+    assert caught.value.code == "UNSAFE_DRAFT_PATH"
+    assert marker.read_bytes() == b"only complete recovery copy"
+
+
+def test_schema_valid_but_unrelated_source_hash_is_rejected_before_publication(
+    tmp_path: Path,
+    source_root: Path,
+    artifacts: tuple[dict[str, Any], dict[str, Any], dict[str, Any], dict[str, Any]],
+) -> None:
+    request, source, report, _draft = artifacts
+    unrelated_source = deepcopy(source)
+    unrelated_source["artifact_id"] = "original/rin-aster/unrelated-source"
+    SchemaRegistry(Path("schemas/v1")).validate("character-source", unrelated_source)
+    draft = build_character_draft(request, unrelated_source, report)
+
+    with pytest.raises(KokoroError) as caught:
+        publish_draft_bundle(tmp_path / "data", source_root, request, draft, report)
+
+    assert caught.value.code == "AUTHORING_SOURCE_HASH_MISMATCH"
+    assert caught.value.details == {"reason": "assembled_source_hash"}
+    assert not (tmp_path / "data").exists()
+
+
+@pytest.mark.parametrize("mutation_after_call", [1, 2])
+def test_source_change_immediately_after_assembled_load_cannot_publish(
+    tmp_path: Path,
+    source_root: Path,
+    artifacts: tuple[dict[str, Any], dict[str, Any], dict[str, Any], dict[str, Any]],
+    monkeypatch: pytest.MonkeyPatch,
+    mutation_after_call: int,
+) -> None:
+    real_load = load_source_pack
+    calls = 0
+
+    def mutate_after_first_load(root: Path, schemas: SchemaRegistry) -> dict[str, Any]:
+        nonlocal calls
+        loaded = real_load(root, schemas)
+        calls += 1
+        if calls == mutation_after_call:
+            (source_root / "behavior.yaml").write_text(
+                "default_intensity: subtle\n"
+                "catchphrase_frequency: very_low\n"
+                "correction_style: direct\n"
+                "reassurance_style: practical\n",
+                encoding="utf-8",
+            )
+        return loaded
+
+    monkeypatch.setattr(
+        storage, "load_source_pack", mutate_after_first_load, raising=False
+    )
+
+    with pytest.raises(KokoroError) as caught:
+        _publish(tmp_path, source_root, artifacts)
+
+    assert caught.value.code == "AUTHORING_SOURCE_CHANGED"
+    assert not list((tmp_path / "data").rglob("draft.json"))
 
 
 def test_source_symlink_is_rejected_without_staging(
@@ -562,6 +644,43 @@ def test_permanent_backup_cleanup_does_not_report_complete_publish_as_failure(
     _publish(tmp_path, source_root, artifacts)
 
     assert list(published.parent.glob(f".{published.name}.backup-*")) == []
+
+
+def test_parent_fsync_failure_preserves_previous_complete_bundle(
+    tmp_path: Path,
+    source_root: Path,
+    artifacts: tuple[dict[str, Any], dict[str, Any], dict[str, Any], dict[str, Any]],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    published = _publish(tmp_path, source_root, artifacts)
+    marker_payload = b"complete previous draft"
+    (published / "previous.txt").write_bytes(marker_payload)
+    real_fsync_directory = storage._fsync_directory
+    failed = False
+
+    def fail_publish_parent_once(path: Path) -> None:
+        nonlocal failed
+        if path == published.parent and not failed:
+            failed = True
+            raise KokoroError(
+                "DRAFT_PUBLISH_FAILED",
+                "Character draft publication failed.",
+                details={"operation": "fsync_directory", "reason": "OSError"},
+            )
+        real_fsync_directory(path)
+
+    monkeypatch.setattr(storage, "_fsync_directory", fail_publish_parent_once)
+
+    with pytest.raises(KokoroError) as caught:
+        _publish(tmp_path, source_root, artifacts)
+
+    assert caught.value.code == "DRAFT_DURABILITY_FAILED"
+    if published.exists():
+        preserved = published
+    else:
+        preserved = Path(caught.value.details["backup_path"])
+    assert (preserved / "previous.txt").read_bytes() == marker_payload
+    assert not list(published.parent.glob(f".{published.name}.staging-*"))
 
 
 def test_staging_creation_failure_is_sanitized_without_residue(

@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from copy import deepcopy
 from hashlib import sha256
-import json
 from pathlib import Path
+import shutil
 from typing import Any
 
 import pytest
@@ -12,6 +12,7 @@ from kokoroarc.authoring import storage
 from kokoroarc.authoring.drafts import build_character_draft
 from kokoroarc.authoring.storage import publish_draft_bundle
 from kokoroarc.packs.compiler import canonical_bytes
+from kokoroarc.packs.loader import load_source_pack
 from kokoroarc.schemas import SchemaRegistry
 
 
@@ -36,10 +37,9 @@ def original_request() -> dict[str, Any]:
 
 @pytest.fixture
 def source() -> dict[str, Any]:
-    return json.loads(
-        Path("tests/fixtures/schema/valid-character-source.json").read_text(
-            encoding="utf-8"
-        )
+    return load_source_pack(
+        Path("characters/original/rin-aster"),
+        SchemaRegistry(Path("schemas/v1")),
     )
 
 
@@ -70,9 +70,7 @@ def report() -> dict[str, Any]:
 @pytest.fixture
 def source_root(tmp_path: Path) -> Path:
     root = tmp_path / "source"
-    (root / "locales").mkdir(parents=True)
-    (root / "character.yaml").write_bytes(b"name: Rin Aster\n")
-    (root / "locales" / "en-US.yaml").write_bytes(b"greeting: hello\n")
+    shutil.copytree(Path("characters/original/rin-aster"), root)
     return root
 
 
@@ -120,6 +118,24 @@ def test_character_draft_artifact_id_respects_schema_bound(
 
     assert len(draft["artifact_id"]) == 152
     SchemaRegistry(Path("schemas/v1")).validate("character-draft", draft)
+
+
+def test_character_draft_clones_report_metadata_without_aliasing(
+    original_request: dict[str, Any], source: dict[str, Any], report: dict[str, Any]
+) -> None:
+    draft = build_character_draft(original_request, source, report)
+
+    draft["locale_coverage"]["en-US"] = False
+    draft["provenance_counts"]["evidence"] = 99
+
+    assert report["locale_coverage"]["en-US"] is True
+    assert report["provenance_counts"]["evidence"] == 0
+
+    report["locale_coverage"]["ja-JP"] = False
+    report["provenance_counts"]["derived_profile"] = 99
+
+    assert draft["locale_coverage"]["ja-JP"] is True
+    assert draft["provenance_counts"]["derived_profile"] == 1
 
 
 def test_publish_writes_canonical_metadata_and_inert_source_bytes_under_drafts(
@@ -191,7 +207,7 @@ def test_publish_replaces_an_existing_complete_draft(
         data_root, source_root, original_request, draft, report
     )
     (published / "obsolete.txt").write_bytes(b"old")
-    (source_root / "character.yaml").write_bytes(b"name: Rin Aster\nrevision: 2\n")
+    (source_root / "notes.yaml").write_bytes(b"revision: 2\n")
 
     replaced = publish_draft_bundle(
         data_root, source_root, original_request, draft, report
@@ -199,7 +215,7 @@ def test_publish_replaces_an_existing_complete_draft(
 
     assert replaced == published
     assert not (replaced / "obsolete.txt").exists()
-    assert (replaced / "source-pack" / "character.yaml").read_bytes().endswith(
+    assert (replaced / "source-pack" / "notes.yaml").read_bytes() == (
         b"revision: 2\n"
     )
     assert list(replaced.parent.glob(f".{replaced.name}.*-*")) == []

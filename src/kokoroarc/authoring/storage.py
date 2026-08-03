@@ -19,6 +19,7 @@ from kokoroarc import __version__
 from kokoroarc.config import resolve_schema_dir
 from kokoroarc.errors import KokoroError
 from kokoroarc.packs.compiler import canonical_bytes
+from kokoroarc.packs.loader import load_source_pack
 from kokoroarc.packs.security import PackLimits, scan_pack
 from kokoroarc.schemas import SchemaRegistry
 
@@ -104,15 +105,32 @@ def publish_draft_bundle(
         path: _source_identity(path, path.relative_to(resolved_source))
         for path in scanned_files
     }
+    recorded_hashes = {
+        path: _hash_regular_file(
+            path,
+            recorded[path],
+            path.relative_to(resolved_source),
+        )
+        for path in scanned_files
+    }
+    assembled_source = load_source_pack(source_root, schemas)
+    _require_source_hash(assembled_source, draft["source_pack_hash"])
+    _revalidate_sources(
+        source_root,
+        resolved_source,
+        scanned_files,
+        recorded,
+        recorded_hashes,
+    )
 
     root = _absolute_without_resolution(data_root)
     final = root / "drafts" / Path(*draft["artifact_id"].split("/"))
     _validate_existing_chain(root)
     _create_secure_directories(final.parent)
-    _reap_stale_backups(final)
-    if final.exists() or final.is_symlink():
+    final_stat = _destination_lstat(final)
+    if final_stat is not None:
         _validate_destination_component(final)
-        if not final.is_dir():
+        if not stat.S_ISDIR(final_stat.st_mode):
             raise _unsafe_draft_path(final, "target is not a directory")
 
     staging: Path | None = None
@@ -134,9 +152,12 @@ def publish_draft_bundle(
             relative = source_path.relative_to(resolved_source)
             destination = source_destination.joinpath(*relative.parts)
             _create_staging_parent(source_destination, destination.parent)
-            copied_hashes[source_path] = _copy_scanned_file(
+            copied_hash = _copy_scanned_file(
                 source_path, destination, recorded[source_path], relative
             )
+            if copied_hash != recorded_hashes[source_path]:
+                raise _source_changed(relative, "content")
+            copied_hashes[source_path] = copied_hash
 
         _write_canonical_file(staging / "request.json", request)
         _write_canonical_file(staging / "validation-report.json", report)
@@ -148,10 +169,28 @@ def publish_draft_bundle(
             recorded,
             copied_hashes,
         )
+        try:
+            post_copy_source = load_source_pack(source_root, schemas)
+        except KokoroError as error:
+            raise _source_changed(Path("."), error.code) from error
+        if _canonical_hash(post_copy_source) != draft["source_pack_hash"]:
+            raise _source_changed(Path("."), "assembled_source")
+        _revalidate_sources(
+            source_root,
+            resolved_source,
+            scanned_files,
+            recorded,
+            copied_hashes,
+        )
         _fsync_tree_directories(staging)
-        _transactional_replace_directory(staging, final)
+        backup = _transactional_replace_directory(staging, final)
+        try:
+            _fsync_directory(final.parent)
+        except KokoroError as error:
+            raise _durability_failure(final, backup, error) from error
+        if backup is not None:
+            _cleanup_tree_best_effort(backup)
         _reap_stale_backups(final)
-        _fsync_directory(final.parent)
         return final
     except KokoroError:
         if staging is not None:
@@ -252,16 +291,17 @@ def _resolved_source_root(source_root: Path) -> Path:
 def _validate_existing_chain(path: Path) -> None:
     chain = [path, *path.parents]
     for component in reversed(chain):
-        if component.exists() or component.is_symlink():
+        if _destination_lstat(component) is not None:
             _validate_destination_component(component)
 
 
 def _create_secure_directories(path: Path) -> None:
     chain = [path, *path.parents]
     for component in reversed(chain):
-        if component.exists() or component.is_symlink():
+        component_stat = _destination_lstat(component)
+        if component_stat is not None:
             _validate_destination_component(component)
-            if not component.is_dir():
+            if not stat.S_ISDIR(component_stat.st_mode):
                 raise _unsafe_draft_path(component, "component is not a directory")
             continue
         try:
@@ -270,7 +310,21 @@ def _create_secure_directories(path: Path) -> None:
             pass
         except OSError as error:
             raise _publish_failed("mkdir", error) from error
+        component_stat = _destination_lstat(component)
+        if component_stat is None:
+            raise _unsafe_draft_path(component, "component disappeared")
         _validate_destination_component(component)
+        if not stat.S_ISDIR(component_stat.st_mode):
+            raise _unsafe_draft_path(component, "component is not a directory")
+
+
+def _destination_lstat(path: Path) -> os.stat_result | None:
+    try:
+        return path.lstat()
+    except FileNotFoundError:
+        return None
+    except OSError as error:
+        raise _publish_failed("inspect_destination", error) from error
 
 
 def _validate_destination_component(path: Path) -> None:
@@ -297,13 +351,24 @@ def _create_staging_parent(root: Path, parent: Path) -> None:
     current = root
     for part in relative.parts:
         current = current / part
-        if current.exists() or current.is_symlink():
+        current_stat = _destination_lstat(current)
+        if current_stat is not None:
             _validate_destination_component(current)
-            if not current.is_dir():
+            if not stat.S_ISDIR(current_stat.st_mode):
                 raise _unsafe_draft_path(current, "copy component is not a directory")
         else:
-            current.mkdir()
+            try:
+                current.mkdir()
+            except FileExistsError:
+                pass
+            except OSError as error:
+                raise _publish_failed("mkdir", error) from error
+            current_stat = _destination_lstat(current)
+            if current_stat is None:
+                raise _unsafe_draft_path(current, "copy component disappeared")
             _validate_destination_component(current)
+            if not stat.S_ISDIR(current_stat.st_mode):
+                raise _unsafe_draft_path(current, "copy component is not a directory")
 
 
 def _source_identity(path: Path, relative: Path) -> _SourceIdentity:
@@ -438,11 +503,14 @@ def _fsync_directory(path: Path) -> None:
             raise _publish_failed("fsync_directory", error) from error
 
 
-def _transactional_replace_directory(staging: Path, target: Path) -> None:
+def _transactional_replace_directory(staging: Path, target: Path) -> Path | None:
     backup: Path | None = None
     try:
-        if target.exists() or target.is_symlink():
+        target_stat = _destination_lstat(target)
+        if target_stat is not None:
             _validate_destination_component(target)
+            if not stat.S_ISDIR(target_stat.st_mode):
+                raise _unsafe_draft_path(target, "target is not a directory")
             backup = target.parent / (
                 f".{target.name}.backup-{secrets.token_hex(12)}"
             )
@@ -468,8 +536,39 @@ def _transactional_replace_directory(staging: Path, target: Path) -> None:
             raise cutover_error
     except OSError as error:
         raise _publish_failed("replace", error) from error
+    return backup
+
+
+def _durability_failure(
+    target: Path, backup: Path | None, error: KokoroError
+) -> KokoroError:
+    details: dict[str, Any] = {
+        "operation": "fsync_parent",
+        "reason": str(error.details.get("reason", error.code)),
+    }
     if backup is not None:
-        _cleanup_tree_best_effort(backup)
+        failed_target = target.parent / (
+            f".{target.name}.failed-{secrets.token_hex(12)}"
+        )
+        try:
+            _replace_with_retries(target, failed_target)
+            try:
+                _replace_with_retries(backup, target)
+            except OSError:
+                try:
+                    _replace_with_retries(failed_target, target)
+                except OSError:
+                    pass
+                details["backup_path"] = str(backup)
+            else:
+                _cleanup_tree_best_effort(failed_target)
+        except OSError:
+            details["backup_path"] = str(backup)
+    return KokoroError(
+        "DRAFT_DURABILITY_FAILED",
+        "Character draft publication could not be made durable.",
+        details=details,
+    )
 
 
 def _replace_with_retries(source: Path, target: Path) -> None:
@@ -505,7 +604,14 @@ def _is_same_scope_backup(path: Path, target: Path) -> bool:
 
 
 def _reap_stale_backups(target: Path) -> None:
-    if not target.is_dir():
+    try:
+        target_stat = _destination_lstat(target)
+        if target_stat is None:
+            return
+        _validate_destination_component(target)
+    except KokoroError:
+        return
+    if not stat.S_ISDIR(target_stat.st_mode):
         return
     try:
         entries = list(os.scandir(target.parent))
@@ -573,8 +679,29 @@ def _stat_is_redirect(path: Path, path_stat: os.stat_result) -> bool:
 
 
 def _remove_staging(staging: Path) -> None:
-    if staging.exists() or staging.is_symlink():
+    try:
+        staging_stat = staging.lstat()
+    except FileNotFoundError:
+        return
+    except OSError:
+        return
+    if stat.S_ISDIR(staging_stat.st_mode) and not _stat_is_redirect(
+        staging, staging_stat
+    ):
         _cleanup_tree_best_effort(staging)
+
+
+def _canonical_hash(value: Any) -> str:
+    return sha256(canonical_bytes(value)).hexdigest()
+
+
+def _require_source_hash(source: dict[str, Any], expected: str) -> None:
+    if _canonical_hash(source) != expected:
+        raise KokoroError(
+            "AUTHORING_SOURCE_HASH_MISMATCH",
+            "Character source pack does not match the draft metadata.",
+            details={"reason": "assembled_source_hash"},
+        )
 
 
 def _invalid_draft(reason: str) -> KokoroError:
