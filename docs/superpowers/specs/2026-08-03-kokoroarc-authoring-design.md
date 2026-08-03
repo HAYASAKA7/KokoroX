@@ -1,8 +1,8 @@
 # KokoroArc Character-Pack Authoring Design
 
-**Design revision:** 0.3.0 standalone refinement  
-**Product version:** Unassigned  
-**Roadmap scope:** Milestone 6, `authoring-character-packs`  
+**Design revision:** 0.3.0 standalone refinement
+**Product version:** Unassigned
+**Roadmap scope:** Milestone 6, `authoring-character-packs`
 **Authority:** Refines the approved standalone design without changing its four-Skill architecture
 
 ## 1. Purpose and boundary
