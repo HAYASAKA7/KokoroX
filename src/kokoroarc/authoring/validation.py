@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 from collections.abc import Mapping
 from typing import Any
@@ -11,9 +12,7 @@ from kokoroarc.schemas import SchemaRegistry
 
 
 _FIRST_CLASS_LOCALES = ("zh-CN", "en-US", "ja-JP")
-_EXTERNAL_CANON_SOURCES = frozenset(
-    {"external canon", "external-canon", "external_canon"}
-)
+_CANON_SOURCE_LABELS = frozenset({"external_canon", "canonical_fact"})
 _MAX_FINDINGS = 256
 
 
@@ -119,9 +118,7 @@ def validate_authoring_pack(
     advisory_findings = advisory_findings[:_MAX_FINDINGS]
     report = {
         "schema_version": "1.0",
-        "artifact_id": (
-            f"{request['namespace']}/{request['character_id']}/build-validation"
-        ),
+        "artifact_id": _report_artifact_id(request),
         "created_by": {"component": "kokoroarc", "version": __version__},
         "hard_failures": hard_failures,
         "advisory_findings": advisory_findings,
@@ -155,7 +152,7 @@ def _validate_original_provenance(
     for index, claim in enumerate(claims):
         if (
             isinstance(claim, Mapping)
-            and claim.get("source") in _EXTERNAL_CANON_SOURCES
+            and _is_canon_source(claim.get("source"))
         ):
             findings.append(
                 _finding(
@@ -197,7 +194,7 @@ def _validate_dossier_provenance(
     for index, claim in enumerate(claims):
         if (
             isinstance(claim, Mapping)
-            and claim.get("source") in _EXTERNAL_CANON_SOURCES
+            and _is_canon_source(claim.get("source"))
         ):
             findings.append(
                 _finding(
@@ -238,11 +235,9 @@ def _validate_dossier_provenance(
         if isinstance(value, str)
     }
     dossier_statements = {
-        statement
-        for claim in claims
-        if isinstance(claim, Mapping)
-        and isinstance((statement := claim.get("statement")), str)
-        and statement not in explicit_identity_values
+        claim["statement"]
+        for claim in dossier_claims
+        if claim["statement"] not in explicit_identity_values
     }
     identity = source.get("identity")
     if not isinstance(identity, Mapping):
@@ -289,6 +284,25 @@ def _mapping_count(value: Any, member: str) -> int:
         return 0
     items = value.get(member)
     return len(items) if isinstance(items, Mapping) else 0
+
+
+def _report_artifact_id(request: Mapping[str, Any]) -> str:
+    readable = f"{request['namespace']}/{request['character_id']}/build-validation"
+    if len(readable) <= 128:
+        return readable
+    identity = (
+        f"{request['namespace']}/{request['character_id']}/"
+        f"{request['character_version']}"
+    )
+    digest = hashlib.sha256(identity.encode("utf-8")).hexdigest()
+    return f"build-validation/{digest}"
+
+
+def _is_canon_source(value: Any) -> bool:
+    if not isinstance(value, str):
+        return False
+    normalized = "_".join(value.casefold().replace("-", " ").replace("_", " ").split())
+    return normalized in _CANON_SOURCE_LABELS
 
 
 def _finding(

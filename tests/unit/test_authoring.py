@@ -307,6 +307,38 @@ def test_validate_original_allows_creative_brief_claim_source(
     assert report["hard_failures"] == []
 
 
+@pytest.mark.parametrize(
+    "mode,source_label,expected_code",
+    [
+        ("original", "External Canon", "AUTHORING_EXTERNAL_CANON_PROHIBITED"),
+        ("dossier", "canonical_fact", "AUTHORING_DOSSIER_CANON_PROHIBITED"),
+    ],
+)
+def test_validate_normalizes_structural_canon_source_labels(
+    mode: str,
+    source_label: str,
+    expected_code: str,
+    registry: SchemaRegistry,
+    original_request: dict[str, Any],
+    source: dict[str, Any],
+) -> None:
+    request = _request_for_mode(original_request, mode)
+    claims = []
+    if mode == "dossier":
+        source["evidence"]["authored_original"] = False
+        claims.append(
+            {"statement": "Quoted assertion", "source": "user_dossier"}
+        )
+    claims.append({"statement": "Relabelled assertion", "source": source_label})
+    source["evidence"]["claims"] = claims
+
+    report = validate_authoring_pack(request, source, registry)
+
+    assert [item["code"] for item in report["hard_failures"]] == [
+        expected_code
+    ]
+
+
 def test_validate_dossier_requires_typed_user_dossier_evidence(
     registry: SchemaRegistry,
     original_request: dict[str, Any],
@@ -417,6 +449,31 @@ def test_validate_dossier_allows_explicit_identity_override(
     assert report["hard_failures"] == []
 
 
+def test_validate_dossier_identity_collapse_ignores_non_dossier_claims(
+    registry: SchemaRegistry,
+    original_request: dict[str, Any],
+    source: dict[str, Any],
+) -> None:
+    request = _request_for_mode(original_request, "dossier")
+    request["inputs"].append(
+        {"type": "creative_brief", "content": "systems architect"}
+    )
+    source["evidence"] = {
+        "authored_original": False,
+        "claims": [
+            {"statement": "Quoted assertion", "source": "user_dossier"},
+            {"statement": "systems architect", "source": "creative_brief"},
+        ],
+    }
+    registry.validate("character-build-request", request)
+    registry.validate("character-source", source)
+
+    report = validate_authoring_pack(request, source, registry)
+
+    assert report["valid"] is True
+    assert report["hard_failures"] == []
+
+
 @pytest.mark.parametrize(
     "source_path,replacement,code",
     [
@@ -509,7 +566,31 @@ def test_validate_authoring_pack_returns_valid_warning_only_report(
         "derived_profile": 1,
         "user_override": 0,
     }
+    assert report["artifact_id"] == "original/rin-aster/build-validation"
     registry.validate("build-validation-report", report)
+
+
+def test_validate_authoring_pack_bounds_overlong_report_artifact_id(
+    registry: SchemaRegistry,
+    original_request: dict[str, Any],
+    source: dict[str, Any],
+) -> None:
+    original_request["artifact_id"] = "build-request"
+    original_request["namespace"] = "a" * 64
+    original_request["character_id"] = "b" * 64
+    source["artifact_id"] = "source"
+    source["namespace"] = original_request["namespace"]
+    source["character_id"] = original_request["character_id"]
+    registry.validate("character-build-request", original_request)
+    registry.validate("character-source", source)
+
+    first = validate_authoring_pack(original_request, source, registry)
+    second = validate_authoring_pack(original_request, source, registry)
+
+    assert first == second
+    assert first["artifact_id"].startswith("build-validation/")
+    assert len(first["artifact_id"]) <= 128
+    registry.validate("build-validation-report", first)
 
 
 def test_validate_authoring_pack_caps_findings_to_report_schema_limit(
