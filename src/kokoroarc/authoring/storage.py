@@ -622,6 +622,7 @@ def _publication_busy() -> KokoroError:
     return KokoroError(
         "DRAFT_PUBLISH_BUSY",
         "Character draft publication is already in progress.",
+        retryable=True,
         details={"reason": "target_locked"},
     )
 

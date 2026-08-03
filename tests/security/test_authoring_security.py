@@ -850,6 +850,7 @@ def test_replace_failure_preserves_previous_draft_and_removes_residue(
         _publish(tmp_path, source_root, artifacts)
 
     assert caught.value.code == "DRAFT_PUBLISH_FAILED"
+    assert caught.value.retryable is False
     assert caught.value.details == {"operation": "replace", "reason": "OSError"}
     assert "sensitive" not in caught.value.message
     assert marker.read_bytes() == b"complete previous draft"
@@ -1103,6 +1104,7 @@ def test_concurrent_publish_is_busy_and_cannot_reap_live_rollback_backup(
             _publish(tmp_path, source_root, artifacts)
 
         assert caught.value.code == "DRAFT_PUBLISH_BUSY"
+        assert caught.value.retryable is True
         assert caught.value.details == {"reason": "target_locked"}
         assert "previous" not in caught.value.message.lower()
         assert (live_backups[0] / "previous.txt").read_bytes() == marker_payload

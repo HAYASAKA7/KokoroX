@@ -12,6 +12,7 @@ from typing import Any
 import pytest
 
 from kokoroarc import cli as cli_module
+from kokoroarc.authoring import storage as authoring_storage
 from kokoroarc.errors import KokoroError
 
 
@@ -378,7 +379,7 @@ def test_character_draft_validate_sanitizes_traversal_pack_reference(
 
 
 @pytest.mark.parametrize(
-    ("error", "expected_message"),
+    ("error", "expected_message", "expected_retryable"),
     [
         (
             KokoroError(
@@ -387,14 +388,12 @@ def test_character_draft_validate_sanitizes_traversal_pack_reference(
                 details={"path": "D:/users/name/source", "reason": "inode"},
             ),
             "Character source pack changed during compilation.",
+            False,
         ),
         (
-            KokoroError(
-                "DRAFT_PUBLISH_BUSY",
-                "PRIVATE lock owner",
-                details={"path": "D:/users/name/.lock"},
-            ),
+            authoring_storage._publication_busy(),
             "Character draft publication is already in progress.",
+            True,
         ),
         (
             KokoroError(
@@ -403,6 +402,7 @@ def test_character_draft_validate_sanitizes_traversal_pack_reference(
                 details={"reason": "AccessDenied", "path": "D:/users/name"},
             ),
             "Character draft publication failed.",
+            False,
         ),
     ],
 )
@@ -413,6 +413,7 @@ def test_character_draft_compile_sanitizes_stale_busy_and_storage_failures(
     capsys: pytest.CaptureFixture[str],
     error: KokoroError,
     expected_message: str,
+    expected_retryable: bool,
 ) -> None:
     request_path = _write_request(tmp_path / "request.json", original_request)
     monkeypatch.setenv("KOKOROARC_DATA_DIR", str(tmp_path / "data"))
@@ -442,7 +443,7 @@ def test_character_draft_compile_sanitizes_stale_busy_and_storage_failures(
         "error": {
             "code": error.code,
             "message": expected_message,
-            "retryable": False,
+            "retryable": expected_retryable,
             "details": {},
         },
     }

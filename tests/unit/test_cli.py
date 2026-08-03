@@ -60,7 +60,9 @@ def test_json_session_show_succeeds_with_configured_data_directory(tmp_path) -> 
 
 
 @pytest.mark.parametrize("arguments", [[], ["session"]])
-def test_incomplete_commands_return_usage_errors(arguments: list[str]) -> None:
+def test_incomplete_commands_return_sanitized_json_errors(
+    arguments: list[str],
+) -> None:
     completed = subprocess.run(
         [sys.executable, "-m", "kokoroarc.cli", *arguments],
         check=False,
@@ -68,8 +70,117 @@ def test_incomplete_commands_return_usage_errors(arguments: list[str]) -> None:
         text=True,
     )
 
-    assert completed.returncode != 0
-    assert "usage: kokoro" in completed.stderr
+    assert completed.returncode == 2
+    assert json.loads(completed.stdout) == {
+        "ok": False,
+        "error": {
+            "code": "ARGUMENT_INVALID",
+            "message": "Command arguments are invalid.",
+            "retryable": False,
+            "details": {},
+        },
+    }
+    assert len(completed.stdout.splitlines()) == 1
+    assert completed.stderr == ""
+
+
+@pytest.mark.parametrize(
+    "arguments",
+    [
+        ["character", "PRIVATE-INVALID-SUBCOMMAND"],
+        ["character", "request", "PRIVATE-REQUEST-SUBCOMMAND"],
+        ["character", "draft", "PRIVATE-DRAFT-SUBCOMMAND"],
+        [
+            "character",
+            "draft",
+            "compile",
+            "--request",
+            "request.json",
+            "--pack",
+            "pack",
+            "--output",
+            r"D:\PRIVATE\dossier-output",
+        ],
+        [
+            "character",
+            "draft",
+            "compile",
+            "--request",
+            "request.json",
+            "--pack",
+            "pack",
+            "--publish",
+            "PRIVATE-PUBLISH-PAYLOAD",
+        ],
+        [
+            "character",
+            "draft",
+            "compile",
+            "--request",
+            "request.json",
+            "--pack",
+            "pack",
+            "--activate",
+            r"D:\PRIVATE\activate-path",
+        ],
+        [
+            "character",
+            "draft",
+            "validate",
+            "--request",
+            "request.json",
+            "--pack",
+            "pack",
+            r"D:\PRIVATE\extra-dossier-token",
+        ],
+    ],
+)
+def test_invalid_character_arguments_never_echo_private_values(
+    arguments: list[str],
+) -> None:
+    completed = subprocess.run(
+        [sys.executable, "-m", "kokoroarc.cli", *arguments],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert completed.returncode == 2
+    assert json.loads(completed.stdout) == {
+        "ok": False,
+        "error": {
+            "code": "ARGUMENT_INVALID",
+            "message": "Command arguments are invalid.",
+            "retryable": False,
+            "details": {},
+        },
+    }
+    assert len(completed.stdout.splitlines()) == 1
+    assert "PRIVATE" not in completed.stdout
+    assert "usage:" not in completed.stdout
+    assert "unrecognized arguments" not in completed.stdout
+    assert completed.stderr == ""
+
+
+def test_nested_character_help_remains_a_successful_stdout_exit() -> None:
+    completed = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "kokoroarc.cli",
+            "character",
+            "draft",
+            "compile",
+            "--help",
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert completed.returncode == 0
+    assert completed.stdout.startswith("usage: kokoro character draft compile")
+    assert completed.stderr == ""
 
 
 @pytest.mark.parametrize(

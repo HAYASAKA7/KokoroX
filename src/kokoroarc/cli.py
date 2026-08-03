@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import argparse
+from contextlib import redirect_stderr
+from io import StringIO
 import json
 import os
 from pathlib import Path
@@ -34,6 +36,7 @@ COMPILED_SCAN_MAX_BYTES = 32 * 1024 * 1024
 SOURCE_HASH_PREFIX_LENGTH = 16
 _PUBLIC_ERROR_CODE = re.compile(r"[A-Z][A-Z0-9_]{0,127}")
 _PUBLIC_MESSAGES = {
+    "ARGUMENT_INVALID": "Command arguments are invalid.",
     "AUTHORING_MODE_UNSUPPORTED": (
         "Construction mode is not available in this milestone."
     ),
@@ -696,7 +699,24 @@ _CHARACTER_HANDLERS: dict[
 
 
 def main(argv: list[str] | None = None) -> int:
-    args = build_parser().parse_args(argv)
+    try:
+        with redirect_stderr(StringIO()):
+            args = build_parser().parse_args(argv)
+    except SystemExit as error:
+        if error.code == 0:
+            return 0
+        invalid = KokoroError(
+            "ARGUMENT_INVALID",
+            "Command arguments are invalid.",
+        )
+        print(
+            json.dumps(
+                _public_error_envelope(invalid),
+                ensure_ascii=False,
+                sort_keys=True,
+            )
+        )
+        return 2
     try:
         if args.command == "character":
             group = args.character_command
