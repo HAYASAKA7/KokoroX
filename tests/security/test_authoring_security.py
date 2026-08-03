@@ -11,6 +11,7 @@ import pytest
 from kokoroarc.authoring import storage
 from kokoroarc.authoring.drafts import build_character_draft
 from kokoroarc.authoring.storage import publish_draft_bundle
+from kokoroarc.authoring.validation import validate_authoring_pack
 from kokoroarc.errors import KokoroError
 from kokoroarc.packs.loader import load_source_pack
 from kokoroarc.schemas import SchemaRegistry
@@ -37,20 +38,9 @@ def artifacts() -> tuple[dict[str, Any], dict[str, Any], dict[str, Any], dict[st
         Path("characters/original/rin-aster"),
         SchemaRegistry(Path("schemas/v1")),
     )
-    report = {
-        "schema_version": "1.0",
-        "artifact_id": "original/rin-aster/build-validation",
-        "created_by": {"component": "kokoroarc", "version": "0.0.0.dev0"},
-        "hard_failures": [],
-        "advisory_findings": [],
-        "locale_coverage": {"zh-CN": True, "en-US": True, "ja-JP": True},
-        "provenance_counts": {
-            "evidence": 0,
-            "derived_profile": 0,
-            "user_override": 0,
-        },
-        "valid": True,
-    }
+    report = validate_authoring_pack(
+        request, source, SchemaRegistry(Path("schemas/v1"))
+    )
     return request, source, report, build_character_draft(request, source, report)
 
 
@@ -93,6 +83,110 @@ def test_invalid_report_is_rejected_before_staging(
     assert caught.value.code == "AUTHORING_VALIDATION_FAILED"
     assert caught.value.details == {"reason": "hard_failures"}
     assert not (tmp_path / "data").exists()
+
+
+def test_recomputed_valid_report_and_matching_draft_publish(
+    tmp_path: Path,
+    source_root: Path,
+    artifacts: tuple[dict[str, Any], dict[str, Any], dict[str, Any], dict[str, Any]],
+) -> None:
+    published = _publish(tmp_path, source_root, artifacts)
+
+    assert (published / "draft.json").is_file()
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("character_id", "forged-character"),
+        ("character_version", "2.0.0"),
+        ("namespace", "forged"),
+        ("display_name", "Forged Rin"),
+        ("mode", "dossier"),
+    ],
+)
+def test_schema_valid_forged_report_cannot_hide_cross_artifact_failure(
+    tmp_path: Path,
+    source_root: Path,
+    artifacts: tuple[dict[str, Any], dict[str, Any], dict[str, Any], dict[str, Any]],
+    field: str,
+    value: str,
+) -> None:
+    request, source, report, _draft = artifacts
+    request[field] = value
+    request["artifact_id"] = (
+        f"{request['namespace']}/{request['character_id']}/build-request"
+    )
+    report["artifact_id"] = (
+        f"{request['namespace']}/{request['character_id']}/build-validation"
+    )
+    if field == "mode":
+        request["inputs"] = [{"type": "user_dossier", "content": "Forged."}]
+    schemas = SchemaRegistry(Path("schemas/v1"))
+    schemas.validate("character-build-request", request)
+    schemas.validate("build-validation-report", report)
+    draft = build_character_draft(request, source, report)
+    schemas.validate("character-draft", draft)
+
+    with pytest.raises(KokoroError) as caught:
+        publish_draft_bundle(tmp_path / "data", source_root, request, draft, report)
+
+    assert caught.value.code == "AUTHORING_VALIDATION_FAILED"
+    assert caught.value.details == {"reason": "report_mismatch"}
+    assert not (tmp_path / "data").exists()
+
+
+def test_schema_valid_stale_report_and_matching_draft_cannot_publish(
+    tmp_path: Path,
+    source_root: Path,
+    artifacts: tuple[dict[str, Any], dict[str, Any], dict[str, Any], dict[str, Any]],
+) -> None:
+    request, source, report, _draft = artifacts
+    report["provenance_counts"]["evidence"] += 1
+    schemas = SchemaRegistry(Path("schemas/v1"))
+    schemas.validate("build-validation-report", report)
+    draft = build_character_draft(request, source, report)
+    schemas.validate("character-draft", draft)
+
+    with pytest.raises(KokoroError) as caught:
+        publish_draft_bundle(tmp_path / "data", source_root, request, draft, report)
+
+    assert caught.value.code == "AUTHORING_VALIDATION_FAILED"
+    assert caught.value.details == {"reason": "report_mismatch"}
+    assert not (tmp_path / "data").exists()
+
+
+def test_report_is_rebound_at_post_copy_checkpoint(
+    tmp_path: Path,
+    source_root: Path,
+    artifacts: tuple[dict[str, Any], dict[str, Any], dict[str, Any], dict[str, Any]],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls = 0
+
+    def change_second_report(
+        request: dict[str, Any],
+        source: dict[str, Any],
+        schemas: SchemaRegistry,
+    ) -> dict[str, Any]:
+        nonlocal calls
+        calls += 1
+        recomputed = validate_authoring_pack(request, source, schemas)
+        if calls == 2:
+            recomputed["provenance_counts"]["evidence"] += 1
+        return recomputed
+
+    monkeypatch.setattr(
+        storage, "validate_authoring_pack", change_second_report, raising=False
+    )
+
+    with pytest.raises(KokoroError) as caught:
+        _publish(tmp_path, source_root, artifacts)
+
+    assert calls == 2
+    assert caught.value.code == "AUTHORING_VALIDATION_FAILED"
+    assert caught.value.details == {"reason": "report_mismatch"}
+    assert not list((tmp_path / "data").rglob("draft.json"))
 
 
 @pytest.mark.parametrize(

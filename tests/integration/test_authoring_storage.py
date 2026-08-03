@@ -11,6 +11,7 @@ import pytest
 from kokoroarc.authoring import storage
 from kokoroarc.authoring.drafts import build_character_draft
 from kokoroarc.authoring.storage import publish_draft_bundle
+from kokoroarc.authoring.validation import validate_authoring_pack
 from kokoroarc.packs.compiler import canonical_bytes
 from kokoroarc.packs.loader import load_source_pack
 from kokoroarc.schemas import SchemaRegistry
@@ -44,27 +45,12 @@ def source() -> dict[str, Any]:
 
 
 @pytest.fixture
-def report() -> dict[str, Any]:
-    return {
-        "schema_version": "1.0",
-        "artifact_id": "original/rin-aster/build-validation",
-        "created_by": {"component": "kokoroarc", "version": "0.0.0.dev0"},
-        "hard_failures": [],
-        "advisory_findings": [
-            {
-                "code": "AUTHORING_SPARSE_EXAMPLES",
-                "path": ["expressions"],
-                "message": "More expression examples would improve coverage.",
-            }
-        ],
-        "locale_coverage": {"zh-CN": True, "en-US": True, "ja-JP": True},
-        "provenance_counts": {
-            "evidence": 0,
-            "derived_profile": 1,
-            "user_override": 0,
-        },
-        "valid": True,
-    }
+def report(
+    original_request: dict[str, Any], source: dict[str, Any]
+) -> dict[str, Any]:
+    return validate_authoring_pack(
+        original_request, source, SchemaRegistry(Path("schemas/v1"))
+    )
 
 
 @pytest.fixture
@@ -124,6 +110,7 @@ def test_character_draft_clones_report_metadata_without_aliasing(
     original_request: dict[str, Any], source: dict[str, Any], report: dict[str, Any]
 ) -> None:
     draft = build_character_draft(original_request, source, report)
+    derived_profile_count = report["provenance_counts"]["derived_profile"]
 
     draft["locale_coverage"]["en-US"] = False
     draft["provenance_counts"]["evidence"] = 99
@@ -135,7 +122,7 @@ def test_character_draft_clones_report_metadata_without_aliasing(
     report["provenance_counts"]["derived_profile"] = 99
 
     assert draft["locale_coverage"]["ja-JP"] is True
-    assert draft["provenance_counts"]["derived_profile"] == 1
+    assert draft["provenance_counts"]["derived_profile"] == derived_profile_count
 
 
 def test_publish_writes_canonical_metadata_and_inert_source_bytes_under_drafts(

@@ -16,6 +16,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from kokoroarc import __version__
+from kokoroarc.authoring.validation import validate_authoring_pack
 from kokoroarc.config import resolve_schema_dir
 from kokoroarc.errors import KokoroError
 from kokoroarc.packs.compiler import canonical_bytes
@@ -115,6 +116,7 @@ def publish_draft_bundle(
     }
     assembled_source = load_source_pack(source_root, schemas)
     _require_source_hash(assembled_source, draft["source_pack_hash"])
+    _require_validation_report(request, assembled_source, report, schemas)
     _revalidate_sources(
         source_root,
         resolved_source,
@@ -175,6 +177,7 @@ def publish_draft_bundle(
             raise _source_changed(Path("."), error.code) from error
         if _canonical_hash(post_copy_source) != draft["source_pack_hash"]:
             raise _source_changed(Path("."), "assembled_source")
+        _require_validation_report(request, post_copy_source, report, schemas)
         _revalidate_sources(
             source_root,
             resolved_source,
@@ -701,6 +704,23 @@ def _require_source_hash(source: dict[str, Any], expected: str) -> None:
             "AUTHORING_SOURCE_HASH_MISMATCH",
             "Character source pack does not match the draft metadata.",
             details={"reason": "assembled_source_hash"},
+        )
+
+
+def _require_validation_report(
+    request: dict[str, Any],
+    source: dict[str, Any],
+    report: dict[str, Any],
+    schemas: SchemaRegistry,
+) -> None:
+    recomputed = validate_authoring_pack(request, source, schemas)
+    if recomputed["hard_failures"] or canonical_bytes(recomputed) != canonical_bytes(
+        report
+    ):
+        raise KokoroError(
+            "AUTHORING_VALIDATION_FAILED",
+            "Character authoring validation does not match the source pack.",
+            details={"reason": "report_mismatch"},
         )
 
 
