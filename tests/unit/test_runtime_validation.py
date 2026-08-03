@@ -40,6 +40,36 @@ def plan(**overrides: Any) -> dict[str, Any]:
     return value
 
 
+def complete_plan(**overrides: Any) -> dict[str, Any]:
+    segments = [
+        {
+            "id": "s1",
+            "channel": "character_dialogue",
+            "target_language": "zh-CN",
+            "semantic_keys": ["conclusion"],
+        },
+        {
+            "id": "s2",
+            "channel": "technical_explanation",
+            "target_language": "zh-CN",
+            "semantic_keys": ["explanation"],
+        },
+        {
+            "id": "s3",
+            "channel": "recommendations",
+            "target_language": "en-US",
+            "semantic_keys": ["recommendations"],
+        },
+        {
+            "id": "s4",
+            "channel": "warnings",
+            "target_language": "en-US",
+            "semantic_keys": ["warnings"],
+        },
+    ]
+    return plan(segments=segments, **overrides)
+
+
 def semantic(**overrides: Any) -> dict[str, Any]:
     value: dict[str, Any] = {
         "immutable_spans": ["go test -race ./..."],
@@ -530,12 +560,14 @@ def test_reduced_semantic_contract_requires_exact_root_keys(meaning: Any) -> Non
 
 def test_accepts_complete_semantic_and_render_plan_artifacts() -> None:
     meaning = full_semantic()
-    route_plan = plan()
+    route_plan = complete_plan()
     registry = SchemaRegistry(Path("schemas/v1"))
     registry.validate("semantic-result", meaning)
     registry.validate("render-plan", route_plan)
 
-    result = validate_rendered_output(rendered(), meaning, route_plan)
+    result = validate_rendered_output(
+        rendered(segments=deepcopy(route_plan["segments"])), meaning, route_plan
+    )
 
     assert result["valid"] is True
     assert_schema_valid(result)
@@ -661,4 +693,115 @@ def test_duplicate_reduced_semantic_spans_are_invalid() -> None:
     )
 
     assert "INVALID_SEMANTIC" in codes(result)
+    assert_schema_valid(result)
+
+
+def test_full_semantic_requires_semantic_artifact_namespace() -> None:
+    meaning = full_semantic(artifact_id="analysis/turn-1")
+    route_plan = complete_plan()
+
+    result = validate_rendered_output(
+        rendered(segments=deepcopy(route_plan["segments"])), meaning, route_plan
+    )
+
+    assert "INVALID_SEMANTIC" in codes(result)
+    assert_schema_valid(result)
+
+
+def test_full_plan_requires_plan_artifact_namespace() -> None:
+    route_plan = complete_plan(artifact_id="render/turn-1")
+
+    result = validate_rendered_output(
+        rendered(segments=deepcopy(route_plan["segments"])),
+        full_semantic(),
+        route_plan,
+    )
+
+    assert "INVALID_PLAN" in codes(result)
+    assert result["artifact_id"] == "validation/result"
+    assert_schema_valid(result)
+
+
+def test_schema_valid_full_artifacts_must_share_the_same_suffix() -> None:
+    meaning = full_semantic(artifact_id="semantic/turn-1")
+    route_plan = complete_plan(artifact_id="plan/turn-2")
+    registry = SchemaRegistry(Path("schemas/v1"))
+    registry.validate("semantic-result", meaning)
+    registry.validate("render-plan", route_plan)
+
+    result = validate_rendered_output(
+        rendered(segments=deepcopy(route_plan["segments"])), meaning, route_plan
+    )
+
+    assert "ARTIFACT_SUFFIX_MISMATCH" in codes(result)
+    assert result["valid"] is False
+    assert_schema_valid(result)
+
+
+@pytest.mark.parametrize(
+    ("semantic_key", "segment_id"),
+    [("conclusion", "s1"), ("recommendations", "s3")],
+)
+def test_full_semantic_populated_fields_require_planned_routes(
+    semantic_key: str, segment_id: str
+) -> None:
+    route_plan = complete_plan()
+    route_plan["segments"] = [
+        segment
+        for segment in route_plan["segments"]
+        if segment["id"] != segment_id
+    ]
+
+    result = validate_rendered_output(
+        rendered(segments=deepcopy(route_plan["segments"])),
+        full_semantic(),
+        route_plan,
+    )
+
+    matching = [
+        item
+        for item in result["violations"]
+        if item["code"] == "MISSING_SEMANTIC_ROUTE"
+    ]
+    assert [item["details"]["semantic_key"] for item in matching] == [semantic_key]
+    assert_schema_valid(result)
+
+
+def test_missing_full_semantic_warning_route_is_reported_once() -> None:
+    route_plan = complete_plan()
+    route_plan["segments"] = route_plan["segments"][:-1]
+
+    result = validate_rendered_output(
+        rendered(segments=deepcopy(route_plan["segments"])),
+        full_semantic(),
+        route_plan,
+    )
+
+    assert codes(result).count("MISSING_WARNING") == 1
+    assert not any(
+        item["code"] == "MISSING_SEMANTIC_ROUTE"
+        and item.get("details", {}).get("semantic_key") == "warnings"
+        for item in result["violations"]
+    )
+    assert_schema_valid(result)
+
+
+def test_full_semantic_with_reduced_plan_still_checks_known_route_coverage() -> None:
+    reduced_plan = {
+        "max_switches": 2,
+        "segments": [deepcopy(complete_plan()["segments"][1])],
+    }
+
+    result = validate_rendered_output(
+        rendered(segments=deepcopy(reduced_plan["segments"])),
+        full_semantic(warnings=[]),
+        reduced_plan,
+    )
+
+    missing = [
+        item["details"]["semantic_key"]
+        for item in result["violations"]
+        if item["code"] == "MISSING_SEMANTIC_ROUTE"
+    ]
+    assert missing == ["conclusion", "recommendations"]
     assert_schema_valid(result)

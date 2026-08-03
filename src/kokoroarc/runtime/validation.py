@@ -148,6 +148,15 @@ def _artifact_id_value(value: Any) -> bool:
     return isinstance(value, str) and _ARTIFACT_ID.fullmatch(value) is not None
 
 
+def _artifact_suffix(value: Any, namespace: str) -> str | None:
+    if not _artifact_id_value(value) or not value.startswith(namespace):
+        return None
+    suffix = value[len(namespace) :]
+    if not suffix or _ARTIFACT_ID.fullmatch(suffix) is None:
+        return None
+    return suffix
+
+
 def _created_by(value: Any) -> bool:
     return (
         isinstance(value, Mapping)
@@ -237,7 +246,7 @@ def _semantic_contract_valid(value: Mapping[str, Any]) -> bool:
 
     return (
         value.get("schema_version") == "1.0"
-        and _artifact_id_value(value.get("artifact_id"))
+        and _artifact_suffix(value.get("artifact_id"), "semantic/") is not None
         and _created_by(value.get("created_by"))
         and _semantic_id(value.get("scenario"))
         and _bounded_string(value.get("conclusion"), 4000)
@@ -277,7 +286,7 @@ def _plan_contract_valid(value: Mapping[str, Any]) -> bool:
         return True
     return (
         value.get("schema_version") == "1.0"
-        and _artifact_id_value(value.get("artifact_id"))
+        and _artifact_suffix(value.get("artifact_id"), "plan/") is not None
         and _created_by(value.get("created_by"))
         and _is_enum_string(value.get("primary_language"), _PRIMARY_LANGUAGES)
         and _string_list(
@@ -342,14 +351,10 @@ def _artifact_id(plan: Any) -> str:
     if not isinstance(plan, Mapping):
         return "validation/result"
     source = plan.get("artifact_id")
-    if (
-        not isinstance(source, str)
-        or not source.startswith("plan/")
-        or len(source) == len("plan/")
-        or _ARTIFACT_ID.fullmatch(source) is None
-    ):
+    suffix = _artifact_suffix(source, "plan/")
+    if suffix is None:
         return "validation/result"
-    candidate = f"validation/{source[len('plan/'):]}"
+    candidate = f"validation/{suffix}"
     if _ARTIFACT_ID.fullmatch(candidate) is None:
         return "validation/result"
     return candidate
@@ -451,6 +456,10 @@ def validate_rendered_output(
     rendered_mapping = isinstance(rendered, Mapping)
     semantic_mapping = isinstance(semantic, Mapping)
     plan_mapping = isinstance(plan, Mapping)
+    semantic_is_full_artifact = (
+        semantic_mapping and set(semantic.keys()) == _FULL_SEMANTIC_KEYS
+    )
+    plan_is_full_artifact = plan_mapping and set(plan.keys()) == _FULL_PLAN_KEYS
     if not rendered_mapping:
         violations.add("INVALID_RENDERED", "Rendered output must be an object.")
     if not semantic_mapping:
@@ -463,6 +472,20 @@ def validate_rendered_output(
         violations.add("INVALID_PLAN", "Render plan must be an object.")
     elif not _plan_contract_valid(plan):
         violations.add("INVALID_PLAN", "Render plan violates its artifact contract.")
+
+    if semantic_is_full_artifact and plan_is_full_artifact:
+        semantic_suffix = _artifact_suffix(semantic.get("artifact_id"), "semantic/")
+        plan_suffix = _artifact_suffix(plan.get("artifact_id"), "plan/")
+        if (
+            semantic_suffix is not None
+            and plan_suffix is not None
+            and semantic_suffix != plan_suffix
+        ):
+            violations.add(
+                "ARTIFACT_SUFFIX_MISMATCH",
+                "Semantic and render-plan artifact suffixes differ.",
+                details={"expected": semantic_suffix, "actual": plan_suffix},
+            )
 
     text: str | None = None
     rendered_segments: list[Any] = []
@@ -625,6 +648,25 @@ def validate_rendered_output(
         validated = _validate_planned_segment(segment, index, violations)
         if validated is not None:
             valid_planned.append(validated)
+
+    if semantic_is_full_artifact:
+        planned_semantic_keys = {
+            semantic_key
+            for segment in valid_planned
+            for semantic_key in segment["semantic_keys"]
+        }
+        populated_keys = (
+            ("conclusion", bool(semantic.get("conclusion"))),
+            ("explanation", bool(semantic.get("explanation"))),
+            ("recommendations", bool(semantic.get("recommendations"))),
+        )
+        for semantic_key, populated in populated_keys:
+            if populated and semantic_key not in planned_semantic_keys:
+                violations.add(
+                    "MISSING_SEMANTIC_ROUTE",
+                    "A populated semantic field has no planned route.",
+                    details={"semantic_key": semantic_key},
+                )
 
     valid_rendered: list[dict[str, Any]] = []
     for index, segment in enumerate(rendered_segments):
