@@ -100,12 +100,20 @@ class _SourceIdentity:
     modified_ns: int
 
 
+@dataclass(frozen=True, slots=True)
+class _DirectoryIdentity:
+    path: Path
+    device: int
+    inode: int
+    file_type: int
+
+
 @dataclass(slots=True)
 class _PublicationLock:
     target: Path
     path: Path
     descriptor: int
-    parent_identity: tuple[int, int]
+    ancestor_chain: tuple[_DirectoryIdentity, ...]
     held: bool = True
 
     def __enter__(self) -> _PublicationLock:
@@ -138,14 +146,12 @@ class _PublicationLock:
         try:
             linked_stat = self.path.lstat()
             opened_stat = os.fstat(self.descriptor)
-            parent_stat = self.target.parent.lstat()
         except OSError:
-            return False
-        return (
-            _safe_lock_stats(self.path, linked_stat, opened_stat)
-            and _safe_lock_parent(self.target.parent, parent_stat)
-            and _filesystem_identity(parent_stat) == self.parent_identity
-        )
+            lock_matches = False
+        else:
+            lock_matches = _safe_lock_stats(self.path, linked_stat, opened_stat)
+        ancestors_match = _lock_ancestor_chain_matches(self.ancestor_chain)
+        return lock_matches and ancestors_match
 
 
 def publish_draft_bundle(
@@ -175,8 +181,14 @@ def publish_draft_bundle(
     if _destination_lstat(final.parent) is None:
         _preflight_validate_source(source_root, request, draft, report, schemas)
         _validate_existing_chain(root)
-    _create_secure_directories(final.parent)
+    created_directories = _create_secure_directories(final.parent)
     with _acquire_publication_lock(final) as publication_lock:
+        if _destination_lstat(final) is None:
+            _fsync_first_publication_directories(
+                root,
+                final.parent,
+                created_directories,
+            )
         return _publish_draft_bundle_locked(
             source_root,
             request,
@@ -330,7 +342,7 @@ def _publish_draft_bundle_locked(
             draft,
         )
         if not publication_lock.owns(final):
-            raise _unsafe_draft_path(final.parent, "publication lock parent changed")
+            raise _unsafe_draft_path(final.parent, "publication lock ancestor changed")
         backup = _transactional_replace_directory(staging, final)
         try:
             _fsync_directory(final.parent)
@@ -433,13 +445,7 @@ def _reserved_device_basename(value: Any) -> bool:
 
 def _acquire_publication_lock(target: Path) -> _PublicationLock:
     lock_path = target.parent / f".{target.name}.publish.lock"
-    try:
-        parent_stat = target.parent.lstat()
-    except OSError as error:
-        raise _publish_failed("inspect_lock_parent", error) from error
-    if not _safe_lock_parent(target.parent, parent_stat):
-        raise _unsafe_draft_path(target.parent, "unsafe publication lock parent")
-    parent_identity = _filesystem_identity(parent_stat)
+    ancestor_chain = _capture_lock_ancestor_chain(target.parent)
     flags = (
         os.O_RDWR
         | os.O_CREAT
@@ -495,16 +501,12 @@ def _acquire_publication_lock(target: Path) -> _PublicationLock:
         opened_stat = os.fstat(descriptor)
         if not _safe_lock_stats(lock_path, linked_stat, opened_stat):
             raise _unsafe_draft_path(lock_path, "publication lock identity changed")
-        current_parent_stat = target.parent.lstat()
-        if (
-            not _safe_lock_parent(target.parent, current_parent_stat)
-            or _filesystem_identity(current_parent_stat) != parent_identity
-        ):
+        if not _lock_ancestor_chain_matches(ancestor_chain):
             raise _unsafe_draft_path(
-                target.parent, "publication lock parent identity changed"
+                target.parent, "publication lock ancestor changed"
             )
         publication_lock = _PublicationLock(
-            target, lock_path, descriptor, parent_identity
+            target, lock_path, descriptor, ancestor_chain
         )
         descriptor = None
         return publication_lock
@@ -539,8 +541,44 @@ def _safe_lock_parent(path: Path, path_stat: os.stat_result) -> bool:
     return not _stat_is_redirect(path, path_stat) and stat.S_ISDIR(path_stat.st_mode)
 
 
-def _filesystem_identity(path_stat: os.stat_result) -> tuple[int, int]:
-    return path_stat.st_dev, path_stat.st_ino
+def _capture_lock_ancestor_chain(path: Path) -> tuple[_DirectoryIdentity, ...]:
+    identities: list[_DirectoryIdentity] = []
+    for component in reversed((path, *path.parents)):
+        try:
+            component_stat = component.lstat()
+        except OSError as error:
+            raise _publish_failed("inspect_lock_ancestor", error) from error
+        if not _safe_lock_parent(component, component_stat):
+            raise _unsafe_draft_path(component, "unsafe publication lock ancestor")
+        identities.append(
+            _DirectoryIdentity(
+                path=component,
+                device=component_stat.st_dev,
+                inode=component_stat.st_ino,
+                file_type=stat.S_IFMT(component_stat.st_mode),
+            )
+        )
+    return tuple(identities)
+
+
+def _lock_ancestor_chain_matches(
+    identities: tuple[_DirectoryIdentity, ...],
+) -> bool:
+    matches = True
+    for identity in identities:
+        try:
+            component_stat = identity.path.lstat()
+        except OSError:
+            matches = False
+            continue
+        if (
+            not _safe_lock_parent(identity.path, component_stat)
+            or component_stat.st_dev != identity.device
+            or component_stat.st_ino != identity.inode
+            or stat.S_IFMT(component_stat.st_mode) != identity.file_type
+        ):
+            matches = False
+    return matches
 
 
 def _lock_publication_descriptor(descriptor: int) -> None:
@@ -613,7 +651,8 @@ def _validate_existing_chain(path: Path) -> None:
             _validate_destination_component(component)
 
 
-def _create_secure_directories(path: Path) -> None:
+def _create_secure_directories(path: Path) -> tuple[Path, ...]:
+    created: list[Path] = []
     chain = [path, *path.parents]
     for component in reversed(chain):
         component_stat = _destination_lstat(component)
@@ -624,6 +663,7 @@ def _create_secure_directories(path: Path) -> None:
             continue
         try:
             component.mkdir()
+            created.append(component)
         except FileExistsError:
             pass
         except OSError as error:
@@ -634,6 +674,7 @@ def _create_secure_directories(path: Path) -> None:
         _validate_destination_component(component)
         if not stat.S_ISDIR(component_stat.st_mode):
             raise _unsafe_draft_path(component, "component is not a directory")
+    return tuple(created)
 
 
 def _destination_lstat(path: Path) -> os.stat_result | None:
@@ -940,6 +981,31 @@ def _fsync_tree_directories(root: Path) -> None:
     for directory in sorted(directories, key=lambda item: len(item.parts), reverse=True):
         _fsync_directory(directory)
     _fsync_directory(root)
+
+
+def _fsync_first_publication_directories(
+    root: Path,
+    target_parent: Path,
+    created_directories: tuple[Path, ...],
+) -> None:
+    directories = [root]
+    current = root
+    for part in target_parent.relative_to(root).parts:
+        current /= part
+        directories.append(current)
+
+    directory_set = set(directories)
+    if any(path not in directory_set for path in created_directories):
+        raise _unsafe_draft_path(
+            target_parent,
+            "created directory escaped publication chain",
+        )
+
+    # Sync the complete chain on first publication, including directories that
+    # another process may have created before this lock holder entered.
+    for directory in directories:
+        _fsync_directory(directory)
+        _fsync_directory(directory.parent)
 
 
 def _fsync_directory(path: Path) -> None:

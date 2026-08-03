@@ -8,6 +8,7 @@ import shutil
 import subprocess
 import sys
 import threading
+from types import SimpleNamespace
 from typing import Any
 
 import pytest
@@ -1118,6 +1119,162 @@ def test_concurrent_publish_is_busy_and_cannot_reap_live_rollback_backup(
     assert lock_files[0].is_file()
 
 
+@pytest.mark.parametrize("mutation", ["identity", "redirect"])
+def test_publish_rejects_changed_non_parent_lock_ancestor_before_cutover(
+    tmp_path: Path,
+    source_root: Path,
+    artifacts: tuple[dict[str, Any], dict[str, Any], dict[str, Any], dict[str, Any]],
+    monkeypatch: pytest.MonkeyPatch,
+    mutation: str,
+) -> None:
+    published = _publish(tmp_path, source_root, artifacts)
+    marker_payload = b"previous complete draft"
+    (published / "previous.txt").write_bytes(marker_payload)
+    ancestor = published.parents[3]
+    real_lstat = Path.lstat
+    real_is_redirect = storage._stat_is_redirect
+    real_verify = storage._verify_staged_bundle
+    armed = False
+
+    def changed_ancestor_lstat(path: Path) -> Any:
+        path_stat = real_lstat(path)
+        if armed and path == ancestor and mutation == "identity":
+            return SimpleNamespace(
+                st_mode=path_stat.st_mode,
+                st_dev=path_stat.st_dev,
+                st_ino=path_stat.st_ino + 1,
+                st_file_attributes=(
+                    getattr(path_stat, "st_file_attributes", 0) or 0
+                ),
+            )
+        return path_stat
+
+    def changed_ancestor_redirect(path: Path, path_stat: os.stat_result) -> bool:
+        return (
+            armed and path == ancestor and mutation == "redirect"
+        ) or real_is_redirect(path, path_stat)
+
+    def arm_after_staging_verification(*args: Any, **kwargs: Any) -> None:
+        nonlocal armed
+        real_verify(*args, **kwargs)
+        armed = True
+
+    monkeypatch.setattr(Path, "lstat", changed_ancestor_lstat)
+    monkeypatch.setattr(storage, "_stat_is_redirect", changed_ancestor_redirect)
+    monkeypatch.setattr(
+        storage, "_verify_staged_bundle", arm_after_staging_verification
+    )
+
+    with pytest.raises(KokoroError) as caught:
+        _publish(tmp_path, source_root, artifacts)
+
+    assert caught.value.code == "UNSAFE_DRAFT_PATH"
+    assert caught.value.details["reason"] == "publication lock ancestor changed"
+    assert (published / "previous.txt").read_bytes() == marker_payload
+    assert list(published.parent.glob(f".{published.name}.backup-*")) == []
+
+
+@pytest.mark.parametrize(
+    "failure_kind",
+    ["lock", "lock_stat_error", "ancestor"],
+)
+def test_publication_lock_owns_restats_every_ancestor_after_early_failure(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    failure_kind: str,
+) -> None:
+    final = tmp_path / "data" / "drafts" / "original" / "rin-aster" / "draft"
+    storage._create_secure_directories(final.parent)
+
+    with storage._acquire_publication_lock(final) as publication_lock:
+        expected_paths = [
+            identity.path for identity in publication_lock.ancestor_chain
+        ]
+        inspected_paths: list[Path] = []
+        real_lstat = Path.lstat
+        real_safe_lock_parent = storage._safe_lock_parent
+
+        def record_ancestor_lstat(path: Path) -> os.stat_result:
+            if failure_kind == "lock_stat_error" and path == publication_lock.path:
+                raise OSError("lock path unavailable")
+            if path in expected_paths:
+                inspected_paths.append(path)
+            return real_lstat(path)
+
+        def reject_first_ancestor(
+            path: Path, path_stat: os.stat_result
+        ) -> bool:
+            if failure_kind == "ancestor" and path == expected_paths[0]:
+                return False
+            return real_safe_lock_parent(path, path_stat)
+
+        monkeypatch.setattr(Path, "lstat", record_ancestor_lstat)
+        monkeypatch.setattr(storage, "_safe_lock_parent", reject_first_ancestor)
+        if failure_kind == "lock":
+            monkeypatch.setattr(
+                storage,
+                "_safe_lock_stats",
+                lambda *args: False,
+            )
+
+        assert not publication_lock.owns(final)
+        assert inspected_paths == expected_paths
+
+
+@pytest.mark.skipif(os.name != "posix", reason="requires POSIX symlink semantics")
+def test_posix_ancestor_substitution_is_rejected_before_cutover(
+    tmp_path: Path,
+    source_root: Path,
+    artifacts: tuple[dict[str, Any], dict[str, Any], dict[str, Any], dict[str, Any]],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    published = _publish(tmp_path, source_root, artifacts)
+    marker_payload = b"previous complete draft"
+    (published / "previous.txt").write_bytes(marker_payload)
+    ancestor = published.parents[3]
+    moved_ancestor = ancestor.with_name(f"{ancestor.name}-moved")
+    verification_complete = threading.Event()
+    release_publish = threading.Event()
+    failures: list[BaseException] = []
+    real_verify = storage._verify_staged_bundle
+
+    def pause_after_staging_verification(*args: Any, **kwargs: Any) -> None:
+        real_verify(*args, **kwargs)
+        verification_complete.set()
+        assert release_publish.wait(timeout=10)
+
+    def publish_again() -> None:
+        try:
+            _publish(tmp_path, source_root, artifacts)
+        except BaseException as error:
+            failures.append(error)
+
+    monkeypatch.setattr(
+        storage, "_verify_staged_bundle", pause_after_staging_verification
+    )
+    worker = threading.Thread(target=publish_again, daemon=True)
+    worker.start()
+    assert verification_complete.wait(timeout=10)
+    ancestor.rename(moved_ancestor)
+    ancestor.symlink_to(moved_ancestor, target_is_directory=True)
+
+    try:
+        release_publish.set()
+        worker.join(timeout=10)
+    finally:
+        release_publish.set()
+        worker.join(timeout=10)
+
+    assert not worker.is_alive()
+    assert len(failures) == 1
+    assert isinstance(failures[0], KokoroError)
+    assert failures[0].code == "UNSAFE_DRAFT_PATH"
+    assert failures[0].details["reason"] == "publication lock ancestor changed"
+    moved_published = moved_ancestor / published.relative_to(ancestor)
+    assert (moved_published / "previous.txt").read_bytes() == marker_payload
+    assert list(moved_published.parent.glob(f".{published.name}.backup-*")) == []
+
+
 @pytest.mark.parametrize(
     "exception_factory",
     [
@@ -1292,6 +1449,93 @@ def test_directory_fsync_eacces_is_a_durability_failure(
         "reason": "PermissionError",
     }
     assert "sensitive" not in caught.value.message
+
+
+def test_secure_directory_creation_reports_every_new_component(
+    tmp_path: Path,
+) -> None:
+    target = tmp_path / "data" / "drafts" / "original"
+
+    created = storage._create_secure_directories(target)
+
+    assert created == (
+        tmp_path / "data",
+        tmp_path / "data" / "drafts",
+        target,
+    )
+
+
+def test_first_publication_syncs_each_directory_and_containing_parent_in_order(
+    tmp_path: Path,
+    source_root: Path,
+    artifacts: tuple[dict[str, Any], dict[str, Any], dict[str, Any], dict[str, Any]],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _request, _source, _report, draft = artifacts
+    data_root = tmp_path / "data"
+    final = data_root / "drafts" / Path(*draft["artifact_id"].split("/"))
+    directories = [data_root]
+    current = data_root
+    for part in final.parent.relative_to(data_root).parts:
+        current /= part
+        directories.append(current)
+    expected_calls = [
+        path
+        for directory in directories
+        for path in (directory, directory.parent)
+    ]
+    calls: list[Path] = []
+    monkeypatch.setattr(storage, "_fsync_directory", calls.append)
+
+    published = _publish(tmp_path, source_root, artifacts)
+
+    assert published == final
+    assert calls[: len(expected_calls)] == expected_calls
+
+
+@pytest.mark.parametrize(
+    "failure_point",
+    ["new_directory", "existing_containing_parent"],
+)
+def test_first_publication_directory_sync_failure_never_publishes_bundle(
+    tmp_path: Path,
+    source_root: Path,
+    artifacts: tuple[dict[str, Any], dict[str, Any], dict[str, Any], dict[str, Any]],
+    monkeypatch: pytest.MonkeyPatch,
+    failure_point: str,
+) -> None:
+    _request, _source, _report, draft = artifacts
+    data_root = tmp_path / "data"
+    final = data_root / "drafts" / Path(*draft["artifact_id"].split("/"))
+    failure_path = (
+        data_root / "drafts"
+        if failure_point == "new_directory"
+        else data_root.parent
+    )
+
+    def fail_selected_directory(path: Path) -> None:
+        if path == failure_path:
+            raise KokoroError(
+                "DRAFT_PUBLISH_FAILED",
+                "Character draft publication failed.",
+                details={
+                    "operation": "fsync_directory",
+                    "reason": "PermissionError",
+                },
+            )
+
+    monkeypatch.setattr(storage, "_fsync_directory", fail_selected_directory)
+
+    with pytest.raises(KokoroError) as caught:
+        _publish(tmp_path, source_root, artifacts)
+
+    assert caught.value.code == "DRAFT_PUBLISH_FAILED"
+    assert caught.value.details == {
+        "operation": "fsync_directory",
+        "reason": "PermissionError",
+    }
+    assert not final.exists()
+    assert list(final.parent.glob(f".{final.name}.staging-*")) == []
 
 
 def test_parent_fsync_failure_preserves_previous_complete_bundle(
