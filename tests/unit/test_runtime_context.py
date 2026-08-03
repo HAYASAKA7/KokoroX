@@ -180,6 +180,34 @@ def test_context_contains_only_active_locale_scenario_and_state() -> None:
     }
 
 
+def test_build_runtime_context_projects_state_to_declared_growth_dimensions() -> None:
+    compiled = _compiled()
+    compiled["growth"]["dimensions"] = ["trust"]
+
+    result = build_runtime_context(compiled, _state(), "zh-CN", "debugging")
+
+    assert result["state"]["dimensions"] == {"trust": 31}
+
+
+def test_build_runtime_context_preserves_declared_growth_dimension_order() -> None:
+    compiled = _compiled()
+    compiled["growth"]["dimensions"] = ["trust", "collaboration"]
+
+    result = build_runtime_context(compiled, _state(), "zh-CN", "debugging")
+
+    assert list(result["state"]["dimensions"]) == ["trust", "collaboration"]
+    assert result["state"]["dimensions"] == {"trust": 31, "collaboration": 42.5}
+
+
+def test_build_runtime_context_rejects_state_missing_a_growth_dimension() -> None:
+    compiled = _compiled()
+    compiled["growth"]["dimensions"] = ["trust", "collaboration"]
+    state = _state()
+    del state["dimensions"]["collaboration"]
+
+    _assert_error("INVALID_RUNTIME_CONTEXT", compiled, state)
+
+
 def test_build_runtime_context_accepts_the_minimal_consumed_shape() -> None:
     compiled = _compiled()
     state = _state()
@@ -279,6 +307,62 @@ def test_build_runtime_context_does_not_chain_internal_mapping_failures() -> Non
 
     assert raised.value.code == "INVALID_RUNTIME_CONTEXT"
     assert raised.value.__cause__ is None
+
+
+def test_build_runtime_context_rejects_hostile_root_without_calling_get() -> None:
+    class HostileRoot(dict[str, Any]):
+        called = False
+
+        def get(self, key: str, default: Any = None) -> Any:
+            self.called = True
+            raise KokoroError("UNSUPPORTED_LOCALE", "injected")
+
+    compiled = HostileRoot(_compiled())
+
+    _assert_error("INVALID_RUNTIME_CONTEXT", compiled, _state())
+    assert compiled.called is False
+
+
+def test_build_runtime_context_rejects_hostile_nested_identity_without_copying() -> None:
+    class HostileIdentity(dict[str, Any]):
+        called = False
+
+        def __deepcopy__(self, memo: dict[int, Any]) -> dict[str, str]:
+            self.called = True
+            return {"display_name": "attacker replacement"}
+
+    compiled = _compiled()
+    identity = HostileIdentity(compiled["identity"])
+    compiled["identity"] = identity
+
+    _assert_error("INVALID_RUNTIME_CONTEXT", compiled, _state())
+    assert identity.called is False
+
+
+def test_build_runtime_context_rejects_json_container_subclasses() -> None:
+    class ListSubclass(list[Any]):
+        pass
+
+    compiled = _compiled()
+    compiled["identity"]["worldview"] = ListSubclass(["looks like JSON"])
+
+    _assert_error("INVALID_RUNTIME_CONTEXT", compiled, _state())
+
+
+def test_build_runtime_context_rejects_json_scalar_subclasses_without_comparing() -> None:
+    class HostileString(str):
+        compared = False
+
+        def __eq__(self, other: object) -> bool:
+            self.compared = True
+            raise KokoroError("UNKNOWN_SCENARIO", "injected")
+
+    character_id = HostileString("rin-aster")
+    compiled = _compiled()
+    compiled["character_id"] = character_id
+
+    _assert_error("INVALID_RUNTIME_CONTEXT", compiled, _state())
+    assert character_id.compared is False
 
 
 @pytest.mark.parametrize(
@@ -383,6 +467,27 @@ def test_build_runtime_context_is_deterministic_detached_and_does_not_mutate_inp
     assert compiled == original_compiled
     assert state == original_state
     assert second == build_runtime_context(compiled, state, "zh-CN", "debugging")
+
+
+def test_build_runtime_context_returns_only_fresh_exact_json_builtins() -> None:
+    compiled = _compiled()
+    state = _state()
+    result = build_runtime_context(compiled, state, "zh-CN", "debugging")
+
+    def assert_exact_json(value: Any) -> None:
+        assert type(value) in {dict, list, str, int, float, bool, type(None)}
+        if type(value) is dict:
+            assert all(type(key) is str for key in value)
+            for item in value.values():
+                assert_exact_json(item)
+        elif type(value) is list:
+            for item in value:
+                assert_exact_json(item)
+
+    assert_exact_json(result)
+    assert result["identity"] is not compiled["identity"]
+    assert result["identity"]["worldview"] is not compiled["identity"]["worldview"]
+    assert result["state"]["dimensions"] is not state["dimensions"]
 
 
 def test_build_runtime_context_preserves_expression_intent_order() -> None:
