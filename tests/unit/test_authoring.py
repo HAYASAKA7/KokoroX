@@ -339,6 +339,86 @@ def test_validate_normalizes_structural_canon_source_labels(
     ]
 
 
+@pytest.mark.parametrize(
+    "mode,source_label",
+    [
+        ("original", "Creative Brief"),
+        ("original", "user-override"),
+        ("dossier", "User Dossier"),
+        ("dossier", "creative-brief"),
+        ("dossier", "USER_OVERRIDE"),
+    ],
+)
+def test_validate_allows_normalized_mode_specific_provenance_labels(
+    mode: str,
+    source_label: str,
+    registry: SchemaRegistry,
+    original_request: dict[str, Any],
+    source: dict[str, Any],
+) -> None:
+    request = _request_for_mode(original_request, mode)
+    claims = []
+    if mode == "dossier" and source_label != "User Dossier":
+        claims.append(
+            {"statement": "Quoted assertion", "source": "user_dossier"}
+        )
+    claims.append({"statement": "Typed assertion", "source": source_label})
+    source["evidence"] = {
+        "authored_original": mode == "original",
+        "claims": claims,
+    }
+
+    report = validate_authoring_pack(request, source, registry)
+
+    assert report["valid"] is True
+    assert report["hard_failures"] == []
+
+
+@pytest.mark.parametrize("mode", ["original", "dossier"])
+@pytest.mark.parametrize(
+    "claim",
+    [
+        {"statement": "Unknown assertion", "source": "canon"},
+        {"statement": "Unknown assertion", "source": "official canon"},
+        {"statement": "Unknown assertion", "source": "canonical source"},
+        {
+            "statement": "Unknown assertion",
+            "source": "external canonical fact",
+        },
+        "Untyped assertion",
+    ],
+)
+def test_validate_fails_closed_for_unknown_or_untyped_claim_provenance(
+    mode: str,
+    claim: object,
+    registry: SchemaRegistry,
+    original_request: dict[str, Any],
+    source: dict[str, Any],
+) -> None:
+    request = _request_for_mode(original_request, mode)
+    claims = []
+    if mode == "dossier":
+        claims.append(
+            {"statement": "Quoted assertion", "source": "user_dossier"}
+        )
+    claims.append(claim)
+    source["evidence"] = {
+        "authored_original": mode == "original",
+        "claims": claims,
+    }
+
+    report = validate_authoring_pack(request, source, registry)
+
+    expected_code = (
+        "AUTHORING_EXTERNAL_CANON_PROHIBITED"
+        if mode == "original"
+        else "AUTHORING_DOSSIER_CANON_PROHIBITED"
+    )
+    assert [item["code"] for item in report["hard_failures"]] == [
+        expected_code
+    ]
+
+
 def test_validate_dossier_requires_typed_user_dossier_evidence(
     registry: SchemaRegistry,
     original_request: dict[str, Any],
@@ -425,6 +505,61 @@ def test_validate_dossier_rejects_claim_copied_into_immutable_identity(
         "AUTHORING_IDENTITY_PROVENANCE_COLLAPSE"
     ]
     assert report["hard_failures"][0]["path"] == ["identity", "role"]
+
+
+@pytest.mark.parametrize(
+    "identity_value,claim_statement",
+    [
+        ("systems architect", "Systems Architect"),
+        ("systems architect", "systems  architect"),
+        ("systems architect", "systems architect."),
+        ("Caf\u00e9 architect", "Cafe\u0301 architect"),
+    ],
+)
+def test_validate_dossier_normalizes_identity_collapse_equality(
+    identity_value: str,
+    claim_statement: str,
+    registry: SchemaRegistry,
+    original_request: dict[str, Any],
+    source: dict[str, Any],
+) -> None:
+    request = _request_for_mode(original_request, "dossier")
+    source["identity"]["role"] = identity_value
+    source["evidence"] = {
+        "authored_original": False,
+        "claims": [
+            {"statement": claim_statement, "source": "user_dossier"}
+        ],
+    }
+
+    report = validate_authoring_pack(request, source, registry)
+
+    assert [item["code"] for item in report["hard_failures"]] == [
+        "AUTHORING_IDENTITY_PROVENANCE_COLLAPSE"
+    ]
+    assert report["hard_failures"][0]["path"] == ["identity", "role"]
+
+
+def test_validate_dossier_normalizes_explicit_identity_override(
+    registry: SchemaRegistry,
+    original_request: dict[str, Any],
+    source: dict[str, Any],
+) -> None:
+    request = _request_for_mode(original_request, "dossier")
+    request["inputs"].append(
+        {"type": "user_override", "content": "  SYSTEMS  ARCHITECT!  "}
+    )
+    source["evidence"] = {
+        "authored_original": False,
+        "claims": [
+            {"statement": "Systems Architect.", "source": "user_dossier"}
+        ],
+    }
+
+    report = validate_authoring_pack(request, source, registry)
+
+    assert report["valid"] is True
+    assert report["hard_failures"] == []
 
 
 def test_validate_dossier_allows_explicit_identity_override(
@@ -659,3 +794,23 @@ def test_validate_authoring_pack_does_not_mutate_inputs(
 
     assert original_request == request_before
     assert source == source_before
+
+
+@pytest.mark.parametrize("mode", ["researched", "hybrid"])
+def test_validate_authoring_pack_reports_unsupported_direct_call_mode(
+    mode: str,
+    registry: SchemaRegistry,
+    original_request: dict[str, Any],
+    source: dict[str, Any],
+) -> None:
+    request = _request_for_mode(original_request, mode)
+    registry.validate("character-build-request", request)
+
+    report = validate_authoring_pack(request, source, registry)
+
+    assert report["valid"] is False
+    assert [item["code"] for item in report["hard_failures"]] == [
+        "AUTHORING_MODE_UNSUPPORTED"
+    ]
+    assert report["hard_failures"][0]["path"] == ["mode"]
+    registry.validate("build-validation-report", report)

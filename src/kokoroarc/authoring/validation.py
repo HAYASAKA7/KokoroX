@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import unicodedata
 from collections.abc import Mapping
 from typing import Any
 
@@ -12,7 +13,10 @@ from kokoroarc.schemas import SchemaRegistry
 
 
 _FIRST_CLASS_LOCALES = ("zh-CN", "en-US", "ja-JP")
-_CANON_SOURCE_LABELS = frozenset({"external_canon", "canonical_fact"})
+_ORIGINAL_CLAIM_SOURCES = frozenset({"creative_brief", "user_override"})
+_DOSSIER_CLAIM_SOURCES = frozenset(
+    {"user_dossier", "creative_brief", "user_override"}
+)
 _MAX_FINDINGS = 256
 
 
@@ -71,6 +75,14 @@ def validate_authoring_pack(
     elif mode == "dossier":
         _validate_dossier_provenance(
             request, source, evidence_map, claims, hard_failures
+        )
+    else:
+        hard_failures.append(
+            _finding(
+                "AUTHORING_MODE_UNSUPPORTED",
+                ["mode"],
+                "Construction mode is not available in this milestone.",
+            )
         )
 
     locales_value = source.get("locales")
@@ -150,14 +162,14 @@ def _validate_original_provenance(
             )
         )
     for index, claim in enumerate(claims):
-        if (
-            isinstance(claim, Mapping)
-            and _is_canon_source(claim.get("source"))
-        ):
+        source = claim.get("source") if isinstance(claim, Mapping) else None
+        if _normalize_source_label(source) not in _ORIGINAL_CLAIM_SOURCES:
             findings.append(
                 _finding(
                     "AUTHORING_EXTERNAL_CANON_PROHIBITED",
-                    ["evidence", "claims", index, "source"],
+                    ["evidence", "claims", index, "source"]
+                    if isinstance(claim, Mapping)
+                    else ["evidence", "claims", index],
                     "Original mode cannot present a claim as external canon.",
                 )
             )
@@ -180,7 +192,7 @@ def _validate_dossier_provenance(
         claim
         for claim in claims
         if isinstance(claim, Mapping)
-        and claim.get("source") == "user_dossier"
+        and _normalize_source_label(claim.get("source")) == "user_dossier"
         and isinstance(claim.get("statement"), str)
     ]
     if evidence.get("authored_original") is True:
@@ -192,14 +204,18 @@ def _validate_dossier_provenance(
             )
         )
     for index, claim in enumerate(claims):
-        if (
-            isinstance(claim, Mapping)
-            and _is_canon_source(claim.get("source"))
-        ):
+        source_label = (
+            _normalize_source_label(claim.get("source"))
+            if isinstance(claim, Mapping)
+            else None
+        )
+        if source_label not in _DOSSIER_CLAIM_SOURCES:
             findings.append(
                 _finding(
                     "AUTHORING_DOSSIER_CANON_PROHIBITED",
-                    ["evidence", "claims", index, "source"],
+                    ["evidence", "claims", index, "source"]
+                    if isinstance(claim, Mapping)
+                    else ["evidence", "claims", index],
                     "Dossier mode cannot relabel user assertions as canon.",
                 )
             )
@@ -221,7 +237,7 @@ def _validate_dossier_provenance(
         )
 
     explicit_identity_values = {
-        value
+        _normalize_identity_text(value)
         for value in (
             request.get("display_name"),
             *_string_items(request.get("user_constraints")),
@@ -234,16 +250,20 @@ def _validate_dossier_provenance(
         )
         if isinstance(value, str)
     }
-    dossier_statements = {
-        claim["statement"]
+    normalized_dossier_statements = (
+        _normalize_identity_text(claim["statement"])
         for claim in dossier_claims
-        if claim["statement"] not in explicit_identity_values
+    )
+    dossier_statements = {
+        statement
+        for statement in normalized_dossier_statements
+        if statement not in explicit_identity_values
     }
     identity = source.get("identity")
     if not isinstance(identity, Mapping):
         return
     for path, value in _string_leaves(identity, ["identity"]):
-        if value in dossier_statements:
+        if _normalize_identity_text(value) in dossier_statements:
             findings.append(
                 _finding(
                     "AUTHORING_IDENTITY_PROVENANCE_COLLAPSE",
@@ -298,11 +318,25 @@ def _report_artifact_id(request: Mapping[str, Any]) -> str:
     return f"build-validation/{digest}"
 
 
-def _is_canon_source(value: Any) -> bool:
+def _normalize_source_label(value: Any) -> str | None:
     if not isinstance(value, str):
-        return False
-    normalized = "_".join(value.casefold().replace("-", " ").replace("_", " ").split())
-    return normalized in _CANON_SOURCE_LABELS
+        return None
+    return "_".join(
+        value.casefold().replace("-", " ").replace("_", " ").split()
+    )
+
+
+def _normalize_identity_text(value: str) -> str:
+    normalized = " ".join(
+        unicodedata.normalize("NFKC", value).casefold().split()
+    )
+    start = 0
+    end = len(normalized)
+    while start < end and unicodedata.category(normalized[start]).startswith("P"):
+        start += 1
+    while end > start and unicodedata.category(normalized[end - 1]).startswith("P"):
+        end -= 1
+    return normalized[start:end].strip()
 
 
 def _finding(
