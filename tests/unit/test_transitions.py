@@ -5,6 +5,7 @@ import pytest
 
 from kokoroarc.errors import KokoroError
 from kokoroarc.schemas import SchemaRegistry
+from kokoroarc.state import transitions as transitions_module
 from kokoroarc.state.transitions import apply_event, derive_stage
 
 
@@ -58,6 +59,33 @@ def test_event_delta_is_capped_and_idempotent() -> None:
     assert second == first
     assert second is not first
     assert second["dimensions"] is not first["dimensions"]
+
+
+def test_public_apply_event_delegates_to_frozen_v1(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    sentinel = {"sentinel": True}
+
+    def fake_v1(*_args, **_kwargs) -> dict:
+        return sentinel
+
+    monkeypatch.setattr(transitions_module, "apply_event_v1", fake_v1)
+
+    assert apply_event(state(), event("e1", "n1", {"trust": 1.0}), 4.0) is sentinel
+
+
+def test_frozen_v1_does_not_follow_current_capacity_aliases(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(transitions_module, "MAX_APPLIED_EVENT_IDS", 0)
+    monkeypatch.setattr(transitions_module, "MAX_RECENT_NOVELTY_KEYS", 0)
+
+    result = transitions_module.apply_event_v1(
+        state(), event("e1", "n1", {"trust": 1.0}), max_delta=4.0
+    )
+
+    assert result["revision"] == 1
+    assert result["dimensions"]["trust"] == 1.0
 
 
 def test_familiar_stage_uses_exit_hysteresis() -> None:

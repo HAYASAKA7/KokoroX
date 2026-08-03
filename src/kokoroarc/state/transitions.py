@@ -7,8 +7,10 @@ import copy
 from kokoroarc.errors import KokoroError
 
 
-MAX_APPLIED_EVENT_IDS = 10_000
-MAX_RECENT_NOVELTY_KEYS = 10_000
+_V1_MAX_APPLIED_EVENT_IDS = 10_000
+_V1_MAX_RECENT_NOVELTY_KEYS = 10_000
+MAX_APPLIED_EVENT_IDS = _V1_MAX_APPLIED_EVENT_IDS
+MAX_RECENT_NOVELTY_KEYS = _V1_MAX_RECENT_NOVELTY_KEYS
 
 
 def _capacity_exceeded(field: str, limit: int) -> KokoroError:
@@ -20,6 +22,21 @@ def _capacity_exceeded(field: str, limit: int) -> KokoroError:
 
 
 def apply_event(
+    state: dict,
+    event: dict,
+    max_delta: float,
+    repetition_window: int = 3,
+) -> dict:
+    """Delegate current relationship transitions to the v1 contract."""
+    return apply_event_v1(
+        state,
+        event,
+        max_delta=max_delta,
+        repetition_window=repetition_window,
+    )
+
+
+def apply_event_v1(
     state: dict,
     event: dict,
     max_delta: float,
@@ -40,18 +57,18 @@ def apply_event(
             )
 
     novelty_key = event["novelty_key"]
-    if len(result["applied_event_ids"]) >= MAX_APPLIED_EVENT_IDS:
+    if len(result["applied_event_ids"]) >= _V1_MAX_APPLIED_EVENT_IDS:
         raise _capacity_exceeded(
             "applied_event_ids",
-            MAX_APPLIED_EVENT_IDS,
+            _V1_MAX_APPLIED_EVENT_IDS,
         )
     if (
         novelty_key not in result["recent_novelty"]
-        and len(result["recent_novelty"]) >= MAX_RECENT_NOVELTY_KEYS
+        and len(result["recent_novelty"]) >= _V1_MAX_RECENT_NOVELTY_KEYS
     ):
         raise _capacity_exceeded(
             "recent_novelty",
-            MAX_RECENT_NOVELTY_KEYS,
+            _V1_MAX_RECENT_NOVELTY_KEYS,
         )
 
     confidence = min(max(float(event["confidence"]), 0.0), 1.0)
@@ -80,12 +97,19 @@ def apply_event(
     result["revision"] += 1
     result["turn_index"] += 1
     result["recent_novelty"][novelty_key] = result["turn_index"]
-    result["stage"] = derive_stage(result["stage"], result["dimensions"])
+    result["stage"] = _derive_stage_v1(
+        result["stage"], result["dimensions"]
+    )
     return result
 
 
 def derive_stage(previous: str, dimensions: dict[str, float]) -> str:
     """Derive the relationship stage using first-slice hysteresis."""
+    return _derive_stage_v1(previous, dimensions)
+
+
+def _derive_stage_v1(previous: str, dimensions: dict[str, float]) -> str:
+    """Frozen relationship-v1 stage derivation."""
     familiarity = dimensions["familiarity"]
     trust = dimensions["trust"]
     tension = dimensions["tension"]

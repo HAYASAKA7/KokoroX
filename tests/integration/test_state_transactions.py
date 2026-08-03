@@ -152,6 +152,23 @@ def test_load_maps_lock_timeout_to_retryable_state_busy(
     assert raised.value.details == {}
 
 
+def test_replay_maps_lock_timeout_to_retryable_state_busy(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    store = started_store(tmp_path)
+    monkeypatch.setattr(store_module, "_SESSION_LOCK_TIMEOUT_SECONDS", 0.0)
+    monkeypatch.setattr(
+        store_module, "_try_acquire_os_file_lock", lambda _handle: False
+    )
+
+    with pytest.raises(KokoroError) as raised:
+        store.replay("s1")
+
+    assert raised.value.code == "STATE_BUSY"
+    assert raised.value.retryable is True
+    assert raised.value.details == {}
+
+
 def test_apply_repairs_corrupt_cache_even_when_manifest_revision_matches(
     tmp_path: Path,
 ) -> None:
@@ -175,8 +192,50 @@ def test_replay_persists_and_uses_non_default_transition_parameters(
     record = read_json(next((tmp_path / "events" / "s1").glob("*.json")))
 
     assert applied["dimensions"]["trust"] == 1.25
-    assert record["transition"] == {"max_delta": 1.25, "repetition_window": 5}
+    assert record["transition"] == {
+        "algorithm": "relationship-v1",
+        "max_delta": 1.25,
+        "repetition_window": 5,
+    }
     assert store.replay("s1") == applied
+
+
+def test_replay_uses_frozen_v1_algorithm_not_current_delegate(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    store = started_store(tmp_path)
+    expected = store.apply("s1", event("e1", 0))
+    current_apply = store_module.apply_event
+
+    def changed_current_algorithm(*args, **kwargs) -> dict:
+        changed = current_apply(*args, **kwargs)
+        changed["dimensions"]["trust"] = 99.0
+        return changed
+
+    monkeypatch.setattr(store_module, "apply_event", changed_current_algorithm)
+
+    assert store.replay("s1") == expected
+
+
+@pytest.mark.parametrize("algorithm", [None, "relationship-v2"])
+def test_replay_rejects_missing_or_unsupported_transition_algorithm(
+    tmp_path: Path, algorithm: str | None
+) -> None:
+    store = started_store(tmp_path)
+    store.apply("s1", event("e1", 0))
+    record_path = next((tmp_path / "events" / "s1").glob("*.json"))
+    record = read_json(record_path)
+    if algorithm is None:
+        record["transition"].pop("algorithm", None)
+    else:
+        record["transition"]["algorithm"] = algorithm
+    store_module._atomic_write_json(record, record_path)
+
+    with pytest.raises(KokoroError) as raised:
+        store.replay("s1")
+
+    assert raised.value.code == "STATE_JOURNAL_INVALID"
+    assert raised.value.details == {}
 
 
 def test_apply_does_not_mutate_minimal_or_full_event(tmp_path: Path) -> None:
@@ -399,6 +458,73 @@ def test_replay_rejects_corrupt_journal_deterministically(
     assert "private" not in str(raised.value)
 
 
+def test_event_record_accepts_exact_per_record_byte_limit(tmp_path: Path) -> None:
+    assert store_module.EVENT_RECORD_MAX_BYTES == 8 * 1024
+    store = started_store(tmp_path)
+    expected = store.apply("s1", event("e1", 0))
+    record_path = next((tmp_path / "events" / "s1").glob("*.json"))
+    contents = record_path.read_bytes()
+    record_path.write_bytes(
+        contents
+        + b" " * (store_module.EVENT_RECORD_MAX_BYTES - len(contents))
+    )
+
+    assert record_path.stat().st_size == store_module.EVENT_RECORD_MAX_BYTES
+    assert store.replay("s1") == expected
+
+
+def test_maximal_valid_full_event_fits_per_record_byte_limit(
+    tmp_path: Path,
+) -> None:
+    store = started_store(tmp_path)
+    event_id = "e" * 128
+    maximal_event = {
+        "schema_version": "1.0",
+        "artifact_id": f"event/{event_id}",
+        "created_by": {"component": "kokoroarc", "version": "v" * 64},
+        "event_id": event_id,
+        "turn_id": "t" * 128,
+        "origin": "verified_task_outcome",
+        "novelty_key": "n" * 128,
+        "expected_state_revision": 0,
+        "evaluator_version": "v" * 128,
+        "evidence": {"kind": "tool_result", "reference": "r" * 512},
+        "confidence": 1.0,
+        "effects": {
+            "familiarity": 4.0,
+            "trust": 4.0,
+            "collaboration": 4.0,
+            "tension": 4.0,
+        },
+    }
+
+    expected = store.apply("s1", maximal_event)
+    record_path = next((tmp_path / "events" / "s1").glob("*.json"))
+
+    assert record_path.stat().st_size <= store_module.EVENT_RECORD_MAX_BYTES
+    assert store.replay("s1") == expected
+
+
+def test_journal_aggregate_byte_limit_accepts_exact_and_rejects_over(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    store = started_store(tmp_path)
+    store.apply("s1", event("e1", 0))
+    expected = store.apply("s1", event("e2", 1))
+    journal = tmp_path / "events" / "s1"
+    total_bytes = sum(path.stat().st_size for path in journal.glob("*.json"))
+
+    monkeypatch.setattr(store_module, "JOURNAL_MAX_BYTES", total_bytes)
+    assert store.replay("s1") == expected
+
+    monkeypatch.setattr(store_module, "JOURNAL_MAX_BYTES", total_bytes - 1)
+    with pytest.raises(KokoroError) as raised:
+        store.replay("s1")
+
+    assert raised.value.code == "STATE_JOURNAL_INVALID"
+    assert raised.value.details == {}
+
+
 def test_replay_rejects_redirected_journal_entry(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -445,3 +571,190 @@ def test_restart_archives_history_and_starts_a_fresh_lifecycle(
     archived = list((tmp_path / "event-archives").glob("s1-*"))
     assert len(archived) == 1
     assert len(list(archived[0].glob("*.json"))) == 1
+
+
+@pytest.mark.parametrize(
+    ("failure_boundary", "recover_with", "restart_committed"),
+    [
+        ("marker", "load", False),
+        ("archive", "load", False),
+        ("state", "start", True),
+        ("manifest", "load", False),
+        ("cleanup", "load", True),
+        ("none", "load", True),
+    ],
+)
+def test_restart_intent_recovers_each_commit_boundary(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    failure_boundary: str,
+    recover_with: str,
+    restart_committed: bool,
+) -> None:
+    store = started_store(tmp_path)
+    old_state = store.apply("s1", event("e1", 0))
+    old_manifest = store.end("s1")
+    real_write = store_module._atomic_write_json
+    real_replace = store_module.os.replace
+    real_unlink = Path.unlink
+    failed = False
+
+    def maybe_fail_write(value: dict, target: Path) -> None:
+        nonlocal failed
+        boundary = None
+        if target.parent.name == "restart-intents":
+            boundary = "marker"
+        elif target.parent.name == "state":
+            boundary = "state"
+        elif target.parent.name == "sessions" and value.get("active") is True:
+            boundary = "manifest"
+        if boundary == failure_boundary and not failed:
+            failed = True
+            raise OSError(f"injected {boundary} failure")
+        real_write(value, target)
+
+    def maybe_fail_replace(source: Path, target: Path) -> None:
+        nonlocal failed
+        if (
+            failure_boundary == "archive"
+            and not failed
+            and source.parent.name == "events"
+            and target.parent.name == "event-archives"
+        ):
+            failed = True
+            raise OSError("injected archive failure")
+        real_replace(source, target)
+
+    def maybe_fail_unlink(path: Path, *args, **kwargs) -> None:
+        nonlocal failed
+        if (
+            failure_boundary == "cleanup"
+            and not failed
+            and path.parent.name == "restart-intents"
+        ):
+            failed = True
+            raise OSError("injected cleanup failure")
+        real_unlink(path, *args, **kwargs)
+
+    monkeypatch.setattr(store_module, "_atomic_write_json", maybe_fail_write)
+    monkeypatch.setattr(store_module.os, "replace", maybe_fail_replace)
+    monkeypatch.setattr(Path, "unlink", maybe_fail_unlink)
+
+    if failure_boundary == "none":
+        store.start("s1", "rin-aster", "1.0.0", HASH)
+    else:
+        with pytest.raises((KokoroError, OSError)):
+            store.start("s1", "rin-aster", "1.0.0", HASH)
+        assert failed is True
+
+    fresh_store = SessionStore(tmp_path)
+    if recover_with == "start":
+        recovered_manifest = fresh_store.start(
+            "s1", "rin-aster", "1.0.0", HASH
+        )
+    else:
+        recovered_manifest = fresh_store.load("s1")
+
+    assert not (tmp_path / "restart-intents" / "s1.json").exists()
+    assert read_json(tmp_path / "state" / "s1.json")["revision"] == (
+        0 if restart_committed else old_state["revision"]
+    )
+    assert recovered_manifest["active"] is restart_committed
+    assert recovered_manifest["state_revision"] == (
+        0 if restart_committed else old_manifest["state_revision"]
+    )
+    assert len(list((tmp_path / "event-archives").glob("s1-*"))) == (
+        1 if restart_committed else 0
+    )
+    current_events = tmp_path / "events" / "s1"
+    assert len(list(current_events.glob("*.json"))) == (
+        0 if restart_committed else 1
+    )
+
+
+def test_corrupt_restart_intent_is_rejected_without_moving_history(
+    tmp_path: Path,
+) -> None:
+    store = started_store(tmp_path)
+    store.apply("s1", event("e1", 0))
+    store.end("s1")
+    journal_before = next((tmp_path / "events" / "s1").glob("*.json")).read_bytes()
+    marker = tmp_path / "restart-intents" / "s1.json"
+    marker.parent.mkdir()
+    marker.write_bytes(b'{"schema_version":"1.0","private":true}')
+
+    for operation in (
+        lambda: store.load("s1"),
+        lambda: store.start("s1", "rin-aster", "1.0.0", HASH),
+        lambda: store.apply("s1", event("e2", 1)),
+    ):
+        with pytest.raises(KokoroError) as raised:
+            operation()
+        assert raised.value.code == "SESSION_RESTART_INVALID"
+        assert raised.value.details == {}
+        assert "private" not in str(raised.value)
+
+    assert next((tmp_path / "events" / "s1").glob("*.json")).read_bytes() == journal_before
+    assert not (tmp_path / "event-archives").exists()
+
+
+def test_restart_recovery_sanitizes_inconsistent_current_journal_path(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    store = started_store(tmp_path)
+    store.apply("s1", event("e1", 0))
+    store.end("s1")
+    real_write = store_module._atomic_write_json
+    failed = False
+
+    def fail_new_state(value: dict, target: Path) -> None:
+        nonlocal failed
+        if target.parent.name == "state" and not failed:
+            failed = True
+            raise OSError("injected state failure")
+        real_write(value, target)
+
+    monkeypatch.setattr(store_module, "_atomic_write_json", fail_new_state)
+    with pytest.raises(OSError):
+        store.start("s1", "rin-aster", "1.0.0", HASH)
+    current = tmp_path / "events" / "s1"
+    current.write_text("private path", encoding="utf-8")
+
+    with pytest.raises(KokoroError) as raised:
+        SessionStore(tmp_path).load("s1")
+
+    assert raised.value.code == "SESSION_RESTART_INVALID"
+    assert raised.value.details == {}
+    assert "private" not in str(raised.value)
+    assert current.is_file()
+    assert (tmp_path / "event-archives" / "s1-1").is_dir()
+    assert (tmp_path / "restart-intents" / "s1.json").is_file()
+
+
+def test_end_recovers_committed_restart_before_deactivation(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    store = started_store(tmp_path)
+    store.apply("s1", event("e1", 0))
+    store.end("s1")
+    real_unlink = Path.unlink
+    failed = False
+
+    def fail_intent_cleanup(path: Path, *args, **kwargs) -> None:
+        nonlocal failed
+        if path.parent.name == "restart-intents" and not failed:
+            failed = True
+            raise OSError("injected cleanup failure")
+        real_unlink(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "unlink", fail_intent_cleanup)
+    with pytest.raises(KokoroError):
+        store.start("s1", "rin-aster", "1.0.0", HASH)
+
+    ended = SessionStore(tmp_path).end("s1")
+
+    assert ended["active"] is False
+    assert ended["state_revision"] == 0
+    assert not (tmp_path / "restart-intents" / "s1.json").exists()
+    assert SessionStore(tmp_path).load("s1") == ended
+    assert (tmp_path / "event-archives" / "s1-1").is_dir()

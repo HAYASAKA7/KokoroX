@@ -19,7 +19,11 @@ from kokoroarc import __version__
 from kokoroarc.errors import KokoroError
 from kokoroarc.json_compat import find_json_incompatibility
 from kokoroarc.packs.compiler import write_compiled_pack
-from kokoroarc.state.transitions import MAX_APPLIED_EVENT_IDS, apply_event
+from kokoroarc.state.transitions import (
+    MAX_APPLIED_EVENT_IDS,
+    apply_event,
+    apply_event_v1,
+)
 
 
 _SESSION_ID = re.compile(r"[a-z0-9]+(?:-[a-z0-9]+)*")
@@ -34,12 +38,15 @@ _SEMVER = re.compile(
 )
 _COMPILED_PACK_HASH = re.compile(r"[a-f0-9]{64}")
 SESSION_MANIFEST_MAX_BYTES = 64 * 1024
-EVENT_RECORD_MAX_BYTES = 64 * 1024
+EVENT_RECORD_MAX_BYTES = 8 * 1024
+JOURNAL_MAX_BYTES = 32 * 1024 * 1024
 RELATIONSHIP_STATE_MAX_BYTES = 4 * 1024 * 1024
+RESTART_INTENT_MAX_BYTES = 160 * 1024
 _SESSION_LOCK_TIMEOUT_SECONDS = 5.0
 _SESSION_LOCK_POLL_SECONDS = 0.01
 _THREAD_LOCKS: dict[tuple[str, str], threading.Lock] = {}
 _THREAD_LOCKS_GUARD = threading.Lock()
+_REPLAY_ALGORITHMS = {"relationship-v1": apply_event_v1}
 _MANIFEST_KEYS = frozenset(
     {
         "schema_version",
@@ -52,6 +59,16 @@ _MANIFEST_KEYS = frozenset(
         "scope",
         "state_revision",
         "active",
+    }
+)
+_RESTART_INTENT_KEYS = frozenset(
+    {
+        "schema_version",
+        "session_id",
+        "old_manifest",
+        "new_manifest",
+        "archive_name",
+        "journal_present",
     }
 )
 _MINIMAL_EVENT_KEYS = frozenset(
@@ -146,6 +163,12 @@ def _invalid_event() -> KokoroError:
 def _invalid_journal() -> KokoroError:
     return KokoroError(
         "STATE_JOURNAL_INVALID", "Session event journal is invalid."
+    )
+
+
+def _invalid_restart() -> KokoroError:
+    return KokoroError(
+        "SESSION_RESTART_INVALID", "Session restart data is invalid."
     )
 
 
@@ -424,7 +447,9 @@ def _state_is_valid(value: object, session_id: str) -> bool:
     )
 
 
-def _read_bounded_json(target: Path, max_bytes: int, error_factory) -> Any:
+def _read_bounded_json_with_size(
+    target: Path, max_bytes: int, error_factory
+) -> tuple[Any, int]:
     try:
         with target.open("rb") as handle:
             contents = handle.read(max_bytes + 1)
@@ -449,6 +474,13 @@ def _read_bounded_json(target: Path, max_bytes: int, error_factory) -> Any:
         raise error_factory() from error
     if find_json_incompatibility(value) is not None:
         raise error_factory()
+    return value, len(contents)
+
+
+def _read_bounded_json(target: Path, max_bytes: int, error_factory) -> Any:
+    value, _size = _read_bounded_json_with_size(
+        target, max_bytes, error_factory
+    )
     return value
 
 
@@ -584,7 +616,9 @@ class SessionStore:
             )
         return target
 
-    def _journal_entries(self, session_id: str) -> list[tuple[int, str, Path]]:
+    def _journal_entries(
+        self, session_id: str
+    ) -> list[tuple[int, str, Path, int]]:
         directory = self._event_directory(session_id, create=False)
         if not directory.exists():
             return []
@@ -599,7 +633,8 @@ class SessionStore:
         except OSError as error:
             raise _invalid_journal() from error
 
-        entries: list[tuple[int, str, Path]] = []
+        entries: list[tuple[int, str, Path, int]] = []
+        total_bytes = 0
         for candidate in candidates:
             if _path_is_redirect(candidate):
                 raise KokoroError(
@@ -607,19 +642,31 @@ class SessionStore:
                 )
             match = _EVENT_FILENAME.fullmatch(candidate.name)
             try:
-                is_file = candidate.is_file()
+                candidate_stat = candidate.stat(follow_symlinks=False)
                 contained = candidate.resolve(strict=False).is_relative_to(
                     self.data_root
                 )
             except OSError as error:
                 raise _invalid_journal() from error
-            if match is None or not is_file or not contained:
+            file_size = candidate_stat.st_size
+            if (
+                match is None
+                or not stat.S_ISREG(candidate_stat.st_mode)
+                or not contained
+                or file_size < 0
+                or file_size > EVENT_RECORD_MAX_BYTES
+            ):
                 raise _invalid_journal()
-            entries.append((int(match.group(1)), match.group(2), candidate))
+            total_bytes += file_size
+            if total_bytes > JOURNAL_MAX_BYTES:
+                raise _invalid_journal()
+            entries.append(
+                (int(match.group(1)), match.group(2), candidate, file_size)
+            )
 
         entries.sort(key=lambda item: (item[0], item[1]))
         seen_ids: set[str] = set()
-        for expected_revision, (revision, event_id, _path) in enumerate(
+        for expected_revision, (revision, event_id, _path, _size) in enumerate(
             entries, start=1
         ):
             if revision != expected_revision or event_id in seen_ids:
@@ -628,16 +675,26 @@ class SessionStore:
         return entries
 
     def _read_event_record(
-        self, revision: int, filename_event_id: str, path: Path
-    ) -> tuple[dict[str, Any], float, int]:
-        value = _read_bounded_json(path, EVENT_RECORD_MAX_BYTES, _invalid_journal)
+        self,
+        revision: int,
+        filename_event_id: str,
+        path: Path,
+        max_bytes: int,
+    ) -> tuple[dict[str, Any], str, float, int, int]:
+        value, actual_bytes = _read_bounded_json_with_size(
+            path, min(EVENT_RECORD_MAX_BYTES, max_bytes), _invalid_journal
+        )
         if (
             not isinstance(value, dict)
             or set(value) != {"schema_version", "event", "transition"}
             or value.get("schema_version") != "1.0"
             or not isinstance(value.get("transition"), dict)
-            or set(value["transition"]) != {"max_delta", "repetition_window"}
+            or set(value["transition"])
+            != {"algorithm", "max_delta", "repetition_window"}
         ):
+            raise _invalid_journal()
+        algorithm = value["transition"]["algorithm"]
+        if algorithm not in _REPLAY_ALGORITHMS:
             raise _invalid_journal()
         try:
             committed_event = _validate_event(value["event"])
@@ -652,17 +709,38 @@ class SessionStore:
             or committed_event["expected_state_revision"] != revision - 1
         ):
             raise _invalid_journal()
-        return committed_event, max_delta, repetition_window
+        return (
+            committed_event,
+            algorithm,
+            max_delta,
+            repetition_window,
+            actual_bytes,
+        )
 
     def _replay_locked(
         self, session_id: str, manifest: dict[str, Any]
     ) -> dict[str, Any]:
         state = _initial_state(session_id, manifest["created_by"])
-        for revision, event_id, path in self._journal_entries(session_id):
-            committed_event, max_delta, repetition_window = self._read_event_record(
-                revision, event_id, path
+        actual_total_bytes = 0
+        for revision, event_id, path, _stat_size in self._journal_entries(
+            session_id
+        ):
+            (
+                committed_event,
+                algorithm,
+                max_delta,
+                repetition_window,
+                actual_bytes,
+            ) = self._read_event_record(
+                revision,
+                event_id,
+                path,
+                JOURNAL_MAX_BYTES - actual_total_bytes,
             )
-            state = apply_event(
+            actual_total_bytes += actual_bytes
+            if actual_total_bytes > JOURNAL_MAX_BYTES:
+                raise _invalid_journal()
+            state = _REPLAY_ALGORITHMS[algorithm](
                 state,
                 committed_event,
                 max_delta=max_delta,
@@ -711,42 +789,191 @@ class SessionStore:
         _atomic_write_json(repaired, manifest_path)
         return repaired
 
-    def _archive_event_history_locked(
-        self, session_id: str, manifest: dict[str, Any]
+    def _archive_path(
+        self, session_id: str, archive_name: str, *, create_root: bool
+    ) -> Path:
+        prefix = f"{session_id}-"
+        if not archive_name.startswith(prefix):
+            raise _invalid_restart()
+        index_text = archive_name[len(prefix) :]
+        if (
+            not index_text.isascii()
+            or not index_text.isdigit()
+            or index_text.startswith("0")
+            or not 1 <= int(index_text) <= MAX_APPLIED_EVENT_IDS
+        ):
+            raise _invalid_restart()
+        archive_root = self._storage_directory(
+            "event-archives", create=create_root
+        )
+        target = archive_root / archive_name
+        if _path_is_redirect(target):
+            raise KokoroError(
+                "SESSION_PATH_UNSAFE", "Session storage path is unsafe."
+            )
+        try:
+            contained = target.resolve(strict=False).is_relative_to(
+                self.data_root
+            )
+        except OSError as error:
+            raise KokoroError(
+                "SESSION_PATH_UNSAFE", "Session storage path is unsafe."
+            ) from error
+        if not contained:
+            raise KokoroError(
+                "SESSION_PATH_UNSAFE", "Session storage path is unsafe."
+            )
+        if target.exists() and not target.is_dir():
+            raise _invalid_restart()
+        return target
+
+    def _choose_archive_path(self, session_id: str) -> Path:
+        for index in range(1, MAX_APPLIED_EVENT_IDS + 1):
+            candidate = self._archive_path(
+                session_id, f"{session_id}-{index}", create_root=True
+            )
+            if not candidate.exists():
+                return candidate
+        raise KokoroError(
+            "STATE_CAPACITY_EXCEEDED",
+            "Relationship state capacity was exceeded.",
+            details={"field": "event_archives", "limit": MAX_APPLIED_EVENT_IDS},
+        )
+
+    def _read_restart_intent(
+        self, session_id: str
+    ) -> dict[str, Any] | None:
+        target = self._target_path(
+            "restart-intents", session_id, create=False
+        )
+        try:
+            intent = _read_bounded_json(
+                target, RESTART_INTENT_MAX_BYTES, _invalid_restart
+            )
+        except FileNotFoundError:
+            return None
+        if (
+            not isinstance(intent, dict)
+            or set(intent) != _RESTART_INTENT_KEYS
+            or intent.get("schema_version") != "1.0"
+            or intent.get("session_id") != session_id
+            or not isinstance(intent.get("journal_present"), bool)
+            or not isinstance(intent.get("archive_name"), str)
+            or not self._manifest_is_valid(intent.get("old_manifest"), session_id)
+            or not self._manifest_is_valid(intent.get("new_manifest"), session_id)
+            or intent["old_manifest"]["active"] is not False
+            or intent["new_manifest"]["active"] is not True
+            or intent["new_manifest"]["state_revision"] != 0
+        ):
+            raise _invalid_restart()
+        self._archive_path(
+            session_id, intent["archive_name"], create_root=False
+        )
+        return intent
+
+    def _remove_restart_intent(self, session_id: str) -> None:
+        target = self._target_path(
+            "restart-intents", session_id, create=False
+        )
+        try:
+            target.unlink()
+        except OSError as error:
+            raise KokoroError(
+                "SESSION_WRITE_FAILED", "Session data could not be written."
+            ) from error
+
+    def _recover_restart_locked(self, session_id: str) -> None:
+        intent = self._read_restart_intent(session_id)
+        if intent is None:
+            return
+        try:
+            manifest = self._read_manifest(session_id)
+        except KokoroError as error:
+            if error.code == "SESSION_PATH_UNSAFE":
+                raise
+            raise _invalid_restart() from error
+
+        old_manifest = intent["old_manifest"]
+        new_manifest = intent["new_manifest"]
+        old_matches = manifest == old_manifest
+        new_matches = manifest == new_manifest
+        if old_matches == new_matches:
+            raise _invalid_restart()
+
+        try:
+            current = self._event_directory(session_id, create=False)
+            archive = self._archive_path(
+                session_id, intent["archive_name"], create_root=False
+            )
+        except KokoroError as error:
+            if error.code == "SESSION_PATH_UNSAFE":
+                raise
+            raise _invalid_restart() from error
+        try:
+            current_exists = current.exists()
+            archive_exists = archive.exists()
+        except OSError as error:
+            raise _invalid_restart() from error
+
+        journal_present = intent["journal_present"]
+        if old_matches:
+            if journal_present:
+                if current_exists == archive_exists:
+                    raise _invalid_restart()
+                if archive_exists:
+                    try:
+                        os.replace(archive, current)
+                    except OSError as error:
+                        raise KokoroError(
+                            "SESSION_WRITE_FAILED",
+                            "Session data could not be written.",
+                        ) from error
+            elif current_exists or archive_exists:
+                raise _invalid_restart()
+            state = self._replay_locked(session_id, manifest)
+            self._repair_projection_locked(session_id, manifest, state)
+            self._remove_restart_intent(session_id)
+            return
+
+        if journal_present != archive_exists:
+            raise _invalid_restart()
+        if current_exists:
+            try:
+                if next(current.iterdir(), None) is not None:
+                    raise _invalid_restart()
+                current.rmdir()
+            except KokoroError:
+                raise
+            except OSError as error:
+                raise _invalid_restart() from error
+        state = self._replay_locked(session_id, manifest)
+        self._repair_projection_locked(session_id, manifest, state)
+        self._remove_restart_intent(session_id)
+
+    def _begin_restart_locked(
+        self,
+        session_id: str,
+        old_manifest: dict[str, Any],
+        new_manifest: dict[str, Any],
     ) -> None:
         source = self._event_directory(session_id, create=False)
-        if not source.exists():
+        journal_present = source.exists()
+        self._replay_locked(session_id, old_manifest)
+        target = self._choose_archive_path(session_id)
+        intent = {
+            "schema_version": "1.0",
+            "session_id": session_id,
+            "old_manifest": copy.deepcopy(old_manifest),
+            "new_manifest": copy.deepcopy(new_manifest),
+            "archive_name": target.name,
+            "journal_present": journal_present,
+        }
+        intent_path = self._target_path(
+            "restart-intents", session_id, create=True
+        )
+        _atomic_write_json(intent, intent_path)
+        if not journal_present:
             return
-        self._replay_locked(session_id, manifest)
-        archive_root = self._storage_directory("event-archives", create=True)
-        target: Path | None = None
-        for index in range(1, MAX_APPLIED_EVENT_IDS + 1):
-            candidate = archive_root / f"{session_id}-{index}"
-            if _path_is_redirect(candidate):
-                raise KokoroError(
-                    "SESSION_PATH_UNSAFE", "Session storage path is unsafe."
-                )
-            try:
-                contained = candidate.resolve(strict=False).is_relative_to(
-                    self.data_root
-                )
-            except OSError as error:
-                raise KokoroError(
-                    "SESSION_PATH_UNSAFE", "Session storage path is unsafe."
-                ) from error
-            if not contained:
-                raise KokoroError(
-                    "SESSION_PATH_UNSAFE", "Session storage path is unsafe."
-                )
-            if not candidate.exists():
-                target = candidate
-                break
-        if target is None:
-            raise KokoroError(
-                "STATE_CAPACITY_EXCEEDED",
-                "Relationship state capacity was exceeded.",
-                details={"field": "event_archives", "limit": MAX_APPLIED_EVENT_IDS},
-            )
         try:
             os.replace(source, target)
         except OSError as error:
@@ -897,6 +1124,7 @@ class SessionStore:
         compiled_pack_hash = _validate_compiled_pack_hash(compiled_pack_hash)
 
         with self._session_lock(session_id):
+            self._recover_restart_locked(session_id)
             existing: dict[str, Any] | None = None
             try:
                 existing = self._read_manifest(session_id)
@@ -908,9 +1136,6 @@ class SessionStore:
                     raise KokoroError(
                         "SESSION_ALREADY_ACTIVE", "Session is already active."
                     )
-
-            if existing is not None:
-                self._archive_event_history_locked(session_id, existing)
 
             manifest = {
                 "schema_version": "1.0",
@@ -924,11 +1149,15 @@ class SessionStore:
                 "state_revision": 0,
                 "active": True,
             }
+            if existing is not None:
+                self._begin_restart_locked(session_id, existing, manifest)
             state = _initial_state(session_id, manifest["created_by"])
             state_path = self._target_path("state", session_id, create=True)
             manifest_path = self._target_path("sessions", session_id, create=True)
             _atomic_write_json(state, state_path)
             _atomic_write_json(manifest, manifest_path)
+            if existing is not None:
+                self._remove_restart_intent(session_id)
             return manifest
 
     def load(self, session_id: str) -> dict[str, Any]:
@@ -936,6 +1165,7 @@ class SessionStore:
         session_id = _validate_session_id(session_id)
         try:
             with self._session_lock(session_id):
+                self._recover_restart_locked(session_id)
                 manifest = self._read_manifest(session_id)
                 state = self._replay_locked(session_id, manifest)
                 return self._repair_projection_locked(
@@ -953,9 +1183,18 @@ class SessionStore:
     def replay(self, session_id: str) -> dict[str, Any]:
         """Read and replay the authoritative append-only event journal."""
         session_id = _validate_session_id(session_id)
-        with self._session_lock(session_id):
-            manifest = self._read_manifest(session_id)
-            return self._replay_locked(session_id, manifest)
+        try:
+            with self._session_lock(session_id):
+                manifest = self._read_manifest(session_id)
+                return self._replay_locked(session_id, manifest)
+        except KokoroError as error:
+            if error.code == "SESSION_LOCK_TIMEOUT":
+                raise KokoroError(
+                    "STATE_BUSY",
+                    "Relationship state is busy.",
+                    retryable=True,
+                ) from error
+            raise
 
     def apply(
         self,
@@ -973,6 +1212,7 @@ class SessionStore:
         )
         try:
             with self._session_lock(session_id):
+                self._recover_restart_locked(session_id)
                 manifest = self._read_manifest(session_id)
                 if not manifest["active"]:
                     raise KokoroError(
@@ -1016,6 +1256,7 @@ class SessionStore:
                     "schema_version": "1.0",
                     "event": committed_event,
                     "transition": {
+                        "algorithm": "relationship-v1",
                         "max_delta": max_delta,
                         "repetition_window": repetition_window,
                     },
@@ -1045,6 +1286,7 @@ class SessionStore:
         """End a session without altering its relationship state."""
         session_id = _validate_session_id(session_id)
         with self._session_lock(session_id):
+            self._recover_restart_locked(session_id)
             manifest = self._read_manifest(session_id)
             if not manifest["active"]:
                 return manifest
