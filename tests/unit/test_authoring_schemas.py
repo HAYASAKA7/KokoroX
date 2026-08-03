@@ -1,4 +1,5 @@
 from copy import deepcopy
+import json
 from pathlib import Path
 
 import pytest
@@ -8,6 +9,14 @@ from kokoroarc.schemas import SchemaRegistry
 
 
 SCHEMAS = SchemaRegistry(Path("schemas/v1"))
+WINDOWS_RESERVED_DEVICE_BASENAMES = (
+    "con",
+    "prn",
+    "aux",
+    "nul",
+    *(f"com{number}" for number in range(1, 10)),
+    *(f"lpt{number}" for number in range(1, 10)),
+)
 
 
 def _metadata(artifact_id: str) -> dict:
@@ -114,6 +123,55 @@ def test_authoring_schemas_accept_representative_artifacts(
     SCHEMAS.validate("character-build-request", valid_request)
     SCHEMAS.validate("character-draft", valid_draft)
     SCHEMAS.validate("build-validation-report", valid_report)
+
+
+@pytest.mark.parametrize("reserved", WINDOWS_RESERVED_DEVICE_BASENAMES)
+@pytest.mark.parametrize(
+    "schema_name,fixture_name,field",
+    [
+        ("character-build-request", "valid_request", "namespace"),
+        ("character-build-request", "valid_request", "character_id"),
+        ("character-draft", "valid_draft", "namespace"),
+        ("character-draft", "valid_draft", "character_id"),
+    ],
+)
+def test_authoring_path_identities_reject_windows_reserved_device_names(
+    schema_name: str,
+    fixture_name: str,
+    field: str,
+    reserved: str,
+    request: pytest.FixtureRequest,
+) -> None:
+    invalid = deepcopy(request.getfixturevalue(fixture_name))
+    invalid[field] = reserved
+
+    _assert_invalid(schema_name, invalid)
+
+
+@pytest.mark.parametrize("field", ["namespace", "character_id"])
+@pytest.mark.parametrize("reserved", WINDOWS_RESERVED_DEVICE_BASENAMES)
+def test_source_path_identities_reject_windows_reserved_device_names(
+    field: str, reserved: str
+) -> None:
+    source = json.loads(
+        Path("tests/fixtures/schema/valid-character-source.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    source[field] = reserved
+
+    _assert_invalid("character-source", source)
+
+
+def test_source_evidence_claim_ids_do_not_use_path_identity_restrictions() -> None:
+    source = json.loads(
+        Path("tests/fixtures/schema/valid-character-source.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    source["evidence"]["claims"] = [{"claim_id": "con"}]
+
+    SCHEMAS.validate("character-source", source)
 
 
 @pytest.mark.parametrize(

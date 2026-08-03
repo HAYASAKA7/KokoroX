@@ -32,6 +32,27 @@ _REPLACE_RETRY_DELAYS = (0.0, 0.001, 0.002, 0.004)
 _CLEANUP_RETRY_DELAYS = (0.0, 0.001, 0.002, 0.004)
 _TRANSIENT_REPLACE_WINERRORS = frozenset({5, 32})
 _BACKUP_TOKEN_PATTERN = re.compile(r"[a-f0-9]{24}\Z")
+_WINDOWS_RESERVED_DEVICE_BASENAMES = frozenset(
+    {
+        "con",
+        "prn",
+        "aux",
+        "nul",
+        *(f"com{number}" for number in range(1, 10)),
+        *(f"lpt{number}" for number in range(1, 10)),
+    }
+)
+_LOCK_CONTENTION_ERRNOS = frozenset(
+    value
+    for value in (
+        getattr(errno, "EACCES", None),
+        getattr(errno, "EAGAIN", None),
+        getattr(errno, "EWOULDBLOCK", None),
+        getattr(errno, "EDEADLK", None),
+    )
+    if value is not None
+)
+_LOCK_CONTENTION_WINERRORS = frozenset({33, 36})
 _BUNDLE_REFERENCES = {
     "request": "request.json",
     "source_pack": "source-pack",
@@ -66,7 +87,6 @@ _DIRECTORY_FSYNC_UNSUPPORTED = frozenset(
         getattr(errno, "ENOTSUP", None),
         getattr(errno, "EOPNOTSUPP", None),
         getattr(errno, "EBADF", None),
-        getattr(errno, "EACCES", None),
     )
     if value is not None
 )
@@ -78,6 +98,54 @@ class _SourceIdentity:
     inode: int
     size: int
     modified_ns: int
+
+
+@dataclass(slots=True)
+class _PublicationLock:
+    target: Path
+    path: Path
+    descriptor: int
+    parent_identity: tuple[int, int]
+    held: bool = True
+
+    def __enter__(self) -> _PublicationLock:
+        return self
+
+    def __exit__(
+        self,
+        _exception_type: object,
+        _exception: object,
+        _traceback: object,
+    ) -> None:
+        self.release()
+
+    def release(self) -> None:
+        if not self.held:
+            return
+        try:
+            _unlock_publication_descriptor(self.descriptor)
+        finally:
+            try:
+                os.close(self.descriptor)
+            except OSError:
+                pass
+            finally:
+                self.held = False
+
+    def owns(self, target: Path) -> bool:
+        if not self.held or target != self.target:
+            return False
+        try:
+            linked_stat = self.path.lstat()
+            opened_stat = os.fstat(self.descriptor)
+            parent_stat = self.target.parent.lstat()
+        except OSError:
+            return False
+        return (
+            _safe_lock_stats(self.path, linked_stat, opened_stat)
+            and _safe_lock_parent(self.target.parent, parent_stat)
+            and _filesystem_identity(parent_stat) == self.parent_identity
+        )
 
 
 def publish_draft_bundle(
@@ -100,6 +168,33 @@ def publish_draft_bundle(
     schemas.validate("build-validation-report", report)
     schemas.validate("character-draft", draft)
     _validate_publish_inputs(request, draft, report)
+
+    root = _absolute_without_resolution(data_root)
+    final = root / "drafts" / Path(*draft["artifact_id"].split("/"))
+    _validate_existing_chain(root)
+    if _destination_lstat(final.parent) is None:
+        _preflight_validate_source(source_root, request, draft, report, schemas)
+        _validate_existing_chain(root)
+    _create_secure_directories(final.parent)
+    with _acquire_publication_lock(final) as publication_lock:
+        return _publish_draft_bundle_locked(
+            source_root,
+            request,
+            draft,
+            report,
+            schemas,
+            final,
+            publication_lock,
+        )
+
+
+def _preflight_validate_source(
+    source_root: Path,
+    request: dict[str, Any],
+    draft: dict[str, Any],
+    report: dict[str, Any],
+    schemas: SchemaRegistry,
+) -> None:
     scanned_files = scan_pack(source_root, PackLimits())
     resolved_source = _resolved_source_root(source_root)
     recorded = {
@@ -125,10 +220,41 @@ def publish_draft_bundle(
         recorded_hashes,
     )
 
-    root = _absolute_without_resolution(data_root)
-    final = root / "drafts" / Path(*draft["artifact_id"].split("/"))
-    _validate_existing_chain(root)
-    _create_secure_directories(final.parent)
+
+def _publish_draft_bundle_locked(
+    source_root: Path,
+    request: dict[str, Any],
+    draft: dict[str, Any],
+    report: dict[str, Any],
+    schemas: SchemaRegistry,
+    final: Path,
+    publication_lock: _PublicationLock,
+) -> Path:
+    scanned_files = scan_pack(source_root, PackLimits())
+    resolved_source = _resolved_source_root(source_root)
+    recorded = {
+        path: _source_identity(path, path.relative_to(resolved_source))
+        for path in scanned_files
+    }
+    recorded_hashes = {
+        path: _hash_regular_file(
+            path,
+            recorded[path],
+            path.relative_to(resolved_source),
+        )
+        for path in scanned_files
+    }
+    assembled_source = load_source_pack(source_root, schemas)
+    _require_source_hash(assembled_source, draft["source_pack_hash"])
+    _require_validation_report(request, assembled_source, report, schemas)
+    _revalidate_sources(
+        source_root,
+        resolved_source,
+        scanned_files,
+        recorded,
+        recorded_hashes,
+    )
+
     final_stat = _destination_lstat(final)
     if final_stat is not None:
         _validate_destination_component(final)
@@ -203,6 +329,8 @@ def publish_draft_bundle(
             report,
             draft,
         )
+        if not publication_lock.owns(final):
+            raise _unsafe_draft_path(final.parent, "publication lock parent changed")
         backup = _transactional_replace_directory(staging, final)
         try:
             _fsync_directory(final.parent)
@@ -210,7 +338,7 @@ def publish_draft_bundle(
             raise _durability_failure(final, backup, error) from error
         if backup is not None:
             _cleanup_tree_best_effort(backup)
-        _reap_stale_backups(final)
+        _reap_stale_backups(final, publication_lock)
         return final
     except KokoroError:
         if staging is not None:
@@ -240,6 +368,14 @@ def _validate_publish_inputs(
         raise _invalid_draft("invalid_fields")
     namespace = request.get("namespace")
     character_id = request.get("character_id")
+    for identity in (
+        namespace,
+        character_id,
+        draft.get("namespace"),
+        draft.get("character_id"),
+    ):
+        if _reserved_device_basename(identity):
+            raise _unsafe_draft_path(Path(identity), "reserved device name")
     if not _valid_slug(namespace) or not _valid_slug(character_id):
         raise _invalid_draft("invalid_identity")
     source_hash = draft.get("source_pack_hash")
@@ -287,6 +423,168 @@ def _valid_slug(value: Any) -> bool:
         isinstance(value, str)
         and len(value) <= 64
         and _SLUG_PATTERN.fullmatch(value) is not None
+        and not _reserved_device_basename(value)
+    )
+
+
+def _reserved_device_basename(value: Any) -> bool:
+    return isinstance(value, str) and value in _WINDOWS_RESERVED_DEVICE_BASENAMES
+
+
+def _acquire_publication_lock(target: Path) -> _PublicationLock:
+    lock_path = target.parent / f".{target.name}.publish.lock"
+    try:
+        parent_stat = target.parent.lstat()
+    except OSError as error:
+        raise _publish_failed("inspect_lock_parent", error) from error
+    if not _safe_lock_parent(target.parent, parent_stat):
+        raise _unsafe_draft_path(target.parent, "unsafe publication lock parent")
+    parent_identity = _filesystem_identity(parent_stat)
+    flags = (
+        os.O_RDWR
+        | os.O_CREAT
+        | getattr(os, "O_BINARY", 0)
+        | getattr(os, "O_CLOEXEC", 0)
+        | getattr(os, "O_NOINHERIT", 0)
+        | getattr(os, "O_NOFOLLOW", 0)
+    )
+    descriptor: int | None = None
+    try:
+        try:
+            descriptor = os.open(lock_path, flags, 0o600)
+        except OSError as error:
+            try:
+                linked_stat = lock_path.lstat()
+            except OSError:
+                raise _publish_failed("open_lock", error) from error
+            if (
+                _stat_is_redirect(lock_path, linked_stat)
+                or not stat.S_ISREG(linked_stat.st_mode)
+                or linked_stat.st_nlink != 1
+            ):
+                unsafe = _unsafe_draft_path(lock_path, "unsafe publication lock")
+                raise unsafe from error
+            raise _publish_failed("open_lock", error) from error
+
+        linked_stat = lock_path.lstat()
+        opened_stat = os.fstat(descriptor)
+        if not _safe_lock_stats(lock_path, linked_stat, opened_stat):
+            raise _unsafe_draft_path(lock_path, "unsafe publication lock")
+        if os.name != "nt":
+            os.fchmod(descriptor, 0o600)
+
+        if os.name == "nt" and opened_stat.st_size < 1:
+            try:
+                os.lseek(descriptor, 0, os.SEEK_SET)
+                if os.write(descriptor, b"\0") != 1:
+                    raise OSError(errno.EIO, "publication lock initialization failed")
+                os.fsync(descriptor)
+            except OSError as error:
+                if _is_lock_contention(error):
+                    raise _publication_busy() from error
+                raise
+
+        try:
+            _lock_publication_descriptor(descriptor)
+        except OSError as error:
+            if _is_lock_contention(error):
+                raise _publication_busy() from error
+            raise _publish_failed("lock", error) from error
+
+        linked_stat = lock_path.lstat()
+        opened_stat = os.fstat(descriptor)
+        if not _safe_lock_stats(lock_path, linked_stat, opened_stat):
+            raise _unsafe_draft_path(lock_path, "publication lock identity changed")
+        current_parent_stat = target.parent.lstat()
+        if (
+            not _safe_lock_parent(target.parent, current_parent_stat)
+            or _filesystem_identity(current_parent_stat) != parent_identity
+        ):
+            raise _unsafe_draft_path(
+                target.parent, "publication lock parent identity changed"
+            )
+        publication_lock = _PublicationLock(
+            target, lock_path, descriptor, parent_identity
+        )
+        descriptor = None
+        return publication_lock
+    except KokoroError:
+        raise
+    except OSError as error:
+        raise _publish_failed("lock", error) from error
+    finally:
+        if descriptor is not None:
+            try:
+                os.close(descriptor)
+            except OSError:
+                pass
+
+
+def _safe_lock_stats(
+    lock_path: Path,
+    linked_stat: os.stat_result,
+    opened_stat: os.stat_result,
+) -> bool:
+    return (
+        not _stat_is_redirect(lock_path, linked_stat)
+        and stat.S_ISREG(linked_stat.st_mode)
+        and stat.S_ISREG(opened_stat.st_mode)
+        and linked_stat.st_nlink == 1
+        and opened_stat.st_nlink == 1
+        and os.path.samestat(linked_stat, opened_stat)
+    )
+
+
+def _safe_lock_parent(path: Path, path_stat: os.stat_result) -> bool:
+    return not _stat_is_redirect(path, path_stat) and stat.S_ISDIR(path_stat.st_mode)
+
+
+def _filesystem_identity(path_stat: os.stat_result) -> tuple[int, int]:
+    return path_stat.st_dev, path_stat.st_ino
+
+
+def _lock_publication_descriptor(descriptor: int) -> None:
+    if os.name == "nt":
+        import msvcrt
+
+        os.lseek(descriptor, 0, os.SEEK_SET)
+        msvcrt.locking(descriptor, msvcrt.LK_NBLCK, 1)
+        return
+
+    import fcntl
+
+    fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
+
+
+def _unlock_publication_descriptor(descriptor: int) -> None:
+    try:
+        if os.name == "nt":
+            import msvcrt
+
+            os.lseek(descriptor, 0, os.SEEK_SET)
+            msvcrt.locking(descriptor, msvcrt.LK_UNLCK, 1)
+            return
+
+        import fcntl
+
+        fcntl.flock(descriptor, fcntl.LOCK_UN)
+    except OSError:
+        # Closing the descriptor below is the authoritative auto-release path.
+        pass
+
+
+def _is_lock_contention(error: OSError) -> bool:
+    return (
+        error.errno in _LOCK_CONTENTION_ERRNOS
+        or getattr(error, "winerror", None) in _LOCK_CONTENTION_WINERRORS
+    )
+
+
+def _publication_busy() -> KokoroError:
+    return KokoroError(
+        "DRAFT_PUBLISH_BUSY",
+        "Character draft publication is already in progress.",
+        details={"reason": "target_locked"},
     )
 
 
@@ -759,7 +1057,11 @@ def _is_same_scope_backup(path: Path, target: Path) -> bool:
     )
 
 
-def _reap_stale_backups(target: Path) -> None:
+def _reap_stale_backups(
+    target: Path, publication_lock: _PublicationLock
+) -> None:
+    if not publication_lock.owns(target):
+        raise RuntimeError("stale backup reaping requires the target publication lock")
     try:
         target_stat = _destination_lstat(target)
         if target_stat is None:

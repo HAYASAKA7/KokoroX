@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 from copy import deepcopy
+import errno
 import os
 from pathlib import Path
 import shutil
 import subprocess
+import sys
+import threading
 from typing import Any
 
 import pytest
@@ -1046,6 +1049,249 @@ def test_permanent_backup_cleanup_does_not_report_complete_publish_as_failure(
     _publish(tmp_path, source_root, artifacts)
 
     assert list(published.parent.glob(f".{published.name}.backup-*")) == []
+
+
+def test_concurrent_publish_is_busy_and_cannot_reap_live_rollback_backup(
+    tmp_path: Path,
+    source_root: Path,
+    artifacts: tuple[dict[str, Any], dict[str, Any], dict[str, Any], dict[str, Any]],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    published = _publish(tmp_path, source_root, artifacts)
+    marker_payload = b"previous complete draft"
+    (published / "previous.txt").write_bytes(marker_payload)
+    real_replace_directory = storage._transactional_replace_directory
+    backup_live = threading.Event()
+    release_first = threading.Event()
+    failures: list[BaseException] = []
+    first_thread: threading.Thread
+
+    def pause_first_with_live_backup(staging: Path, target: Path) -> Path | None:
+        backup = real_replace_directory(staging, target)
+        if threading.current_thread() is first_thread:
+            assert backup is not None
+            backup_live.set()
+            assert release_first.wait(timeout=10)
+        return backup
+
+    def first_publish() -> None:
+        try:
+            _publish(tmp_path, source_root, artifacts)
+        except BaseException as error:
+            failures.append(error)
+
+    monkeypatch.setattr(
+        storage, "_transactional_replace_directory", pause_first_with_live_backup
+    )
+    first_thread = threading.Thread(target=first_publish, daemon=True)
+    first_thread.start()
+    assert backup_live.wait(timeout=10)
+    live_backups = list(published.parent.glob(f".{published.name}.backup-*"))
+    assert len(live_backups) == 1
+    real_scan_pack = storage.scan_pack
+    monkeypatch.setattr(
+        storage,
+        "scan_pack",
+        lambda *args, **kwargs: pytest.fail(
+            "a contending publisher must fail before source validation"
+        ),
+    )
+
+    try:
+        with pytest.raises(KokoroError) as caught:
+            _publish(tmp_path, source_root, artifacts)
+
+        assert caught.value.code == "DRAFT_PUBLISH_BUSY"
+        assert caught.value.details == {"reason": "target_locked"}
+        assert "previous" not in caught.value.message.lower()
+        assert (live_backups[0] / "previous.txt").read_bytes() == marker_payload
+    finally:
+        monkeypatch.setattr(storage, "scan_pack", real_scan_pack)
+        release_first.set()
+        first_thread.join(timeout=10)
+
+    assert not first_thread.is_alive()
+    assert failures == []
+    assert _publish(tmp_path, source_root, artifacts) == published
+    lock_files = list(published.parent.glob(f".{published.name}.publish.lock"))
+    assert len(lock_files) == 1
+    assert lock_files[0].is_file()
+
+
+@pytest.mark.parametrize(
+    "exception_factory",
+    [
+        lambda: KokoroError("PACK_SCAN_FAILED", "Injected failure."),
+        lambda: PermissionError("Injected failure."),
+        lambda: KeyboardInterrupt(),
+    ],
+    ids=["kokoro-error", "os-error", "base-exception"],
+)
+def test_publish_lock_releases_after_publication_error(
+    tmp_path: Path,
+    source_root: Path,
+    artifacts: tuple[dict[str, Any], dict[str, Any], dict[str, Any], dict[str, Any]],
+    monkeypatch: pytest.MonkeyPatch,
+    exception_factory: Any,
+) -> None:
+    real_scan_pack = storage.scan_pack
+    calls = 0
+    injected = exception_factory()
+
+    def fail_once(*args: Any, **kwargs: Any) -> Any:
+        nonlocal calls
+        calls += 1
+        if calls == 2:
+            raise injected
+        return real_scan_pack(*args, **kwargs)
+
+    monkeypatch.setattr(storage, "scan_pack", fail_once)
+
+    with pytest.raises(type(injected)):
+        _publish(tmp_path, source_root, artifacts)
+
+    published = _publish(tmp_path, source_root, artifacts)
+    assert published.is_dir()
+
+
+def test_process_exit_auto_releases_publication_lock(
+    tmp_path: Path,
+    source_root: Path,
+    artifacts: tuple[dict[str, Any], dict[str, Any], dict[str, Any], dict[str, Any]],
+) -> None:
+    request, _source, report, draft = artifacts
+    data_root = tmp_path / "data"
+    published = data_root / "drafts" / Path(*draft["artifact_id"].split("/"))
+    published.parent.mkdir(parents=True)
+    script = (
+        "import sys,time;"
+        f"sys.path.insert(0,{str(Path('src').resolve())!r});"
+        "from pathlib import Path;"
+        "from kokoroarc.authoring.storage import _acquire_publication_lock;"
+        "lock=_acquire_publication_lock(Path(sys.argv[1]));"
+        "print('LOCKED',flush=True);"
+        "time.sleep(60)"
+    )
+    process = subprocess.Popen(
+        [sys.executable, "-c", script, str(published)],
+        cwd=Path.cwd(),
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    try:
+        assert process.stdout is not None
+        assert process.stdout.readline().strip() == "LOCKED"
+        process.kill()
+        assert process.wait(timeout=10) != 0
+    finally:
+        if process.poll() is None:
+            process.kill()
+            process.wait(timeout=10)
+
+    recovered = publish_draft_bundle(data_root, source_root, request, draft, report)
+    assert recovered == published
+
+
+def test_stale_backup_reaper_requires_live_target_lock_owner(
+    tmp_path: Path,
+    source_root: Path,
+    artifacts: tuple[dict[str, Any], dict[str, Any], dict[str, Any], dict[str, Any]],
+) -> None:
+    published = _publish(tmp_path, source_root, artifacts)
+    stale = published.parent / f".{published.name}.backup-{'b' * 24}"
+    stale.mkdir()
+    marker = stale / "preserved.txt"
+    marker.write_bytes(b"stale complete bundle")
+    released_lock = storage._acquire_publication_lock(published)
+    released_lock.release()
+
+    with pytest.raises(RuntimeError, match="requires the target publication lock"):
+        storage._reap_stale_backups(published, released_lock)
+
+    assert marker.read_bytes() == b"stale complete bundle"
+    assert _publish(tmp_path, source_root, artifacts) == published
+    assert not stale.exists()
+
+
+def test_publish_rejects_hardlinked_target_lock_file(
+    tmp_path: Path,
+    source_root: Path,
+    artifacts: tuple[dict[str, Any], dict[str, Any], dict[str, Any], dict[str, Any]],
+) -> None:
+    request, _source, report, draft = artifacts
+    data_root = tmp_path / "data"
+    published = data_root / "drafts" / Path(*draft["artifact_id"].split("/"))
+    published.parent.mkdir(parents=True)
+    outside = tmp_path / "outside-lock-target"
+    outside.write_bytes(b"must remain unchanged")
+    lock_path = published.parent / f".{published.name}.publish.lock"
+    os.link(outside, lock_path)
+
+    with pytest.raises(KokoroError) as caught:
+        publish_draft_bundle(data_root, source_root, request, draft, report)
+
+    assert caught.value.code == "UNSAFE_DRAFT_PATH"
+    assert outside.read_bytes() == b"must remain unchanged"
+    assert not published.exists()
+
+
+def test_reserved_device_identity_is_rejected_before_storage_creation(
+    tmp_path: Path,
+    source_root: Path,
+    artifacts: tuple[dict[str, Any], dict[str, Any], dict[str, Any], dict[str, Any]],
+) -> None:
+    request, _source, report, draft = deepcopy(artifacts)
+    request["namespace"] = "con"
+    draft["namespace"] = "con"
+    data_root = tmp_path / "data"
+
+    with pytest.raises(KokoroError) as caught:
+        publish_draft_bundle(data_root, source_root, request, draft, report)
+
+    assert caught.value.code == "SCHEMA_VALIDATION_FAILED"
+    assert not data_root.exists()
+
+
+def test_storage_defense_rejects_reserved_device_identity_as_unsafe(
+    tmp_path: Path,
+    source_root: Path,
+    artifacts: tuple[dict[str, Any], dict[str, Any], dict[str, Any], dict[str, Any]],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    request, _source, report, draft = deepcopy(artifacts)
+    request["character_id"] = "lpt1"
+    draft["character_id"] = "lpt1"
+    data_root = tmp_path / "data"
+    monkeypatch.setattr(storage.SchemaRegistry, "validate", lambda *args: None)
+
+    with pytest.raises(KokoroError) as caught:
+        publish_draft_bundle(data_root, source_root, request, draft, report)
+
+    assert caught.value.code == "UNSAFE_DRAFT_PATH"
+    assert caught.value.details["reason"] == "reserved device name"
+    assert not data_root.exists()
+
+
+def test_directory_fsync_eacces_is_a_durability_failure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(storage.os, "name", "posix")
+
+    def deny_directory_open(*args: Any, **kwargs: Any) -> int:
+        raise OSError(errno.EACCES, "sensitive permission failure")
+
+    monkeypatch.setattr(storage.os, "open", deny_directory_open)
+
+    with pytest.raises(KokoroError) as caught:
+        storage._fsync_directory(tmp_path)
+
+    assert caught.value.code == "DRAFT_PUBLISH_FAILED"
+    assert caught.value.details == {
+        "operation": "fsync_directory",
+        "reason": "PermissionError",
+    }
+    assert "sensitive" not in caught.value.message
 
 
 def test_parent_fsync_failure_preserves_previous_complete_bundle(
