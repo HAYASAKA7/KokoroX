@@ -50,6 +50,19 @@ def _installed_schema_candidates() -> tuple[Path, ...]:
     return tuple(dict.fromkeys(candidate.resolve() for candidate in candidates))
 
 
+def resolve_schema_dir() -> Path:
+    """Resolve repository schemas first, then installed data-file schemas."""
+    repository_root = Path(__file__).resolve().parents[2]
+    repository_schemas = (repository_root / "schemas" / "v1").resolve()
+    if repository_schemas.is_dir():
+        return repository_schemas
+    installed_schemas = _installed_schema_candidates()
+    return next(
+        (candidate for candidate in installed_schemas if candidate.is_dir()),
+        installed_schemas[0],
+    )
+
+
 @dataclass(frozen=True, slots=True)
 class Settings:
     data_dir: Path
@@ -63,18 +76,9 @@ class Settings:
                 "DATA_DIR_REQUIRED",
                 "Set KOKOROARC_DATA_DIR before running a stateful command.",
             )
-        repository_root = Path(__file__).resolve().parents[2]
-        repository_schemas = (repository_root / "schemas" / "v1").resolve()
-        installed_schemas = _installed_schema_candidates()
-        schema_dir = repository_schemas
-        if not schema_dir.is_dir():
-            schema_dir = next(
-                (candidate for candidate in installed_schemas if candidate.is_dir()),
-                installed_schemas[0],
-            )
         return cls(
             data_dir=Path(raw_data_dir).expanduser().resolve(),
-            schema_dir=schema_dir,
+            schema_dir=resolve_schema_dir(),
         )
 
     def ensure_directories(self) -> None:

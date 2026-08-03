@@ -11,18 +11,25 @@ import secrets
 import shutil
 import stat
 import tempfile
+import time
 from dataclasses import dataclass
 from typing import Any
 
 from kokoroarc import __version__
+from kokoroarc.config import resolve_schema_dir
 from kokoroarc.errors import KokoroError
 from kokoroarc.packs.compiler import canonical_bytes
 from kokoroarc.packs.security import PackLimits, scan_pack
+from kokoroarc.schemas import SchemaRegistry
 
 
 _SLUG_PATTERN = re.compile(r"[a-z0-9]+(?:-[a-z0-9]+)*\Z")
 _HASH_PATTERN = re.compile(r"[a-f0-9]{64}\Z")
 _SOURCE_HASH_ID_PREFIX_LENGTH = 16
+_REPLACE_RETRY_DELAYS = (0.0, 0.001, 0.002, 0.004)
+_CLEANUP_RETRY_DELAYS = (0.0, 0.001, 0.002, 0.004)
+_TRANSIENT_REPLACE_WINERRORS = frozenset({5, 32})
+_BACKUP_TOKEN_PATTERN = re.compile(r"[a-f0-9]{24}\Z")
 _BUNDLE_REFERENCES = {
     "request": "request.json",
     "source_pack": "source-pack",
@@ -86,6 +93,10 @@ def publish_draft_bundle(
     renames and rollback because replacing a non-empty directory in one syscall
     is not portable to Windows.
     """
+    schemas = SchemaRegistry(resolve_schema_dir())
+    schemas.validate("character-build-request", request)
+    schemas.validate("build-validation-report", report)
+    schemas.validate("character-draft", draft)
     _validate_publish_inputs(request, draft, report)
     scanned_files = scan_pack(source_root, PackLimits())
     resolved_source = _resolved_source_root(source_root)
@@ -98,18 +109,23 @@ def publish_draft_bundle(
     final = root / "drafts" / Path(*draft["artifact_id"].split("/"))
     _validate_existing_chain(root)
     _create_secure_directories(final.parent)
+    _reap_stale_backups(final)
     if final.exists() or final.is_symlink():
         _validate_destination_component(final)
         if not final.is_dir():
             raise _unsafe_draft_path(final, "target is not a directory")
 
-    staging = Path(
-        tempfile.mkdtemp(
-            prefix=f".{final.name}.staging-",
-            dir=final.parent,
-        )
-    )
+    staging: Path | None = None
     try:
+        try:
+            staging = Path(
+                tempfile.mkdtemp(
+                    prefix=f".{final.name}.staging-",
+                    dir=final.parent,
+                )
+            )
+        except OSError as error:
+            raise _publish_failed("create_staging", error) from error
         _validate_destination_component(staging)
         source_destination = staging / _BUNDLE_REFERENCES["source_pack"]
         source_destination.mkdir()
@@ -134,16 +150,20 @@ def publish_draft_bundle(
         )
         _fsync_tree_directories(staging)
         _transactional_replace_directory(staging, final)
+        _reap_stale_backups(final)
         _fsync_directory(final.parent)
         return final
     except KokoroError:
-        _remove_staging(staging)
+        if staging is not None:
+            _remove_staging(staging)
         raise
     except OSError as error:
-        _remove_staging(staging)
+        if staging is not None:
+            _remove_staging(staging)
         raise _publish_failed("write", error) from error
     except BaseException:
-        _remove_staging(staging)
+        if staging is not None:
+            _remove_staging(staging)
         raise
 
 
@@ -426,29 +446,135 @@ def _transactional_replace_directory(staging: Path, target: Path) -> None:
             backup = target.parent / (
                 f".{target.name}.backup-{secrets.token_hex(12)}"
             )
-            os.replace(target, backup)
+            _replace_with_retries(target, backup)
         try:
-            os.replace(staging, target)
-        except OSError:
+            _replace_with_retries(staging, target)
+        except OSError as cutover_error:
             if backup is not None:
-                os.replace(backup, target)
+                try:
+                    _replace_with_retries(backup, target)
+                except OSError as restore_error:
+                    raise KokoroError(
+                        "DRAFT_RESTORE_FAILED",
+                        "Character draft publication failed; the previous draft "
+                        "remains in a recovery backup.",
+                        details={
+                            "operation": "rollback",
+                            "reason": type(restore_error).__name__,
+                            "backup_path": str(backup),
+                        },
+                    ) from restore_error
                 backup = None
-            raise
+            raise cutover_error
     except OSError as error:
         raise _publish_failed("replace", error) from error
     if backup is not None:
+        _cleanup_tree_best_effort(backup)
+
+
+def _replace_with_retries(source: Path, target: Path) -> None:
+    attempts = len(_REPLACE_RETRY_DELAYS) + 1
+    for attempt in range(attempts):
         try:
-            shutil.rmtree(backup)
-        except OSError as error:
-            raise _publish_failed("cleanup_backup", error) from error
+            os.replace(source, target)
+            return
+        except PermissionError as error:
+            if not _is_transient_replace_error(error) or attempt == attempts - 1:
+                raise
+            time.sleep(_REPLACE_RETRY_DELAYS[attempt])
+
+
+def _is_transient_replace_error(error: PermissionError) -> bool:
+    return (
+        os.name == "nt"
+        and getattr(error, "winerror", None) in _TRANSIENT_REPLACE_WINERRORS
+    )
+
+
+def _backup_prefix(target: Path) -> str:
+    return f".{target.name}.backup-"
+
+
+def _is_same_scope_backup(path: Path, target: Path) -> bool:
+    prefix = _backup_prefix(target)
+    return (
+        path.parent == target.parent
+        and path.name.startswith(prefix)
+        and _BACKUP_TOKEN_PATTERN.fullmatch(path.name[len(prefix) :]) is not None
+    )
+
+
+def _reap_stale_backups(target: Path) -> None:
+    if not target.is_dir():
+        return
+    try:
+        entries = list(os.scandir(target.parent))
+    except OSError:
+        return
+    for entry in entries:
+        candidate = Path(entry.path)
+        if _is_same_scope_backup(candidate, target):
+            _cleanup_tree_best_effort(candidate)
+
+
+def _cleanup_tree_best_effort(path: Path) -> bool:
+    if not _tree_is_redirect_free(path):
+        return False
+    attempts = len(_CLEANUP_RETRY_DELAYS) + 1
+    for attempt in range(attempts):
+        try:
+            shutil.rmtree(path)
+            return True
+        except FileNotFoundError:
+            return True
+        except OSError:
+            if attempt == attempts - 1:
+                return False
+            time.sleep(_CLEANUP_RETRY_DELAYS[attempt])
+    return False
+
+
+def _tree_is_redirect_free(root: Path) -> bool:
+    try:
+        root_stat = root.lstat()
+        if _stat_is_redirect(root, root_stat) or not stat.S_ISDIR(root_stat.st_mode):
+            return False
+        pending = [root]
+        while pending:
+            directory = pending.pop()
+            with os.scandir(directory) as iterator:
+                for entry in iterator:
+                    path = Path(entry.path)
+                    path_stat = path.stat(follow_symlinks=False)
+                    if _stat_is_redirect(path, path_stat):
+                        return False
+                    if stat.S_ISDIR(path_stat.st_mode):
+                        pending.append(path)
+                    elif not stat.S_ISREG(path_stat.st_mode):
+                        return False
+    except OSError:
+        return False
+    return True
+
+
+def _stat_is_redirect(path: Path, path_stat: os.stat_result) -> bool:
+    attributes = getattr(path_stat, "st_file_attributes", 0)
+    reparse_flag = getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0)
+    is_junction = getattr(path, "is_junction", None)
+    try:
+        junction = bool(is_junction()) if is_junction is not None else False
+    except OSError:
+        return True
+    return (
+        stat.S_ISLNK(path_stat.st_mode)
+        or junction
+        or bool(attributes & reparse_flag)
+    )
 
 
 def _remove_staging(staging: Path) -> None:
-    try:
-        if staging.exists() or staging.is_symlink():
-            shutil.rmtree(staging)
-    except BaseException:
-        pass
+    if staging.exists() or staging.is_symlink():
+        _cleanup_tree_best_effort(staging)
 
 
 def _invalid_draft(reason: str) -> KokoroError:
