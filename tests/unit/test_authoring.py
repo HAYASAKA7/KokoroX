@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 from copy import deepcopy
+import json
 from pathlib import Path
 from typing import Any
 
 import pytest
 
 from kokoroarc.authoring.requests import normalize_build_request
+from kokoroarc.authoring.validation import validate_authoring_pack
 from kokoroarc.errors import KokoroError
 from kokoroarc.schemas import SchemaRegistry
 
@@ -37,6 +39,15 @@ def original_request() -> dict[str, Any]:
             }
         ],
     }
+
+
+@pytest.fixture
+def source() -> dict[str, Any]:
+    return json.loads(
+        Path("tests/fixtures/schema/valid-character-source.json").read_text(
+            encoding="utf-8"
+        )
+    )
 
 
 def _request_for_mode(
@@ -199,3 +210,371 @@ def test_normalize_rejects_non_json_values_safely(registry: SchemaRegistry) -> N
         normalize_build_request({"invalid": object()}, registry)
 
     assert caught.value.code == "INVALID_PACK_DATA"
+
+
+def test_validate_authoring_pack_reports_character_identity_mismatch(
+    registry: SchemaRegistry,
+    original_request: dict[str, Any],
+    source: dict[str, Any],
+) -> None:
+    source["character_id"] = "another-character"
+
+    report = validate_authoring_pack(original_request, source, registry)
+
+    assert report["valid"] is False
+    assert report["hard_failures"] == [
+        {
+            "code": "AUTHORING_IDENTITY_MISMATCH",
+            "path": ["character_id"],
+            "message": "Source character ID does not match the build request.",
+        }
+    ]
+
+
+def test_validate_authoring_pack_reports_character_version_mismatch(
+    registry: SchemaRegistry,
+    original_request: dict[str, Any],
+    source: dict[str, Any],
+) -> None:
+    source["character_version"] = "2.0.0"
+
+    report = validate_authoring_pack(original_request, source, registry)
+
+    assert [item["code"] for item in report["hard_failures"]] == [
+        "AUTHORING_VERSION_MISMATCH"
+    ]
+    assert report["hard_failures"][0]["path"] == ["character_version"]
+
+
+def test_validate_original_requires_authored_original_evidence(
+    registry: SchemaRegistry,
+    original_request: dict[str, Any],
+    source: dict[str, Any],
+) -> None:
+    source["evidence"]["authored_original"] = False
+
+    report = validate_authoring_pack(original_request, source, registry)
+
+    assert [item["code"] for item in report["hard_failures"]] == [
+        "AUTHORING_ORIGINAL_EVIDENCE_REQUIRED"
+    ]
+    assert report["hard_failures"][0]["path"] == [
+        "evidence",
+        "authored_original",
+    ]
+
+
+def test_validate_original_prohibits_externally_sourced_claims(
+    registry: SchemaRegistry,
+    original_request: dict[str, Any],
+    source: dict[str, Any],
+) -> None:
+    source["evidence"]["claims"] = [
+        {
+            "statement": "A claim presented as external canon.",
+            "source": "external-canon",
+        }
+    ]
+
+    report = validate_authoring_pack(original_request, source, registry)
+
+    assert [item["code"] for item in report["hard_failures"]] == [
+        "AUTHORING_EXTERNAL_CANON_PROHIBITED"
+    ]
+    assert report["hard_failures"][0]["path"] == [
+        "evidence",
+        "claims",
+        0,
+        "source",
+    ]
+
+
+def test_validate_original_allows_creative_brief_claim_source(
+    registry: SchemaRegistry,
+    original_request: dict[str, Any],
+    source: dict[str, Any],
+) -> None:
+    source["evidence"]["claims"] = [
+        {
+            "statement": "A restrained systems architect.",
+            "source": "creative_brief",
+        }
+    ]
+
+    report = validate_authoring_pack(original_request, source, registry)
+
+    assert report["valid"] is True
+    assert report["hard_failures"] == []
+
+
+def test_validate_dossier_requires_typed_user_dossier_evidence(
+    registry: SchemaRegistry,
+    original_request: dict[str, Any],
+    source: dict[str, Any],
+) -> None:
+    request = _request_for_mode(original_request, "dossier")
+    source["evidence"] = {"authored_original": False, "claims": []}
+
+    report = validate_authoring_pack(request, source, registry)
+
+    assert [item["code"] for item in report["hard_failures"]] == [
+        "AUTHORING_DOSSIER_EVIDENCE_REQUIRED"
+    ]
+    assert report["hard_failures"][0]["path"] == ["evidence", "claims"]
+
+
+def test_validate_dossier_rejects_claim_relabelled_as_external_canon(
+    registry: SchemaRegistry,
+    original_request: dict[str, Any],
+    source: dict[str, Any],
+) -> None:
+    request = _request_for_mode(original_request, "dossier")
+    source["evidence"] = {
+        "authored_original": False,
+        "claims": [
+            {"statement": "Quoted assertion", "source": "user_dossier"},
+            {"statement": "Relabelled assertion", "source": "external-canon"},
+        ],
+    }
+
+    report = validate_authoring_pack(request, source, registry)
+
+    assert [item["code"] for item in report["hard_failures"]] == [
+        "AUTHORING_DOSSIER_CANON_PROHIBITED"
+    ]
+    assert report["hard_failures"][0]["path"] == [
+        "evidence",
+        "claims",
+        1,
+        "source",
+    ]
+
+
+def test_validate_dossier_rejects_authored_original_flag(
+    registry: SchemaRegistry,
+    original_request: dict[str, Any],
+    source: dict[str, Any],
+) -> None:
+    request = _request_for_mode(original_request, "dossier")
+    source["evidence"] = {
+        "authored_original": True,
+        "claims": [
+            {"statement": "Quoted assertion", "source": "user_dossier"}
+        ],
+    }
+
+    report = validate_authoring_pack(request, source, registry)
+
+    assert [item["code"] for item in report["hard_failures"]] == [
+        "AUTHORING_DOSSIER_ORIGINAL_PROVENANCE_PROHIBITED"
+    ]
+    assert report["hard_failures"][0]["path"] == [
+        "evidence",
+        "authored_original",
+    ]
+
+
+def test_validate_dossier_rejects_claim_copied_into_immutable_identity(
+    registry: SchemaRegistry,
+    original_request: dict[str, Any],
+    source: dict[str, Any],
+) -> None:
+    request = _request_for_mode(original_request, "dossier")
+    source["evidence"] = {
+        "authored_original": False,
+        "claims": [
+            {"statement": "systems architect", "source": "user_dossier"}
+        ],
+    }
+
+    report = validate_authoring_pack(request, source, registry)
+
+    assert [item["code"] for item in report["hard_failures"]] == [
+        "AUTHORING_IDENTITY_PROVENANCE_COLLAPSE"
+    ]
+    assert report["hard_failures"][0]["path"] == ["identity", "role"]
+
+
+def test_validate_dossier_allows_explicit_identity_override(
+    registry: SchemaRegistry,
+    original_request: dict[str, Any],
+    source: dict[str, Any],
+) -> None:
+    request = _request_for_mode(original_request, "dossier")
+    request["inputs"].append(
+        {"type": "user_override", "content": "systems architect"}
+    )
+    source["evidence"] = {
+        "authored_original": False,
+        "claims": [
+            {"statement": "systems architect", "source": "user_dossier"}
+        ],
+    }
+
+    report = validate_authoring_pack(request, source, registry)
+
+    assert report["valid"] is True
+    assert report["hard_failures"] == []
+
+
+@pytest.mark.parametrize(
+    "source_path,replacement,code",
+    [
+        (
+            ("namespace",),
+            "another-namespace",
+            "AUTHORING_NAMESPACE_MISMATCH",
+        ),
+        (
+            ("identity", "display_name"),
+            "Another Name",
+            "AUTHORING_DISPLAY_NAME_MISMATCH",
+        ),
+    ],
+)
+def test_validate_authoring_pack_reports_complete_target_identity_mismatch(
+    source_path: tuple[str, ...],
+    replacement: str,
+    code: str,
+    registry: SchemaRegistry,
+    original_request: dict[str, Any],
+    source: dict[str, Any],
+) -> None:
+    target: dict[str, Any] = source
+    for component in source_path[:-1]:
+        target = target[component]
+    target[source_path[-1]] = replacement
+
+    report = validate_authoring_pack(original_request, source, registry)
+
+    assert [item["code"] for item in report["hard_failures"]] == [code]
+    assert report["hard_failures"][0]["path"] == list(source_path)
+
+
+@pytest.mark.parametrize("locale", ["zh-CN", "en-US", "ja-JP"])
+def test_validate_authoring_pack_reports_missing_locale_coverage(
+    locale: str,
+    registry: SchemaRegistry,
+    original_request: dict[str, Any],
+    source: dict[str, Any],
+) -> None:
+    source["locales"].pop(locale)
+
+    report = validate_authoring_pack(original_request, source, registry)
+
+    assert report["locale_coverage"][locale] is False
+    assert [item["code"] for item in report["hard_failures"]] == [
+        "AUTHORING_LOCALE_MISSING"
+    ]
+    assert report["hard_failures"][0]["path"] == ["locales", locale]
+
+
+@pytest.mark.parametrize("locale", ["zh-CN", "en-US", "ja-JP"])
+def test_validate_authoring_pack_requires_locale_in_every_expression(
+    locale: str,
+    registry: SchemaRegistry,
+    original_request: dict[str, Any],
+    source: dict[str, Any],
+) -> None:
+    source["expressions"]["restrained_diagnosis"].pop(locale)
+
+    report = validate_authoring_pack(original_request, source, registry)
+
+    assert report["locale_coverage"][locale] is False
+    assert [item["code"] for item in report["hard_failures"]] == [
+        "AUTHORING_LOCALE_MISSING"
+    ]
+    assert report["hard_failures"][0]["path"] == ["expressions", locale]
+
+
+def test_validate_authoring_pack_returns_valid_warning_only_report(
+    registry: SchemaRegistry,
+    original_request: dict[str, Any],
+    source: dict[str, Any],
+) -> None:
+    report = validate_authoring_pack(original_request, source, registry)
+
+    assert report["valid"] is True
+    assert report["hard_failures"] == []
+    assert [item["code"] for item in report["advisory_findings"]] == [
+        "AUTHORING_SPARSE_EXAMPLES"
+    ]
+    assert report["locale_coverage"] == {
+        "zh-CN": True,
+        "en-US": True,
+        "ja-JP": True,
+    }
+    assert report["provenance_counts"] == {
+        "evidence": 0,
+        "derived_profile": 1,
+        "user_override": 0,
+    }
+    registry.validate("build-validation-report", report)
+
+
+def test_validate_authoring_pack_caps_findings_to_report_schema_limit(
+    registry: SchemaRegistry,
+    original_request: dict[str, Any],
+    source: dict[str, Any],
+) -> None:
+    source["evidence"] = {
+        "authored_original": False,
+        "claims": [
+            {
+                "claim_id": f"claim-{index}",
+                "statement": f"External claim {index}",
+                "source": "external-canon",
+            }
+            for index in range(256)
+        ],
+    }
+
+    report = validate_authoring_pack(original_request, source, registry)
+
+    assert report["valid"] is False
+    assert len(report["hard_failures"]) == 256
+    registry.validate("build-validation-report", report)
+
+
+def test_validate_authoring_pack_findings_are_complete_and_sorted(
+    registry: SchemaRegistry,
+    original_request: dict[str, Any],
+    source: dict[str, Any],
+) -> None:
+    source["character_id"] = "another-character"
+    source["evidence"] = {
+        "authored_original": False,
+        "claims": [{"statement": "Claim", "source": "external-canon"}],
+    }
+    source["locales"].pop("ja-JP")
+
+    first = validate_authoring_pack(original_request, source, registry)
+    second = validate_authoring_pack(original_request, source, registry)
+
+    assert first == second
+    assert all(
+        set(item) == {"code", "path", "message"}
+        for item in first["hard_failures"]
+    )
+    assert first["hard_failures"] == sorted(
+        first["hard_failures"],
+        key=lambda item: (
+            item["code"],
+            json.dumps(item["path"], separators=(",", ":")),
+            item["message"],
+        ),
+    )
+
+
+def test_validate_authoring_pack_does_not_mutate_inputs(
+    registry: SchemaRegistry,
+    original_request: dict[str, Any],
+    source: dict[str, Any],
+) -> None:
+    request_before = deepcopy(original_request)
+    source_before = deepcopy(source)
+
+    validate_authoring_pack(original_request, source, registry)
+
+    assert original_request == request_before
+    assert source == source_before
