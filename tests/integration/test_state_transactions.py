@@ -72,7 +72,7 @@ def test_apply_publishes_event_before_cache_and_manifest(
     assert [area for area, _revision in writes] == ["s1", "state", "sessions"]
 
 
-def test_event_commit_recovers_cache_and_manifest_on_duplicate_apply(
+def test_event_commit_recovers_cache_and_manifest_on_load(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     store = started_store(tmp_path)
@@ -92,13 +92,64 @@ def test_event_commit_recovers_cache_and_manifest_on_duplicate_apply(
 
     assert len(list((tmp_path / "events" / "s1").glob("*.json"))) == 1
     assert read_json(tmp_path / "state" / "s1.json")["revision"] == 0
-    assert store.load("s1")["state_revision"] == 0
+
+    recovered_manifest = store.load("s1")
+    assert recovered_manifest["state_revision"] == 1
+    assert read_json(tmp_path / "sessions" / "s1.json") == recovered_manifest
+    assert read_json(tmp_path / "state" / "s1.json")["revision"] == 1
 
     recovered = store.apply("s1", event("e1", 0))
 
     assert recovered["revision"] == 1
     assert read_json(tmp_path / "state" / "s1.json") == recovered
     assert store.load("s1")["state_revision"] == 1
+
+
+def test_truncated_journal_never_rolls_back_or_reuses_manifest_revision(
+    tmp_path: Path,
+) -> None:
+    store = started_store(tmp_path)
+    store.apply("s1", event("e1", 0))
+    store.apply("s1", event("e2", 1))
+    manifest_path = tmp_path / "sessions" / "s1.json"
+    state_path = tmp_path / "state" / "s1.json"
+    manifest_before = manifest_path.read_bytes()
+    state_before = state_path.read_bytes()
+    (tmp_path / "events" / "s1" / "2-e2.json").unlink()
+
+    operations = [
+        lambda: store.load("s1"),
+        lambda: store.apply("s1", event("e3", 1)),
+        lambda: store.replay("s1"),
+    ]
+    for operation in operations:
+        with pytest.raises(KokoroError) as raised:
+            operation()
+        assert raised.value.code == "STATE_JOURNAL_INVALID"
+        assert raised.value.details == {}
+        assert manifest_path.read_bytes() == manifest_before
+        assert state_path.read_bytes() == state_before
+
+    assert sorted(path.name for path in (tmp_path / "events" / "s1").iterdir()) == [
+        "1-e1.json"
+    ]
+
+
+def test_load_maps_lock_timeout_to_retryable_state_busy(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    store = started_store(tmp_path)
+    monkeypatch.setattr(store_module, "_SESSION_LOCK_TIMEOUT_SECONDS", 0.0)
+    monkeypatch.setattr(
+        store_module, "_try_acquire_os_file_lock", lambda _handle: False
+    )
+
+    with pytest.raises(KokoroError) as raised:
+        store.load("s1")
+
+    assert raised.value.code == "STATE_BUSY"
+    assert raised.value.retryable is True
+    assert raised.value.details == {}
 
 
 def test_apply_repairs_corrupt_cache_even_when_manifest_revision_matches(

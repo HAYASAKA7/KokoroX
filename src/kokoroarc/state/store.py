@@ -672,6 +672,8 @@ class SessionStore:
                 raise _invalid_journal()
         if not _state_is_valid(state, session_id):
             raise _invalid_journal()
+        if state["revision"] < manifest["state_revision"]:
+            raise _invalid_journal()
         return state
 
     def _read_cached_state(self, session_id: str) -> dict[str, Any] | None:
@@ -930,9 +932,23 @@ class SessionStore:
             return manifest
 
     def load(self, session_id: str) -> dict[str, Any]:
-        """Load an existing session manifest as a fresh object."""
+        """Load a fresh manifest after repairing journal-backed projections."""
         session_id = _validate_session_id(session_id)
-        return self._read_manifest(session_id)
+        try:
+            with self._session_lock(session_id):
+                manifest = self._read_manifest(session_id)
+                state = self._replay_locked(session_id, manifest)
+                return self._repair_projection_locked(
+                    session_id, manifest, state
+                )
+        except KokoroError as error:
+            if error.code == "SESSION_LOCK_TIMEOUT":
+                raise KokoroError(
+                    "STATE_BUSY",
+                    "Relationship state is busy.",
+                    retryable=True,
+                ) from error
+            raise
 
     def replay(self, session_id: str) -> dict[str, Any]:
         """Read and replay the authoritative append-only event journal."""
