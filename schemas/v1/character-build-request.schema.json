@@ -15,8 +15,7 @@
     "requested_locales",
     "intended_use_cases",
     "user_constraints",
-    "inputs",
-    "requested_visibility"
+    "inputs"
   ],
   "properties": {
     "schema_version": {"const": "1.0"},

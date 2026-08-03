@@ -184,6 +184,13 @@ def test_build_request_requires_exact_first_class_locales(valid_request: dict) -
         _assert_invalid("character-build-request", invalid)
 
 
+def test_original_request_may_omit_default_visibility(valid_request: dict) -> None:
+    request = deepcopy(valid_request)
+    request.pop("requested_visibility")
+
+    SCHEMAS.validate("character-build-request", request)
+
+
 @pytest.mark.parametrize("mode", ["dossier", "researched", "hybrid"])
 def test_non_original_requests_must_be_private(
     mode: str, valid_request: dict
@@ -276,3 +283,29 @@ def test_report_valid_flag_must_agree_with_hard_findings(
     invalid["valid"] = valid
     invalid["hard_failures"] = hard_failures
     _assert_invalid("build-validation-report", invalid)
+
+
+@pytest.mark.parametrize("locale", ["zh-CN", "en-US", "ja-JP"])
+def test_valid_report_requires_complete_locale_coverage(
+    locale: str, valid_report: dict
+) -> None:
+    invalid = deepcopy(valid_report)
+    invalid["locale_coverage"][locale] = False
+
+    _assert_invalid("build-validation-report", invalid)
+
+
+def test_invalid_report_may_have_complete_locale_coverage(
+    valid_report: dict,
+) -> None:
+    report = deepcopy(valid_report)
+    report["valid"] = False
+    report["hard_failures"] = [
+        {
+            "code": "AUTHORING_IDENTITY_MISMATCH",
+            "path": ["character_id"],
+            "message": "Character identity does not match.",
+        }
+    ]
+
+    SCHEMAS.validate("build-validation-report", report)

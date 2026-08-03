@@ -39,7 +39,18 @@
     "properties": {"valid": {"const": true}},
     "required": ["valid"]
   },
-  "then": {"properties": {"hard_failures": {"maxItems": 0}}},
+  "then": {
+    "properties": {
+      "hard_failures": {"maxItems": 0},
+      "locale_coverage": {
+        "properties": {
+          "zh-CN": {"const": true},
+          "en-US": {"const": true},
+          "ja-JP": {"const": true}
+        }
+      }
+    }
+  },
   "else": {"properties": {"hard_failures": {"minItems": 1}}},
   "$defs": {
     "artifact_id": {
