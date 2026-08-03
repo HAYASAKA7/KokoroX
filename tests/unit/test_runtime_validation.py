@@ -212,6 +212,18 @@ def test_warning_is_not_required_when_semantic_warning_list_is_empty() -> None:
     assert result["valid"] is True
 
 
+def test_planned_warning_is_required_when_semantic_warning_list_is_empty() -> None:
+    warning_only_plan = plan(segments=[plan()["segments"][1]])
+
+    result = validate_rendered_output(
+        rendered(segments=[]), semantic(warnings=[]), warning_only_plan
+    )
+
+    assert result["valid"] is False
+    assert codes(result) == ["MISSING_WARNING"]
+    assert_schema_valid(result)
+
+
 def test_nonempty_warning_requires_a_planned_warning_route() -> None:
     no_warning_plan = plan(segments=[plan()["segments"][0]])
 

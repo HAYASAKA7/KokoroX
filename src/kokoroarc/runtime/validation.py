@@ -494,7 +494,9 @@ def validate_rendered_output(
         and actual["channel"] == "warnings"
         and "warnings" in actual["semantic_keys"]
     ]
-    if warnings_required and (not warning_plans or not warning_matches):
+    if (warning_plans and not warning_matches) or (
+        warnings_required and not warning_plans
+    ):
         warning_id = warning_plans[0]["id"] if warning_plans else None
         violations.add(
             "MISSING_WARNING",
