@@ -1,0 +1,119 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kokoroarc.local/schemas/v1/character-draft.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "artifact_id",
+    "created_by",
+    "build_status",
+    "visibility",
+    "activation_allowed",
+    "mode",
+    "namespace",
+    "character_id",
+    "display_name",
+    "character_version",
+    "request_hash",
+    "source_pack_hash",
+    "validation_report_hash",
+    "bundle_references",
+    "locale_coverage",
+    "provenance_counts",
+    "unresolved_warnings"
+  ],
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "artifact_id": {"$ref": "#/$defs/artifact_id"},
+    "created_by": {"$ref": "#/$defs/created_by"},
+    "build_status": {"const": "draft"},
+    "visibility": {"const": "private"},
+    "activation_allowed": {"const": false},
+    "mode": {"enum": ["original", "dossier", "researched", "hybrid"]},
+    "namespace": {"$ref": "#/$defs/slug_id"},
+    "character_id": {"$ref": "#/$defs/slug_id"},
+    "display_name": {"$ref": "#/$defs/short_string"},
+    "character_version": {"$ref": "#/$defs/character_version"},
+    "request_hash": {"$ref": "#/$defs/sha256"},
+    "source_pack_hash": {"$ref": "#/$defs/sha256"},
+    "validation_report_hash": {"$ref": "#/$defs/sha256"},
+    "bundle_references": {"$ref": "#/$defs/bundle_references"},
+    "locale_coverage": {"$ref": "#/$defs/locale_coverage"},
+    "provenance_counts": {"$ref": "#/$defs/provenance_counts"},
+    "unresolved_warnings": {
+      "type": "array",
+      "maxItems": 256,
+      "uniqueItems": true,
+      "items": {"type": "string", "minLength": 1, "maxLength": 4000}
+    }
+  },
+  "$defs": {
+    "artifact_id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9._/-]{0,151}(?![\\s\\S])"
+    },
+    "created_by": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["component", "version"],
+      "properties": {
+        "component": {"const": "kokoroarc"},
+        "version": {"type": "string", "minLength": 1, "maxLength": 64}
+      }
+    },
+    "slug_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*(?![\\s\\S])"
+    },
+    "character_version": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(?:-(?:0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*)(?:\\.(?:0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*))*)?(?:\\+[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)?(?![\\s\\S])"
+    },
+    "short_string": {"type": "string", "minLength": 1, "maxLength": 256},
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}(?![\\s\\S])"
+    },
+    "bundle_path": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512,
+      "pattern": "^(?!/)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*//)[A-Za-z0-9._/-]+(?![\\s\\S])"
+    },
+    "bundle_references": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["request", "source_pack", "validation_report"],
+      "properties": {
+        "request": {"$ref": "#/$defs/bundle_path"},
+        "source_pack": {"$ref": "#/$defs/bundle_path"},
+        "validation_report": {"$ref": "#/$defs/bundle_path"}
+      }
+    },
+    "locale_coverage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["zh-CN", "en-US", "ja-JP"],
+      "properties": {
+        "zh-CN": {"type": "boolean"},
+        "en-US": {"type": "boolean"},
+        "ja-JP": {"type": "boolean"}
+      }
+    },
+    "provenance_counts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["evidence", "derived_profile", "user_override"],
+      "properties": {
+        "evidence": {"type": "integer", "minimum": 0},
+        "derived_profile": {"type": "integer", "minimum": 0},
+        "user_override": {"type": "integer", "minimum": 0}
+      }
+    }
+  }
+}

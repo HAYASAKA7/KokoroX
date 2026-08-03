@@ -1,0 +1,102 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kokoroarc.local/schemas/v1/build-validation-report.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "artifact_id",
+    "created_by",
+    "hard_failures",
+    "advisory_findings",
+    "locale_coverage",
+    "provenance_counts",
+    "valid"
+  ],
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "artifact_id": {"$ref": "#/$defs/artifact_id"},
+    "created_by": {"$ref": "#/$defs/created_by"},
+    "hard_failures": {
+      "description": "Findings sorted deterministically by code, path, and message.",
+      "type": "array",
+      "maxItems": 256,
+      "uniqueItems": true,
+      "items": {"$ref": "#/$defs/finding"}
+    },
+    "advisory_findings": {
+      "description": "Findings sorted deterministically by code, path, and message.",
+      "type": "array",
+      "maxItems": 256,
+      "uniqueItems": true,
+      "items": {"$ref": "#/$defs/finding"}
+    },
+    "locale_coverage": {"$ref": "#/$defs/locale_coverage"},
+    "provenance_counts": {"$ref": "#/$defs/provenance_counts"},
+    "valid": {"type": "boolean"}
+  },
+  "if": {
+    "properties": {"valid": {"const": true}},
+    "required": ["valid"]
+  },
+  "then": {"properties": {"hard_failures": {"maxItems": 0}}},
+  "else": {"properties": {"hard_failures": {"minItems": 1}}},
+  "$defs": {
+    "artifact_id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9._/-]{0,127}(?![\\s\\S])"
+    },
+    "created_by": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["component", "version"],
+      "properties": {
+        "component": {"const": "kokoroarc"},
+        "version": {"type": "string", "minLength": 1, "maxLength": 64}
+      }
+    },
+    "finding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "path", "message"],
+      "properties": {
+        "code": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)*(?![\\s\\S])"
+        },
+        "path": {
+          "type": "array",
+          "maxItems": 32,
+          "items": {
+            "oneOf": [
+              {"type": "string", "minLength": 1, "maxLength": 128},
+              {"type": "integer", "minimum": 0}
+            ]
+          }
+        },
+        "message": {"type": "string", "minLength": 1, "maxLength": 4000}
+      }
+    },
+    "locale_coverage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["zh-CN", "en-US", "ja-JP"],
+      "properties": {
+        "zh-CN": {"type": "boolean"},
+        "en-US": {"type": "boolean"},
+        "ja-JP": {"type": "boolean"}
+      }
+    },
+    "provenance_counts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["evidence", "derived_profile", "user_override"],
+      "properties": {
+        "evidence": {"type": "integer", "minimum": 0},
+        "derived_profile": {"type": "integer", "minimum": 0},
+        "user_override": {"type": "integer", "minimum": 0}
+      }
+    }
+  }
+}

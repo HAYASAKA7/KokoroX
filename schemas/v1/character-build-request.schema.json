@@ -1,0 +1,161 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kokoroarc.local/schemas/v1/character-build-request.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "artifact_id",
+    "created_by",
+    "mode",
+    "namespace",
+    "character_id",
+    "display_name",
+    "character_version",
+    "requested_locales",
+    "intended_use_cases",
+    "user_constraints",
+    "inputs",
+    "requested_visibility"
+  ],
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "artifact_id": {"$ref": "#/$defs/artifact_id"},
+    "created_by": {"$ref": "#/$defs/created_by"},
+    "mode": {"$ref": "#/$defs/mode"},
+    "namespace": {"$ref": "#/$defs/slug_id"},
+    "character_id": {"$ref": "#/$defs/slug_id"},
+    "display_name": {"$ref": "#/$defs/short_string"},
+    "character_version": {"$ref": "#/$defs/character_version"},
+    "requested_locales": {"$ref": "#/$defs/requested_locales"},
+    "intended_use_cases": {"$ref": "#/$defs/string_array"},
+    "user_constraints": {"$ref": "#/$defs/string_array"},
+    "continuity": {"$ref": "#/$defs/long_string"},
+    "timeline": {"$ref": "#/$defs/long_string"},
+    "spoiler_scope": {"$ref": "#/$defs/long_string"},
+    "inputs": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 64,
+      "items": {"$ref": "#/$defs/input_record"}
+    },
+    "requested_visibility": {
+      "enum": ["private", "public"],
+      "default": "private"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {"mode": {"const": "original"}},
+        "required": ["mode"]
+      },
+      "then": {
+        "properties": {
+          "inputs": {
+            "contains": {
+              "type": "object",
+              "properties": {"type": {"const": "creative_brief"}},
+              "required": ["type"]
+            },
+            "minContains": 1
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {"mode": {"const": "dossier"}},
+        "required": ["mode"]
+      },
+      "then": {
+        "properties": {
+          "inputs": {
+            "contains": {
+              "type": "object",
+              "properties": {"type": {"const": "user_dossier"}},
+              "required": ["type"]
+            },
+            "minContains": 1
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "mode": {"enum": ["dossier", "researched", "hybrid"]}
+        },
+        "required": ["mode"]
+      },
+      "then": {
+        "properties": {"requested_visibility": {"const": "private"}}
+      }
+    }
+  ],
+  "$defs": {
+    "artifact_id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9._/-]{0,127}(?![\\s\\S])"
+    },
+    "created_by": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["component", "version"],
+      "properties": {
+        "component": {"const": "kokoroarc"},
+        "version": {"type": "string", "minLength": 1, "maxLength": 64}
+      }
+    },
+    "mode": {"enum": ["original", "dossier", "researched", "hybrid"]},
+    "slug_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*(?![\\s\\S])"
+    },
+    "character_version": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(?:-(?:0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*)(?:\\.(?:0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*))*)?(?:\\+[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)?(?![\\s\\S])"
+    },
+    "short_string": {"type": "string", "minLength": 1, "maxLength": 256},
+    "long_string": {"type": "string", "minLength": 1, "maxLength": 4000},
+    "string_array": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 64,
+      "uniqueItems": true,
+      "items": {"$ref": "#/$defs/long_string"}
+    },
+    "requested_locales": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "uniqueItems": true,
+      "items": {"enum": ["zh-CN", "en-US", "ja-JP"]},
+      "allOf": [
+        {"contains": {"const": "zh-CN"}},
+        {"contains": {"const": "en-US"}},
+        {"contains": {"const": "ja-JP"}}
+      ]
+    },
+    "input_record": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "content"],
+      "properties": {
+        "type": {
+          "enum": [
+            "creative_brief",
+            "user_dossier",
+            "research_bundle",
+            "user_override"
+          ]
+        },
+        "content": {"type": "string", "minLength": 1, "maxLength": 262144}
+      }
+    }
+  }
+}
