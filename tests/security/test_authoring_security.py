@@ -4,6 +4,7 @@ from copy import deepcopy
 import os
 from pathlib import Path
 import shutil
+import subprocess
 from typing import Any
 
 import pytest
@@ -89,6 +90,37 @@ def _assert_staging_mutation_fails_closed(
         _publish(tmp_path, source_root, artifacts)
 
     assert calls == 2
+    assert caught.value.code == "DRAFT_STAGING_INVALID"
+    assert marker.read_bytes() == b"previous complete bundle"
+    assert list(published.parent.glob(f".{published.name}.staging-*")) == []
+    assert list(published.parent.glob(f".{published.name}.backup-*")) == []
+
+
+def _assert_fsync_entry_mutation_fails_closed(
+    tmp_path: Path,
+    source_root: Path,
+    artifacts: tuple[dict[str, Any], dict[str, Any], dict[str, Any], dict[str, Any]],
+    monkeypatch: pytest.MonkeyPatch,
+    mutation: Any,
+) -> None:
+    published = _publish(tmp_path, source_root, artifacts)
+    marker = published / "previous.txt"
+    marker.write_bytes(b"previous complete bundle")
+    real_fsync_tree = storage._fsync_tree_directories
+    calls = 0
+
+    def mutate_on_fsync_entry(staging: Path) -> None:
+        nonlocal calls
+        calls += 1
+        mutation(staging)
+        real_fsync_tree(staging)
+
+    monkeypatch.setattr(storage, "_fsync_tree_directories", mutate_on_fsync_entry)
+
+    with pytest.raises(KokoroError) as caught:
+        _publish(tmp_path, source_root, artifacts)
+
+    assert calls == 1
     assert caught.value.code == "DRAFT_STAGING_INVALID"
     assert marker.read_bytes() == b"previous complete bundle"
     assert list(published.parent.glob(f".{published.name}.staging-*")) == []
@@ -349,6 +381,120 @@ def test_unexpected_staged_bundle_entry_fails_closed(
     _assert_staging_mutation_fails_closed(
         tmp_path, source_root, artifacts, monkeypatch, mutate
     )
+
+
+@pytest.mark.parametrize(
+    "mutation_kind",
+    [
+        "content",
+        "add-file",
+        "remove-file",
+        "add-directory",
+        "remove-directory",
+        "hardlink",
+    ],
+)
+def test_fsync_entry_source_mutation_fails_closed(
+    tmp_path: Path,
+    source_root: Path,
+    artifacts: tuple[dict[str, Any], dict[str, Any], dict[str, Any], dict[str, Any]],
+    monkeypatch: pytest.MonkeyPatch,
+    mutation_kind: str,
+) -> None:
+    outside = tmp_path / "outside-fsync-source.yaml"
+    outside.write_bytes(b"outside fsync source")
+
+    def mutate(staging: Path) -> None:
+        source_pack = staging / "source-pack"
+        target = source_pack / "behavior.yaml"
+        if mutation_kind == "content":
+            target.write_bytes(b"late staged content")
+        elif mutation_kind == "add-file":
+            (source_pack / "late.yaml").write_bytes(b"late: true\n")
+        elif mutation_kind == "remove-file":
+            target.unlink()
+        elif mutation_kind == "add-directory":
+            (source_pack / "late-directory").mkdir()
+        elif mutation_kind == "remove-directory":
+            shutil.rmtree(source_pack / "locales")
+        else:
+            target.unlink()
+            os.link(outside, target)
+
+    _assert_fsync_entry_mutation_fails_closed(
+        tmp_path, source_root, artifacts, monkeypatch, mutate
+    )
+    assert outside.read_bytes() == b"outside fsync source"
+
+
+@pytest.mark.parametrize(
+    "metadata_name", ["request.json", "validation-report.json", "draft.json"]
+)
+def test_fsync_entry_metadata_mutation_fails_closed(
+    tmp_path: Path,
+    source_root: Path,
+    artifacts: tuple[dict[str, Any], dict[str, Any], dict[str, Any], dict[str, Any]],
+    monkeypatch: pytest.MonkeyPatch,
+    metadata_name: str,
+) -> None:
+    def mutate(staging: Path) -> None:
+        (staging / metadata_name).write_bytes(b"late metadata\n")
+
+    _assert_fsync_entry_mutation_fails_closed(
+        tmp_path, source_root, artifacts, monkeypatch, mutate
+    )
+
+
+def test_fsync_entry_symlink_mutation_fails_closed_when_supported(
+    tmp_path: Path,
+    source_root: Path,
+    artifacts: tuple[dict[str, Any], dict[str, Any], dict[str, Any], dict[str, Any]],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    outside = tmp_path / "outside-fsync-source.yaml"
+    outside.write_bytes(b"outside fsync source")
+
+    def mutate(staging: Path) -> None:
+        target = staging / "source-pack" / "behavior.yaml"
+        target.unlink()
+        try:
+            target.symlink_to(outside)
+        except OSError as error:
+            pytest.skip(f"The current account cannot create file symlinks: {error}")
+
+    _assert_fsync_entry_mutation_fails_closed(
+        tmp_path, source_root, artifacts, monkeypatch, mutate
+    )
+    assert outside.read_bytes() == b"outside fsync source"
+
+
+def test_fsync_entry_real_junction_mutation_fails_closed_when_supported(
+    tmp_path: Path,
+    source_root: Path,
+    artifacts: tuple[dict[str, Any], dict[str, Any], dict[str, Any], dict[str, Any]],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    if os.name != "nt" or not hasattr(Path, "is_junction"):
+        pytest.skip("Real directory junctions are unavailable on this platform")
+    outside = tmp_path / "outside-junction"
+    outside.mkdir()
+    marker = outside / "must-not-follow.txt"
+    marker.write_bytes(b"outside junction data")
+
+    def mutate(staging: Path) -> None:
+        junction = staging / "source-pack" / "late-junction"
+        result = subprocess.run(
+            ["cmd", "/c", "mklink", "/J", str(junction), str(outside)],
+            capture_output=True,
+            check=False,
+        )
+        if result.returncode != 0:
+            pytest.skip("The current account cannot create directory junctions")
+
+    _assert_fsync_entry_mutation_fails_closed(
+        tmp_path, source_root, artifacts, monkeypatch, mutate
+    )
+    assert marker.read_bytes() == b"outside junction data"
 
 
 @pytest.mark.parametrize(

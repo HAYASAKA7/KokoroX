@@ -189,13 +189,6 @@ def publish_draft_bundle(
             path.relative_to(resolved_source): copied_hashes[path]
             for path in scanned_files
         }
-        _verify_staged_bundle(
-            staging,
-            expected_source_hashes,
-            request,
-            report,
-            draft,
-        )
         _validate_existing_chain(final.parent)
         final_stat = _destination_lstat(final)
         if final_stat is not None:
@@ -203,6 +196,13 @@ def publish_draft_bundle(
             if not stat.S_ISDIR(final_stat.st_mode):
                 raise _unsafe_draft_path(final, "target is not a directory")
         _fsync_tree_directories(staging)
+        _verify_staged_bundle(
+            staging,
+            expected_source_hashes,
+            request,
+            report,
+            draft,
+        )
         backup = _transactional_replace_directory(staging, final)
         try:
             _fsync_directory(final.parent)
