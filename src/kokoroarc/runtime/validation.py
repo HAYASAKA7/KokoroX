@@ -51,6 +51,34 @@ _LANGUAGES = frozenset({"zh-CN", "en-US", "ja-JP", "preserve"})
 _SEMANTIC_KEYS = frozenset(
     {"conclusion", "explanation", "recommendations", "warnings"}
 )
+_REDUCED_SEMANTIC_KEYS = frozenset({"immutable_spans", "warnings"})
+_FULL_SEMANTIC_KEYS = frozenset(
+    {
+        "schema_version",
+        "artifact_id",
+        "created_by",
+        "scenario",
+        "conclusion",
+        "explanation",
+        "recommendations",
+        "warnings",
+        "immutable_spans",
+        "format_constraints",
+    }
+)
+_REDUCED_PLAN_KEYS = frozenset({"max_switches", "segments"})
+_FULL_PLAN_KEYS = frozenset(
+    {
+        "schema_version",
+        "artifact_id",
+        "created_by",
+        "primary_language",
+        "segments",
+        "protected_spans",
+        "max_switches",
+    }
+)
+_PRIMARY_LANGUAGES = frozenset({"zh-CN", "en-US", "ja-JP"})
 
 
 def fallback_action(attempt: int) -> str:
@@ -113,6 +141,149 @@ def _semantic_id(value: Any) -> bool:
         isinstance(value, str)
         and len(value) <= 128
         and _SEMANTIC_KEY.fullmatch(value) is not None
+    )
+
+
+def _artifact_id_value(value: Any) -> bool:
+    return isinstance(value, str) and _ARTIFACT_ID.fullmatch(value) is not None
+
+
+def _created_by(value: Any) -> bool:
+    return (
+        isinstance(value, Mapping)
+        and set(value.keys()) == {"component", "version"}
+        and value.get("component") == "kokoroarc"
+        and _bounded_string(value.get("version"), 64)
+    )
+
+
+def _string_list(
+    value: Any,
+    *,
+    minimum: int = 0,
+    maximum: int,
+    unique: bool = False,
+    semantic_ids: bool = False,
+) -> list[str] | None:
+    if not isinstance(value, list) or not minimum <= len(value) <= maximum:
+        return None
+    if semantic_ids:
+        if any(not _semantic_id(item) for item in value):
+            return None
+    elif any(not _bounded_string(item, 4000) for item in value):
+        return None
+    if unique and len(set(value)) != len(value):
+        return None
+    return list(value)
+
+
+def _plan_segment_contract_valid(segment: Any) -> bool:
+    if not isinstance(segment, Mapping):
+        return False
+    keys = set(segment.keys())
+    required = {"id", "channel", "target_language", "semantic_keys"}
+    semantic_keys = _semantic_keys(segment.get("semantic_keys"))
+    return (
+        required.issubset(keys)
+        and keys.issubset(_PLAN_SEGMENT_KEYS)
+        and _segment_id(segment.get("id"))
+        and _is_enum_string(segment.get("channel"), _CHANNELS)
+        and _is_enum_string(segment.get("target_language"), _LANGUAGES)
+        and semantic_keys is not None
+        and all(key in _SEMANTIC_KEYS for key in semantic_keys)
+        and (
+            "expression_intent" not in segment
+            or _semantic_id(segment.get("expression_intent"))
+        )
+    )
+
+
+def _segments_contract_valid(value: Any, *, nonempty: bool) -> bool:
+    minimum = 1 if nonempty else 0
+    if not isinstance(value, list) or not minimum <= len(value) <= _MAX_SEGMENTS:
+        return False
+    if any(not _plan_segment_contract_valid(segment) for segment in value):
+        return False
+    signatures = [
+        (
+            segment["id"],
+            segment["channel"],
+            segment["target_language"],
+            tuple(segment["semantic_keys"]),
+            "expression_intent" in segment,
+            segment.get("expression_intent"),
+        )
+        for segment in value
+    ]
+    return len(set(signatures)) == len(signatures)
+
+
+def _semantic_contract_valid(value: Mapping[str, Any]) -> bool:
+    keys = set(value.keys())
+    reduced = keys == _REDUCED_SEMANTIC_KEYS
+    full = keys == _FULL_SEMANTIC_KEYS
+    if not reduced and not full:
+        return False
+
+    span_limit = 64 if full else 128
+    if _string_list(
+        value.get("immutable_spans"), maximum=span_limit, unique=True
+    ) is None:
+        return False
+    if _string_list(value.get("warnings"), maximum=64) is None:
+        return False
+    if reduced:
+        return True
+
+    return (
+        value.get("schema_version") == "1.0"
+        and _artifact_id_value(value.get("artifact_id"))
+        and _created_by(value.get("created_by"))
+        and _semantic_id(value.get("scenario"))
+        and _bounded_string(value.get("conclusion"), 4000)
+        and _string_list(
+            value.get("explanation"), minimum=1, maximum=64
+        )
+        is not None
+        and _string_list(
+            value.get("recommendations"), minimum=1, maximum=64
+        )
+        is not None
+        and _string_list(
+            value.get("format_constraints"),
+            maximum=64,
+            unique=True,
+            semantic_ids=True,
+        )
+        is not None
+    )
+
+
+def _plan_contract_valid(value: Mapping[str, Any]) -> bool:
+    keys = set(value.keys())
+    reduced = keys == _REDUCED_PLAN_KEYS
+    full = keys == _FULL_PLAN_KEYS
+    if not reduced and not full:
+        return False
+    max_switches = value.get("max_switches")
+    if (
+        isinstance(max_switches, bool)
+        or not isinstance(max_switches, int)
+        or not 0 <= max_switches <= _MAX_SWITCHES
+        or not _segments_contract_valid(value.get("segments"), nonempty=True)
+    ):
+        return False
+    if reduced:
+        return True
+    return (
+        value.get("schema_version") == "1.0"
+        and _artifact_id_value(value.get("artifact_id"))
+        and _created_by(value.get("created_by"))
+        and _is_enum_string(value.get("primary_language"), _PRIMARY_LANGUAGES)
+        and _string_list(
+            value.get("protected_spans"), maximum=128, unique=True
+        )
+        is not None
     )
 
 
@@ -284,8 +455,14 @@ def validate_rendered_output(
         violations.add("INVALID_RENDERED", "Rendered output must be an object.")
     if not semantic_mapping:
         violations.add("INVALID_SEMANTIC", "Semantic input must be an object.")
+    elif not _semantic_contract_valid(semantic):
+        violations.add(
+            "INVALID_SEMANTIC", "Semantic input violates its artifact contract."
+        )
     if not plan_mapping:
         violations.add("INVALID_PLAN", "Render plan must be an object.")
+    elif not _plan_contract_valid(plan):
+        violations.add("INVALID_PLAN", "Render plan violates its artifact contract.")
 
     text: str | None = None
     rendered_segments: list[Any] = []
@@ -337,10 +514,13 @@ def validate_rendered_output(
             switch_count = candidate_switch_count
 
     immutable_spans: list[str] = []
+    semantic_spans_usable = False
     warnings_required = False
     if semantic_mapping:
         candidate_spans = semantic.get("immutable_spans", [])
-        if not isinstance(candidate_spans, list) or len(candidate_spans) > 128:
+        semantic_is_full = _FULL_SEMANTIC_KEYS.issubset(set(semantic.keys()))
+        span_limit = 64 if semantic_is_full else 128
+        if not isinstance(candidate_spans, list) or len(candidate_spans) > span_limit:
             violations.add(
                 "INVALID_IMMUTABLE_SPANS",
                 "Immutable spans must be a bounded list.",
@@ -350,7 +530,13 @@ def validate_rendered_output(
                 "INVALID_IMMUTABLE_SPANS", "Immutable spans are invalid."
             )
         else:
-            immutable_spans = list(dict.fromkeys(candidate_spans))
+            semantic_spans_usable = True
+            immutable_spans = list(candidate_spans)
+            if len(set(candidate_spans)) != len(candidate_spans):
+                violations.add(
+                    "INVALID_IMMUTABLE_SPANS",
+                    "Immutable spans must be unique.",
+                )
 
         candidate_warnings = semantic.get("warnings", [])
         if not isinstance(candidate_warnings, list) or len(candidate_warnings) > 64:
@@ -360,18 +546,12 @@ def validate_rendered_output(
         else:
             warnings_required = bool(candidate_warnings)
 
-    if text is not None:
-        for span in immutable_spans:
-            if span not in text:
-                violations.add(
-                    "MISSING_PROTECTED_SPAN",
-                    "Rendered text omitted an immutable span.",
-                    details={"protected_span": span},
-                )
-
     planned_segments: list[Any] = []
+    plan_protected_spans: list[str] = []
+    plan_spans_usable = False
     max_switches: int | None = None
     if plan_mapping:
+        plan_is_full = "protected_spans" in plan
         candidate_segments = plan.get("segments")
         if (
             not isinstance(candidate_segments, list)
@@ -395,6 +575,42 @@ def validate_rendered_output(
             )
         else:
             max_switches = candidate_max_switches
+
+        if plan_is_full:
+            candidate_plan_spans = plan.get("protected_spans")
+            if (
+                isinstance(candidate_plan_spans, list)
+                and len(candidate_plan_spans) <= 128
+                and all(
+                    _bounded_string(span, 4000) for span in candidate_plan_spans
+                )
+            ):
+                plan_spans_usable = True
+                plan_protected_spans = list(candidate_plan_spans)
+
+    if plan_mapping and "protected_spans" in plan:
+        if (
+            semantic_spans_usable
+            and plan_spans_usable
+            and plan_protected_spans != immutable_spans
+        ):
+            violations.add(
+                "PROTECTED_SPAN_MISMATCH",
+                "Plan protected spans differ from semantic immutable spans.",
+            )
+
+    enforced_spans: list[str] = []
+    for span in [*immutable_spans, *plan_protected_spans]:
+        if span not in enforced_spans:
+            enforced_spans.append(span)
+    if text is not None:
+        for span in enforced_spans:
+            if span not in text:
+                violations.add(
+                    "MISSING_PROTECTED_SPAN",
+                    "Rendered text omitted an immutable span.",
+                    details={"protected_span": span},
+                )
 
     if switch_count is not None and max_switches is not None:
         if switch_count > max_switches:

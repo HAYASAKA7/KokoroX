@@ -49,6 +49,23 @@ def semantic(**overrides: Any) -> dict[str, Any]:
     return value
 
 
+def full_semantic(**overrides: Any) -> dict[str, Any]:
+    value: dict[str, Any] = {
+        "schema_version": "1.0",
+        "artifact_id": "semantic/turn-1",
+        "created_by": {"component": "kokoroarc", "version": __version__},
+        "scenario": "debugging",
+        "conclusion": "The cause is clear.",
+        "explanation": ["The read path is not protected."],
+        "recommendations": ["Add a concurrent regression test."],
+        "warnings": ["Do not trust repeated runs."],
+        "immutable_spans": ["go test -race ./..."],
+        "format_constraints": ["preserve_code_blocks"],
+    }
+    value.update(overrides)
+    return value
+
+
 def rendered(**overrides: Any) -> dict[str, Any]:
     value: dict[str, Any] = {
         "text": "原因已经明确。 go test -race ./...",
@@ -324,7 +341,9 @@ def test_rendered_root_contract_rejects_unknown_keys() -> None:
 def test_each_unique_missing_immutable_span_has_ordered_bounded_details() -> None:
     spans = ["first", "second", "first"]
     result = validate_rendered_output(
-        rendered(text="none"), semantic(immutable_spans=spans), plan()
+        rendered(text="none"),
+        semantic(immutable_spans=spans),
+        plan(protected_spans=["first", "second"]),
     )
 
     protected = [
@@ -489,4 +508,157 @@ def test_violations_are_capped_at_schema_maximum() -> None:
     result = validate_rendered_output(actual, meaning, plan())
 
     assert len(result["violations"]) == 128
+    assert_schema_valid(result)
+
+
+@pytest.mark.parametrize(
+    "meaning",
+    [
+        {},
+        {"immutable_spans": []},
+        {"warnings": []},
+        {"immutable_spans": [], "warnings": [], "extra": True},
+    ],
+    ids=["empty", "missing-warnings", "missing-spans", "extra-key"],
+)
+def test_reduced_semantic_contract_requires_exact_root_keys(meaning: Any) -> None:
+    result = validate_rendered_output(rendered(), meaning, plan())
+
+    assert "INVALID_SEMANTIC" in codes(result)
+    assert_schema_valid(result)
+
+
+def test_accepts_complete_semantic_and_render_plan_artifacts() -> None:
+    meaning = full_semantic()
+    route_plan = plan()
+    registry = SchemaRegistry(Path("schemas/v1"))
+    registry.validate("semantic-result", meaning)
+    registry.validate("render-plan", route_plan)
+
+    result = validate_rendered_output(rendered(), meaning, route_plan)
+
+    assert result["valid"] is True
+    assert_schema_valid(result)
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    [
+        lambda value: value.update({"schema_version": "2.0"}),
+        lambda value: value.update({"artifact_id": "Bad Artifact"}),
+        lambda value: value.update({"created_by": {"component": "other", "version": "1"}}),
+        lambda value: value.update({"scenario": "Bad Scenario"}),
+        lambda value: value.update({"explanation": []}),
+        lambda value: value.update({"format_constraints": ["same", "same"]}),
+        lambda value: value.update({"unknown": True}),
+    ],
+    ids=[
+        "version",
+        "artifact",
+        "creator",
+        "scenario",
+        "explanation",
+        "duplicate-format",
+        "extra-key",
+    ],
+)
+def test_full_semantic_contract_rejects_schema_invalid_artifacts(mutation) -> None:
+    meaning = full_semantic()
+    mutation(meaning)
+
+    result = validate_rendered_output(rendered(), meaning, plan())
+
+    assert "INVALID_SEMANTIC" in codes(result)
+    assert_schema_valid(result)
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    [
+        lambda value: value.update({"schema_version": "2.0"}),
+        lambda value: value.update({"artifact_id": "Bad Artifact"}),
+        lambda value: value.update({"created_by": {"component": "other", "version": "1"}}),
+        lambda value: value.update({"primary_language": "preserve"}),
+        lambda value: value.update({"segments": []}),
+        lambda value: value.update({"protected_spans": ["same", "same"]}),
+        lambda value: value.update({"unknown": True}),
+    ],
+    ids=[
+        "version",
+        "artifact",
+        "creator",
+        "primary",
+        "empty-segments",
+        "duplicate-spans",
+        "extra-key",
+    ],
+)
+def test_full_plan_contract_rejects_schema_invalid_artifacts(mutation) -> None:
+    route_plan = plan()
+    mutation(route_plan)
+
+    result = validate_rendered_output(rendered(), semantic(), route_plan)
+
+    assert "INVALID_PLAN" in codes(result)
+    assert result["valid"] is False
+    assert_schema_valid(result)
+
+
+def test_reduced_plan_contract_requires_exact_root_keys() -> None:
+    reduced_plan = {
+        "max_switches": 2,
+        "segments": [deepcopy(plan()["segments"][0])],
+        "unknown": True,
+    }
+
+    result = validate_rendered_output(rendered(), semantic(), reduced_plan)
+
+    assert "INVALID_PLAN" in codes(result)
+    assert_schema_valid(result)
+
+
+def test_full_plan_protected_spans_must_match_semantic_and_rendered_text() -> None:
+    route_plan = plan(protected_spans=["plan-only-span"])
+
+    result = validate_rendered_output(
+        rendered(text="", segments=rendered()["segments"]),
+        semantic(immutable_spans=[]),
+        route_plan,
+    )
+
+    assert "PROTECTED_SPAN_MISMATCH" in codes(result)
+    missing = [
+        item for item in result["violations"] if item["code"] == "MISSING_PROTECTED_SPAN"
+    ]
+    assert [item["details"]["protected_span"] for item in missing] == [
+        "plan-only-span"
+    ]
+    assert_schema_valid(result)
+
+
+def test_malformed_full_plan_cannot_bypass_its_protected_spans() -> None:
+    route_plan = plan(protected_spans=["plan-only-span"], unknown=True)
+
+    result = validate_rendered_output(
+        rendered(text=""), semantic(immutable_spans=[]), route_plan
+    )
+
+    assert "INVALID_PLAN" in codes(result)
+    assert "PROTECTED_SPAN_MISMATCH" in codes(result)
+    assert any(
+        item["code"] == "MISSING_PROTECTED_SPAN"
+        and item["details"]["protected_span"] == "plan-only-span"
+        for item in result["violations"]
+    )
+    assert_schema_valid(result)
+
+
+def test_duplicate_reduced_semantic_spans_are_invalid() -> None:
+    result = validate_rendered_output(
+        rendered(),
+        semantic(immutable_spans=["go test -race ./...", "go test -race ./..."]),
+        plan(),
+    )
+
+    assert "INVALID_SEMANTIC" in codes(result)
     assert_schema_valid(result)
