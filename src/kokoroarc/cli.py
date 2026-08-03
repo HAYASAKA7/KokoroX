@@ -4,6 +4,7 @@ import argparse
 import json
 import os
 from pathlib import Path
+import re
 import stat
 from typing import Any, Callable
 
@@ -27,6 +28,16 @@ COMPILED_SCAN_MAX_FILES = 256
 COMPILED_SCAN_MAX_BYTES = 32 * 1024 * 1024
 # Compiled filenames use the first 16 lowercase SHA-256 hex characters.
 SOURCE_HASH_PREFIX_LENGTH = 16
+_PUBLIC_ERROR_CODE = re.compile(r"[A-Z][A-Z0-9_]{0,127}")
+_PUBLIC_MESSAGES = {
+    "DATA_DIR_REQUIRED": "Set KOKOROARC_DATA_DIR before running a stateful command.",
+    "INPUT_NOT_FOUND": "Input file was not found.",
+    "INPUT_PATH_UNSAFE": "Input file path is unsafe.",
+    "INPUT_READ_FAILED": "Input file could not be read.",
+    "INPUT_TOO_LARGE": "Input file exceeds the size limit.",
+    "INPUT_INVALID_JSON": "Input file contains invalid JSON.",
+    "STATE_REVISION_CONFLICT": "Relationship state revision conflicted.",
+}
 
 
 def _leaf_json(parser: argparse.ArgumentParser) -> None:
@@ -113,6 +124,28 @@ def _input_error(code: str, message: str) -> KokoroError:
 
 def _read_json(path: Path, *, max_bytes: int = JSON_INPUT_MAX_BYTES) -> Any:
     try:
+        path_stat = path.lstat()
+    except FileNotFoundError as error:
+        raise _input_error("INPUT_NOT_FOUND", "Input file was not found.") from error
+    except OSError as error:
+        raise _input_error("INPUT_READ_FAILED", "Input file could not be read.") from error
+    reparse = getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0)
+    attributes = getattr(path_stat, "st_file_attributes", 0)
+    is_junction = getattr(path, "is_junction", None)
+    try:
+        junction = bool(is_junction is not None and is_junction())
+    except OSError as error:
+        raise _input_error("INPUT_READ_FAILED", "Input file could not be read.") from error
+    if (
+        not stat.S_ISREG(path_stat.st_mode)
+        or stat.S_ISLNK(path_stat.st_mode)
+        or junction
+        or bool(reparse and attributes & reparse)
+    ):
+        raise _input_error("INPUT_PATH_UNSAFE", "Input file path is unsafe.")
+    if path_stat.st_size > max_bytes:
+        raise _input_error("INPUT_TOO_LARGE", "Input file exceeds the size limit.")
+    try:
         with path.open("rb") as handle:
             contents = handle.read(max_bytes + 1)
     except FileNotFoundError as error:
@@ -184,6 +217,7 @@ def _compiled_file(settings: Settings, raw_path: str) -> Path:
     if (
         resolved.parent != directory_resolved
         or not stat.S_ISREG(path_stat.st_mode)
+        or path_stat.st_nlink != 1
         or _path_is_redirect(path)
     ):
         raise KokoroError("COMPILED_PATH_UNSAFE", "Compiled artifact path is unsafe.")
@@ -193,13 +227,25 @@ def _compiled_file(settings: Settings, raw_path: str) -> Path:
 def _validated_compiled(path: Path, schemas: SchemaRegistry) -> dict[str, Any]:
     value = _read_json(path)
     schemas.validate("compiled-pack", value)
+    artifact_id = value["artifact_id"]
+    components = artifact_id.split("/")
+    if (
+        len(components) != 3
+        or not components[0]
+        or components[1] != value["character_id"]
+        or components[2] != "compiled"
+    ):
+        raise KokoroError(
+            "COMPILED_IDENTITY_MISMATCH",
+            "Compiled artifact identity does not match.",
+        )
     return value
 
 
 def _find_compiled(
     settings: Settings,
     schemas: SchemaRegistry,
-    source_hash: str,
+    manifest: dict[str, Any],
 ) -> dict[str, Any]:
     directory = _compiled_directory(settings, create=False)
     if not directory.exists():
@@ -232,7 +278,13 @@ def _find_compiled(
                 or _path_is_redirect(path)
             ):
                 raise KokoroError("COMPILED_PATH_UNSAFE", "Compiled artifact path is unsafe.")
-            size = entry.stat(follow_symlinks=False).st_size
+            entry_stat = path.stat(follow_symlinks=False)
+            if entry_stat.st_nlink != 1:
+                raise KokoroError(
+                    "COMPILED_PATH_UNSAFE",
+                    "Compiled artifact path is unsafe.",
+                )
+            size = entry_stat.st_size
         except KokoroError:
             raise
         except OSError as error:
@@ -243,7 +295,16 @@ def _find_compiled(
         if path.suffix != ".json":
             raise KokoroError("COMPILED_PATH_UNSAFE", "Compiled artifact path is unsafe.")
         compiled = _validated_compiled(path, schemas)
-        if compiled["source_hash"] == source_hash:
+        if compiled["source_hash"] == manifest["compiled_pack_hash"]:
+            if (
+                compiled["character_id"] != manifest["character_id"]
+                or compiled["character_version"]
+                != manifest["character_version"]
+            ):
+                raise KokoroError(
+                    "COMPILED_IDENTITY_MISMATCH",
+                    "Compiled artifact identity does not match.",
+                )
             matches.append(compiled)
     if not matches:
         raise KokoroError("COMPILED_PACK_NOT_FOUND", "Compiled artifact was not found for the session.")
@@ -266,13 +327,16 @@ def _handle_pack_compile(
     if _path_is_redirect(target):
         raise KokoroError("COMPILED_PATH_UNSAFE", "Compiled artifact path is unsafe.")
     try:
-        if target.exists() and not stat.S_ISREG(
-            target.stat(follow_symlinks=False).st_mode
-        ):
-            raise KokoroError(
-                "COMPILED_PATH_UNSAFE",
-                "Compiled artifact path is unsafe.",
-            )
+        if target.exists():
+            target_stat = target.stat(follow_symlinks=False)
+            if (
+                not stat.S_ISREG(target_stat.st_mode)
+                or target_stat.st_nlink != 1
+            ):
+                raise KokoroError(
+                    "COMPILED_PATH_UNSAFE",
+                    "Compiled artifact path is unsafe.",
+                )
     except KokoroError:
         raise
     except OSError as error:
@@ -363,11 +427,10 @@ def _handle_runtime_context(
     args: argparse.Namespace, settings: Settings, schemas: SchemaRegistry
 ) -> dict[str, Any]:
     store = SessionStore(settings.data_dir)
-    manifest = store.load(args.session)
+    manifest, state = store.snapshot(args.session)
     if not manifest["active"]:
         raise KokoroError("SESSION_NOT_ACTIVE", "Session is not active.")
-    compiled = _find_compiled(settings, schemas, manifest["compiled_pack_hash"])
-    state = store.replay(args.session)
+    compiled = _find_compiled(settings, schemas, manifest)
     context = build_runtime_context(compiled, state, args.locale, args.scenario)
     return {"ok": True, "context": context}
 
@@ -405,14 +468,15 @@ def _active_compiled_and_state(
     settings: Settings,
     schemas: SchemaRegistry,
     session_id: str,
-) -> tuple[SessionStore, dict[str, Any], dict[str, Any]]:
+) -> tuple[
+    SessionStore, dict[str, Any], dict[str, Any], dict[str, Any]
+]:
     store = SessionStore(settings.data_dir)
-    manifest = store.load(session_id)
+    manifest, state = store.snapshot(session_id)
     if not manifest["active"]:
         raise KokoroError("SESSION_NOT_ACTIVE", "Session is not active.")
-    compiled = _find_compiled(settings, schemas, manifest["compiled_pack_hash"])
-    state = store.replay(session_id)
-    return store, compiled, state
+    compiled = _find_compiled(settings, schemas, manifest)
+    return store, manifest, compiled, state
 
 
 def _growth_config(compiled: dict[str, Any]) -> tuple[float, int]:
@@ -433,7 +497,7 @@ def _handle_state_preview(
     args: argparse.Namespace, settings: Settings, schemas: SchemaRegistry
 ) -> dict[str, Any]:
     event = _validated_event(args, schemas)
-    _store, compiled, state = _active_compiled_and_state(
+    _store, _manifest, compiled, state = _active_compiled_and_state(
         settings, schemas, args.session
     )
     if event["event_id"] in state["applied_event_ids"]:
@@ -461,7 +525,7 @@ def _handle_state_apply(
     args: argparse.Namespace, settings: Settings, schemas: SchemaRegistry
 ) -> dict[str, Any]:
     event = _validated_event(args, schemas)
-    store, compiled, _state = _active_compiled_and_state(
+    store, manifest, compiled, _state = _active_compiled_and_state(
         settings, schemas, args.session
     )
     max_delta, repetition_window = _growth_config(compiled)
@@ -470,8 +534,41 @@ def _handle_state_apply(
         event,
         max_delta=max_delta,
         repetition_window=repetition_window,
+        expected_character_id=manifest["character_id"],
+        expected_character_version=manifest["character_version"],
+        expected_compiled_pack_hash=manifest["compiled_pack_hash"],
     )
     return {"ok": True, "state": state}
+
+
+def _public_error_envelope(error: KokoroError) -> dict[str, Any]:
+    code = error.code
+    if not isinstance(code, str) or _PUBLIC_ERROR_CODE.fullmatch(code) is None:
+        code = "COMMAND_FAILED"
+    details: dict[str, Any] = {}
+    if code == "STATE_REVISION_CONFLICT":
+        expected = error.details.get("expected")
+        actual = error.details.get("actual")
+        if (
+            isinstance(expected, int)
+            and not isinstance(expected, bool)
+            and expected >= 0
+            and isinstance(actual, int)
+            and not isinstance(actual, bool)
+            and actual >= 0
+        ):
+            details = {"expected": expected, "actual": actual}
+    return {
+        "ok": False,
+        "error": {
+            "code": code,
+            "message": _PUBLIC_MESSAGES.get(
+                code, "Command could not be completed."
+            ),
+            "retryable": bool(error.retryable),
+            "details": details,
+        },
+    }
 
 
 _HANDLERS: dict[tuple[str, str], Callable[..., dict[str, Any]]] = {
@@ -497,7 +594,13 @@ def main(argv: list[str] | None = None) -> int:
         subcommand = getattr(args, f"{args.command}_command")
         result = _HANDLERS[(args.command, subcommand)](args, settings, schemas)
     except KokoroError as error:
-        print(json.dumps(error.envelope(), ensure_ascii=False, sort_keys=True))
+        print(
+            json.dumps(
+                _public_error_envelope(error),
+                ensure_ascii=False,
+                sort_keys=True,
+            )
+        )
         return 2
     except (OSError, json.JSONDecodeError, UnicodeError, ValueError, TypeError):
         safe = KokoroError("COMMAND_FAILED", "Command could not be completed.")

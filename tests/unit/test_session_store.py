@@ -64,6 +64,56 @@ def canonical_file(value: dict) -> bytes:
     )
 
 
+def test_snapshot_returns_detached_manifest_and_authoritative_state(
+    tmp_path: Path,
+) -> None:
+    store = SessionStore(tmp_path)
+    store.start("session-1", "rin-aster", "1.2.3", HASH)
+
+    manifest, state = store.snapshot("session-1")
+    manifest["active"] = False
+    state["dimensions"]["trust"] = 99
+    fresh_manifest, fresh_state = store.snapshot("session-1")
+
+    assert fresh_manifest == expected_manifest()
+    assert fresh_state == expected_state()
+
+
+def test_snapshot_observes_completed_restart_as_one_binding(
+    tmp_path: Path,
+) -> None:
+    store = SessionStore(tmp_path)
+    store.start("session-1", "rin-aster", "1.2.3", HASH)
+    store.end("session-1")
+    new_hash = "b" * 64
+    store.start("session-1", "rin-aster", "2.0.0", new_hash)
+
+    manifest, state = store.snapshot("session-1")
+
+    assert manifest["character_version"] == "2.0.0"
+    assert manifest["compiled_pack_hash"] == new_hash
+    assert manifest["state_revision"] == state["revision"] == 0
+
+
+def test_snapshot_waits_for_the_session_advisory_lock(tmp_path: Path) -> None:
+    store = SessionStore(tmp_path)
+    store.start("session-1", "rin-aster", "1.2.3", HASH)
+    entered = threading.Event()
+
+    def take_snapshot() -> tuple[dict, dict]:
+        entered.set()
+        return store.snapshot("session-1")
+
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        with store._session_lock("session-1"):
+            future = executor.submit(take_snapshot)
+            assert entered.wait(timeout=1)
+            assert future.done() is False
+
+        manifest, state = future.result(timeout=1)
+    assert manifest["state_revision"] == state["revision"]
+
+
 def _process_start_worker(data_root: str, barrier, results) -> None:
     from kokoroarc.errors import KokoroError
     from kokoroarc.state import store as process_store_module

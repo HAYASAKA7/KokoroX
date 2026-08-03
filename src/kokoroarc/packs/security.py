@@ -60,6 +60,8 @@ def scan_pack(root: Path, limits: PackLimits) -> list[Path]:
                 continue
             if not stat.S_ISREG(entry_stat.st_mode):
                 raise _unsafe_path(path, "unsupported entry type")
+            if entry_stat.st_nlink != 1:
+                raise _unsafe_path(path, "hardlinked file")
 
             size = entry_stat.st_size
             if size > limits.max_file_bytes:
@@ -147,7 +149,9 @@ def _entry_is_symlink(entry: os.DirEntry[str]) -> bool:
 
 def _entry_stat(entry: os.DirEntry[str], path: Path) -> os.stat_result:
     try:
-        return entry.stat(follow_symlinks=False)
+        # Path.stat reports the NTFS link count correctly on Windows; Python's
+        # DirEntry cache can report zero for ordinary files.
+        return path.stat(follow_symlinks=False)
     except OSError as exc:
         raise _scan_failed(path, exc) from exc
 

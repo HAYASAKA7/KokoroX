@@ -36,6 +36,23 @@ def test_scan_rejects_symlink(tmp_path: Path) -> None:
     assert raised.value.code == "UNSAFE_PACK_PATH"
 
 
+def test_scan_rejects_regular_file_hardlinked_outside_pack(
+    tmp_path: Path,
+) -> None:
+    outside = tmp_path.parent / f"{tmp_path.name}-outside.yaml"
+    outside.write_text("secret: true", encoding="utf-8")
+    inside = tmp_path / "identity.yaml"
+    try:
+        os.link(outside, inside)
+    except OSError:
+        pytest.skip("hardlink creation is unavailable")
+
+    with pytest.raises(KokoroError) as raised:
+        scan_pack(tmp_path, PackLimits())
+
+    assert raised.value.code == "UNSAFE_PACK_PATH"
+
+
 def test_scan_rejects_oversized_file(tmp_path: Path) -> None:
     (tmp_path / "large.yaml").write_bytes(b"x" * 33)
     with pytest.raises(KokoroError) as raised:

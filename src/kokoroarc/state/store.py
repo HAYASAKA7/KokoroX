@@ -1199,17 +1199,20 @@ class SessionStore:
                 self._remove_restart_intent(session_id)
             return manifest
 
-    def load(self, session_id: str) -> dict[str, Any]:
-        """Load a fresh manifest after repairing journal-backed projections."""
+    def snapshot(
+        self, session_id: str
+    ) -> tuple[dict[str, Any], dict[str, Any]]:
+        """Return one detached manifest/state snapshot under the session lock."""
         session_id = _validate_session_id(session_id)
         try:
             with self._session_lock(session_id):
                 self._recover_restart_locked(session_id)
                 manifest = self._read_manifest(session_id)
                 state = self._replay_locked(session_id, manifest)
-                return self._repair_projection_locked(
+                manifest = self._repair_projection_locked(
                     session_id, manifest, state
                 )
+                return copy.deepcopy(manifest), copy.deepcopy(state)
         except KokoroError as error:
             if error.code == "SESSION_LOCK_TIMEOUT":
                 raise KokoroError(
@@ -1218,6 +1221,11 @@ class SessionStore:
                     retryable=True,
                 ) from error
             raise
+
+    def load(self, session_id: str) -> dict[str, Any]:
+        """Load a fresh manifest after repairing journal-backed projections."""
+        manifest, _state = self.snapshot(session_id)
+        return manifest
 
     def replay(self, session_id: str) -> dict[str, Any]:
         """Read and replay the authoritative append-only event journal."""
@@ -1242,6 +1250,9 @@ class SessionStore:
         max_delta: float = 4.0,
         *,
         repetition_window: int = 3,
+        expected_character_id: str | None = None,
+        expected_character_version: str | None = None,
+        expected_compiled_pack_hash: str | None = None,
     ) -> dict[str, Any]:
         """Commit one revision-checked event and refresh derived projections."""
         session_id = _validate_session_id(session_id)
@@ -1252,6 +1263,18 @@ class SessionStore:
             repetition_window,
             max_repetition_window=contract.max_applied_event_ids,
         )
+        if expected_character_id is not None:
+            expected_character_id = _validate_character_id(
+                expected_character_id
+            )
+        if expected_character_version is not None:
+            expected_character_version = _validate_character_version(
+                expected_character_version
+            )
+        if expected_compiled_pack_hash is not None:
+            expected_compiled_pack_hash = _validate_compiled_pack_hash(
+                expected_compiled_pack_hash
+            )
         try:
             with self._session_lock(session_id):
                 self._recover_restart_locked(session_id)
@@ -1263,6 +1286,28 @@ class SessionStore:
                 if not manifest["active"]:
                     raise KokoroError(
                         "SESSION_NOT_ACTIVE", "Session is not active."
+                    )
+                binding_changed = (
+                    (
+                        expected_character_id is not None
+                        and manifest["character_id"] != expected_character_id
+                    )
+                    or (
+                        expected_character_version is not None
+                        and manifest["character_version"]
+                        != expected_character_version
+                    )
+                    or (
+                        expected_compiled_pack_hash is not None
+                        and manifest["compiled_pack_hash"]
+                        != expected_compiled_pack_hash
+                    )
+                )
+                if binding_changed:
+                    raise KokoroError(
+                        "SESSION_CHANGED",
+                        "Session binding changed.",
+                        retryable=True,
                     )
                 event_id = committed_event["event_id"]
                 if event_id in state["applied_event_ids"]:

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import argparse
 import json
 import os
 import shutil
@@ -11,6 +12,10 @@ from typing import Any
 import pytest
 
 from kokoroarc import __version__
+from kokoroarc import cli as cli_module
+from kokoroarc.config import Settings
+from kokoroarc.errors import KokoroError
+from kokoroarc.schemas import SchemaRegistry
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 RIN_PACK = REPOSITORY_ROOT / "characters" / "original" / "rin-aster"
@@ -118,6 +123,13 @@ def compiled_session(tmp_path: Path) -> tuple[dict[str, Any], dict[str, Any]]:
         "s1",
     )
     return compiled, session
+
+
+def make_hardlink(source: Path, target: Path) -> None:
+    try:
+        os.link(source, target)
+    except OSError:
+        pytest.skip("hardlink creation is unavailable")
 
 
 def test_all_command_families_and_state_lifecycle(tmp_path: Path) -> None:
@@ -279,6 +291,128 @@ def test_oversize_json_is_rejected_before_parsing(tmp_path: Path) -> None:
     assert result["error"]["code"] == "INPUT_TOO_LARGE"
 
 
+def test_external_json_rejects_directory_before_open(tmp_path: Path) -> None:
+    result = run_cli(
+        tmp_path,
+        "policy",
+        "compile",
+        "--input",
+        str(tmp_path),
+        expected_returncode=2,
+    )
+    assert result["error"]["code"] == "INPUT_PATH_UNSAFE"
+
+
+def test_external_json_rejects_symlink_before_open(tmp_path: Path) -> None:
+    target = write_json(tmp_path / "target.json", {})
+    link = tmp_path / "link.json"
+    try:
+        link.symlink_to(target)
+    except OSError:
+        pytest.skip("symlink creation is unavailable")
+
+    result = run_cli(
+        tmp_path,
+        "policy",
+        "compile",
+        "--input",
+        str(link),
+        expected_returncode=2,
+    )
+    assert result["error"]["code"] == "INPUT_PATH_UNSAFE"
+
+
+def test_external_json_rejects_fifo_before_open(tmp_path: Path) -> None:
+    make_fifo = getattr(os, "mkfifo", None)
+    if make_fifo is None:
+        pytest.skip("FIFO creation is unavailable")
+    fifo = tmp_path / "input.fifo"
+    make_fifo(fifo)
+
+    result = run_cli(
+        tmp_path,
+        "policy",
+        "compile",
+        "--input",
+        str(fifo),
+        expected_returncode=2,
+    )
+    assert result["error"]["code"] == "INPUT_PATH_UNSAFE"
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Windows device namespace")
+def test_external_json_rejects_windows_nul_before_open(tmp_path: Path) -> None:
+    result = run_cli(
+        tmp_path,
+        "policy",
+        "compile",
+        "--input",
+        "NUL",
+        expected_returncode=2,
+    )
+    assert result["error"]["code"] == "INPUT_PATH_UNSAFE"
+
+
+def test_public_error_mapper_strips_secret_values_and_paths(
+    tmp_path: Path,
+) -> None:
+    secret = f"secret-{tmp_path.name}"
+    policy = write_json(
+        tmp_path / f"{secret}.json",
+        {"primary_language": secret},
+    )
+    result = run_cli(
+        tmp_path,
+        "policy",
+        "compile",
+        "--input",
+        str(policy),
+        expected_returncode=2,
+    )
+    serialized = json.dumps(result, ensure_ascii=False)
+    assert result["error"]["code"] == "INVALID_LANGUAGE_POLICY"
+    assert result["error"]["details"] == {}
+    assert secret not in serialized
+    assert str(tmp_path) not in serialized
+
+    missing = run_cli(
+        tmp_path,
+        "pack",
+        "validate",
+        str(tmp_path / secret / "pack"),
+        expected_returncode=2,
+    )
+    serialized_missing = json.dumps(missing, ensure_ascii=False)
+    assert missing["error"]["code"] == "PACK_NOT_FOUND"
+    assert missing["error"]["details"] == {}
+    assert secret not in serialized_missing
+    assert str(tmp_path) not in serialized_missing
+
+    semantic = semantic_artifact()
+    semantic["scenario"] = secret
+    semantic_path = write_json(tmp_path / "semantic-secret.json", semantic)
+    policy_input = write_json(tmp_path / "policy-safe.json", {})
+    policy = run_cli(
+        tmp_path, "policy", "compile", "--input", str(policy_input)
+    )["policy"]
+    policy_path = write_json(tmp_path / "policy-compiled.json", policy)
+    invalid_schema = run_cli(
+        tmp_path,
+        "runtime",
+        "plan",
+        "--semantic",
+        str(semantic_path),
+        "--policy",
+        str(policy_path),
+        expected_returncode=2,
+    )
+    serialized_schema = json.dumps(invalid_schema, ensure_ascii=False)
+    assert invalid_schema["error"]["code"] == "SCHEMA_VALIDATION_FAILED"
+    assert invalid_schema["error"]["details"] == {}
+    assert secret not in serialized_schema
+    assert str(tmp_path) not in serialized_schema
+
+
 def test_session_start_rejects_compiled_path_outside_data_root(
     tmp_path: Path,
 ) -> None:
@@ -296,6 +430,73 @@ def test_session_start_rejects_compiled_path_outside_data_root(
         expected_returncode=2,
     )
     assert result["error"]["code"] == "COMPILED_PATH_UNSAFE"
+
+
+def test_session_start_rejects_compiled_file_with_external_hardlink(
+    tmp_path: Path,
+) -> None:
+    compiled = run_cli(tmp_path, "pack", "compile", str(RIN_PACK))
+    target = Path(compiled["path"])
+    outside = tmp_path.parent / f"{tmp_path.name}-compiled.json"
+    make_hardlink(target, outside)
+
+    result = run_cli(
+        tmp_path,
+        "session",
+        "start",
+        "--character",
+        str(target),
+        "--session",
+        "s1",
+        expected_returncode=2,
+    )
+
+    assert result["error"]["code"] == "COMPILED_PATH_UNSAFE"
+
+
+def test_runtime_scan_rejects_compiled_candidate_with_external_hardlink(
+    tmp_path: Path,
+) -> None:
+    compiled, _session = compiled_session(tmp_path)
+    target = Path(compiled["path"])
+    outside = tmp_path.parent / f"{tmp_path.name}-scan.json"
+    make_hardlink(target, outside)
+
+    result = run_cli(
+        tmp_path,
+        "runtime",
+        "context",
+        "--session",
+        "s1",
+        "--locale",
+        "zh-CN",
+        "--scenario",
+        "debugging",
+        expected_returncode=2,
+    )
+
+    assert result["error"]["code"] == "COMPILED_PATH_UNSAFE"
+
+
+def test_pack_compile_rejects_preexisting_hardlinked_target(
+    tmp_path: Path,
+) -> None:
+    compiled = run_cli(tmp_path, "pack", "compile", str(RIN_PACK))
+    target = Path(compiled["path"])
+    outside = tmp_path.parent / f"{tmp_path.name}-compile.json"
+    make_hardlink(target, outside)
+    before = outside.read_bytes()
+
+    result = run_cli(
+        tmp_path,
+        "pack",
+        "compile",
+        str(RIN_PACK),
+        expected_returncode=2,
+    )
+
+    assert result["error"]["code"] == "COMPILED_PATH_UNSAFE"
+    assert outside.read_bytes() == before
 
 
 def test_pack_compile_rejects_special_existing_target(tmp_path: Path) -> None:
@@ -396,6 +597,99 @@ def test_session_start_rejects_corrupt_compiled_json(tmp_path: Path) -> None:
     )
     assert result["error"]["code"] == "INPUT_INVALID_JSON"
     assert result["error"]["details"] == {}
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("artifact_id", "original/other-character/compiled"),
+        ("character_id", "other-character"),
+    ],
+)
+def test_session_start_rejects_compiled_identity_mismatch(
+    tmp_path: Path, field: str, value: str
+) -> None:
+    compiled = run_cli(tmp_path, "pack", "compile", str(RIN_PACK))
+    path = Path(compiled["path"])
+    artifact = json.loads(path.read_text(encoding="utf-8"))
+    artifact[field] = value
+    write_json(path, artifact)
+
+    result = run_cli(
+        tmp_path,
+        "session",
+        "start",
+        "--character",
+        str(path),
+        "--session",
+        "s1",
+        expected_returncode=2,
+    )
+
+    assert result["error"]["code"] == "COMPILED_IDENTITY_MISMATCH"
+
+
+@pytest.mark.parametrize("wrong_field", ["character", "version"])
+def test_runtime_context_rejects_matching_hash_with_wrong_identity(
+    tmp_path: Path, wrong_field: str
+) -> None:
+    compiled, _session = compiled_session(tmp_path)
+    path = Path(compiled["path"])
+    artifact = json.loads(path.read_text(encoding="utf-8"))
+    if wrong_field == "character":
+        artifact["character_id"] = "other-character"
+        artifact["artifact_id"] = "original/other-character/compiled"
+    else:
+        artifact["character_version"] = "9.9.9"
+    write_json(path, artifact)
+
+    result = run_cli(
+        tmp_path,
+        "runtime",
+        "context",
+        "--session",
+        "s1",
+        "--locale",
+        "zh-CN",
+        "--scenario",
+        "debugging",
+        expected_returncode=2,
+    )
+
+    assert result["error"]["code"] == "COMPILED_IDENTITY_MISMATCH"
+
+
+def test_state_apply_detects_restart_between_growth_lookup_and_commit(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _compiled, _session = compiled_session(tmp_path)
+    event_path = write_json(tmp_path / "event.json", interaction_event("e1", 0))
+    settings = Settings.from_env({"KOKOROARC_DATA_DIR": str(tmp_path)})
+    schemas = SchemaRegistry(settings.schema_dir)
+    real_lookup = cli_module._active_compiled_and_state
+
+    def restart_after_lookup(settings_value, schemas_value, session_id):
+        result = real_lookup(settings_value, schemas_value, session_id)
+        store = result[0]
+        store.end(session_id)
+        store.start(session_id, "rin-aster", "2.0.0", "b" * 64)
+        return result
+
+    monkeypatch.setattr(
+        cli_module, "_active_compiled_and_state", restart_after_lookup
+    )
+    args = argparse.Namespace(session="s1", event=str(event_path))
+
+    with pytest.raises(KokoroError) as raised:
+        cli_module._handle_state_apply(args, settings, schemas)
+
+    assert raised.value.code == "SESSION_CHANGED"
+    assert raised.value.retryable is True
+    assert result_revision(tmp_path, "s1") == 0
+
+
+def result_revision(data_root: Path, session_id: str) -> int:
+    return cli_module.SessionStore(data_root).replay(session_id)["revision"]
 
 
 def test_session_start_rejects_redirected_compiled_file(tmp_path: Path) -> None:
