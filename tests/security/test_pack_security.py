@@ -90,12 +90,14 @@ def test_scan_accepts_complete_rin_pack_under_default_limits() -> None:
         "overrides.yaml",
         "scenarios/debugging.yaml",
         "tests/multilingual.yaml",
+        "tests/negative.yaml",
+        "tests/positive.yaml",
         "tests/protected-spans.yaml",
     }
 
     files = scan_pack(pack_root, PackLimits())
 
-    assert len(files) == 14
+    assert len(files) == 16
     assert files == sorted(files, key=lambda path: path.as_posix())
     assert all(path.is_absolute() for path in files)
     assert all(path == path.resolve(strict=True) and path.is_file() for path in files)

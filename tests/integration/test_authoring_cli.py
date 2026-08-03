@@ -10,38 +10,60 @@ import sys
 from typing import Any
 
 import pytest
+import yaml
 
 from kokoroarc import cli as cli_module
 from kokoroarc.authoring import storage as authoring_storage
 from kokoroarc.errors import KokoroError
 
 
+AUTHORING_FIXTURES = Path("tests/fixtures/authoring")
+
+
+def _load_authoring_fixture(name: str) -> dict[str, Any]:
+    return json.loads((AUTHORING_FIXTURES / name).read_text(encoding="utf-8"))
+
+
 @pytest.fixture
 def original_request() -> dict[str, Any]:
-    return {
-        "schema_version": "1.0",
-        "artifact_id": "original/rin-aster/build-request",
-        "created_by": {"component": "kokoroarc", "version": "0.0.0.dev0"},
-        "mode": "original",
-        "namespace": "original",
-        "character_id": "rin-aster",
-        "display_name": "Rin Aster",
-        "character_version": "1.0.0",
-        "requested_locales": ["zh-CN", "en-US", "ja-JP"],
-        "intended_use_cases": ["technical collaboration"],
-        "user_constraints": ["Do not fabricate certainty."],
-        "inputs": [
-            {
-                "type": "creative_brief",
-                "content": "A restrained systems architect.",
-            }
-        ],
-    }
+    return _load_authoring_fixture("original-request.json")
+
+
+@pytest.fixture
+def dossier_request() -> dict[str, Any]:
+    return _load_authoring_fixture("dossier-request.json")
 
 
 def _write_request(path: Path, request: dict[str, Any]) -> Path:
     path.write_text(json.dumps(request), encoding="utf-8")
     return path
+
+
+def _copy_dossier_pack(tmp_path: Path) -> Path:
+    pack = tmp_path / "dossier-pack"
+    shutil.copytree("characters/original/rin-aster", pack)
+    (pack / "evidence.yaml").write_text(
+        yaml.safe_dump(
+            {
+                "authored_original": False,
+                "claims": [
+                    {
+                        "claim_id": "tracks-open-assumptions",
+                        "statement": (
+                            "Keeps a compact notebook of unresolved system "
+                            "assumptions."
+                        ),
+                        "source": "user_dossier",
+                        "confidence": 1.0,
+                    }
+                ],
+            },
+            allow_unicode=True,
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+    return pack
 
 
 def _cli(
@@ -92,6 +114,32 @@ def test_character_request_validate_returns_normalized_request_without_data_dir(
     assert completed.returncode == 0
     assert json.loads(completed.stdout) == {"ok": True, "request": expected}
     assert completed.stderr == ""
+
+
+@pytest.mark.parametrize(
+    "fixture_name", ["original-request.json", "dossier-request.json"]
+)
+def test_authoring_representative_requests_normalize_deterministically(
+    fixture_name: str,
+) -> None:
+    request = _load_authoring_fixture(fixture_name)
+    arguments = [
+        "character",
+        "request",
+        "validate",
+        "--input",
+        str(AUTHORING_FIXTURES / fixture_name),
+        "--json",
+    ]
+
+    first = _cli(arguments)
+    second = _cli(arguments)
+
+    assert first.returncode == second.returncode == 0
+    assert first.stdout == second.stdout
+    assert json.loads(first.stdout) == {"ok": True, "request": request}
+    assert request["requested_visibility"] == "private"
+    assert first.stderr == second.stderr == ""
 
 
 def test_character_draft_validate_returns_report_without_data_dir(
@@ -159,6 +207,87 @@ def test_character_draft_compile_publishes_deterministic_private_inactive_bundle
     assert not (data_dir / "state").exists()
     assert not (data_dir / "events").exists()
     assert first.stderr == second.stderr == ""
+
+
+def test_authoring_dossier_flow_compiles_private_inactive_draft(
+    tmp_path: Path, dossier_request: dict[str, Any]
+) -> None:
+    request_path = _write_request(tmp_path / "request.json", dossier_request)
+    data_dir = tmp_path / "data"
+    completed = _cli(
+        [
+            "character",
+            "draft",
+            "compile",
+            "--request",
+            str(request_path),
+            "--pack",
+            str(_copy_dossier_pack(tmp_path)),
+            "--json",
+        ],
+        data_dir=data_dir,
+    )
+
+    body = json.loads(completed.stdout)
+    assert completed.returncode == 0
+    assert body["ok"] is True
+    assert body["build_status"] == "draft"
+    assert body["visibility"] == "private"
+    assert body["activation_allowed"] is False
+    assert body["validation_report"]["valid"] is True
+    assert not (data_dir / "compiled").exists()
+    assert not (data_dir / "sessions").exists()
+    assert not (data_dir / "state").exists()
+    assert not (data_dir / "events").exists()
+    assert not (data_dir / "installed").exists()
+    assert not (data_dir / "public").exists()
+    assert completed.stderr == ""
+
+
+def test_authoring_injection_dossier_remains_inert_private_data(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    request = _load_authoring_fixture("injection-dossier.json")
+    payloads = [item["content"] for item in request["inputs"]]
+    marker = tmp_path / "injection-activated"
+    secret = "DOSSIER-INTERPOLATION-SECRET"
+    monkeypatch.setenv("KOKOROARC_INJECTION_MARKER", str(marker))
+    monkeypatch.setenv("KOKOROARC_INJECTION_SECRET", secret)
+    data_dir = tmp_path / "data"
+    completed = _cli(
+        [
+            "character",
+            "draft",
+            "compile",
+            "--request",
+            str(AUTHORING_FIXTURES / "injection-dossier.json"),
+            "--pack",
+            str(_copy_dossier_pack(tmp_path)),
+            "--json",
+        ],
+        data_dir=data_dir,
+    )
+
+    body = json.loads(completed.stdout)
+    assert completed.returncode == 0
+    bundle = Path(body["path"])
+    stored_request = json.loads(
+        (bundle / "request.json").read_text(encoding="utf-8")
+    )
+    assert body["build_status"] == "draft"
+    assert body["visibility"] == "private"
+    assert body["activation_allowed"] is False
+    assert stored_request["inputs"] == request["inputs"]
+    assert not marker.exists()
+    assert secret not in completed.stdout
+    assert all(payload not in completed.stdout for payload in payloads)
+    assert not (data_dir / "compiled").exists()
+    assert not (data_dir / "sessions").exists()
+    assert not (data_dir / "state").exists()
+    assert not (data_dir / "events").exists()
+    assert not (data_dir / "installed").exists()
+    assert not (data_dir / "public").exists()
+    assert completed.stderr == ""
 
 
 def test_character_request_validate_sanitizes_malformed_json(

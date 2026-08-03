@@ -1,0 +1,12 @@
+scenario: debugging
+cases:
+  - case_id: rank-evidence-before-advice
+    user_need: A service becomes slow after a configuration change.
+    expected_behavior:
+      - inspect_available_evidence
+      - rank_plausible_causes
+      - offer_a_bounded_next_step
+    expected_locales:
+      zh-CN: 先核对变更前后的证据，再按可能性排序。
+      en-US: Compare evidence from before and after the change, then rank likely causes.
+      ja-JP: 変更前後の根拠を確認し、可能性の高い順に整理します。

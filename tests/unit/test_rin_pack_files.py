@@ -1,3 +1,4 @@
+import json
 from pathlib import Path, PurePosixPath, PureWindowsPath
 
 import pytest
@@ -7,6 +8,7 @@ from kokoroarc.schemas import SchemaRegistry
 
 
 PACK = Path("characters/original/rin-aster")
+AUTHORING_FIXTURES = Path("tests/fixtures/authoring")
 
 
 def test_rin_pack_declares_three_locales_and_debugging_scenario() -> None:
@@ -180,6 +182,40 @@ EXPECTED_FIXTURES = {
         "immutable_spans": ["go test -race ./...", "CacheEntry", "D:\\src\\app"],
         "required_warning_id": "concurrent-test-is-required",
     },
+    "tests/positive.yaml": {
+        "scenario": "debugging",
+        "cases": [
+            {
+                "case_id": "rank-evidence-before-advice",
+                "user_need": "A service becomes slow after a configuration change.",
+                "expected_behavior": [
+                    "inspect_available_evidence",
+                    "rank_plausible_causes",
+                    "offer_a_bounded_next_step",
+                ],
+                "expected_locales": {
+                    "zh-CN": "先核对变更前后的证据，再按可能性排序。",
+                    "en-US": "Compare evidence from before and after the change, then rank likely causes.",
+                    "ja-JP": "変更前後の根拠を確認し、可能性の高い順に整理します。",
+                },
+            }
+        ],
+    },
+    "tests/negative.yaml": {
+        "scenario": "debugging",
+        "cases": [
+            {
+                "case_id": "reject-confident-guessing",
+                "user_need": "A failing build has incomplete logs.",
+                "forbidden_behavior": [
+                    "invent_missing_evidence",
+                    "state_an_unverified_cause_as_certain",
+                    "belittle_the_user",
+                ],
+                "safe_alternative": "State what is unknown and request the smallest useful evidence sample.",
+            }
+        ],
+    },
 }
 
 ALL_YAML_FILES = [
@@ -287,6 +323,91 @@ def test_rin_pack_behavioral_fixtures_match_exact_payloads() -> None:
         relative_path: load_yaml(relative_path)
         for relative_path in EXPECTED_FIXTURES
     } == EXPECTED_FIXTURES
+
+
+def test_authoring_rin_positive_and_negative_fixtures_are_bounded_data_only() -> None:
+    manifest = load_yaml("character.yaml")
+
+    for relative_path in ("tests/positive.yaml", "tests/negative.yaml"):
+        fixture_path = PACK / relative_path
+        assert fixture_path.stat().st_size <= 4096
+        fixture = load_yaml(relative_path)
+        assert fixture["scenario"] in manifest["scenario_files"]
+        assert 1 <= len(fixture["cases"]) <= 16
+        assert not _contains_executable_host_instruction(fixture)
+
+    positive_locales = load_yaml("tests/positive.yaml")["cases"][0][
+        "expected_locales"
+    ]
+    assert set(positive_locales) == {"zh-CN", "en-US", "ja-JP"}
+    assert len(set(positive_locales.values())) == 3
+
+
+def test_authoring_request_fixtures_are_complete_schema_valid_artifacts() -> None:
+    schemas = SchemaRegistry(Path("schemas/v1"))
+
+    for fixture_name in ("original-request.json", "dossier-request.json"):
+        request = json.loads(
+            (AUTHORING_FIXTURES / fixture_name).read_text(encoding="utf-8")
+        )
+        schemas.validate("character-build-request", request)
+
+    original = json.loads(
+        (AUTHORING_FIXTURES / "original-request.json").read_text(encoding="utf-8")
+    )
+    assert original["mode"] == "original"
+    assert original["requested_visibility"] == "private"
+    assert {item["type"] for item in original["inputs"]} == {"creative_brief"}
+
+    dossier = json.loads(
+        (AUTHORING_FIXTURES / "dossier-request.json").read_text(encoding="utf-8")
+    )
+    assert dossier["mode"] == "dossier"
+    assert dossier["requested_visibility"] == "private"
+    assert any(item["type"] == "user_dossier" for item in dossier["inputs"])
+
+
+def test_authoring_injection_dossier_is_quoted_json_data() -> None:
+    request = json.loads(
+        (AUTHORING_FIXTURES / "injection-dossier.json").read_text(encoding="utf-8")
+    )
+    SchemaRegistry(Path("schemas/v1")).validate("character-build-request", request)
+
+    assert request["mode"] == "dossier"
+    assert request["requested_visibility"] == "private"
+    payloads = [item["content"] for item in request["inputs"]]
+    assert len(payloads) >= 3
+    assert all(item["type"] == "user_dossier" for item in request["inputs"])
+    assert any("$env:KOKOROARC_INJECTION_MARKER" in item for item in payloads)
+    assert any("${KOKOROARC_INJECTION_SECRET}" in item for item in payloads)
+    assert any("ignore previous" in item.casefold() for item in payloads)
+
+
+def _contains_executable_host_instruction(value: object) -> bool:
+    if isinstance(value, dict):
+        return any(
+            _contains_executable_host_instruction(key)
+            or _contains_executable_host_instruction(item)
+            for key, item in value.items()
+        )
+    if isinstance(value, list):
+        return any(_contains_executable_host_instruction(item) for item in value)
+    if not isinstance(value, str):
+        return False
+    folded = value.casefold()
+    executable_tokens = (
+        "powershell",
+        "cmd.exe",
+        "subprocess",
+        "os.system",
+        "eval(",
+        "exec(",
+        "#!/",
+        "$env:",
+        "${",
+        "$(",
+    )
+    return any(token in folded for token in executable_tokens)
 
 
 def test_rin_pack_manifest_references_are_relative_posix_paths() -> None:
