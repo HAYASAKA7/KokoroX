@@ -147,6 +147,39 @@ def test_build_runtime_context_returns_only_the_selected_compact_view() -> None:
     assert "provenance" not in result
 
 
+def test_context_contains_only_active_locale_scenario_and_state() -> None:
+    compiled = {
+        "character_id": "rin-aster",
+        "character_version": "1.0.0",
+        "identity": {"display_name": "Rin Aster"},
+        "effective_profile": {"composure": 0.9},
+        "provenance": {"composure": {"selected_layer": "derived_profile"}},
+        "locales": {
+            "zh-CN": {"register": "standard"},
+            "ja-JP": {"register": "teineigo"},
+        },
+        "scenarios": {"debugging": {"intensity_cap": "balanced"}},
+        "expressions": {"restrained_diagnosis": {"zh-CN": ["原因明确。"]}},
+        "growth": {"dimensions": ["trust"]},
+    }
+    context = build_runtime_context(
+        compiled,
+        {"revision": 0, "stage": "unknown", "dimensions": {"trust": 0}},
+        "zh-CN",
+        "debugging",
+    )
+    assert set(context["locales"]) == {"zh-CN"}
+    assert "provenance" not in context
+    assert set(context["scenarios"]) == {"debugging"}
+    assert context["identity"] == {"display_name": "Rin Aster"}
+    assert context["growth"] == {"dimensions": ["trust"]}
+    assert context["state"] == {
+        "revision": 0,
+        "stage": "unknown",
+        "dimensions": {"trust": 0},
+    }
+
+
 def test_build_runtime_context_accepts_the_minimal_consumed_shape() -> None:
     compiled = _compiled()
     state = _state()

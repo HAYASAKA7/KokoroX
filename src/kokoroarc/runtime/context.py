@@ -29,10 +29,13 @@ _DIMENSIONS = frozenset({"familiarity", "trust", "collaboration", "tension"})
 _INTENSITIES = frozenset(
     {"neutral", "subtle", "balanced", "immersive", "performance"}
 )
-_IDENTITY_REQUIRED = frozenset(
-    {"display_name", "declared_age", "role", "non_negotiables"}
-)
-_IDENTITY_ALLOWED = _IDENTITY_REQUIRED | {"worldview"}
+_IDENTITY_REQUIRED = frozenset({"display_name"})
+_IDENTITY_ALLOWED = _IDENTITY_REQUIRED | {
+    "declared_age",
+    "role",
+    "worldview",
+    "non_negotiables",
+}
 _LOCALE_CONFIG_KEYS = frozenset(
     {"register", "sentence_length", "technical_terms", "addressing", "politeness"}
 )
@@ -110,14 +113,15 @@ def _identity_valid(value: Any) -> bool:
     keys = set(value)
     if not _IDENTITY_REQUIRED.issubset(keys) or not keys.issubset(_IDENTITY_ALLOWED):
         return False
-    if not all(
-        _bounded_string(value[key], 256)
-        for key in ("display_name", "declared_age", "role")
-    ):
+    if not _bounded_string(value["display_name"], 256):
         return False
-    if not _string_array(value["non_negotiables"]):
-        return False
-    return "worldview" not in value or _string_array(value["worldview"])
+    for key in ("declared_age", "role"):
+        if key in value and not _bounded_string(value[key], 256):
+            return False
+    for key in ("worldview", "non_negotiables"):
+        if key in value and not _string_array(value[key]):
+            return False
+    return True
 
 
 def _profile_valid(value: Any) -> bool:
@@ -219,7 +223,8 @@ def _state_summary(state: Any) -> dict[str, Any]:
         or revision < 0
         or stage not in _STAGES
         or not isinstance(dimensions, dict)
-        or set(dimensions) != _DIMENSIONS
+        or not 1 <= len(dimensions) <= len(_DIMENSIONS)
+        or not set(dimensions).issubset(_DIMENSIONS)
         or any(not _number_in_range(value, 0, 100) for value in dimensions.values())
     ):
         raise _invalid()
