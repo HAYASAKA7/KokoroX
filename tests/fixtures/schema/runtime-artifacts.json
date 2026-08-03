@@ -82,6 +82,7 @@
     "character_id": "rin-aster",
     "character_version": "1.0.0",
     "compiled_pack_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "lifecycle_generation": "00000000000000000000000000000000",
     "scope": "session",
     "state_revision": 0,
     "active": true

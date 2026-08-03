@@ -8,6 +8,7 @@ import json
 import math
 import os
 import re
+import secrets
 import stat
 import threading
 import time
@@ -40,6 +41,7 @@ _SEMVER = re.compile(
     r"(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?"
 )
 _COMPILED_PACK_HASH = re.compile(r"[a-f0-9]{64}")
+_LIFECYCLE_GENERATION = re.compile(r"[a-f0-9]{32}")
 _ARCHIVE_INDEX = re.compile(r"[1-9][0-9]{0,4}", re.ASCII)
 SESSION_MANIFEST_MAX_BYTES = 64 * 1024
 EVENT_RECORD_MAX_BYTES = 8 * 1024
@@ -78,6 +80,7 @@ _MANIFEST_KEYS = frozenset(
         "character_id",
         "character_version",
         "compiled_pack_hash",
+        "lifecycle_generation",
         "scope",
         "state_revision",
         "active",
@@ -309,6 +312,22 @@ def _validate_compiled_pack_hash(compiled_pack_hash: object) -> str:
             "INVALID_COMPILED_PACK_HASH", "Compiled pack hash is invalid."
         )
     return compiled_pack_hash
+
+
+def _validate_lifecycle_generation(generation: object) -> str:
+    if (
+        not isinstance(generation, str)
+        or _LIFECYCLE_GENERATION.fullmatch(generation) is None
+    ):
+        raise _invalid(
+            "INVALID_LIFECYCLE_GENERATION",
+            "Session lifecycle generation is invalid.",
+        )
+    return generation
+
+
+def _new_lifecycle_generation() -> str:
+    return secrets.token_hex(16)
 
 
 def _is_number(value: object) -> bool:
@@ -1143,6 +1162,11 @@ class SessionStore:
             and isinstance(manifest["compiled_pack_hash"], str)
             and _COMPILED_PACK_HASH.fullmatch(manifest["compiled_pack_hash"])
             is not None
+            and isinstance(manifest["lifecycle_generation"], str)
+            and _LIFECYCLE_GENERATION.fullmatch(
+                manifest["lifecycle_generation"]
+            )
+            is not None
             and manifest["scope"] == "session"
             and isinstance(state_revision, int)
             and not isinstance(state_revision, bool)
@@ -1184,6 +1208,7 @@ class SessionStore:
                 "character_id": character_id,
                 "character_version": character_version,
                 "compiled_pack_hash": compiled_pack_hash,
+                "lifecycle_generation": _new_lifecycle_generation(),
                 "scope": "session",
                 "state_revision": 0,
                 "active": True,
@@ -1253,6 +1278,7 @@ class SessionStore:
         expected_character_id: str | None = None,
         expected_character_version: str | None = None,
         expected_compiled_pack_hash: str | None = None,
+        expected_lifecycle_generation: str | None = None,
     ) -> dict[str, Any]:
         """Commit one revision-checked event and refresh derived projections."""
         session_id = _validate_session_id(session_id)
@@ -1274,6 +1300,10 @@ class SessionStore:
         if expected_compiled_pack_hash is not None:
             expected_compiled_pack_hash = _validate_compiled_pack_hash(
                 expected_compiled_pack_hash
+            )
+        if expected_lifecycle_generation is not None:
+            expected_lifecycle_generation = _validate_lifecycle_generation(
+                expected_lifecycle_generation
             )
         try:
             with self._session_lock(session_id):
@@ -1301,6 +1331,11 @@ class SessionStore:
                         expected_compiled_pack_hash is not None
                         and manifest["compiled_pack_hash"]
                         != expected_compiled_pack_hash
+                    )
+                    or (
+                        expected_lifecycle_generation is not None
+                        and manifest["lifecycle_generation"]
+                        != expected_lifecycle_generation
                     )
                 )
                 if binding_changed:

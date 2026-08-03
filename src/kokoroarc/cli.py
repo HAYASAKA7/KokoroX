@@ -537,6 +537,7 @@ def _handle_state_apply(
         expected_character_id=manifest["character_id"],
         expected_character_version=manifest["character_version"],
         expected_compiled_pack_hash=manifest["compiled_pack_hash"],
+        expected_lifecycle_generation=manifest["lifecycle_generation"],
     )
     return {"ok": True, "state": state}
 

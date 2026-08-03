@@ -11,6 +11,7 @@
     "character_id",
     "character_version",
     "compiled_pack_hash",
+    "lifecycle_generation",
     "scope",
     "state_revision",
     "active"
@@ -25,6 +26,10 @@
     "compiled_pack_hash": {
       "type": "string",
       "pattern": "^[a-f0-9]{64}(?![\\s\\S])"
+    },
+    "lifecycle_generation": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{32}(?![\\s\\S])"
     },
     "scope": {"const": "session"},
     "state_revision": {"type": "integer", "minimum": 0},

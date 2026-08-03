@@ -108,6 +108,18 @@ def test_runtime_artifact_contracts(schema_name: str, fixture_key: str) -> None:
     SchemaRegistry(Path("schemas/v1")).validate(schema_name, fixture[fixture_key])
 
 
+def test_session_manifest_requires_lifecycle_generation() -> None:
+    document = load_fixture("runtime-artifacts.json")["session_manifest"]
+    document.pop("lifecycle_generation")
+
+    with pytest.raises(KokoroError) as raised:
+        SchemaRegistry(Path("schemas/v1")).validate(
+            "session-manifest", document
+        )
+
+    assert raised.value.code == "SCHEMA_VALIDATION_FAILED"
+
+
 @pytest.mark.parametrize(
     "schema_name,fixture_key,mutation",
     [
@@ -162,6 +174,7 @@ def test_runtime_artifact_contracts(schema_name: str, fixture_key: str) -> None:
         ("relationship-state", "relationship_state", lambda d: _set_nested(d, ("recent_novelty",), {"Invalid-Key": 1})),
         ("relationship-state", "relationship_state", lambda d: _set_nested(d, ("recent_novelty",), {"completed-test": -1})),
         ("session-manifest", "session_manifest", lambda d: _set_nested(d, ("compiled_pack_hash",), "A" * 64)),
+        ("session-manifest", "session_manifest", lambda d: _set_nested(d, ("lifecycle_generation",), "A" * 32)),
         ("session-manifest", "session_manifest", lambda d: _set_nested(d, ("scope",), "global")),
         ("session-manifest", "session_manifest", lambda d: _set_nested(d, ("state_revision",), -1)),
         ("session-manifest", "session_manifest", lambda d: _set_nested(d, ("unknown",), True)),
@@ -188,7 +201,7 @@ def test_runtime_artifact_contracts(schema_name: str, fixture_key: str) -> None:
         "state-dimension-field",
         "state-missing-dimension", "state-stage", "state-revision", "state-turn",
         "state-duplicate-event", "state-novelty-key", "state-novelty-value",
-        "manifest-hash", "manifest-scope", "manifest-revision", "manifest-unknown-root",
+        "manifest-hash", "manifest-generation", "manifest-scope", "manifest-revision", "manifest-unknown-root",
         "manifest-character-id-too-long", "manifest-character-version",
     ],
 )

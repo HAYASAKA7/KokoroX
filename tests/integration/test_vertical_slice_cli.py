@@ -671,8 +671,14 @@ def test_state_apply_detects_restart_between_growth_lookup_and_commit(
     def restart_after_lookup(settings_value, schemas_value, session_id):
         result = real_lookup(settings_value, schemas_value, session_id)
         store = result[0]
+        manifest = result[1]
         store.end(session_id)
-        store.start(session_id, "rin-aster", "2.0.0", "b" * 64)
+        store.start(
+            session_id,
+            manifest["character_id"],
+            manifest["character_version"],
+            manifest["compiled_pack_hash"],
+        )
         return result
 
     monkeypatch.setattr(

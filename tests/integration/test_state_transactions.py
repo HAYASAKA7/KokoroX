@@ -75,6 +75,36 @@ def test_apply_rejects_binding_changed_after_snapshot(tmp_path: Path) -> None:
     assert store.replay("s1")["revision"] == 0
 
 
+def test_apply_rejects_stale_event_after_same_binding_restart(
+    tmp_path: Path,
+) -> None:
+    store = started_store(tmp_path)
+    manifest, _state = store.snapshot("s1")
+    store.end("s1")
+    restarted = store.start("s1", "rin-aster", "1.0.0", HASH)
+
+    with pytest.raises(KokoroError) as raised:
+        store.apply(
+            "s1",
+            event("e1", 0),
+            expected_character_id=manifest["character_id"],
+            expected_character_version=manifest["character_version"],
+            expected_compiled_pack_hash=manifest["compiled_pack_hash"],
+            expected_lifecycle_generation=manifest[
+                "lifecycle_generation"
+            ],
+        )
+
+    assert restarted["lifecycle_generation"] != manifest[
+        "lifecycle_generation"
+    ]
+    assert raised.value.code == "SESSION_CHANGED"
+    assert raised.value.retryable is True
+    state = store.replay("s1")
+    assert state["revision"] == 0
+    assert state["applied_event_ids"] == []
+
+
 def test_apply_publishes_event_before_cache_and_manifest(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

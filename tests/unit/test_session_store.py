@@ -1,5 +1,6 @@
 import json
 import multiprocessing
+import re
 import threading
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
@@ -15,6 +16,15 @@ from kokoroarc.state.store import SessionStore
 
 
 HASH = "a" * 64
+GENERATION = "0" * 32
+_REAL_NEW_LIFECYCLE_GENERATION = store_module._new_lifecycle_generation
+
+
+@pytest.fixture(autouse=True)
+def fixed_lifecycle_generation(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        store_module, "_new_lifecycle_generation", lambda: GENERATION
+    )
 
 
 def expected_manifest(session_id: str = "session-1") -> dict:
@@ -26,6 +36,7 @@ def expected_manifest(session_id: str = "session-1") -> dict:
         "character_id": "rin-aster",
         "character_version": "1.2.3",
         "compiled_pack_hash": HASH,
+        "lifecycle_generation": GENERATION,
         "scope": "session",
         "state_revision": 0,
         "active": True,
@@ -157,6 +168,25 @@ def test_start_creates_exact_manifest_and_initial_state(tmp_path: Path) -> None:
     assert not list(tmp_path.rglob("*.tmp"))
 
 
+def test_start_generates_unique_fixed_format_lifecycle_tokens(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        store_module,
+        "_new_lifecycle_generation",
+        _REAL_NEW_LIFECYCLE_GENERATION,
+    )
+    store = SessionStore(tmp_path)
+
+    first = store.start("session-1", "rin-aster", "1.2.3", HASH)
+    store.end("session-1")
+    second = store.start("session-1", "rin-aster", "1.2.3", HASH)
+
+    assert re.fullmatch(r"[a-f0-9]{32}", first["lifecycle_generation"])
+    assert re.fullmatch(r"[a-f0-9]{32}", second["lifecycle_generation"])
+    assert first["lifecycle_generation"] != second["lifecycle_generation"]
+
+
 def test_start_writes_state_before_publishing_active_manifest(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -235,7 +265,12 @@ def test_concurrent_starts_across_processes_are_serialized(
         ("error", "SESSION_ALREADY_ACTIVE"),
         ("ok", None),
     ]
-    assert SessionStore(tmp_path).load("session-1") == expected_manifest()
+    loaded = SessionStore(tmp_path).load("session-1")
+    generation = loaded.pop("lifecycle_generation")
+    expected = expected_manifest()
+    expected.pop("lifecycle_generation")
+    assert re.fullmatch(r"[a-f0-9]{32}", generation)
+    assert loaded == expected
 
 
 def test_duplicate_active_start_rejects_without_writes_or_content_changes(
@@ -344,6 +379,8 @@ def test_load_sanitizes_malformed_manifest_data(
         lambda document: document.update({"character_id": "Invalid"}),
         lambda document: document.update({"character_version": "1.2.3-01"}),
         lambda document: document.update({"compiled_pack_hash": "A" * 64}),
+        lambda document: document.pop("lifecycle_generation"),
+        lambda document: document.update({"lifecycle_generation": "A" * 32}),
         lambda document: document.update({"scope": "global"}),
         lambda document: document.update({"state_revision": True}),
         lambda document: document.update({"state_revision": -1}),
@@ -363,6 +400,8 @@ def test_load_sanitizes_malformed_manifest_data(
         "character-id",
         "character-version",
         "compiled-pack-hash",
+        "missing-generation",
+        "invalid-generation",
         "scope",
         "boolean-state-revision",
         "negative-state-revision",
