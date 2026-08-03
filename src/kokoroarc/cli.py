@@ -9,7 +9,11 @@ import stat
 from typing import Any, Callable
 
 from kokoroarc import __version__
-from kokoroarc.config import Settings
+from kokoroarc.authoring.drafts import build_character_draft
+from kokoroarc.authoring.requests import normalize_build_request
+from kokoroarc.authoring.storage import publish_draft_bundle
+from kokoroarc.authoring.validation import validate_authoring_pack
+from kokoroarc.config import Settings, resolve_schema_dir
 from kokoroarc.errors import KokoroError
 from kokoroarc.json_compat import find_json_incompatibility
 from kokoroarc.packs.compiler import compile_pack, write_compiled_pack
@@ -30,13 +34,24 @@ COMPILED_SCAN_MAX_BYTES = 32 * 1024 * 1024
 SOURCE_HASH_PREFIX_LENGTH = 16
 _PUBLIC_ERROR_CODE = re.compile(r"[A-Z][A-Z0-9_]{0,127}")
 _PUBLIC_MESSAGES = {
+    "AUTHORING_MODE_UNSUPPORTED": (
+        "Construction mode is not available in this milestone."
+    ),
+    "AUTHORING_SOURCE_CHANGED": "Character source pack changed during compilation.",
+    "AUTHORING_VALIDATION_FAILED": "Character authoring validation failed.",
     "DATA_DIR_REQUIRED": "Set KOKOROARC_DATA_DIR before running a stateful command.",
+    "DRAFT_PUBLISH_BUSY": "Character draft publication is already in progress.",
+    "DRAFT_PUBLISH_FAILED": "Character draft publication failed.",
     "INPUT_NOT_FOUND": "Input file was not found.",
     "INPUT_PATH_UNSAFE": "Input file path is unsafe.",
     "INPUT_READ_FAILED": "Input file could not be read.",
     "INPUT_TOO_LARGE": "Input file exceeds the size limit.",
     "INPUT_INVALID_JSON": "Input file contains invalid JSON.",
+    "INVALID_PACK_DATA": "Character pack data is invalid.",
+    "PACK_NOT_FOUND": "Character pack was not found.",
+    "SCHEMA_VALIDATION_FAILED": "Input did not match the required schema.",
     "STATE_REVISION_CONFLICT": "Relationship state revision conflicted.",
+    "UNSAFE_PACK_PATH": "Character pack path is unsafe.",
 }
 
 
@@ -57,6 +72,27 @@ def build_parser() -> argparse.ArgumentParser:
     pack_validate = pack_commands.add_parser("validate")
     pack_validate.add_argument("pack_path")
     _leaf_json(pack_validate)
+
+    character = commands.add_parser("character")
+    character_commands = character.add_subparsers(
+        dest="character_command", required=True
+    )
+    character_request = character_commands.add_parser("request")
+    request_commands = character_request.add_subparsers(
+        dest="request_command", required=True
+    )
+    request_validate = request_commands.add_parser("validate")
+    request_validate.add_argument("--input", required=True)
+    _leaf_json(request_validate)
+    character_draft = character_commands.add_parser("draft")
+    draft_commands = character_draft.add_subparsers(
+        dest="draft_command", required=True
+    )
+    for name in ("validate", "compile"):
+        draft_command = draft_commands.add_parser(name)
+        draft_command.add_argument("--request", required=True)
+        draft_command.add_argument("--pack", required=True)
+        _leaf_json(draft_command)
 
     session = commands.add_parser("session")
     session_commands = session.add_subparsers(dest="session_command", required=True)
@@ -371,6 +407,70 @@ def _handle_pack_validate(
     }
 
 
+def _handle_character_request_validate(
+    args: argparse.Namespace,
+    settings: Settings | None,
+    schemas: SchemaRegistry,
+) -> dict[str, Any]:
+    del settings
+    request = normalize_build_request(_read_json(Path(args.input)), schemas)
+    return {"ok": True, "request": request}
+
+
+def _authoring_inputs(
+    args: argparse.Namespace, schemas: SchemaRegistry
+) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
+    request = normalize_build_request(_read_json(Path(args.request)), schemas)
+    source = load_source_pack(Path(args.pack), schemas)
+    report = validate_authoring_pack(request, source, schemas)
+    return request, source, report
+
+
+def _handle_character_draft_validate(
+    args: argparse.Namespace,
+    settings: Settings | None,
+    schemas: SchemaRegistry,
+) -> dict[str, Any]:
+    del settings
+    _request, _source, report = _authoring_inputs(args, schemas)
+    return {
+        "ok": True,
+        "valid": report["valid"],
+        "validation_report": report,
+    }
+
+
+def _handle_character_draft_compile(
+    args: argparse.Namespace, settings: Settings, schemas: SchemaRegistry
+) -> dict[str, Any]:
+    request, source, report = _authoring_inputs(args, schemas)
+    if not report["valid"]:
+        raise KokoroError(
+            "AUTHORING_VALIDATION_FAILED",
+            "Character authoring validation failed.",
+        )
+    draft = build_character_draft(request, source, report)
+    target = publish_draft_bundle(
+        settings.data_dir,
+        Path(args.pack),
+        request,
+        draft,
+        report,
+    )
+    return {
+        "ok": True,
+        "path": str(target),
+        "artifact_id": draft["artifact_id"],
+        "request_hash": draft["request_hash"],
+        "source_pack_hash": draft["source_pack_hash"],
+        "validation_report_hash": draft["validation_report_hash"],
+        "build_status": draft["build_status"],
+        "visibility": draft["visibility"],
+        "activation_allowed": draft["activation_allowed"],
+        "validation_report": report,
+    }
+
+
 def _handle_session_start(
     args: argparse.Namespace, settings: Settings, schemas: SchemaRegistry
 ) -> dict[str, Any]:
@@ -586,14 +686,37 @@ _HANDLERS: dict[tuple[str, str], Callable[..., dict[str, Any]]] = {
     ("state", "apply"): _handle_state_apply,
 }
 
+_CHARACTER_HANDLERS: dict[
+    tuple[str, str], Callable[..., dict[str, Any]]
+] = {
+    ("request", "validate"): _handle_character_request_validate,
+    ("draft", "validate"): _handle_character_draft_validate,
+    ("draft", "compile"): _handle_character_draft_compile,
+}
+
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     try:
-        settings = Settings.from_env(os.environ)
-        schemas = SchemaRegistry(settings.schema_dir)
-        subcommand = getattr(args, f"{args.command}_command")
-        result = _HANDLERS[(args.command, subcommand)](args, settings, schemas)
+        if args.command == "character":
+            group = args.character_command
+            subcommand = getattr(args, f"{group}_command")
+            settings = (
+                Settings.from_env(os.environ)
+                if (group, subcommand) == ("draft", "compile")
+                else None
+            )
+            schemas = SchemaRegistry(
+                settings.schema_dir if settings is not None else resolve_schema_dir()
+            )
+            result = _CHARACTER_HANDLERS[(group, subcommand)](
+                args, settings, schemas
+            )
+        else:
+            settings = Settings.from_env(os.environ)
+            schemas = SchemaRegistry(settings.schema_dir)
+            subcommand = getattr(args, f"{args.command}_command")
+            result = _HANDLERS[(args.command, subcommand)](args, settings, schemas)
     except KokoroError as error:
         print(
             json.dumps(
