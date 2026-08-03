@@ -1,0 +1,21 @@
+{
+  "schema_version": "1.0",
+  "artifact_id": "semantic/race-condition-explanation",
+  "created_by": {"component": "kokoroarc", "version": "0.0.0.dev0"},
+  "scenario": "debugging",
+  "conclusion": "A race condition occurs when correct behavior depends on the timing or interleaving of concurrent operations.",
+  "explanation": [
+    "Two tasks can read the same shared state before either writes its update. Each then computes from the stale value, and the later write overwrites the earlier one.",
+    "For example, two requests both read a counter of 10 and each add 1. If both write 11, one increment is lost even though each request looked correct in isolation.",
+    "These bugs are intermittent because scheduling changes from run to run. Logs, breakpoints, and load can alter timing and make the failure appear or disappear."
+  ],
+  "recommendations": [
+    "Identify shared mutable state and make the full read-modify-write operation atomic with a lock, transaction, atomic primitive, or a concurrency-safe design such as message passing.",
+    "Test with controlled concurrency and assert the final state, rather than relying on repeated manual runs."
+  ],
+  "warnings": [
+    "Thread-safe individual reads and writes do not automatically make a multi-step operation thread-safe."
+  ],
+  "immutable_spans": [],
+  "format_constraints": []
+}

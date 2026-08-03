@@ -1,0 +1,11 @@
+A race condition occurs when correct behavior depends on the timing or interleaving of concurrent operations.
+
+Two tasks can read the same shared state before either writes its update. Each then computes from a stale value, so the later write overwrites the earlier one.
+
+For example, two requests both read a counter of 10 and each add 1. If both write 11, one increment is lost, even though each request is correct in isolation.
+
+These failures are intermittent: scheduling changes from run to run, and logs, breakpoints, or load can make the bug appear or disappear.
+
+Make the full read-modify-write operation atomic using a lock, transaction, atomic primitive, or a concurrency-safe design such as message passing. Test with controlled concurrency and assert the final state.
+
+Thread-safe individual reads and writes do not automatically make a multi-step operation thread-safe.

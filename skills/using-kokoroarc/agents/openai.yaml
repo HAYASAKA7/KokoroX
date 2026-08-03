@@ -1,0 +1,4 @@
+interface:
+  display_name: "Using KokoroArc"
+  short_description: "Run an explicitly activated KokoroArc character safely"
+  default_prompt: "Use $using-kokoroarc with the active KokoroArc Character Pack for this response while preserving task correctness and protected content."

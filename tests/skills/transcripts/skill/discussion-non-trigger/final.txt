@@ -1,0 +1,13 @@
+KokoroArc is a character-runtime pipeline with five layers:
+
+1. **Character packs** define a character’s source material. `pack validate` checks a pack; `pack compile` turns it into a versioned, hashed compiled artifact.
+
+2. **Sessions** activate a compiled character for a named conversation. Sessions can be started, inspected, and ended, keeping character use explicit rather than implicit.
+
+3. **Policy compilation** converts policy input into a runtime policy artifact—separating behavioral constraints from character content.
+
+4. **Runtime orchestration** builds a context for a session, locale, and scenario; then creates a response plan from semantic intent plus policy. A final validation step checks the rendered response against the semantic input and plan.
+
+5. **State management** previews or applies events to a session, so changes in session state are deliberate and inspectable.
+
+In short: **pack → compile → session/context → policy-guided plan → render/validate → state update**. This separation makes characters portable, sessions auditable, policies enforceable, and runtime behavior testable.

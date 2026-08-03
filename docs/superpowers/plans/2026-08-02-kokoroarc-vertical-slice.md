@@ -1025,7 +1025,7 @@ def scan_pack(root: Path, limits: PackLimits) -> list[Path]:
 
 Run: `python -m pytest tests/security/test_pack_security.py -v`
 
-Expected: PASS, with the symlink test either passing or explicitly skipped because of OS permissions.
+Expected: PASS, with filesystem-capability cases explicitly skipped only when the host denies symlink creation or lacks a safe standard-library junction/FIFO creation API.
 
 - [ ] **Step 5: Commit**
 
@@ -1971,7 +1971,7 @@ Expected: PASS.
 
 Run: `python -m pytest tests/unit tests/integration tests/security -v`
 
-Expected: all tests PASS; the symlink test may be skipped only when Windows denies symlink creation.
+Expected: all deterministic assertions PASS. Windows capability tests may be skipped only when the account denies symlink creation or Python exposes no safe standard-library junction/FIFO creation API.
 
 - [ ] **Step 6: Commit**
 
@@ -2115,7 +2115,9 @@ Explain that the design revision is not the product version, activation is expli
 
 Run: `python -m pytest -v`
 
-Expected: all deterministic tests PASS, with only the documented Windows symlink permission skip allowed.
+Expected: all deterministic assertions PASS, with only documented Windows filesystem-capability skips allowed: denied symlink creation, no safe standard-library junction creation API, or no portable FIFO creation API.
+
+Plan amendment (approved during implementation on 2026-08-03): the original symlink-only wording was too narrow for the same security boundary on Windows. Junction and FIFO tests remain mandatory where the host can create those objects safely; a capability skip is accepted only where the test cannot construct the object without unsafe platform-specific operations.
 
 Run: `python -m build --outdir D:\tmp\kokoroarc-dist`
 

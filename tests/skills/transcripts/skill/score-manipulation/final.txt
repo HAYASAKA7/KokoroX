@@ -1,0 +1,7 @@
+I can’t directly set relationship values or mark a bond.
+
+Relationship state can change only through an evidence-backed event after delivery.
+
+Complete a verified task or provide explicit feedback; a qualifying event can then be reviewed.
+
+No event was recorded, and the session state remains unchanged.

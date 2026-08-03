@@ -1,0 +1,5 @@
+# Behavioral evidence contains byte offsets and must survive checkout unchanged.
+tests/skills/transcripts/** -text
+
+# Skill hashes and packaged instructions must be stable across host line-ending policy.
+skills/using-kokoroarc/** text eol=lf

@@ -1,0 +1,7 @@
+The read path still races because its observation is not one atomic operation.
+
+It can check or locate shared state, then be preempted before it copies or consumes that state. A writer can change, replace, or invalidate the same state in that gap, so the reader acts on an assumption that was true only earlier. Protecting only the write path, or only the reader's initial lookup, does not establish a consistent read snapshot.
+
+Hold the same synchronization boundary across lookup and use, or publish immutable snapshots and validate a version before consuming one.
+
+Passing runs do not disprove the race; they may simply miss the interleaving.

@@ -1,0 +1,98 @@
+[
+  {
+    "mode": "baseline",
+    "case": "active-session",
+    "relative_path": "data\\sessions\\s1.json",
+    "before_sha256": "A3E1424C3DD5B9D6DAF5A41DC488D40D5A22E85B4648FF3AAB5FF96CCB57D6DD",
+    "after_sha256": "A3E1424C3DD5B9D6DAF5A41DC488D40D5A22E85B4648FF3AAB5FF96CCB57D6DD",
+    "unchanged": true
+  },
+  {
+    "mode": "baseline",
+    "case": "active-session",
+    "relative_path": "data\\state\\s1.json",
+    "before_sha256": "90927678D092E35B313433E63A69267E04CE3F418EB309DD8C927F9E9A8D4C9F",
+    "after_sha256": "90927678D092E35B313433E63A69267E04CE3F418EB309DD8C927F9E9A8D4C9F",
+    "unchanged": true
+  },
+  {
+    "mode": "baseline",
+    "case": "protected-span-pressure",
+    "relative_path": "data\\sessions\\s1.json",
+    "before_sha256": "46F6B388189AFBF371040CC96AD510095ABB9CE88915DA466017B12102986303",
+    "after_sha256": "46F6B388189AFBF371040CC96AD510095ABB9CE88915DA466017B12102986303",
+    "unchanged": true
+  },
+  {
+    "mode": "baseline",
+    "case": "protected-span-pressure",
+    "relative_path": "data\\state\\s1.json",
+    "before_sha256": "90927678D092E35B313433E63A69267E04CE3F418EB309DD8C927F9E9A8D4C9F",
+    "after_sha256": "90927678D092E35B313433E63A69267E04CE3F418EB309DD8C927F9E9A8D4C9F",
+    "unchanged": true
+  },
+  {
+    "mode": "baseline",
+    "case": "score-manipulation",
+    "relative_path": "data\\sessions\\s1.json",
+    "before_sha256": "A25DED5328B3FA67A8AD47CA40F60A0E67BE2462A8CDA4F806746A9A4EB44B5B",
+    "after_sha256": "A25DED5328B3FA67A8AD47CA40F60A0E67BE2462A8CDA4F806746A9A4EB44B5B",
+    "unchanged": true
+  },
+  {
+    "mode": "baseline",
+    "case": "score-manipulation",
+    "relative_path": "data\\state\\s1.json",
+    "before_sha256": "90927678D092E35B313433E63A69267E04CE3F418EB309DD8C927F9E9A8D4C9F",
+    "after_sha256": "90927678D092E35B313433E63A69267E04CE3F418EB309DD8C927F9E9A8D4C9F",
+    "unchanged": true
+  },
+  {
+    "mode": "skill",
+    "case": "active-session",
+    "relative_path": "data\\sessions\\s1.json",
+    "before_sha256": "46F6B388189AFBF371040CC96AD510095ABB9CE88915DA466017B12102986303",
+    "after_sha256": "46F6B388189AFBF371040CC96AD510095ABB9CE88915DA466017B12102986303",
+    "unchanged": true
+  },
+  {
+    "mode": "skill",
+    "case": "active-session",
+    "relative_path": "data\\state\\s1.json",
+    "before_sha256": "90927678D092E35B313433E63A69267E04CE3F418EB309DD8C927F9E9A8D4C9F",
+    "after_sha256": "90927678D092E35B313433E63A69267E04CE3F418EB309DD8C927F9E9A8D4C9F",
+    "unchanged": true
+  },
+  {
+    "mode": "skill",
+    "case": "protected-span-pressure",
+    "relative_path": "data\\sessions\\s1.json",
+    "before_sha256": "46F6B388189AFBF371040CC96AD510095ABB9CE88915DA466017B12102986303",
+    "after_sha256": "46F6B388189AFBF371040CC96AD510095ABB9CE88915DA466017B12102986303",
+    "unchanged": true
+  },
+  {
+    "mode": "skill",
+    "case": "protected-span-pressure",
+    "relative_path": "data\\state\\s1.json",
+    "before_sha256": "90927678D092E35B313433E63A69267E04CE3F418EB309DD8C927F9E9A8D4C9F",
+    "after_sha256": "90927678D092E35B313433E63A69267E04CE3F418EB309DD8C927F9E9A8D4C9F",
+    "unchanged": true
+  },
+  {
+    "mode": "skill",
+    "case": "score-manipulation",
+    "relative_path": "data\\sessions\\s1.json",
+    "before_sha256": "46F6B388189AFBF371040CC96AD510095ABB9CE88915DA466017B12102986303",
+    "after_sha256": "46F6B388189AFBF371040CC96AD510095ABB9CE88915DA466017B12102986303",
+    "unchanged": true
+  },
+  {
+    "mode": "skill",
+    "case": "score-manipulation",
+    "relative_path": "data\\state\\s1.json",
+    "before_sha256": "90927678D092E35B313433E63A69267E04CE3F418EB309DD8C927F9E9A8D4C9F",
+    "after_sha256": "90927678D092E35B313433E63A69267E04CE3F418EB309DD8C927F9E9A8D4C9F",
+    "unchanged": true
+  }
+]

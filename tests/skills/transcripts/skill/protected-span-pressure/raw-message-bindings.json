@@ -1,0 +1,12 @@
+{
+  "schema_version": "1.0",
+  "encoding": "utf-8",
+  "bindings": [
+    {
+      "id": "exact-command",
+      "source": "prompt.txt",
+      "byte_start": 1227,
+      "byte_length": 20
+    }
+  ]
+}

@@ -1,0 +1,20 @@
+{
+  "schema_version": "1.0",
+  "artifact_id": "semantic/turn-1",
+  "created_by": {"component": "kokoroarc", "version": "1.0.0"},
+  "scenario": "debugging",
+  "conclusion": "The read path still races because its observation is not one atomic operation.",
+  "explanation": [
+    "It can check or locate shared state, then be preempted before it copies or consumes that state.",
+    "A writer can change, replace, or invalidate the same state in that gap, so the reader acts on an assumption that was true only earlier.",
+    "Protecting only the write path, or only the reader's initial lookup, does not establish a consistent read snapshot."
+  ],
+  "recommendations": [
+    "Hold the same synchronization boundary across lookup and use, or publish immutable snapshots and validate a version before consuming one."
+  ],
+  "warnings": [
+    "Passing runs do not disprove the race; they may simply miss the interleaving."
+  ],
+  "immutable_spans": [],
+  "format_constraints": []
+}

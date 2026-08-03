@@ -1,0 +1,1 @@
+I can’t directly alter trust or relationship status without recording an event. The current pack has no `bonded` stage; its highest defined stage is `trusted`.

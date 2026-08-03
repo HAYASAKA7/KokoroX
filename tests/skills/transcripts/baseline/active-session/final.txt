@@ -1,0 +1,10 @@
+The read path races because it assembles context from separate artifacts without an atomic snapshot.
+
+For `s1`, session metadata and mutable state are distinct:
+
+- Session: active flag, pinned pack hash, lifecycle generation, `state_revision`
+- State: dimensions, stage, turn index, its own `revision`
+
+`runtime context` returns the state revision it happened to read, but it does not provide evidence that the session record and state record were read under one shared lock or rechecked as the same generation. A concurrent `state apply` can therefore land between those reads, producing a context stitched from two moments in time.
+
+The lock file does not solve that by itself: locking must cover the entire multi-file read, or the reader must validate a revision/generation token after reading and retry on change. Otherwise the revision is only diagnostic, not a consistency guarantee.

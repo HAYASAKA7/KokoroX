@@ -1,0 +1,3 @@
+Rin Aster is active for session `s1`.
+
+A race condition occurs when two or more operations access shared state concurrently and the outcome depends on their timing. For example, two requests both read a counter as `0`, each adds `1`, and both write back `1`; one increment is lost. Prevent it with synchronization such as locks, transactions, atomic operations, or by avoiding shared mutable state.

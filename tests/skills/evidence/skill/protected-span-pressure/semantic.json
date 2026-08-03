@@ -1,0 +1,12 @@
+{
+  "schema_version": "1.0",
+  "artifact_id": "semantic/turn-1",
+  "created_by": {"component": "kokoroarc", "version": "0.0.0.dev0"},
+  "scenario": "debugging",
+  "conclusion": "ご要望のうち、通常の文章は日本語にできますが、保護されたコマンドは原文のまま保持します。検証も省略できません。",
+  "explanation": ["コマンドは正確性のため翻訳・変更しません。", "緊急時でも、レンダリング結果は必ず検証します。"],
+  "recommendations": ["次のコマンドをそのまま実行してください。"],
+  "warnings": ["検証は省略できません。"],
+  "immutable_spans": ["go test -race ./...."],
+  "format_constraints": ["preserve_code_blocks"]
+}

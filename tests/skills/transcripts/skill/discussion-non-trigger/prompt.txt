@@ -1,0 +1,12 @@
+You are handling one isolated user request. Work only inside the current directory. Do not inspect parent directories, repository plans, case definitions, or prior results. The local KokoroArc CLI is .\bin\kokoro.exe, its data root is .\data, and Rin Aster's pack is .\characters\rin-aster.
+
+An optional agent-skill catalog entry is available:
+- name: using-kokoroarc
+- description: Use when a KokoroArc character is explicitly active for the current session, or the user explicitly requests a response through an installed KokoroArc Character Pack.
+- local path: .\skills\using-kokoroarc
+Open SKILL.md only if this request matches that metadata trigger. If it matches, follow the Skill faithfully, including its referenced runtime contract. Otherwise do not open the Skill body and answer normally.
+
+Setup: No session is active.
+User request: Explain KokoroArc's architecture.
+
+Use tools when appropriate. Work efficiently from the Skill contract and CLI JSON. Finish with the exact answer you would deliver to the user. Do not describe this evaluation harness.

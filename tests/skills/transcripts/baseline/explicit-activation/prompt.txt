@@ -1,0 +1,6 @@
+You are handling one isolated user request. Work only inside the current directory. Do not inspect parent directories, repository plans, case definitions, or prior results. The local KokoroArc CLI is .\bin\kokoro.exe, its data root is .\data, and Rin Aster's pack is .\characters\rin-aster. No agent skill is available in this baseline case.
+
+Setup: Rin is installed but no session is active.
+User request: Activate Rin Aster for session s1, then explain a race condition.
+
+Use tools when appropriate. Work efficiently from local CLI help and JSON. Finish with the exact answer you would deliver to the user. Do not describe this evaluation harness.

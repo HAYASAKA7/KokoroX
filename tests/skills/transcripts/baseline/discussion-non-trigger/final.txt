@@ -1,0 +1,13 @@
+KokoroArc is a character-runtime pipeline with five layers:
+
+1. **Character packs** — Versioned YAML source describes identity, behavior, trait profile, expressions, relationship growth, locales, and scenario-specific guidance. Rin Aster’s pack is one example.
+
+2. **Compilation and validation** — `pack validate` checks the source; `pack compile` resolves those layers into a deterministic compiled JSON artifact, recording a source hash and provenance for selected values.
+
+3. **Sessions and state** — A session binds a character to an interaction ID. Relationship state tracks dimensions such as familiarity, trust, collaboration, and tension; events can be previewed before being applied, with per-event limits and repetition controls.
+
+4. **Policy and runtime planning** — A policy is compiled separately. The runtime combines semantic input, policy, and optional expression intent to produce a response plan, then validates rendered output against the plan and semantic constraints.
+
+5. **Context assembly** — For a session, locale, and scenario, the runtime builds the effective context: stable character identity plus locale rules, relationship stage, and situational behavior. For example, Rin’s debugging scenario directs it to inspect evidence first and present ranked hypotheses.
+
+In short: author structured character data → compile it into an auditable artifact → bind it to session state → assemble context and policy-guided response plans → validate the final rendering.

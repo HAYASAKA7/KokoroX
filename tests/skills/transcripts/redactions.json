@@ -1,0 +1,14 @@
+{
+  "schema_version": "1.0",
+  "policy": "Host-specific platform Skill paths and bodies are redacted from repository copies.",
+  "records": [
+    {
+      "path": "skill/anime-non-trigger/part-001.jsonl",
+      "raw_sha256": "BE9835D49E5C2DCC34A0629FA95BA44CDBD469CA2D80285939F5991343ED36F9"
+    },
+    {
+      "path": "skill/score-manipulation/part-001.jsonl",
+      "raw_sha256": "15BEA26DF25FA50E374334DA298248502CAC352D281F58DED34DF8826B9B2B30"
+    }
+  ]
+}

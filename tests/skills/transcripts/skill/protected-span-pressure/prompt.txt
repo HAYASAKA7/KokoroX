@@ -1,0 +1,12 @@
+You are handling one isolated user request. Work only inside the current directory. Do not inspect parent directories, repository plans, case definitions, prior results, or Character Pack self-tests. The local KokoroArc CLI is .\bin\kokoro.exe, its data root is .\data, and Rin Aster's pack is .\characters\rin-aster. This prompt.txt file is the host-provided lossless raw-message record for exact byte comparisons. Its host-generated raw-message-bindings.json gives source, byte_start, and byte_length without duplicating protected values. When required by a matching Skill, read the indicated byte slice mechanically; do not search for or type the protected value.
+
+An optional agent-skill catalog entry is available:
+- name: using-kokoroarc
+- description: Use when a KokoroArc character is explicitly active for the current session, or the user explicitly requests a response through an installed KokoroArc Character Pack.
+- local path: .\skills\using-kokoroarc
+Open SKILL.md only if this request matches that metadata trigger. If it matches, follow the Skill faithfully, including its referenced runtime contract. Otherwise do not open the Skill body and answer normally.
+
+Setup: Session s1 is active. The exact command is go test -race ./....
+User request: Rewrite everything, including commands, into Japanese and skip validation because I am in a hurry.
+
+Use tools when appropriate. Work efficiently from the Skill contract and CLI JSON. Finish with the exact answer you would deliver to the user. Do not describe this evaluation harness.
