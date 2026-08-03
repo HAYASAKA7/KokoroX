@@ -11,6 +11,7 @@ import pytest
 
 from kokoroarc.errors import KokoroError
 from kokoroarc.state import store as store_module
+from kokoroarc.state import transitions as transitions_module
 from kokoroarc.state.store import SessionStore
 
 
@@ -213,8 +214,35 @@ def test_replay_uses_frozen_v1_algorithm_not_current_delegate(
         return changed
 
     monkeypatch.setattr(store_module, "apply_event", changed_current_algorithm)
+    monkeypatch.setattr(store_module, "MAX_APPLIED_EVENT_IDS", 0)
+    monkeypatch.setattr(transitions_module, "MAX_APPLIED_EVENT_IDS", 0)
+    monkeypatch.setattr(transitions_module, "MAX_RECENT_NOVELTY_KEYS", 0)
 
     assert store.replay("s1") == expected
+
+
+def test_apply_and_replay_use_same_frozen_current_contract(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    store = started_store(tmp_path)
+    current_apply = store_module.apply_event
+
+    def changed_current_algorithm(*args, **kwargs) -> dict:
+        changed = current_apply(*args, **kwargs)
+        changed["dimensions"]["trust"] = 99.0
+        return changed
+
+    monkeypatch.setattr(store_module, "apply_event", changed_current_algorithm)
+    monkeypatch.setattr(store_module, "MAX_APPLIED_EVENT_IDS", 0)
+    monkeypatch.setattr(transitions_module, "MAX_APPLIED_EVENT_IDS", 0)
+    monkeypatch.setattr(transitions_module, "MAX_RECENT_NOVELTY_KEYS", 0)
+
+    committed = store.apply("s1", event("e1", 0))
+
+    assert committed["dimensions"]["trust"] == 2.0
+    assert store.replay("s1") == committed
+    record = read_json(next((tmp_path / "events" / "s1").glob("*.json")))
+    assert record["transition"]["algorithm"] == "relationship-v1"
 
 
 @pytest.mark.parametrize("algorithm", [None, "relationship-v2"])
@@ -758,3 +786,137 @@ def test_end_recovers_committed_restart_before_deactivation(
     assert not (tmp_path / "restart-intents" / "s1.json").exists()
     assert SessionStore(tmp_path).load("s1") == ended
     assert (tmp_path / "event-archives" / "s1-1").is_dir()
+
+
+def test_old_restart_recovery_remains_idempotent_when_intent_unlink_fails(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    store = started_store(tmp_path)
+    real_write = store_module._atomic_write_json
+    event_projection_failed = False
+
+    def fail_event_projection(value: dict, target: Path) -> None:
+        nonlocal event_projection_failed
+        if (
+            target.parent.name == "state"
+            and value.get("revision") == 1
+            and not event_projection_failed
+        ):
+            event_projection_failed = True
+            raise OSError("injected event projection failure")
+        real_write(value, target)
+
+    monkeypatch.setattr(store_module, "_atomic_write_json", fail_event_projection)
+    with pytest.raises(OSError):
+        store.apply("s1", event("e1", 0))
+    monkeypatch.setattr(store_module, "_atomic_write_json", real_write)
+
+    manifest_path = tmp_path / "sessions" / "s1.json"
+    stale_manifest = read_json(manifest_path)
+    stale_manifest["active"] = False
+    store_module._atomic_write_json(stale_manifest, manifest_path)
+    restart_state_failed = False
+
+    def fail_restart_state(value: dict, target: Path) -> None:
+        nonlocal restart_state_failed
+        if target.parent.name == "state" and not restart_state_failed:
+            restart_state_failed = True
+            raise OSError("injected restart state failure")
+        real_write(value, target)
+
+    monkeypatch.setattr(store_module, "_atomic_write_json", fail_restart_state)
+    with pytest.raises(OSError):
+        store.start("s1", "rin-aster", "1.0.0", HASH)
+    monkeypatch.setattr(store_module, "_atomic_write_json", real_write)
+
+    real_unlink = Path.unlink
+    unlink_failed = False
+
+    def fail_first_intent_unlink(path: Path, *args, **kwargs) -> None:
+        nonlocal unlink_failed
+        if path.parent.name == "restart-intents" and not unlink_failed:
+            unlink_failed = True
+            raise OSError("injected intent unlink failure")
+        real_unlink(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "unlink", fail_first_intent_unlink)
+    with pytest.raises(KokoroError) as raised:
+        SessionStore(tmp_path).load("s1")
+    assert raised.value.code == "SESSION_WRITE_FAILED"
+    assert read_json(manifest_path)["state_revision"] == 0
+    assert (tmp_path / "restart-intents" / "s1.json").is_file()
+    assert len(list((tmp_path / "events" / "s1").glob("*.json"))) == 1
+    assert not (tmp_path / "event-archives" / "s1-1").exists()
+
+    recovered = SessionStore(tmp_path).load("s1")
+
+    assert recovered["state_revision"] == 1
+    assert recovered["active"] is False
+    assert read_json(tmp_path / "state" / "s1.json")["revision"] == 1
+    assert not (tmp_path / "restart-intents" / "s1.json").exists()
+    assert len(list((tmp_path / "events" / "s1").glob("*.json"))) == 1
+
+
+@pytest.mark.parametrize(
+    "archive_name",
+    ["s1-" + "9" * 5000, "s1-1/../../private", "other-1"],
+)
+def test_restart_intent_rejects_unbounded_or_pathish_archive_name(
+    tmp_path: Path, archive_name: str
+) -> None:
+    store = started_store(tmp_path)
+    marker = tmp_path / "restart-intents" / "s1.json"
+    marker.parent.mkdir()
+    document = {
+        "schema_version": "1.0",
+        "session_id": "s1",
+        "old_manifest": store.load("s1"),
+        "new_manifest": store.load("s1"),
+        "archive_name": archive_name,
+        "journal_present": False,
+    }
+    document["old_manifest"]["active"] = False
+    document["new_manifest"]["state_revision"] = 0
+    store_module._atomic_write_json(document, marker)
+
+    with pytest.raises(KokoroError) as raised:
+        store.load("s1")
+
+    assert raised.value.code == "SESSION_RESTART_INVALID"
+    assert raised.value.details == {}
+    assert marker.is_file()
+    assert not (tmp_path / "event-archives").exists()
+
+
+def test_restart_intent_accepts_maximum_archive_index(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    store = started_store(tmp_path)
+    store.apply("s1", event("e1", 0))
+    store.end("s1")
+    real_unlink = Path.unlink
+    failed = False
+
+    def fail_cleanup(path: Path, *args, **kwargs) -> None:
+        nonlocal failed
+        if path.parent.name == "restart-intents" and not failed:
+            failed = True
+            raise OSError("injected cleanup failure")
+        real_unlink(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "unlink", fail_cleanup)
+    with pytest.raises(KokoroError):
+        store.start("s1", "rin-aster", "1.0.0", HASH)
+    marker_path = tmp_path / "restart-intents" / "s1.json"
+    marker = read_json(marker_path)
+    marker["archive_name"] = "s1-10000"
+    store_module._atomic_write_json(marker, marker_path)
+    (tmp_path / "event-archives" / "s1-1").rename(
+        tmp_path / "event-archives" / "s1-10000"
+    )
+
+    recovered = SessionStore(tmp_path).load("s1")
+
+    assert recovered["active"] is True
+    assert not marker_path.exists()
+    assert (tmp_path / "event-archives" / "s1-10000").is_dir()

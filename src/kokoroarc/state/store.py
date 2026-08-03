@@ -13,7 +13,8 @@ import threading
 import time
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Any, BinaryIO, Iterator
+from types import MappingProxyType
+from typing import Any, BinaryIO, Callable, Iterator, NamedTuple
 
 from kokoroarc import __version__
 from kokoroarc.errors import KokoroError
@@ -21,6 +22,8 @@ from kokoroarc.json_compat import find_json_incompatibility
 from kokoroarc.packs.compiler import write_compiled_pack
 from kokoroarc.state.transitions import (
     MAX_APPLIED_EVENT_IDS,
+    RELATIONSHIP_V1_MAX_APPLIED_EVENT_IDS,
+    RELATIONSHIP_V1_MAX_RECENT_NOVELTY_KEYS,
     apply_event,
     apply_event_v1,
 )
@@ -37,16 +40,35 @@ _SEMVER = re.compile(
     r"(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?"
 )
 _COMPILED_PACK_HASH = re.compile(r"[a-f0-9]{64}")
+_ARCHIVE_INDEX = re.compile(r"[1-9][0-9]{0,4}", re.ASCII)
 SESSION_MANIFEST_MAX_BYTES = 64 * 1024
 EVENT_RECORD_MAX_BYTES = 8 * 1024
 JOURNAL_MAX_BYTES = 32 * 1024 * 1024
+JOURNAL_MAX_ENTRIES = RELATIONSHIP_V1_MAX_APPLIED_EVENT_IDS
+MAX_EVENT_ARCHIVES = 10_000
 RELATIONSHIP_STATE_MAX_BYTES = 4 * 1024 * 1024
 RESTART_INTENT_MAX_BYTES = 160 * 1024
 _SESSION_LOCK_TIMEOUT_SECONDS = 5.0
 _SESSION_LOCK_POLL_SECONDS = 0.01
 _THREAD_LOCKS: dict[tuple[str, str], threading.Lock] = {}
 _THREAD_LOCKS_GUARD = threading.Lock()
-_REPLAY_ALGORITHMS = {"relationship-v1": apply_event_v1}
+CURRENT_TRANSITION_ALGORITHM = "relationship-v1"
+
+
+class _TransitionContract(NamedTuple):
+    apply: Callable[[dict, dict, float, int], dict]
+    max_applied_event_ids: int
+    max_recent_novelty_keys: int
+
+
+_V1_TRANSITION_CONTRACT = _TransitionContract(
+    apply=apply_event_v1,
+    max_applied_event_ids=RELATIONSHIP_V1_MAX_APPLIED_EVENT_IDS,
+    max_recent_novelty_keys=RELATIONSHIP_V1_MAX_RECENT_NOVELTY_KEYS,
+)
+_TRANSITION_CONTRACTS = MappingProxyType(
+    {CURRENT_TRANSITION_ALGORITHM: _V1_TRANSITION_CONTRACT}
+)
 _MANIFEST_KEYS = frozenset(
     {
         "schema_version",
@@ -372,14 +394,17 @@ def _validate_event(event: object) -> dict[str, Any]:
 
 
 def _validate_transition_config(
-    max_delta: object, repetition_window: object
+    max_delta: object,
+    repetition_window: object,
+    *,
+    max_repetition_window: int = RELATIONSHIP_V1_MAX_APPLIED_EVENT_IDS,
 ) -> tuple[float, int]:
     if (
         not _is_number(max_delta)
         or not 0 <= max_delta <= 4
         or not isinstance(repetition_window, int)
         or isinstance(repetition_window, bool)
-        or not 1 <= repetition_window <= MAX_APPLIED_EVENT_IDS
+        or not 1 <= repetition_window <= max_repetition_window
     ):
         raise _invalid_event()
     return float(max_delta), repetition_window
@@ -406,7 +431,11 @@ def _initial_state(
     }
 
 
-def _state_is_valid(value: object, session_id: str) -> bool:
+def _state_is_valid(
+    value: object,
+    session_id: str,
+    contract: _TransitionContract = _V1_TRANSITION_CONTRACT,
+) -> bool:
     if not isinstance(value, dict) or set(value) != _STATE_KEYS:
         return False
     revision = value.get("revision")
@@ -431,13 +460,15 @@ def _state_is_valid(value: object, session_id: str) -> bool:
             for item in dimensions.values()
         )
         and value.get("stage") in _STAGES
-        and isinstance(event_ids, list) and len(event_ids) <= MAX_APPLIED_EVENT_IDS
+        and isinstance(event_ids, list)
+        and len(event_ids) <= contract.max_applied_event_ids
         and all(
             isinstance(item, str) and len(item) <= 128
             and _SESSION_ID.fullmatch(item) is not None for item in event_ids
         )
         and len(event_ids) == len(set(event_ids))
-        and isinstance(novelty, dict) and len(novelty) <= MAX_APPLIED_EVENT_IDS
+        and isinstance(novelty, dict)
+        and len(novelty) <= contract.max_recent_novelty_keys
         and all(
             isinstance(key, str) and len(key) <= 128
             and _SESSION_ID.fullmatch(key) is not None
@@ -625,7 +656,7 @@ class SessionStore:
         candidates: list[Path] = []
         try:
             for candidate in directory.iterdir():
-                if len(candidates) >= MAX_APPLIED_EVENT_IDS:
+                if len(candidates) >= JOURNAL_MAX_ENTRIES:
                     raise _invalid_journal()
                 candidates.append(candidate)
         except KokoroError:
@@ -694,13 +725,17 @@ class SessionStore:
         ):
             raise _invalid_journal()
         algorithm = value["transition"]["algorithm"]
-        if algorithm not in _REPLAY_ALGORITHMS:
+        if not isinstance(algorithm, str):
+            raise _invalid_journal()
+        contract = _TRANSITION_CONTRACTS.get(algorithm)
+        if contract is None:
             raise _invalid_journal()
         try:
             committed_event = _validate_event(value["event"])
             max_delta, repetition_window = _validate_transition_config(
                 value["transition"]["max_delta"],
                 value["transition"]["repetition_window"],
+                max_repetition_window=contract.max_applied_event_ids,
             )
         except KokoroError as error:
             raise _invalid_journal() from error
@@ -740,7 +775,8 @@ class SessionStore:
             actual_total_bytes += actual_bytes
             if actual_total_bytes > JOURNAL_MAX_BYTES:
                 raise _invalid_journal()
-            state = _REPLAY_ALGORITHMS[algorithm](
+            contract = _TRANSITION_CONTRACTS[algorithm]
+            state = contract.apply(
                 state,
                 committed_event,
                 max_delta=max_delta,
@@ -748,7 +784,7 @@ class SessionStore:
             )
             if state["revision"] != revision:
                 raise _invalid_journal()
-        if not _state_is_valid(state, session_id):
+        if not _state_is_valid(state, session_id, _V1_TRANSITION_CONTRACT):
             raise _invalid_journal()
         if state["revision"] < manifest["state_revision"]:
             raise _invalid_journal()
@@ -793,15 +829,20 @@ class SessionStore:
         self, session_id: str, archive_name: str, *, create_root: bool
     ) -> Path:
         prefix = f"{session_id}-"
-        if not archive_name.startswith(prefix):
+        if (
+            not isinstance(archive_name, str)
+            or len(archive_name) > len(prefix) + 5
+            or not archive_name.startswith(prefix)
+        ):
             raise _invalid_restart()
         index_text = archive_name[len(prefix) :]
-        if (
-            not index_text.isascii()
-            or not index_text.isdigit()
-            or index_text.startswith("0")
-            or not 1 <= int(index_text) <= MAX_APPLIED_EVENT_IDS
-        ):
+        if _ARCHIVE_INDEX.fullmatch(index_text) is None:
+            raise _invalid_restart()
+        try:
+            index = int(index_text)
+        except (ValueError, OverflowError) as error:
+            raise _invalid_restart() from error
+        if not 1 <= index <= MAX_EVENT_ARCHIVES:
             raise _invalid_restart()
         archive_root = self._storage_directory(
             "event-archives", create=create_root
@@ -828,7 +869,7 @@ class SessionStore:
         return target
 
     def _choose_archive_path(self, session_id: str) -> Path:
-        for index in range(1, MAX_APPLIED_EVENT_IDS + 1):
+        for index in range(1, MAX_EVENT_ARCHIVES + 1):
             candidate = self._archive_path(
                 session_id, f"{session_id}-{index}", create_root=True
             )
@@ -837,7 +878,7 @@ class SessionStore:
         raise KokoroError(
             "STATE_CAPACITY_EXCEEDED",
             "Relationship state capacity was exceeded.",
-            details={"field": "event_archives", "limit": MAX_APPLIED_EVENT_IDS},
+            details={"field": "event_archives", "limit": MAX_EVENT_ARCHIVES},
         )
 
     def _read_restart_intent(
@@ -930,8 +971,6 @@ class SessionStore:
                         ) from error
             elif current_exists or archive_exists:
                 raise _invalid_restart()
-            state = self._replay_locked(session_id, manifest)
-            self._repair_projection_locked(session_id, manifest, state)
             self._remove_restart_intent(session_id)
             return
 
@@ -1207,22 +1246,24 @@ class SessionStore:
         """Commit one revision-checked event and refresh derived projections."""
         session_id = _validate_session_id(session_id)
         committed_event = _validate_event(event)
+        contract = _TRANSITION_CONTRACTS[CURRENT_TRANSITION_ALGORITHM]
         max_delta, repetition_window = _validate_transition_config(
-            max_delta, repetition_window
+            max_delta,
+            repetition_window,
+            max_repetition_window=contract.max_applied_event_ids,
         )
         try:
             with self._session_lock(session_id):
                 self._recover_restart_locked(session_id)
                 manifest = self._read_manifest(session_id)
-                if not manifest["active"]:
-                    raise KokoroError(
-                        "SESSION_NOT_ACTIVE", "Session is not active."
-                    )
-
                 state = self._replay_locked(session_id, manifest)
                 manifest = self._repair_projection_locked(
                     session_id, manifest, state
                 )
+                if not manifest["active"]:
+                    raise KokoroError(
+                        "SESSION_NOT_ACTIVE", "Session is not active."
+                    )
                 event_id = committed_event["event_id"]
                 if event_id in state["applied_event_ids"]:
                     return state
@@ -1240,7 +1281,7 @@ class SessionStore:
                         },
                     )
 
-                next_state = apply_event(
+                next_state = contract.apply(
                     state,
                     committed_event,
                     max_delta=max_delta,
@@ -1256,7 +1297,7 @@ class SessionStore:
                     "schema_version": "1.0",
                     "event": committed_event,
                     "transition": {
-                        "algorithm": "relationship-v1",
+                        "algorithm": CURRENT_TRANSITION_ALGORITHM,
                         "max_delta": max_delta,
                         "repetition_window": repetition_window,
                     },
@@ -1288,6 +1329,10 @@ class SessionStore:
         with self._session_lock(session_id):
             self._recover_restart_locked(session_id)
             manifest = self._read_manifest(session_id)
+            state = self._replay_locked(session_id, manifest)
+            manifest = self._repair_projection_locked(
+                session_id, manifest, state
+            )
             if not manifest["active"]:
                 return manifest
 

@@ -7,10 +7,10 @@ import copy
 from kokoroarc.errors import KokoroError
 
 
-_V1_MAX_APPLIED_EVENT_IDS = 10_000
-_V1_MAX_RECENT_NOVELTY_KEYS = 10_000
-MAX_APPLIED_EVENT_IDS = _V1_MAX_APPLIED_EVENT_IDS
-MAX_RECENT_NOVELTY_KEYS = _V1_MAX_RECENT_NOVELTY_KEYS
+RELATIONSHIP_V1_MAX_APPLIED_EVENT_IDS = 10_000
+RELATIONSHIP_V1_MAX_RECENT_NOVELTY_KEYS = 10_000
+MAX_APPLIED_EVENT_IDS = RELATIONSHIP_V1_MAX_APPLIED_EVENT_IDS
+MAX_RECENT_NOVELTY_KEYS = RELATIONSHIP_V1_MAX_RECENT_NOVELTY_KEYS
 
 
 def _capacity_exceeded(field: str, limit: int) -> KokoroError:
@@ -57,18 +57,22 @@ def apply_event_v1(
             )
 
     novelty_key = event["novelty_key"]
-    if len(result["applied_event_ids"]) >= _V1_MAX_APPLIED_EVENT_IDS:
+    if (
+        len(result["applied_event_ids"])
+        >= RELATIONSHIP_V1_MAX_APPLIED_EVENT_IDS
+    ):
         raise _capacity_exceeded(
             "applied_event_ids",
-            _V1_MAX_APPLIED_EVENT_IDS,
+            RELATIONSHIP_V1_MAX_APPLIED_EVENT_IDS,
         )
     if (
         novelty_key not in result["recent_novelty"]
-        and len(result["recent_novelty"]) >= _V1_MAX_RECENT_NOVELTY_KEYS
+        and len(result["recent_novelty"])
+        >= RELATIONSHIP_V1_MAX_RECENT_NOVELTY_KEYS
     ):
         raise _capacity_exceeded(
             "recent_novelty",
-            _V1_MAX_RECENT_NOVELTY_KEYS,
+            RELATIONSHIP_V1_MAX_RECENT_NOVELTY_KEYS,
         )
 
     confidence = min(max(float(event["confidence"]), 0.0), 1.0)
