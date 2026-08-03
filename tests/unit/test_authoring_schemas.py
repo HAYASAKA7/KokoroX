@@ -196,9 +196,29 @@ def test_non_original_requests_must_be_private(
     _assert_invalid("character-build-request", invalid)
 
 
-def test_draft_cannot_be_active(valid_draft: dict) -> None:
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("build_status", "validated"),
+        ("visibility", "public"),
+        ("activation_allowed", True),
+    ],
+)
+def test_draft_lifecycle_is_fixed(
+    field: str, value: object, valid_draft: dict
+) -> None:
     invalid = deepcopy(valid_draft)
-    invalid["activation_allowed"] = True
+    invalid[field] = value
+    _assert_invalid("character-draft", invalid)
+
+
+@pytest.mark.parametrize(
+    "field",
+    ["request_hash", "source_pack_hash", "validation_report_hash"],
+)
+def test_draft_hashes_must_be_sha256(field: str, valid_draft: dict) -> None:
+    invalid = deepcopy(valid_draft)
+    invalid[field] = "not-a-sha256"
     _assert_invalid("character-draft", invalid)
 
 
