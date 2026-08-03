@@ -1,0 +1,483 @@
+"""Safe, transactional publication of private character draft bundles."""
+
+from __future__ import annotations
+
+import errno
+from hashlib import sha256
+import os
+from pathlib import Path
+import re
+import secrets
+import shutil
+import stat
+import tempfile
+from dataclasses import dataclass
+from typing import Any
+
+from kokoroarc import __version__
+from kokoroarc.errors import KokoroError
+from kokoroarc.packs.compiler import canonical_bytes
+from kokoroarc.packs.security import PackLimits, scan_pack
+
+
+_SLUG_PATTERN = re.compile(r"[a-z0-9]+(?:-[a-z0-9]+)*\Z")
+_HASH_PATTERN = re.compile(r"[a-f0-9]{64}\Z")
+_SOURCE_HASH_ID_PREFIX_LENGTH = 16
+_BUNDLE_REFERENCES = {
+    "request": "request.json",
+    "source_pack": "source-pack",
+    "validation_report": "validation-report.json",
+}
+_DRAFT_FIELDS = frozenset(
+    {
+        "schema_version",
+        "artifact_id",
+        "created_by",
+        "build_status",
+        "visibility",
+        "activation_allowed",
+        "mode",
+        "namespace",
+        "character_id",
+        "display_name",
+        "character_version",
+        "request_hash",
+        "source_pack_hash",
+        "validation_report_hash",
+        "bundle_references",
+        "locale_coverage",
+        "provenance_counts",
+        "unresolved_warnings",
+    }
+)
+_DIRECTORY_FSYNC_UNSUPPORTED = frozenset(
+    value
+    for value in (
+        getattr(errno, "EINVAL", None),
+        getattr(errno, "ENOTSUP", None),
+        getattr(errno, "EOPNOTSUPP", None),
+        getattr(errno, "EBADF", None),
+        getattr(errno, "EACCES", None),
+    )
+    if value is not None
+)
+
+
+@dataclass(frozen=True, slots=True)
+class _SourceIdentity:
+    device: int
+    inode: int
+    size: int
+    modified_ns: int
+
+
+def publish_draft_bundle(
+    data_root: Path,
+    source_root: Path,
+    request: dict[str, Any],
+    draft: dict[str, Any],
+    report: dict[str, Any],
+) -> Path:
+    """Publish one complete draft beneath ``data_root/drafts``.
+
+    The source directory is treated as inert data. It is pre-scanned with the
+    hardened pack scanner, and only the scanned regular files are copied.
+    Existing directories are replaced transactionally using same-parent atomic
+    renames and rollback because replacing a non-empty directory in one syscall
+    is not portable to Windows.
+    """
+    _validate_publish_inputs(request, draft, report)
+    scanned_files = scan_pack(source_root, PackLimits())
+    resolved_source = _resolved_source_root(source_root)
+    recorded = {
+        path: _source_identity(path, path.relative_to(resolved_source))
+        for path in scanned_files
+    }
+
+    root = _absolute_without_resolution(data_root)
+    final = root / "drafts" / Path(*draft["artifact_id"].split("/"))
+    _validate_existing_chain(root)
+    _create_secure_directories(final.parent)
+    if final.exists() or final.is_symlink():
+        _validate_destination_component(final)
+        if not final.is_dir():
+            raise _unsafe_draft_path(final, "target is not a directory")
+
+    staging = Path(
+        tempfile.mkdtemp(
+            prefix=f".{final.name}.staging-",
+            dir=final.parent,
+        )
+    )
+    try:
+        _validate_destination_component(staging)
+        source_destination = staging / _BUNDLE_REFERENCES["source_pack"]
+        source_destination.mkdir()
+        copied_hashes: dict[Path, str] = {}
+        for source_path in scanned_files:
+            relative = source_path.relative_to(resolved_source)
+            destination = source_destination.joinpath(*relative.parts)
+            _create_staging_parent(source_destination, destination.parent)
+            copied_hashes[source_path] = _copy_scanned_file(
+                source_path, destination, recorded[source_path], relative
+            )
+
+        _write_canonical_file(staging / "request.json", request)
+        _write_canonical_file(staging / "validation-report.json", report)
+        _write_canonical_file(staging / "draft.json", draft)
+        _revalidate_sources(
+            source_root,
+            resolved_source,
+            scanned_files,
+            recorded,
+            copied_hashes,
+        )
+        _fsync_tree_directories(staging)
+        _transactional_replace_directory(staging, final)
+        _fsync_directory(final.parent)
+        return final
+    except KokoroError:
+        _remove_staging(staging)
+        raise
+    except OSError as error:
+        _remove_staging(staging)
+        raise _publish_failed("write", error) from error
+    except BaseException:
+        _remove_staging(staging)
+        raise
+
+
+def _validate_publish_inputs(
+    request: dict[str, Any], draft: dict[str, Any], report: dict[str, Any]
+) -> None:
+    if report.get("valid") is not True or report.get("hard_failures") != []:
+        raise KokoroError(
+            "AUTHORING_VALIDATION_FAILED",
+            "A draft cannot be published while authoring validation has hard failures.",
+            details={"reason": "hard_failures"},
+        )
+
+    if not isinstance(draft, dict) or set(draft) != _DRAFT_FIELDS:
+        raise _invalid_draft("invalid_fields")
+    namespace = request.get("namespace")
+    character_id = request.get("character_id")
+    if not _valid_slug(namespace) or not _valid_slug(character_id):
+        raise _invalid_draft("invalid_identity")
+    source_hash = draft.get("source_pack_hash")
+    if not isinstance(source_hash, str) or _HASH_PATTERN.fullmatch(source_hash) is None:
+        raise _invalid_draft("invalid_source_hash")
+
+    expected_artifact_id = (
+        f"{namespace}/{character_id}/draft/"
+        f"{source_hash[:_SOURCE_HASH_ID_PREFIX_LENGTH]}"
+    )
+    advisory = report.get("advisory_findings", [])
+    if not isinstance(advisory, list):
+        raise _invalid_draft("invalid_report")
+    try:
+        warning_codes = sorted({item["code"] for item in advisory})
+    except (KeyError, TypeError):
+        raise _invalid_draft("invalid_report") from None
+
+    expected = {
+        "schema_version": "1.0",
+        "artifact_id": expected_artifact_id,
+        "created_by": {"component": "kokoroarc", "version": __version__},
+        "build_status": "draft",
+        "visibility": "private",
+        "activation_allowed": False,
+        "mode": request.get("mode"),
+        "namespace": namespace,
+        "character_id": character_id,
+        "display_name": request.get("display_name"),
+        "character_version": request.get("character_version"),
+        "request_hash": sha256(canonical_bytes(request)).hexdigest(),
+        "source_pack_hash": source_hash,
+        "validation_report_hash": sha256(canonical_bytes(report)).hexdigest(),
+        "bundle_references": _BUNDLE_REFERENCES,
+        "locale_coverage": report.get("locale_coverage"),
+        "provenance_counts": report.get("provenance_counts"),
+        "unresolved_warnings": warning_codes,
+    }
+    if draft != expected:
+        raise _invalid_draft("metadata_mismatch")
+
+
+def _valid_slug(value: Any) -> bool:
+    return (
+        isinstance(value, str)
+        and len(value) <= 64
+        and _SLUG_PATTERN.fullmatch(value) is not None
+    )
+
+
+def _absolute_without_resolution(path: Path) -> Path:
+    try:
+        return path.absolute()
+    except (OSError, RuntimeError, ValueError) as error:
+        raise _unsafe_draft_path(path, "path cannot be canonicalized") from error
+
+
+def _resolved_source_root(source_root: Path) -> Path:
+    try:
+        return source_root.resolve(strict=True)
+    except (OSError, RuntimeError, ValueError) as error:
+        raise KokoroError(
+            "PACK_SCAN_FAILED",
+            "Character pack filesystem scan failed.",
+            details={"path": str(source_root), "reason": type(error).__name__},
+        ) from error
+
+
+def _validate_existing_chain(path: Path) -> None:
+    chain = [path, *path.parents]
+    for component in reversed(chain):
+        if component.exists() or component.is_symlink():
+            _validate_destination_component(component)
+
+
+def _create_secure_directories(path: Path) -> None:
+    chain = [path, *path.parents]
+    for component in reversed(chain):
+        if component.exists() or component.is_symlink():
+            _validate_destination_component(component)
+            if not component.is_dir():
+                raise _unsafe_draft_path(component, "component is not a directory")
+            continue
+        try:
+            component.mkdir()
+        except FileExistsError:
+            pass
+        except OSError as error:
+            raise _publish_failed("mkdir", error) from error
+        _validate_destination_component(component)
+
+
+def _validate_destination_component(path: Path) -> None:
+    try:
+        path_stat = path.lstat()
+        is_junction = getattr(path, "is_junction", None)
+        junction = bool(is_junction()) if is_junction is not None else False
+    except OSError as error:
+        raise _publish_failed("inspect_destination", error) from error
+    attributes = getattr(path_stat, "st_file_attributes", 0)
+    reparse_flag = getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0)
+    if stat.S_ISLNK(path_stat.st_mode):
+        raise _unsafe_draft_path(path, "symlink")
+    if junction:
+        raise _unsafe_draft_path(path, "junction")
+    if attributes & reparse_flag:
+        raise _unsafe_draft_path(path, "reparse point")
+
+
+def _create_staging_parent(root: Path, parent: Path) -> None:
+    if not parent.is_relative_to(root):
+        raise _unsafe_draft_path(parent, "copy path escapes staging")
+    relative = parent.relative_to(root)
+    current = root
+    for part in relative.parts:
+        current = current / part
+        if current.exists() or current.is_symlink():
+            _validate_destination_component(current)
+            if not current.is_dir():
+                raise _unsafe_draft_path(current, "copy component is not a directory")
+        else:
+            current.mkdir()
+            _validate_destination_component(current)
+
+
+def _source_identity(path: Path, relative: Path) -> _SourceIdentity:
+    try:
+        path_stat = path.stat(follow_symlinks=False)
+    except OSError as error:
+        raise _source_changed(relative, type(error).__name__) from error
+    if (
+        not stat.S_ISREG(path_stat.st_mode)
+        or stat.S_ISLNK(path_stat.st_mode)
+        or path_stat.st_nlink != 1
+    ):
+        raise _source_changed(relative, "unsafe_entry")
+    return _identity_from_stat(path_stat)
+
+
+def _identity_from_stat(path_stat: os.stat_result) -> _SourceIdentity:
+    return _SourceIdentity(
+        device=path_stat.st_dev,
+        inode=path_stat.st_ino,
+        size=path_stat.st_size,
+        modified_ns=path_stat.st_mtime_ns,
+    )
+
+
+def _copy_scanned_file(
+    source: Path,
+    destination: Path,
+    expected: _SourceIdentity,
+    relative: Path,
+) -> str:
+    digest = sha256()
+    flags = os.O_RDONLY | getattr(os, "O_BINARY", 0) | getattr(os, "O_NOFOLLOW", 0)
+    try:
+        source_fd = os.open(source, flags)
+        with os.fdopen(source_fd, "rb") as source_handle:
+            if _identity_from_stat(os.fstat(source_handle.fileno())) != expected:
+                raise _source_changed(relative, "identity")
+            with destination.open("xb") as destination_handle:
+                copied = 0
+                while True:
+                    chunk = source_handle.read(64 * 1024)
+                    if not chunk:
+                        break
+                    destination_handle.write(chunk)
+                    digest.update(chunk)
+                    copied += len(chunk)
+                destination_handle.flush()
+                os.fsync(destination_handle.fileno())
+            if copied != expected.size:
+                raise _source_changed(relative, "size")
+            if _identity_from_stat(os.fstat(source_handle.fileno())) != expected:
+                raise _source_changed(relative, "identity")
+    except KokoroError:
+        raise
+    except OSError as error:
+        raise _publish_failed("copy", error) from error
+    if _source_identity(source, relative) != expected:
+        raise _source_changed(relative, "identity")
+    return digest.hexdigest()
+
+
+def _write_canonical_file(path: Path, value: Any) -> None:
+    payload = canonical_bytes(value) + b"\n"
+    try:
+        with path.open("xb") as handle:
+            handle.write(payload)
+            handle.flush()
+            os.fsync(handle.fileno())
+    except OSError as error:
+        raise _publish_failed("write_metadata", error) from error
+
+
+def _revalidate_sources(
+    source_root: Path,
+    resolved_source: Path,
+    expected_files: list[Path],
+    recorded: dict[Path, _SourceIdentity],
+    copied_hashes: dict[Path, str],
+) -> None:
+    rescanned = scan_pack(source_root, PackLimits())
+    if rescanned != expected_files:
+        raise _source_changed(Path("."), "entry_set")
+    for path in rescanned:
+        relative = path.relative_to(resolved_source)
+        if _source_identity(path, relative) != recorded[path]:
+            raise _source_changed(relative, "identity")
+        if _hash_regular_file(path, recorded[path], relative) != copied_hashes[path]:
+            raise _source_changed(relative, "content")
+
+
+def _hash_regular_file(
+    path: Path, expected: _SourceIdentity, relative: Path
+) -> str:
+    digest = sha256()
+    flags = os.O_RDONLY | getattr(os, "O_BINARY", 0) | getattr(os, "O_NOFOLLOW", 0)
+    try:
+        fd = os.open(path, flags)
+        with os.fdopen(fd, "rb") as handle:
+            if _identity_from_stat(os.fstat(handle.fileno())) != expected:
+                raise _source_changed(relative, "identity")
+            while chunk := handle.read(64 * 1024):
+                digest.update(chunk)
+            if _identity_from_stat(os.fstat(handle.fileno())) != expected:
+                raise _source_changed(relative, "identity")
+    except KokoroError:
+        raise
+    except OSError as error:
+        raise _source_changed(relative, type(error).__name__) from error
+    return digest.hexdigest()
+
+
+def _fsync_tree_directories(root: Path) -> None:
+    directories = [path for path in root.rglob("*") if path.is_dir()]
+    for directory in sorted(directories, key=lambda item: len(item.parts), reverse=True):
+        _fsync_directory(directory)
+    _fsync_directory(root)
+
+
+def _fsync_directory(path: Path) -> None:
+    if os.name == "nt":
+        return
+    flags = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0)
+    try:
+        descriptor = os.open(path, flags)
+        try:
+            os.fsync(descriptor)
+        finally:
+            os.close(descriptor)
+    except OSError as error:
+        if error.errno not in _DIRECTORY_FSYNC_UNSUPPORTED:
+            raise _publish_failed("fsync_directory", error) from error
+
+
+def _transactional_replace_directory(staging: Path, target: Path) -> None:
+    backup: Path | None = None
+    try:
+        if target.exists() or target.is_symlink():
+            _validate_destination_component(target)
+            backup = target.parent / (
+                f".{target.name}.backup-{secrets.token_hex(12)}"
+            )
+            os.replace(target, backup)
+        try:
+            os.replace(staging, target)
+        except OSError:
+            if backup is not None:
+                os.replace(backup, target)
+                backup = None
+            raise
+    except OSError as error:
+        raise _publish_failed("replace", error) from error
+    if backup is not None:
+        try:
+            shutil.rmtree(backup)
+        except OSError as error:
+            raise _publish_failed("cleanup_backup", error) from error
+
+
+def _remove_staging(staging: Path) -> None:
+    try:
+        if staging.exists() or staging.is_symlink():
+            shutil.rmtree(staging)
+    except BaseException:
+        pass
+
+
+def _invalid_draft(reason: str) -> KokoroError:
+    return KokoroError(
+        "INVALID_DRAFT_DATA",
+        "Character draft metadata is invalid.",
+        details={"reason": reason},
+    )
+
+
+def _unsafe_draft_path(path: Path, reason: str) -> KokoroError:
+    return KokoroError(
+        "UNSAFE_DRAFT_PATH",
+        "Character draft destination contains an unsafe filesystem path.",
+        details={"path": str(path), "reason": reason},
+    )
+
+
+def _source_changed(relative: Path, reason: str) -> KokoroError:
+    return KokoroError(
+        "AUTHORING_SOURCE_CHANGED",
+        "Character source pack changed while the draft was being published.",
+        details={"path": relative.as_posix(), "reason": reason},
+    )
+
+
+def _publish_failed(operation: str, error: OSError) -> KokoroError:
+    return KokoroError(
+        "DRAFT_PUBLISH_FAILED",
+        "Character draft publication failed.",
+        details={"operation": operation, "reason": type(error).__name__},
+    )
