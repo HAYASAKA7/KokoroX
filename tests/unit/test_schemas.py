@@ -108,6 +108,21 @@ def test_runtime_artifact_contracts(schema_name: str, fixture_key: str) -> None:
     SchemaRegistry(Path("schemas/v1")).validate(schema_name, fixture[fixture_key])
 
 
+@pytest.mark.parametrize("channel", ["recommendations", "code_identifiers"])
+def test_compiled_language_policy_requires_every_runtime_channel(
+    channel: str,
+) -> None:
+    document = deepcopy(load_fixture("runtime-artifacts.json")["language_policy"])
+    document["channels"]["recommendations"] = "en-US"
+    document["channels"]["code_identifiers"] = "preserve"
+    document["channels"].pop(channel)
+
+    with pytest.raises(KokoroError) as raised:
+        SchemaRegistry(Path("schemas/v1")).validate("language-policy", document)
+
+    assert raised.value.code == "SCHEMA_VALIDATION_FAILED"
+
+
 def test_session_manifest_requires_lifecycle_generation() -> None:
     document = load_fixture("runtime-artifacts.json")["session_manifest"]
     document.pop("lifecycle_generation")

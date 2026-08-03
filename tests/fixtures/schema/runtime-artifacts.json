@@ -8,11 +8,13 @@
     "channels": {
       "character_dialogue": "ja-JP",
       "technical_explanation": "zh-CN",
+      "recommendations": "zh-CN",
       "warnings": "zh-CN",
       "technical_terms": "preserve",
       "commands": "preserve",
       "file_paths": "preserve",
-      "exact_errors": "preserve"
+      "exact_errors": "preserve",
+      "code_identifiers": "preserve"
     },
     "mixing": {"max_switches": 4, "min_primary_ratio": 0.7},
     "subtitles": {"enabled": false, "language": null}

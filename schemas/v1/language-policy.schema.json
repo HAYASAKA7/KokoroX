@@ -45,11 +45,13 @@
       "required": [
         "character_dialogue",
         "technical_explanation",
+        "recommendations",
         "warnings",
         "technical_terms",
         "commands",
         "file_paths",
-        "exact_errors"
+        "exact_errors",
+        "code_identifiers"
       ],
       "properties": {
         "character_dialogue": {"$ref": "#/$defs/channel_language"},
