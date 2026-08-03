@@ -185,6 +185,23 @@ def publish_draft_bundle(
             recorded,
             copied_hashes,
         )
+        expected_source_hashes = {
+            path.relative_to(resolved_source): copied_hashes[path]
+            for path in scanned_files
+        }
+        _verify_staged_bundle(
+            staging,
+            expected_source_hashes,
+            request,
+            report,
+            draft,
+        )
+        _validate_existing_chain(final.parent)
+        final_stat = _destination_lstat(final)
+        if final_stat is not None:
+            _validate_destination_component(final)
+            if not stat.S_ISDIR(final_stat.st_mode):
+                raise _unsafe_draft_path(final, "target is not a directory")
         _fsync_tree_directories(staging)
         backup = _transactional_replace_directory(staging, final)
         try:
@@ -484,6 +501,142 @@ def _hash_regular_file(
     return digest.hexdigest()
 
 
+def _verify_staged_bundle(
+    staging: Path,
+    expected_source_hashes: dict[Path, str],
+    request: dict[str, Any],
+    report: dict[str, Any],
+    draft: dict[str, Any],
+) -> None:
+    _require_staged_directory(staging, Path("."))
+    source_root = staging / _BUNDLE_REFERENCES["source_pack"]
+    _require_staged_directory(source_root, Path("source-pack"))
+
+    expected_files = {
+        Path("request.json"),
+        Path("validation-report.json"),
+        Path("draft.json"),
+        *(Path("source-pack") / relative for relative in expected_source_hashes),
+    }
+    expected_directories = {Path("source-pack")}
+    for relative in expected_source_hashes:
+        parent = relative.parent
+        while parent != Path("."):
+            expected_directories.add(Path("source-pack") / parent)
+            parent = parent.parent
+    observed_directories, observed_files = _inspect_staged_layout(staging)
+    if observed_files != expected_files or observed_directories != expected_directories:
+        raise _staging_invalid("layout", Path("."))
+
+    try:
+        scanned = scan_pack(source_root, PackLimits())
+    except KokoroError as error:
+        raise _staging_invalid("source_scan", Path("source-pack")) from error
+    try:
+        resolved_source = source_root.resolve(strict=True)
+        observed_source_files = {
+            path.relative_to(resolved_source): path for path in scanned
+        }
+    except (OSError, RuntimeError, ValueError) as error:
+        raise _staging_invalid("source_scan", Path("source-pack")) from error
+    if set(observed_source_files) != set(expected_source_hashes):
+        raise _staging_invalid("source_file_set", Path("source-pack"))
+    for relative, expected_hash in expected_source_hashes.items():
+        payload = _read_staged_regular_file(
+            observed_source_files[relative], Path("source-pack") / relative
+        )
+        if sha256(payload).hexdigest() != expected_hash:
+            raise _staging_invalid("source_content", Path("source-pack") / relative)
+
+    expected_metadata = {
+        Path("request.json"): canonical_bytes(request) + b"\n",
+        Path("validation-report.json"): canonical_bytes(report) + b"\n",
+        Path("draft.json"): canonical_bytes(draft) + b"\n",
+    }
+    for relative, expected_payload in expected_metadata.items():
+        if _read_staged_regular_file(staging / relative, relative) != expected_payload:
+            raise _staging_invalid("metadata_content", relative)
+
+    _require_staged_directory(staging, Path("."))
+    _require_staged_directory(source_root, Path("source-pack"))
+
+
+def _require_staged_directory(path: Path, relative: Path) -> None:
+    try:
+        path_stat = path.lstat()
+    except OSError as error:
+        raise _staging_invalid("directory", relative) from error
+    if _stat_is_redirect(path, path_stat) or not stat.S_ISDIR(path_stat.st_mode):
+        raise _staging_invalid("directory", relative)
+
+
+def _inspect_staged_layout(root: Path) -> tuple[set[Path], set[Path]]:
+    directories: set[Path] = set()
+    files: set[Path] = set()
+    pending = [(root, Path("."))]
+    try:
+        while pending:
+            directory, relative_directory = pending.pop()
+            with os.scandir(directory) as entries:
+                for entry in entries:
+                    path = Path(entry.path)
+                    relative = relative_directory / entry.name
+                    path_stat = path.stat(follow_symlinks=False)
+                    if _stat_is_redirect(path, path_stat):
+                        raise _staging_invalid("redirect", relative)
+                    if stat.S_ISDIR(path_stat.st_mode):
+                        directories.add(relative)
+                        pending.append((path, relative))
+                    elif stat.S_ISREG(path_stat.st_mode):
+                        files.add(relative)
+                    else:
+                        raise _staging_invalid("entry_type", relative)
+    except KokoroError:
+        raise
+    except OSError as error:
+        raise _staging_invalid("layout_scan", Path(".")) from error
+    return directories, files
+
+
+def _read_staged_regular_file(path: Path, relative: Path) -> bytes:
+    flags = os.O_RDONLY | getattr(os, "O_BINARY", 0) | getattr(os, "O_NOFOLLOW", 0)
+    try:
+        initial_stat = path.lstat()
+        if (
+            _stat_is_redirect(path, initial_stat)
+            or not stat.S_ISREG(initial_stat.st_mode)
+            or initial_stat.st_nlink != 1
+        ):
+            raise _staging_invalid("unsafe_file", relative)
+        expected_identity = _identity_from_stat(initial_stat)
+        descriptor = os.open(path, flags)
+        with os.fdopen(descriptor, "rb") as handle:
+            if (
+                _identity_from_stat(os.fstat(handle.fileno())) != expected_identity
+                or os.fstat(handle.fileno()).st_nlink != 1
+            ):
+                raise _staging_invalid("file_identity", relative)
+            payload = handle.read()
+            final_handle_stat = os.fstat(handle.fileno())
+            if (
+                _identity_from_stat(final_handle_stat) != expected_identity
+                or final_handle_stat.st_nlink != 1
+            ):
+                raise _staging_invalid("file_identity", relative)
+        final_stat = path.lstat()
+        if (
+            _stat_is_redirect(path, final_stat)
+            or _identity_from_stat(final_stat) != expected_identity
+            or final_stat.st_nlink != 1
+        ):
+            raise _staging_invalid("file_identity", relative)
+    except KokoroError:
+        raise
+    except OSError as error:
+        raise _staging_invalid("read", relative) from error
+    return payload
+
+
 def _fsync_tree_directories(root: Path) -> None:
     directories = [path for path in root.rglob("*") if path.is_dir()]
     for directory in sorted(directories, key=lambda item: len(item.parts), reverse=True):
@@ -682,16 +835,35 @@ def _stat_is_redirect(path: Path, path_stat: os.stat_result) -> bool:
 
 
 def _remove_staging(staging: Path) -> None:
-    try:
-        staging_stat = staging.lstat()
-    except FileNotFoundError:
+    attempts = len(_CLEANUP_RETRY_DELAYS) + 1
+    for attempt in range(attempts):
+        try:
+            _remove_staged_entry_no_follow(staging)
+            return
+        except FileNotFoundError:
+            return
+        except OSError:
+            if attempt == attempts - 1:
+                return
+            time.sleep(_CLEANUP_RETRY_DELAYS[attempt])
+
+
+def _remove_staged_entry_no_follow(path: Path) -> None:
+    path_stat = path.lstat()
+    if _stat_is_redirect(path, path_stat):
+        try:
+            path.unlink()
+        except (IsADirectoryError, PermissionError):
+            path.rmdir()
         return
-    except OSError:
+    if stat.S_ISDIR(path_stat.st_mode):
+        with os.scandir(path) as entries:
+            children = [Path(entry.path) for entry in entries]
+        for child in children:
+            _remove_staged_entry_no_follow(child)
+        path.rmdir()
         return
-    if stat.S_ISDIR(staging_stat.st_mode) and not _stat_is_redirect(
-        staging, staging_stat
-    ):
-        _cleanup_tree_best_effort(staging)
+    path.unlink()
 
 
 def _canonical_hash(value: Any) -> str:
@@ -722,6 +894,14 @@ def _require_validation_report(
             "Character authoring validation does not match the source pack.",
             details={"reason": "report_mismatch"},
         )
+
+
+def _staging_invalid(reason: str, relative: Path) -> KokoroError:
+    return KokoroError(
+        "DRAFT_STAGING_INVALID",
+        "Character draft staging bundle failed final verification.",
+        details={"path": relative.as_posix(), "reason": reason},
+    )
 
 
 def _invalid_draft(reason: str) -> KokoroError:

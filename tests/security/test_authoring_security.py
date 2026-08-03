@@ -60,6 +60,41 @@ def _publish(
     return publish_draft_bundle(tmp_path / "data", source_root, request, draft, report)
 
 
+def _assert_staging_mutation_fails_closed(
+    tmp_path: Path,
+    source_root: Path,
+    artifacts: tuple[dict[str, Any], dict[str, Any], dict[str, Any], dict[str, Any]],
+    monkeypatch: pytest.MonkeyPatch,
+    mutation: Any,
+) -> None:
+    published = _publish(tmp_path, source_root, artifacts)
+    marker = published / "previous.txt"
+    marker.write_bytes(b"previous complete bundle")
+    real_require_report = storage._require_validation_report
+    calls = 0
+
+    def inject_after_second_report_check(*args: Any, **kwargs: Any) -> None:
+        nonlocal calls
+        real_require_report(*args, **kwargs)
+        calls += 1
+        if calls == 2:
+            staging = next((tmp_path / "data").rglob(".*.staging-*"))
+            mutation(staging)
+
+    monkeypatch.setattr(
+        storage, "_require_validation_report", inject_after_second_report_check
+    )
+
+    with pytest.raises(KokoroError) as caught:
+        _publish(tmp_path, source_root, artifacts)
+
+    assert calls == 2
+    assert caught.value.code == "DRAFT_STAGING_INVALID"
+    assert marker.read_bytes() == b"previous complete bundle"
+    assert list(published.parent.glob(f".{published.name}.staging-*")) == []
+    assert list(published.parent.glob(f".{published.name}.backup-*")) == []
+
+
 def test_invalid_report_is_rejected_before_staging(
     tmp_path: Path,
     source_root: Path,
@@ -187,6 +222,133 @@ def test_report_is_rebound_at_post_copy_checkpoint(
     assert caught.value.code == "AUTHORING_VALIDATION_FAILED"
     assert caught.value.details == {"reason": "report_mismatch"}
     assert not list((tmp_path / "data").rglob("draft.json"))
+
+
+def test_unmodified_staged_bundle_publishes(
+    tmp_path: Path,
+    source_root: Path,
+    artifacts: tuple[dict[str, Any], dict[str, Any], dict[str, Any], dict[str, Any]],
+) -> None:
+    published = _publish(tmp_path, source_root, artifacts)
+
+    assert (published / "source-pack" / "character.yaml").is_file()
+    assert (published / "request.json").is_file()
+    assert (published / "validation-report.json").is_file()
+    assert (published / "draft.json").is_file()
+
+
+@pytest.mark.parametrize("mutation_kind", ["content", "hardlink"])
+def test_staged_source_file_mutation_fails_closed(
+    tmp_path: Path,
+    source_root: Path,
+    artifacts: tuple[dict[str, Any], dict[str, Any], dict[str, Any], dict[str, Any]],
+    monkeypatch: pytest.MonkeyPatch,
+    mutation_kind: str,
+) -> None:
+    outside = tmp_path / "outside-source.yaml"
+    outside.write_bytes(b"outside staged source")
+
+    def mutate(staging: Path) -> None:
+        target = staging / "source-pack" / "behavior.yaml"
+        target.unlink()
+        if mutation_kind == "hardlink":
+            os.link(outside, target)
+        else:
+            target.write_bytes(b"tampered staged source")
+
+    _assert_staging_mutation_fails_closed(
+        tmp_path, source_root, artifacts, monkeypatch, mutate
+    )
+    assert outside.read_bytes() == b"outside staged source"
+
+
+def test_staged_source_symlink_mutation_fails_closed_when_supported(
+    tmp_path: Path,
+    source_root: Path,
+    artifacts: tuple[dict[str, Any], dict[str, Any], dict[str, Any], dict[str, Any]],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    outside = tmp_path / "outside-source.yaml"
+    outside.write_bytes(b"outside staged source")
+
+    def mutate(staging: Path) -> None:
+        target = staging / "source-pack" / "behavior.yaml"
+        target.unlink()
+        try:
+            target.symlink_to(outside)
+        except OSError as error:
+            pytest.skip(f"The current account cannot create file symlinks: {error}")
+
+    _assert_staging_mutation_fails_closed(
+        tmp_path, source_root, artifacts, monkeypatch, mutate
+    )
+    assert outside.read_bytes() == b"outside staged source"
+
+
+def test_staged_source_junction_marker_fails_closed(
+    tmp_path: Path,
+    source_root: Path,
+    artifacts: tuple[dict[str, Any], dict[str, Any], dict[str, Any], dict[str, Any]],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    marked: Path | None = None
+    real_is_junction = getattr(Path, "is_junction", lambda _path: False)
+
+    def is_injected_junction(path: Path) -> bool:
+        return path == marked or bool(real_is_junction(path))
+
+    monkeypatch.setattr(Path, "is_junction", is_injected_junction, raising=False)
+
+    def mutate(staging: Path) -> None:
+        nonlocal marked
+        marked = staging / "source-pack" / "injected-junction"
+        marked.mkdir()
+
+    _assert_staging_mutation_fails_closed(
+        tmp_path, source_root, artifacts, monkeypatch, mutate
+    )
+
+
+@pytest.mark.parametrize(
+    "metadata_name", ["request.json", "validation-report.json", "draft.json"]
+)
+def test_staged_metadata_mutation_fails_closed(
+    tmp_path: Path,
+    source_root: Path,
+    artifacts: tuple[dict[str, Any], dict[str, Any], dict[str, Any], dict[str, Any]],
+    monkeypatch: pytest.MonkeyPatch,
+    metadata_name: str,
+) -> None:
+    def mutate(staging: Path) -> None:
+        (staging / metadata_name).write_bytes(b"{}\n")
+
+    _assert_staging_mutation_fails_closed(
+        tmp_path, source_root, artifacts, monkeypatch, mutate
+    )
+
+
+@pytest.mark.parametrize(
+    "unexpected_entry",
+    ["extra-file", "extra-directory", "source-empty-directory"],
+)
+def test_unexpected_staged_bundle_entry_fails_closed(
+    tmp_path: Path,
+    source_root: Path,
+    artifacts: tuple[dict[str, Any], dict[str, Any], dict[str, Any], dict[str, Any]],
+    monkeypatch: pytest.MonkeyPatch,
+    unexpected_entry: str,
+) -> None:
+    def mutate(staging: Path) -> None:
+        if unexpected_entry == "extra-file":
+            (staging / "extra.txt").write_bytes(b"unexpected")
+        elif unexpected_entry == "extra-directory":
+            (staging / "extra").mkdir()
+        else:
+            (staging / "source-pack" / "empty-extra").mkdir()
+
+    _assert_staging_mutation_fails_closed(
+        tmp_path, source_root, artifacts, monkeypatch, mutate
+    )
 
 
 @pytest.mark.parametrize(
