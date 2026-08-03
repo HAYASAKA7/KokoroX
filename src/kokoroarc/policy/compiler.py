@@ -1,0 +1,161 @@
+"""Compile partial language policies into complete, validated policy bodies."""
+
+from __future__ import annotations
+
+from collections.abc import Mapping
+from copy import deepcopy
+from math import isfinite
+from typing import Any
+
+from kokoroarc.errors import KokoroError
+
+
+LANGUAGES = frozenset({"zh-CN", "en-US", "ja-JP"})
+CHANNELS = frozenset(
+    {
+        "character_dialogue",
+        "technical_explanation",
+        "recommendations",
+        "warnings",
+        "technical_terms",
+        "commands",
+        "file_paths",
+        "exact_errors",
+        "code_identifiers",
+    }
+)
+MANDATORY_PROTECTED_CHANNELS = frozenset(
+    {"commands", "file_paths", "exact_errors", "code_identifiers"}
+)
+
+_DEFAULT_POLICY_TEMPLATE: dict[str, Any] = {
+    "mode": "single",
+    "primary_language": "en-US",
+    "channels": {
+        "character_dialogue": "en-US",
+        "technical_explanation": "en-US",
+        "recommendations": "en-US",
+        "warnings": "en-US",
+        "technical_terms": "preserve",
+        "commands": "preserve",
+        "file_paths": "preserve",
+        "exact_errors": "preserve",
+        "code_identifiers": "preserve",
+    },
+    "mixing": {"max_switches": 4, "min_primary_ratio": 0.7},
+    "subtitles": {"enabled": False, "language": None},
+}
+DEFAULT_POLICY: dict[str, Any] = deepcopy(_DEFAULT_POLICY_TEMPLATE)
+
+_TOP_LEVEL_KEYS = frozenset(DEFAULT_POLICY)
+_NESTED_KEYS = {
+    "channels": CHANNELS,
+    "mixing": frozenset({"max_switches", "min_primary_ratio"}),
+    "subtitles": frozenset({"enabled", "language"}),
+}
+
+
+def _invalid_policy() -> KokoroError:
+    return KokoroError(
+        "INVALID_LANGUAGE_POLICY",
+        "Language policy is invalid.",
+    )
+
+
+def _protected_override(channel: str) -> KokoroError:
+    return KokoroError(
+        "PROTECTED_CHANNEL_OVERRIDE",
+        "A protected language channel cannot be overridden.",
+        details={"channel": channel},
+    )
+
+
+def _is_language(value: Any) -> bool:
+    return isinstance(value, str) and value in LANGUAGES
+
+
+def _validate_layer(
+    policy: Any,
+    protected_channels: frozenset[str] = MANDATORY_PROTECTED_CHANNELS,
+) -> Mapping[str, Any]:
+    """Validate one partial policy without requiring fields supplied by other layers."""
+    if not isinstance(policy, Mapping):
+        raise _invalid_policy()
+    if any(not isinstance(key, str) or key not in _TOP_LEVEL_KEYS for key in policy):
+        raise _invalid_policy()
+
+    for section, allowed_keys in _NESTED_KEYS.items():
+        if section not in policy:
+            continue
+        value = policy[section]
+        if not isinstance(value, Mapping):
+            raise _invalid_policy()
+        if any(not isinstance(key, str) or key not in allowed_keys for key in value):
+            raise _invalid_policy()
+
+    if "mode" in policy:
+        mode = policy["mode"]
+        if not isinstance(mode, str) or mode not in {"single", "mixed"}:
+            raise _invalid_policy()
+    if "primary_language" in policy and not _is_language(
+        policy["primary_language"]
+    ):
+        raise _invalid_policy()
+
+    channels = policy.get("channels", {})
+    for channel, value in channels.items():
+        if channel in protected_channels and value != "preserve":
+            raise _protected_override(channel)
+        if not isinstance(value, str) or (
+            value not in LANGUAGES and value != "preserve"
+        ):
+            raise _invalid_policy()
+
+    mixing = policy.get("mixing", {})
+    if "max_switches" in mixing:
+        switches = mixing["max_switches"]
+        if isinstance(switches, bool) or not isinstance(switches, int) or switches < 0:
+            raise _invalid_policy()
+    if "min_primary_ratio" in mixing:
+        ratio = mixing["min_primary_ratio"]
+        if isinstance(ratio, bool) or not isinstance(ratio, (int, float)):
+            raise _invalid_policy()
+        try:
+            ratio_is_finite = isfinite(ratio)
+        except (OverflowError, TypeError, ValueError):
+            raise _invalid_policy() from None
+        if not ratio_is_finite or not 0 <= ratio <= 1:
+            raise _invalid_policy()
+
+    subtitles = policy.get("subtitles", {})
+    if "enabled" in subtitles and not isinstance(subtitles["enabled"], bool):
+        raise _invalid_policy()
+    if "language" in subtitles:
+        language = subtitles["language"]
+        if language is not None and not _is_language(language):
+            raise _invalid_policy()
+
+    return policy
+
+
+def _merge_policy(target: dict[str, Any], layer: Mapping[str, Any]) -> None:
+    for key, value in layer.items():
+        if key in _NESTED_KEYS:
+            target[key].update(value)
+        else:
+            target[key] = value
+
+
+def _validate_complete(policy: Mapping[str, Any]) -> None:
+    subtitles = policy["subtitles"]
+    if subtitles["enabled"] and subtitles["language"] is None:
+        raise _invalid_policy()
+
+
+def normalize_policy(policy: Mapping[str, Any]) -> dict[str, Any]:
+    """Fill defaults in a partial policy and return a detached policy body."""
+    layer = _validate_layer(policy)
+    normalized = deepcopy(_DEFAULT_POLICY_TEMPLATE)
+    _merge_policy(normalized, layer)
+    _validate_complete(normalized)
+    return deepcopy(normalized)
