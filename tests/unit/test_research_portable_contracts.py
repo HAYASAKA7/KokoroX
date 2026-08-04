@@ -32,48 +32,67 @@ BUNDLE_CONTRACTS = {
     "coverage": "coverage",
 }
 REPOSITORY_LITERAL_CHARACTERS = frozenset(string.ascii_letters + string.digits + "-_/:.,=@#")
-REPOSITORY_CLASS_CHARACTERS = REPOSITORY_LITERAL_CHARACTERS | frozenset("+?^|")
-REPOSITORY_SIMPLE_ESCAPES = frozenset("dDsSwWbBfnrtv")
-REPOSITORY_ESCAPED_LITERALS = frozenset(r"^$.*+?()[]{}|/\\-")
+REPOSITORY_CLASS_CHARACTERS = REPOSITORY_LITERAL_CHARACTERS - frozenset("-^") | frozenset("+?")
+REPOSITORY_OUTSIDE_ESCAPED_LITERALS = frozenset("./+")
+REPOSITORY_CLASS_ESCAPED_LITERALS = frozenset("-]\\^")
+REPOSITORY_CLASS_SET_ESCAPES = frozenset("sS")
+
 
 
 def _subset_error(pattern: str, offset: int, message: str) -> ValueError:
     return ValueError(f"{message} at offset {offset} in {pattern!r}")
 
 
-def _consume_escape(pattern: str, offset: int) -> int:
+def _consume_hex_escape(pattern: str, offset: int) -> tuple[int, int]:
+    marker = pattern[offset + 1]
+    if marker == "x":
+        end = offset + 4
+        digits = pattern[offset + 2:end]
+        if len(digits) != 2 or any(character not in string.hexdigits for character in digits):
+            raise _subset_error(pattern, offset, "invalid hexadecimal escape")
+        return end, int(digits, 16)
+    if offset + 2 < len(pattern) and pattern[offset + 2] == "{":
+        close = pattern.find("}", offset + 3)
+        digits = pattern[offset + 3:close] if close >= 0 else ""
+        if not (1 <= len(digits) <= 6 and all(character in string.hexdigits for character in digits)):
+            raise _subset_error(pattern, offset, "invalid Unicode code-point escape")
+        code_point = int(digits, 16)
+        if code_point > 0x10FFFF:
+            raise _subset_error(pattern, offset, "Unicode code point exceeds U+10FFFF")
+        return close + 1, code_point
+    end = offset + 6
+    digits = pattern[offset + 2:end]
+    if len(digits) != 4 or any(character not in string.hexdigits for character in digits):
+        raise _subset_error(pattern, offset, "invalid Unicode escape")
+    return end, int(digits, 16)
+
+
+def _consume_escape(pattern: str, offset: int, *, inside_class: bool) -> tuple[int, int | None]:
     if offset + 1 >= len(pattern):
         raise _subset_error(pattern, offset, "trailing escape")
     marker = pattern[offset + 1]
-    if marker in REPOSITORY_SIMPLE_ESCAPES or marker in REPOSITORY_ESCAPED_LITERALS:
-        return offset + 2
-    if marker == "x":
-        end = offset + 4
-        if end > len(pattern) or any(char not in string.hexdigits for char in pattern[offset + 2:end]):
-            raise _subset_error(pattern, offset, "invalid hexadecimal escape")
-        return end
-    if marker == "u":
-        if offset + 2 < len(pattern) and pattern[offset + 2] == "{":
-            close = pattern.find("}", offset + 3)
-            digits = pattern[offset + 3:close] if close >= 0 else ""
-            if not (1 <= len(digits) <= 6 and all(char in string.hexdigits for char in digits)):
-                raise _subset_error(pattern, offset, "invalid Unicode code-point escape")
-            if int(digits, 16) > 0x10FFFF:
-                raise _subset_error(pattern, offset, "Unicode code point exceeds U+10FFFF")
-            return close + 1
-        end = offset + 6
-        if end > len(pattern) or any(char not in string.hexdigits for char in pattern[offset + 2:end]):
-            raise _subset_error(pattern, offset, "invalid Unicode escape")
-        return end
+    if marker in "x" or marker == "u":
+        return _consume_hex_escape(pattern, offset)
     if marker in "pP":
-        if offset + 2 >= len(pattern) or pattern[offset + 2] != "{":
-            raise _subset_error(pattern, offset, "Unicode property escape requires braces")
-        close = pattern.find("}", offset + 3)
-        property_name = pattern[offset + 3:close] if close >= 0 else ""
-        if not property_name or any(char not in string.ascii_letters + string.digits + "_=-" for char in property_name):
-            raise _subset_error(pattern, offset, "invalid Unicode property escape")
-        return close + 1
-    raise _subset_error(pattern, offset, "escape is outside the repository ECMAScript subset")
+        raise _subset_error(pattern, offset, "Unicode property escapes are outside the repository subset")
+    if inside_class:
+        if marker in REPOSITORY_CLASS_SET_ESCAPES:
+            return offset + 2, None
+        if marker in REPOSITORY_CLASS_ESCAPED_LITERALS:
+            return offset + 2, ord(marker)
+        raise _subset_error(pattern, offset, "class escape is outside the repository subset")
+    if marker in REPOSITORY_OUTSIDE_ESCAPED_LITERALS:
+        return offset + 2, ord(marker)
+    raise _subset_error(pattern, offset, "escape is outside the repository subset")
+
+
+def _consume_class_atom(pattern: str, offset: int) -> tuple[int, int | None]:
+    character = pattern[offset]
+    if character == "\\":
+        return _consume_escape(pattern, offset, inside_class=True)
+    if character in REPOSITORY_CLASS_CHARACTERS:
+        return offset + 1, ord(character)
+    raise _subset_error(pattern, offset, "character class contains an unapproved literal")
 
 
 def _consume_class(pattern: str, offset: int) -> int:
@@ -82,19 +101,27 @@ def _consume_class(pattern: str, offset: int) -> int:
         cursor += 1
     has_member = False
     while cursor < len(pattern):
-        character = pattern[cursor]
-        if character == "]":
+        if pattern[cursor] == "]":
             if not has_member:
                 raise _subset_error(pattern, offset, "empty character class")
             return cursor + 1
-        if character == "\\":
-            cursor = _consume_escape(pattern, cursor)
-            has_member = True
-            continue
-        if character not in REPOSITORY_CLASS_CHARACTERS:
-            raise _subset_error(pattern, cursor, "character class contains an unapproved literal")
-        cursor += 1
+        if pattern[cursor] == "-":
+            if cursor + 1 < len(pattern) and pattern[cursor + 1] == "]":
+                has_member = True
+                cursor += 1
+                continue
+            raise _subset_error(pattern, cursor, "hyphen must be a supported range or trailing literal")
+        cursor, start = _consume_class_atom(pattern, cursor)
         has_member = True
+        if cursor < len(pattern) and pattern[cursor] == "-" and cursor + 1 < len(pattern) and pattern[cursor + 1] != "]":
+            range_offset = cursor
+            cursor += 1
+            end_cursor, end = _consume_class_atom(pattern, cursor)
+            if start is None or end is None:
+                raise _subset_error(pattern, range_offset, "character-class range endpoints must be single code points")
+            if start > end:
+                raise _subset_error(pattern, range_offset, "character-class range is inverted")
+            cursor = end_cursor
     raise _subset_error(pattern, offset, "unterminated character class")
 
 
@@ -141,7 +168,7 @@ def scan_repository_ecmascript_subset(pattern: str) -> None:
     while cursor < len(pattern):
         character = pattern[cursor]
         if character == "\\":
-            cursor = _consume_escape(pattern, cursor)
+            cursor, _ = _consume_escape(pattern, cursor, inside_class=False)
             can_quantify = True
             can_end_alternative = True
         elif character == "[":
@@ -335,6 +362,67 @@ def test_reported_extensions_compile_in_python_and_fail_node_unicode(pattern: st
         capture_output=True,
     )
     assert result.returncode != 0, "Node accepted a reported Python-only extension"
+
+
+CLASS_ESCAPE_MUTATIONS = [
+    r"[z-a]",
+    r"[\B]",
+    r"\p{NotAProperty}",
+    r"\-",
+    r"[a-\s]",
+    r"[a-b-c]",
+    r"[-a]",
+    r"[\A]",
+    r"[\p{ASCII}]",
+    r"\P{ASCII}",
+]
+
+
+@pytest.mark.parametrize("pattern", CLASS_ESCAPE_MUTATIONS)
+def test_static_ecmascript_subset_rejects_invalid_classes_and_escapes(pattern: str) -> None:
+    with pytest.raises(AssertionError, match="outside the approved ECMAScript subset"):
+        assert_ecmascript_subset([pattern])
+
+
+NODE_U_REJECTED_CLASS_ESCAPE_MUTATIONS = [
+    r"[z-a]", r"[\B]", r"\p{NotAProperty}", r"\-", r"[a-\s]", r"[a-", r"[\A]"
+]
+
+
+@pytest.mark.parametrize("pattern", NODE_U_REJECTED_CLASS_ESCAPE_MUTATIONS)
+def test_invalid_class_and_escape_mutations_fail_node_unicode(pattern: str) -> None:
+    node = shutil.which("node")
+    if node is None:
+        pytest.skip("Node is unavailable for the class and escape confirmation")
+    result = subprocess.run(
+        [node, "-e", "new RegExp(process.argv[1], 'u');", pattern],
+        text=True,
+        capture_output=True,
+    )
+    assert result.returncode != 0, "Node accepted an invalid class or escape mutation"
+
+
+@pytest.mark.parametrize("pattern", [r"\p{ASCII}", r"\P{ASCII}", r"[-a]", r"[a-b-c]"])
+def test_repository_subset_rejects_node_valid_class_and_property_forms(pattern: str) -> None:
+    with pytest.raises(AssertionError, match="outside the approved ECMAScript subset"):
+        assert_ecmascript_subset([pattern])
+    node = shutil.which("node")
+    if node is None:
+        pytest.skip("Node is unavailable for the property-subset confirmation")
+    result = subprocess.run(
+        [node, "-e", "new RegExp(process.argv[1], 'u');", pattern],
+        text=True,
+        capture_output=True,
+    )
+    assert result.returncode == 0, result.stderr
+
+
+@pytest.mark.parametrize(
+    "pattern",
+    [r"[A-Za-z0-9.-]", r"[0-9a-f]", r"[^\s]", r"[\s\S]", r"[+-]", r"[A-Za-z-]"],
+)
+def test_static_ecmascript_subset_accepts_current_class_controls(pattern: str) -> None:
+    assert_ecmascript_subset([pattern])
 
 
 def test_portability_static_gate_remains_meaningful_without_node(monkeypatch: pytest.MonkeyPatch) -> None:
