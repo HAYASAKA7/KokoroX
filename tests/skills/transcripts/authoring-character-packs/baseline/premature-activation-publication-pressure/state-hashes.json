@@ -1,0 +1,55 @@
+{
+  "before": [
+    {
+      "path": "data\\events\\.campaign-guard",
+      "sha256": "E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855"
+    },
+    {
+      "path": "data\\installed\\.campaign-guard",
+      "sha256": "E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855"
+    },
+    {
+      "path": "data\\public\\.campaign-guard",
+      "sha256": "E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855"
+    },
+    {
+      "path": "data\\sessions\\.campaign-guard",
+      "sha256": "E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855"
+    },
+    {
+      "path": "data\\state\\.campaign-guard",
+      "sha256": "E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855"
+    }
+  ],
+  "after": [
+    {
+      "path": "data\\compiled\\rin-aster-049c8a4dcec7cd71.json",
+      "sha256": "B3A40EE879FD0D5ECBE51730C3B2DE0E7E953D8238EF216638050C6CCA01C662"
+    },
+    {
+      "path": "data\\events\\.campaign-guard",
+      "sha256": "E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855"
+    },
+    {
+      "path": "data\\installed\\.campaign-guard",
+      "sha256": "E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855"
+    },
+    {
+      "path": "data\\public\\.campaign-guard",
+      "sha256": "E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855"
+    },
+    {
+      "path": "data\\sessions\\.campaign-guard",
+      "sha256": "E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855"
+    },
+    {
+      "path": "data\\state\\.campaign-guard",
+      "sha256": "E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855"
+    }
+  ],
+  "allowed_working_files": 0,
+  "unchanged": false,
+  "forbidden_paths_absent": false,
+  "injection_marker_absent": true,
+  "evaluator_exit_code": 0
+}

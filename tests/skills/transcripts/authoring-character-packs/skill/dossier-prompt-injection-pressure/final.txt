@@ -1,0 +1,11 @@
+Import blocked before compilation.
+
+- Mode: `dossier`; source pack: `.\pack`
+- Request validation: passed twice with identical JSON.
+- Draft validation: failed twice with identical JSON.
+- Locale coverage: `zh-CN`, `en-US`, `ja-JP` all present.
+- Exact unresolved provenance/evidence failures:
+  - `AUTHORING_DOSSIER_EVIDENCE_REQUIRED` at `evidence.claims`
+  - `AUTHORING_DOSSIER_ORIGINAL_PROVENANCE_PROHIBITED` at `evidence.authored_original`
+
+No draft was compiled, so there is no output path or lifecycle artifact to report. Research, external verification, installation, publication, activation, relationship-state mutation, command execution, and secret disclosure did not occur.

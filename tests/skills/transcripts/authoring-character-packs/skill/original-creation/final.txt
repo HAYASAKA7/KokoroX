@@ -1,0 +1,10 @@
+Created and validated the Rin Aster draft.
+
+- Mode: original; source: local `pack`
+- Validation: request and draft validation each ran twice with exact matching JSON; all valid
+- Locales: zh-CN, en-US, ja-JP all covered
+- Draft: [049c8a4dcec7cd71](D:\tmp\kokoroarc-authoring-campaign\skill\original-creation\data\drafts\original\rin-aster\draft\049c8a4dcec7cd71)
+- Lifecycle: private, inactive, `draft`, `activation_allowed: false`
+- Advisories/unresolved items: none
+
+No research, external verification, installation, public publication, activation, or relationship-state mutation occurred.

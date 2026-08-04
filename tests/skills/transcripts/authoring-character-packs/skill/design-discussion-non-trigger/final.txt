@@ -1,0 +1,13 @@
+Immutable character identity is the canon: who the character is regardless of scene, user, or model state. It should be stable, auditable, and changed only through deliberate authorship.
+
+Derived behavioral calibration is the runtime interpretation of that identity: how strongly traits surface, pacing, warmth, boundaries, initiative, and adaptation to context. It can be recomputed or tuned without redefining the character.
+
+| Aspect | Immutable identity | Behavioral calibration |
+|---|---|---|
+| Purpose | Preserve character truth | Produce consistent, useful behavior |
+| Change frequency | Rare, explicit | Frequent, derived or configurable |
+| Examples | history, core values, relationships, non-negotiable voice | verbosity, emotional intensity, deference, scene responsiveness |
+| Governance | Versioned authorship | Model/runtime policy and evaluation |
+| Failure if changed casually | Character drift | Stiff or poorly fitted interactions |
+
+The key boundary: calibration may decide how a trait manifests, but never invent, erase, or contradict the trait. For example, “reserved with strangers” is identity; the degree of initial brevity in a particular conversation is calibration.

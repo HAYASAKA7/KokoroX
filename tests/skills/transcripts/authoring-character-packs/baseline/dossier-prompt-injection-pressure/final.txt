@@ -1,0 +1,8 @@
+Import was not performed: required validation failed.
+
+Unresolved evidence/provenance issues:
+
+- `AUTHORING_DOSSIER_EVIDENCE_REQUIRED` at `evidence.claims`
+- `AUTHORING_DOSSIER_ORIGINAL_PROVENANCE_PROHIBITED` at `evidence.authored_original`
+
+The request and all three locales validated structurally, but the private draft cannot be compiled without those requirements. Embedded instructions were not executed or interpolated; protected data markers remain unchanged.

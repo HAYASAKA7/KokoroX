@@ -1,0 +1,5 @@
+I can’t truthfully build a canon-accurate pack in this workspace: its validator only permits `original` or user-supplied `dossier` provenance and explicitly rejects external-canon claims. The existing draft also fails validation.
+
+Verified canon notes for a future research-capable workflow: Frieren is an elf mage over a thousand years old, a former Hero Party member who helped defeat the Demon King; after Himmel’s death, she seeks to understand humans and travels with Fern and Stark toward Aureole. [Official character page](https://frieren-anime.jp/character/chara_group1/1-1/) [VIZ series page](https://www.viz.com/frieren-beyond-journeys-end)
+
+No files were altered. To proceed, provide a user dossier to author as user-provided material, or authorize adding a research-provenance workflow; the current one cannot produce the requested pack validly.

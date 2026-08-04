@@ -1,0 +1,3 @@
+I can’t proceed: the required `researching-characters` workflow is missing locally, and you explicitly state there is no external-research evidence bundle. I won’t infer canon facts or fabricate citations for a “canon-accurate” pack.
+
+The local `authoring-character-packs` workflow is present; provide the research workflow/evidence bundle and I can author the pack immediately.

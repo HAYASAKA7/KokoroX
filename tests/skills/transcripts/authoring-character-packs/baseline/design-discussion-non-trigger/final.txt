@@ -1,0 +1,22 @@
+Immutable character identity is the stable answer to “who is this character?” Derived behavioral calibration is the adaptive answer to “how should this character act in this context?”
+
+| Aspect | Immutable identity | Derived calibration |
+|---|---|---|
+| Purpose | Preserve continuity and recognizability | Tune behavior to scenario, audience, and interaction history |
+| Examples | Core values, voice boundaries, biography, hard prohibitions | Warmth, assertiveness, verbosity, initiative, caution |
+| Change rate | Never or only through explicit versioning | Recomputed or adjusted as inputs change |
+| Failure mode | Too rigid or stereotyped | Personality drift or inconsistent behavior |
+| Best representation | Small, explicit, auditable canonical record | Transparent function of identity + context + policy |
+
+The key design rule: calibration may express identity, but must not redefine it. For example, a reserved character can become more concise under pressure or warmer with a trusted user, but should not become impulsive, cruel, or suddenly adopt a contradictory worldview.
+
+I’d model it as:
+
+`behavior = calibrate(identity, current_context, relationship_state, task_policy)`
+
+with explicit guardrails:
+
+- Identity defines hard boundaries and preferred ranges.
+- Calibration operates only within those ranges.
+- Any long-term change belongs in a separate, reviewable character-evolution mechanism—not in transient calibration.
+- Logs should distinguish “identity constraint” from “calibration decision,” so unexpected behavior can be diagnosed.

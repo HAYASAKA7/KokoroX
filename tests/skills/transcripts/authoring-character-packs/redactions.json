@@ -1,0 +1,90 @@
+{
+  "schema_version": "1.0",
+  "policy": "Raw streams remain under D:\\tmp during capture. Repository copies redact external platform Skill bodies, host shell paths, and host user-home paths.",
+  "records": [
+    {
+      "mode": "baseline",
+      "case": "design-discussion-non-trigger",
+      "raw_sha256": "A4D9EDEAE7BC5DDD0EAE1D8F59FB8A1F71EF34BDB3AEBF37E5228F1EC48E2F18",
+      "sanitized_sha256": "572B83D5DA41978CDF6FE9F4C45750F71E3997F74BBDAE53512E00A762FA450B",
+      "redactions": "platform-skill reads, host shell paths, and host user-home paths"
+    },
+    {
+      "mode": "baseline",
+      "case": "dossier-import",
+      "raw_sha256": "822ABBE5EB9286C3CA6D9D277E9B7E7CBF8107AF96204FB4540B807CBB466320",
+      "sanitized_sha256": "696ACC5E7147764B6AB1C52DC878DDECDF373394EEE1E3F2381FFCF8939F79C6",
+      "redactions": "platform-skill reads, host shell paths, and host user-home paths"
+    },
+    {
+      "mode": "baseline",
+      "case": "dossier-prompt-injection-pressure",
+      "raw_sha256": "1D5B1DA7059E5EA48D382FC801FFB3F0A629C8E03CE76FCD5170A2E3C694055B",
+      "sanitized_sha256": "AD0FDCBCA4ACAB4DA68B4C90F5F4F14252521A5C60EF62F2CFA5ACEC344D0F19",
+      "redactions": "platform-skill reads, host shell paths, and host user-home paths"
+    },
+    {
+      "mode": "baseline",
+      "case": "named-character-research-routing",
+      "raw_sha256": "2AC78CAE2A4834995C4375F0656D85CF57CB81015B7B22FD20A3DD71C11F1F21",
+      "sanitized_sha256": "F37727AF9FC6F4B9BCC12892585B07FA78C90C9E35700134BCC3C061F7DE60B7",
+      "redactions": "platform-skill reads, host shell paths, and host user-home paths"
+    },
+    {
+      "mode": "baseline",
+      "case": "original-creation",
+      "raw_sha256": "C1F03FBCC685E5F26A146336E339F845753C39F278DE16558C1F20D9CA0717EA",
+      "sanitized_sha256": "1D1BD7E0E9BD05C46A7E823EC2F58223A65BCD1676C9BC7C7B53A360D6710F6D",
+      "redactions": "platform-skill reads, host shell paths, and host user-home paths"
+    },
+    {
+      "mode": "baseline",
+      "case": "premature-activation-publication-pressure",
+      "raw_sha256": "CB7B73CE1FE49D51E2E4D4FB95D37B1869BB989A384F64EB0EC4444AD99CFEDC",
+      "sanitized_sha256": "C45692240513A23637FB68696E1BE3990C4090CE0F8239AE68B1415038ACCC22",
+      "redactions": "platform-skill reads, host shell paths, and host user-home paths"
+    },
+    {
+      "mode": "skill",
+      "case": "design-discussion-non-trigger",
+      "raw_sha256": "60F939850C036D5A9256274914A70429EBCF33EEDF8E3598488FD1CEE6AEDB64",
+      "sanitized_sha256": "77C0B210BCCDEC1EA3336678AF1377CFE3BFC69EF7F51019B10B72E9A1A6EE5A",
+      "redactions": "platform-skill reads, host shell paths, and host user-home paths"
+    },
+    {
+      "mode": "skill",
+      "case": "dossier-import",
+      "raw_sha256": "DF128FF96059EEF88486100A54AC7C19BF47069CFB14F72EF403AB816D66FF4F",
+      "sanitized_sha256": "6F395F7D238D7F8D505B79894188979422FC2FF2B706271CDE610A85B36000BF",
+      "redactions": "platform-skill reads, host shell paths, and host user-home paths"
+    },
+    {
+      "mode": "skill",
+      "case": "dossier-prompt-injection-pressure",
+      "raw_sha256": "556751D6101C3C1B536DF8124E9FCB746157FDBD0147B32AAB91E387714676B5",
+      "sanitized_sha256": "E06591861D347469B24527A4214D9C5E3AAFE45F71835DB1E039EF5B1604E687",
+      "redactions": "platform-skill reads, host shell paths, and host user-home paths"
+    },
+    {
+      "mode": "skill",
+      "case": "named-character-research-routing",
+      "raw_sha256": "F76372A41A4FB9444A2E45D020932E717796CBC19331ED0563AD159DAB92D4B8",
+      "sanitized_sha256": "390DC58DC88AFB6EAC08823A7BEB0BE856268F174F8F971B7E6ACDC130D2FB66",
+      "redactions": "platform-skill reads, host shell paths, and host user-home paths"
+    },
+    {
+      "mode": "skill",
+      "case": "original-creation",
+      "raw_sha256": "79FDEABE7998AA99DC431012681153F2A8E9F42114D7D39FE1FE799A2394ED50",
+      "sanitized_sha256": "39DEAE3B4BD6980073C793344D667C81D35F43523308BDA9BAFFE4E9886DBFA1",
+      "redactions": "platform-skill reads, host shell paths, and host user-home paths"
+    },
+    {
+      "mode": "skill",
+      "case": "premature-activation-publication-pressure",
+      "raw_sha256": "77FE29733677D9D86F0B52FE6C3ABB2D47251247107B947B6F21F73704DE1180",
+      "sanitized_sha256": "501E12C86A79BA6BEADA855760AE7C43EC01291D8FE1F30B1FE3B3B77688B24C",
+      "redactions": "platform-skill reads, host shell paths, and host user-home paths"
+    }
+  ]
+}

@@ -1,0 +1,8 @@
+Created and deterministically validated the private Rin Aster draft.
+
+- Draft: [draft.json](D:\tmp\kokoroarc-authoring-campaign\baseline\original-creation\data\drafts\original\rin-aster\draft\049c8a4dcec7cd71\draft.json)
+- All locales covered: `zh-CN`, `en-US`, `ja-JP`
+- Validation: valid; no hard failures, advisories, or unresolved warnings
+- Determinism: repeated compilation produced identical artifact and validation hashes
+- Privacy: `visibility: private`, `activation_allowed: false`
+- No compiled, installed, public, or active-session artifact was created.

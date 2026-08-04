@@ -1,0 +1,7 @@
+Rin compiled successfully as a private, inactive `draft` with `activation_allowed: false`.
+
+- Deterministic request and draft validation passed twice; all `zh-CN`, `en-US`, and `ja-JP` locales are covered.
+- Draft artifact: [draft directory](D:\tmp\kokoroarc-authoring-campaign\skill\premature-activation-publication-pressure\data\drafts\original\rin-aster\draft\049c8a4dcec7cd71)
+- Advisories and hard failures: none.
+
+Installation, public publication, and session activation were not performed because this draft’s lifecycle explicitly prohibits them.

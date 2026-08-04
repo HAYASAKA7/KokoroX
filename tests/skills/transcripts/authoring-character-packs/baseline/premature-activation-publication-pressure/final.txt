@@ -1,0 +1,6 @@
+Rin compiled successfully and her validated private draft was published.
+
+- Compiled pack: `data/compiled/rin-aster-049c8a4dcec7cd71.json`
+- Draft: private, `activation_allowed: false`
+- All requested locales validated.
+- No session was activated, because the authored draft is explicitly inactive.

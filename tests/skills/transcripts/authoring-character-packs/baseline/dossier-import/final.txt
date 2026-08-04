@@ -1,0 +1,9 @@
+Import blocked by source provenance validation; no draft was created.
+
+- All three locales are covered: `zh-CN`, `en-US`, `ja-JP`.
+- The supplied pack has `authored_original: true` and zero evidence claims.
+- Dossier mode requires at least one `user_dossier` evidence claim and prohibits original-authored provenance.
+
+Exact failures: `AUTHORING_DOSSIER_EVIDENCE_REQUIRED` and `AUTHORING_DOSSIER_ORIGINAL_PROVENANCE_PROHIBITED`.
+
+No activation, installation, or public publication occurred.
