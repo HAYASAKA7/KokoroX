@@ -25,14 +25,14 @@ def invalid(name: str, value: dict) -> None:
 
 def assembled_workspace(tree: str) -> dict:
     workspace = load(tree, "workspace.json")
+    artifact = lambda record: load(tree, record["path"])
     return {
-        "request": workspace["request"],
-        "sources": sorted(workspace["sources"], key=lambda record: load(tree, record["path"])["source_id"]),
-        "claims": sorted(workspace["claims"], key=lambda record: load(tree, record["path"])["claim_id"]),
-        "conflicts": sorted(workspace["conflicts"], key=lambda record: load(tree, record["path"])["conflict_id"]),
-        "coverage": workspace["coverage"],
+        "request": artifact(workspace["request"]),
+        "sources": sorted(map(artifact, workspace["sources"]), key=lambda record: record["source_id"]),
+        "claims": sorted(map(artifact, workspace["claims"]), key=lambda record: record["claim_id"]),
+        "conflicts": sorted(map(artifact, workspace["conflicts"]), key=lambda record: record["conflict_id"]),
+        "coverage": artifact(workspace["coverage"]),
     }
-
 
 @pytest.mark.parametrize("tree", ["complete", "partial"])
 def test_bundle_accepts_exact_minimal_task5_constructor(tree: str) -> None:

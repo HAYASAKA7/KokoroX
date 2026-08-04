@@ -125,11 +125,11 @@ def test_bundle_hashes_use_canonical_fixture_identities(tree: str) -> None:
     workspace = load(tree, "workspace.json")
     report = load(tree, "validation-report.json")
     canonical_workspace = {
-        "request": workspace["request"],
-        "sources": sorted(workspace["sources"], key=lambda item: load(tree, item["path"])["source_id"]),
-        "claims": sorted(workspace["claims"], key=lambda item: load(tree, item["path"])["claim_id"]),
-        "conflicts": sorted(workspace["conflicts"], key=lambda item: load(tree, item["path"])["conflict_id"]),
-        "coverage": workspace["coverage"],
+        "request": load(tree, workspace["request"]["path"]),
+        "sources": sorted([load(tree, item["path"]) for item in workspace["sources"]], key=lambda item: item["source_id"]),
+        "claims": sorted([load(tree, item["path"]) for item in workspace["claims"]], key=lambda item: item["claim_id"]),
+        "conflicts": sorted([load(tree, item["path"]) for item in workspace["conflicts"]], key=lambda item: item["conflict_id"]),
+        "coverage": load(tree, workspace["coverage"]["path"]),
     }
     assert bundle["request_hash"] == digest(request)
     assert bundle["workspace_hash"] == digest(canonical_workspace)
