@@ -1,8 +1,10 @@
 from copy import deepcopy
 import json
 from pathlib import Path
+import re
 import shutil
 import subprocess
+import string
 
 import pytest
 
@@ -29,28 +31,172 @@ BUNDLE_CONTRACTS = {
     "conflict": "conflicts",
     "coverage": "coverage",
 }
-ECMASCRIPT_SUBSET_FORBIDDEN = (
-    r"(?P<",
-    r"(?P=",
-    r"(?<",
-    r"(?a",
-    r"(?i",
-    r"(?L",
-    r"(?m",
-    r"(?s",
-    r"(?u",
-    r"(?x",
-    r"(?#",
-    r"(?(",
-    r"(?|",
-    r"(?R",
-    r"(?0",
-    r"\A",
-    r"\Z",
-    r"\N",
-    r"\g<",
-    r"\k<",
-)
+REPOSITORY_LITERAL_CHARACTERS = frozenset(string.ascii_letters + string.digits + "-_/:.,=@#")
+REPOSITORY_CLASS_CHARACTERS = REPOSITORY_LITERAL_CHARACTERS | frozenset("+?^|")
+REPOSITORY_SIMPLE_ESCAPES = frozenset("dDsSwWbBfnrtv")
+REPOSITORY_ESCAPED_LITERALS = frozenset(r"^$.*+?()[]{}|/\\-")
+
+
+def _subset_error(pattern: str, offset: int, message: str) -> ValueError:
+    return ValueError(f"{message} at offset {offset} in {pattern!r}")
+
+
+def _consume_escape(pattern: str, offset: int) -> int:
+    if offset + 1 >= len(pattern):
+        raise _subset_error(pattern, offset, "trailing escape")
+    marker = pattern[offset + 1]
+    if marker in REPOSITORY_SIMPLE_ESCAPES or marker in REPOSITORY_ESCAPED_LITERALS:
+        return offset + 2
+    if marker == "x":
+        end = offset + 4
+        if end > len(pattern) or any(char not in string.hexdigits for char in pattern[offset + 2:end]):
+            raise _subset_error(pattern, offset, "invalid hexadecimal escape")
+        return end
+    if marker == "u":
+        if offset + 2 < len(pattern) and pattern[offset + 2] == "{":
+            close = pattern.find("}", offset + 3)
+            digits = pattern[offset + 3:close] if close >= 0 else ""
+            if not (1 <= len(digits) <= 6 and all(char in string.hexdigits for char in digits)):
+                raise _subset_error(pattern, offset, "invalid Unicode code-point escape")
+            if int(digits, 16) > 0x10FFFF:
+                raise _subset_error(pattern, offset, "Unicode code point exceeds U+10FFFF")
+            return close + 1
+        end = offset + 6
+        if end > len(pattern) or any(char not in string.hexdigits for char in pattern[offset + 2:end]):
+            raise _subset_error(pattern, offset, "invalid Unicode escape")
+        return end
+    if marker in "pP":
+        if offset + 2 >= len(pattern) or pattern[offset + 2] != "{":
+            raise _subset_error(pattern, offset, "Unicode property escape requires braces")
+        close = pattern.find("}", offset + 3)
+        property_name = pattern[offset + 3:close] if close >= 0 else ""
+        if not property_name or any(char not in string.ascii_letters + string.digits + "_=-" for char in property_name):
+            raise _subset_error(pattern, offset, "invalid Unicode property escape")
+        return close + 1
+    raise _subset_error(pattern, offset, "escape is outside the repository ECMAScript subset")
+
+
+def _consume_class(pattern: str, offset: int) -> int:
+    cursor = offset + 1
+    if cursor < len(pattern) and pattern[cursor] == "^":
+        cursor += 1
+    has_member = False
+    while cursor < len(pattern):
+        character = pattern[cursor]
+        if character == "]":
+            if not has_member:
+                raise _subset_error(pattern, offset, "empty character class")
+            return cursor + 1
+        if character == "\\":
+            cursor = _consume_escape(pattern, cursor)
+            has_member = True
+            continue
+        if character not in REPOSITORY_CLASS_CHARACTERS:
+            raise _subset_error(pattern, cursor, "character class contains an unapproved literal")
+        cursor += 1
+        has_member = True
+    raise _subset_error(pattern, offset, "unterminated character class")
+
+
+def _consume_braced_quantifier(pattern: str, offset: int) -> int:
+    cursor = offset + 1
+    lower_start = cursor
+    while cursor < len(pattern) and pattern[cursor].isdigit():
+        cursor += 1
+    if cursor == lower_start:
+        raise _subset_error(pattern, offset, "invalid braced quantifier")
+    lower = int(pattern[lower_start:cursor])
+    if cursor < len(pattern) and pattern[cursor] == "}":
+        return cursor + 1
+    if cursor >= len(pattern) or pattern[cursor] != ",":
+        raise _subset_error(pattern, offset, "invalid braced quantifier")
+    cursor += 1
+    upper_start = cursor
+    while cursor < len(pattern) and pattern[cursor].isdigit():
+        cursor += 1
+    if cursor >= len(pattern) or pattern[cursor] != "}":
+        raise _subset_error(pattern, offset, "invalid braced quantifier")
+    if cursor > upper_start and lower > int(pattern[upper_start:cursor]):
+        raise _subset_error(pattern, offset, "quantifier range is inverted")
+    return cursor + 1
+
+
+def _consume_quantifier(pattern: str, offset: int, can_quantify: bool) -> int:
+    if not can_quantify:
+        raise _subset_error(pattern, offset, "quantifier has no preceding atom")
+    cursor = _consume_braced_quantifier(pattern, offset) if pattern[offset] == "{" else offset + 1
+    if cursor < len(pattern) and pattern[cursor] == "?":
+        cursor += 1
+    if cursor < len(pattern) and pattern[cursor] in "*+?{":
+        raise _subset_error(pattern, cursor, "stacked or possessive quantifier")
+    return cursor
+
+
+def scan_repository_ecmascript_subset(pattern: str) -> None:
+    """Accept only the deliberately conservative ECMAScript subset used by repository schemas."""
+    cursor = 0
+    can_quantify = False
+    can_end_alternative = False
+    groups: list[bool] = []
+    while cursor < len(pattern):
+        character = pattern[cursor]
+        if character == "\\":
+            cursor = _consume_escape(pattern, cursor)
+            can_quantify = True
+            can_end_alternative = True
+        elif character == "[":
+            cursor = _consume_class(pattern, cursor)
+            can_quantify = True
+            can_end_alternative = True
+        elif character == "(":
+            if cursor + 1 < len(pattern) and pattern[cursor + 1] == "?":
+                opener = pattern[cursor + 1:cursor + 3]
+                if opener == "?:":
+                    groups.append(True)
+                    cursor += 3
+                elif opener in {"?=", "?!"}:
+                    groups.append(False)
+                    cursor += 3
+                else:
+                    raise _subset_error(pattern, cursor, "group extension is outside the repository ECMAScript subset")
+            else:
+                groups.append(True)
+                cursor += 1
+            can_quantify = False
+            can_end_alternative = False
+        elif character == ")":
+            if not groups:
+                raise _subset_error(pattern, cursor, "unmatched closing group")
+            can_quantify = groups.pop()
+            can_end_alternative = can_quantify
+            cursor += 1
+        elif character in "*+?{":
+            cursor = _consume_quantifier(pattern, cursor, can_quantify)
+            can_quantify = False
+            can_end_alternative = True
+        elif character == "|":
+            if not can_end_alternative:
+                raise _subset_error(pattern, cursor, "alternative has no preceding atom")
+            cursor += 1
+            can_quantify = False
+            can_end_alternative = False
+        elif character in "^$":
+            cursor += 1
+            can_quantify = False
+            can_end_alternative = True
+        elif character == ".":
+            cursor += 1
+            can_quantify = True
+            can_end_alternative = True
+        elif character in REPOSITORY_LITERAL_CHARACTERS:
+            cursor += 1
+            can_quantify = True
+            can_end_alternative = True
+        else:
+            raise _subset_error(pattern, cursor, "literal is outside the repository ECMAScript subset")
+    if groups:
+        raise _subset_error(pattern, len(pattern), "unterminated group")
+
 
 
 def load_fixture(path: str) -> dict:
@@ -119,15 +265,14 @@ def all_schema_patterns() -> list[str]:
 
 def assert_ecmascript_subset(patterns: list[str]) -> None:
     assert patterns, "expected at least one schema pattern"
-    forbidden = {
-        token
-        for token in ECMASCRIPT_SUBSET_FORBIDDEN
-        if any(token in pattern for pattern in patterns)
-    }
-    assert not forbidden, (
-        "schema patterns use syntax outside the approved ECMAScript subset: "
-        f"{sorted(forbidden)}"
-    )
+    for pattern in patterns:
+        try:
+            scan_repository_ecmascript_subset(pattern)
+        except ValueError as error:
+            raise AssertionError(
+                "schema patterns use syntax outside the approved ECMAScript subset: "
+                f"{error}"
+            ) from None
 
 
 def confirm_node_patterns(patterns: list[str]) -> None:
@@ -147,20 +292,49 @@ def test_node_confirms_all_schema_patterns_when_available() -> None:
     confirm_node_patterns(all_schema_patterns())
 
 
-@pytest.mark.parametrize(
-    "pattern",
-    [
-        r"(?i:alpha)",
-        r"(?P<name>alpha)",
-        r"(?P=name)",
-        r"(?<=alpha)beta",
-        r"\Aalpha\Z",
-        r"(?# Python comment)alpha",
-    ],
-)
+PYTHON_EXTENSION_MUTATIONS = [
+    r"(?i:alpha)",
+    r"(?-i:alpha)",
+    r"(?im:alpha)",
+    r"(?>alpha)",
+    r"alpha*+",
+    r"alpha++",
+    r"alpha?+",
+    r"alpha{1,2}+",
+    r"alpha**",
+    r"alpha?*",
+    r"alpha{1,2}??",
+    r"(?P<name>alpha)",
+    r"(?P=name)",
+    r"(?# Python comment)alpha",
+    r"(?(1)alpha|beta)",
+    r"(?|alpha|beta)",
+    r"(?R)",
+    r"(?1)",
+    r"\Aalpha\Z",
+    r"\N{LATIN SMALL LETTER A}",
+    r"\u{110000}",
+]
+
+
+@pytest.mark.parametrize("pattern", PYTHON_EXTENSION_MUTATIONS)
 def test_static_ecmascript_subset_rejects_python_only_syntax(pattern: str) -> None:
     with pytest.raises(AssertionError, match="outside the approved ECMAScript subset"):
         assert_ecmascript_subset([pattern])
+
+
+@pytest.mark.parametrize("pattern", [r"(?>alpha)", r"alpha++", r"(?-i:alpha)"])
+def test_reported_extensions_compile_in_python_and_fail_node_unicode(pattern: str) -> None:
+    re.compile(pattern)
+    node = shutil.which("node")
+    if node is None:
+        pytest.skip("Node is unavailable for the reported-extension confirmation")
+    result = subprocess.run(
+        [node, "-e", "new RegExp(process.argv[1], 'u');", pattern],
+        text=True,
+        capture_output=True,
+    )
+    assert result.returncode != 0, "Node accepted a reported Python-only extension"
 
 
 def test_portability_static_gate_remains_meaningful_without_node(monkeypatch: pytest.MonkeyPatch) -> None:
