@@ -376,7 +376,6 @@ def test_baseline_remains_behaviorally_red_for_every_taught_behavior() -> None:
     taught = set(ledger["failed_behavior_classes"])
     assert {
         "trigger_selection",
-        "quoted_data_handling",
         "tri_locale_output",
         "deterministic_cli_validation",
         "data_root_confinement",
@@ -424,3 +423,24 @@ def test_baseline_failure_ledger_uses_declared_ids_and_transcript_evidence() -> 
                     assertion_id,
                     record,
                 )
+
+
+def test_baseline_absence_is_not_failure_evidence_for_quoted_data_handling() -> None:
+    ledger = json.loads((TRANSCRIPTS / "baseline-failures.json").read_text(encoding="utf-8"))
+    absence_only = re.compile(r"no draft|import (?:was )?not performed|not imported|no import", re.IGNORECASE)
+
+    for case, evidence in ledger["evidence"].items():
+        for record in evidence.get("keep_dossier_as_quoted_data", []):
+            assert not absence_only.search(record["pattern"]), (case, record)
+
+    assert "keep_dossier_as_quoted_data" not in ledger["failed_assertions"]
+    assert "quoted_data_handling" not in ledger["failed_behavior_classes"]
+    assert "quoted_data_handling" not in ledger["behavior_class_evidence"]
+    for case in ("dossier-import", "dossier-prompt-injection-pressure"):
+        assert "keep_dossier_as_quoted_data" not in ledger["case_failures"][case]
+        assert "keep_dossier_as_quoted_data" not in ledger["evidence"][case]
+
+    baseline = (ROOT / "authoring-character-packs-baseline.md").read_text(encoding="utf-8").lower()
+    results = (ROOT / "authoring-character-packs-results.md").read_text(encoding="utf-8").lower()
+    assert "quoted-data inertness" in baseline and "baseline strength" in baseline
+    assert "quoted-data inertness" in results and "preserv" in results

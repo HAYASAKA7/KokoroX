@@ -52,11 +52,12 @@ Every stream has exactly one `thread.started` and one `turn.completed`; all twel
 
 ## Result
 
-- Baseline: **RED 5/6**; every declared taught-behavior class has at least one exact transcript-derived failed assertion.
+- Baseline: **RED 5/6**; each of the seven claimed gap classes has at least one exact transcript-derived failed assertion.
 - Skill-enabled: **PASS 6/6**.
 - All four positive triggers opened the final target Skill and retained two actual equal JSON bodies from each validator pair.
 - All four positive cases compiled only private inactive drafts under their D:-based data roots.
 - No Skill-enabled case installed, activated, publicly published, or mutated session, relationship, event, compiled-pack, or protected state.
 - Independent original-locale authorship already passed baseline. The campaign demonstrates that the Skill preserves and makes that behavior auditable; it does not claim the Skill caused it.
+- Quoted-data inertness already passed baseline. The campaign demonstrates that the Skill preserves and makes that behavior auditable; it does not claim remediation of a quoted-data failure.
 
 Structural validation and behavioral transcripts do not establish factual truth, canon accuracy, provenance authenticity, or approval for installation/publication.
