@@ -35,7 +35,7 @@ def test_request_uses_public_flat_identity_and_scope_contract() -> None:
     assert request["character_id"] == "aoi-kisaragi-fixture"
     assert request["display_name"] == "Aoi Kisaragi Fixture"
     assert request["research_questions"]
-    assert request["required_coverage_topics"] == ["role", "behavior"]
+    assert request["required_coverage_topics"] == ["role-primary", "role-alternate"]
     assert "subject" not in request and "scope" not in request
 
 

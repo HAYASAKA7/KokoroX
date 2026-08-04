@@ -1,1 +1,25 @@
-{"schema_version":"1.0","artifact_id":"research/aoi-kisaragi-fixture/source-episode-01","created_by":{"component":"kokoroarc","version":"0.0.0.dev0"},"source_id":"source-episode-01","category":"episode","locator":"kokoro-evidence:fixture-arc/episode-01","title":"Fixture Arc Episode 01","publisher":"Fixture Arc Studio","accessed_at":"2026-08-04T00:00:00Z","availability":"available","content_sha256":"2222222222222222222222222222222222222222222222222222222222222222","excerpts":["Aoi pauses, checks the star chart, and gives a calm answer."],"continuity":"fixture-primary","spoiler_scope":"episode-01 only","limitations":[],"trust_notes":["Fictional episode fixture record."]}
+{
+  "schema_version": "1.0",
+  "artifact_id": "research/aoi-kisaragi-fixture/source-episode-01",
+  "created_by": {
+    "component": "kokoroarc",
+    "version": "0.0.0.dev0"
+  },
+  "source_id": "source-episode-01",
+  "category": "episode",
+  "locator": "kokoro-evidence:fixture-arc/episode-01",
+  "title": "Fixture Arc Episode 01",
+  "publisher": "Fixture Arc Studio",
+  "accessed_at": "2026-08-04T00:00:00Z",
+  "availability": "available",
+  "content_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+  "excerpts": [
+    "In this fixture timeline, Aoi states that she is not an observatory apprentice."
+  ],
+  "continuity": "fixture-primary",
+  "spoiler_scope": "episode-01 only",
+  "limitations": [],
+  "trust_notes": [
+    "Fictional episode fixture record."
+  ]
+}

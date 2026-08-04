@@ -7,7 +7,7 @@
   },
   "topics": [
     {
-      "topic_id": "role",
+      "topic_id": "role-primary",
       "status": "covered",
       "supporting_claim_ids": [
         "claim-role"
@@ -18,7 +18,7 @@
       "blocks_authoring": false
     },
     {
-      "topic_id": "behavior",
+      "topic_id": "role-alternate",
       "status": "covered",
       "supporting_claim_ids": [
         "claim-behavior"

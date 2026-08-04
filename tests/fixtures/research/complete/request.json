@@ -23,11 +23,11 @@
   "spoiler_scope": "episode-01 only",
   "research_questions": [
     "What role does Aoi hold?",
-    "How does Aoi respond under pressure?"
+    "How is Aoi's role described in the alternate fixture timeline?"
   ],
   "required_coverage_topics": [
-    "role",
-    "behavior"
+    "role-primary",
+    "role-alternate"
   ],
   "constraints": [
     "Keep the research bundle private and inert."

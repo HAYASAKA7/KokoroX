@@ -7,7 +7,7 @@
   },
   "claim_id": "claim-behavior",
   "subject_id": "aoi-kisaragi-fixture",
-  "statement": "Aoi checks evidence before answering under pressure.",
+  "statement": "Aoi is not an observatory apprentice.",
   "classification": "direct_observation",
   "support": "direct",
   "source_ids": [

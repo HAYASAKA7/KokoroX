@@ -7,12 +7,12 @@
   },
   "request": {
     "path": "request.json",
-    "sha256": "e3e5815acba7139031cded05b3ac4e2caea7bee5b85964be6a6e9d7aa81de98f"
+    "sha256": "1568eb96e6892e6518e186ab43db9380219e876f448c04e830b84e11fd5dfc6d"
   },
   "sources": [
     {
       "path": "sources/source-episode-01.json",
-      "sha256": "2d0565c98462c476e6a5446aa81bf1a1922db98bbb6a2ae12061ba6a105cad26"
+      "sha256": "d44dea0c930e82b8af5952cf448d0a3f8a09aed6054be8aaa07070be66694407"
     },
     {
       "path": "sources/source-official-profile.json",
@@ -22,7 +22,7 @@
   "claims": [
     {
       "path": "claims/claim-behavior.json",
-      "sha256": "92b4726fa896785e070d8f41f7ce4a2aca09659bdea175b9fdcd50d416389841"
+      "sha256": "de8f1c581d64182bc8a9a668a762d43885f6364b784812023b1d4c7cf68720c2"
     },
     {
       "path": "claims/claim-role.json",
@@ -32,11 +32,11 @@
   "conflicts": [
     {
       "path": "conflicts/conflict-adaptation-wording.json",
-      "sha256": "6d1fc492c324ea063e0df711864c04098681fb551cc383907f1d5242d885fd56"
+      "sha256": "f99d693b908bf4cc337a8f60accdb067677ee7c3c90c91d125571ff8ce4add5c"
     }
   ],
   "coverage": {
     "path": "coverage.json",
-    "sha256": "619dfda239d4ac925caad308099ccdde47e3820df5a63b1d624bb41bf916eb7e"
+    "sha256": "66d19afa19de0b5860fb59d1221593c4bee9b35b6a90941d1b9b12054c969d80"
   }
 }

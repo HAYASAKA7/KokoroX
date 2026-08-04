@@ -10,7 +10,7 @@
     "claim-role",
     "claim-behavior"
   ],
-  "kind": "wording",
+  "kind": "source_disagreement",
   "scopes": [
     "fixture-primary@episode-01",
     "fixture-primary@episode-01-behavior"
@@ -19,5 +19,5 @@
   "selected_claim_ids": [
     "claim-role"
   ],
-  "resolution_rationale": "Claims apply to distinct fixture scopes."
+  "resolution_rationale": "The claims make incompatible assertions about Aoi's role in distinct fixture timelines; both are retained as scope-separated rather than selecting a universal conclusion."
 }
