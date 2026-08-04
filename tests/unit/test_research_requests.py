@@ -3,6 +3,7 @@ from __future__ import annotations
 from copy import deepcopy
 import json
 from pathlib import Path
+import traceback
 from typing import Any, cast
 import unicodedata
 
@@ -52,10 +53,13 @@ def assert_safe_canonical_error(error: KokoroError, secrets: tuple[str, ...]) ->
     serialized_envelope = json.dumps(
         error.envelope(), ensure_ascii=False, sort_keys=True
     )
+    formatted_traceback = "".join(traceback.format_exception(error))
     assert error.code == "INVALID_PACK_DATA"
     assert str(error) == SAFE_CANONICAL_MESSAGE
     assert error.details == {"path": []}
     assert error.retryable is False
+    assert error.__cause__ is None
+    assert error.__suppress_context__ is True
     assert error.envelope() == {
         "ok": False,
         "error": {
@@ -69,6 +73,7 @@ def assert_safe_canonical_error(error: KokoroError, secrets: tuple[str, ...]) ->
         assert secret not in str(error)
         assert secret not in serialized_details
         assert secret not in serialized_envelope
+        assert secret not in formatted_traceback
 
 
 def count_values(field: str, count: int) -> list[str]:
@@ -267,19 +272,30 @@ def test_invalid_root_type_is_rejected(registry: SchemaRegistry) -> None:
 def test_schema_validation_error_does_not_leak_assertion_or_source_payload(
     registry: SchemaRegistry, complete_request: dict[str, Any]
 ) -> None:
-    sensitive = "SENSITIVE_ASSERTION_SOURCE_PAYLOAD"
-    complete_request["user_assertions"] = [sensitive * 200]
+    secrets = (
+        "UNIQUE_SENSITIVE_ASSERTION_SOURCE_KEY",
+        "UNIQUE_SENSITIVE_ASSERTION_SOURCE_VALUE",
+    )
+    complete_request["user_assertions"] = cast(Any, [{secrets[0]: secrets[1]}])
 
     error = invalid_request(registry, complete_request)
 
     serialized_details = json.dumps(error.details, ensure_ascii=False)
+    serialized_envelope = json.dumps(error.envelope(), ensure_ascii=False)
+    formatted_traceback = "".join(traceback.format_exception(error))
     assert error.code == "SCHEMA_VALIDATION_FAILED"
-    assert sensitive not in str(error)
-    assert sensitive not in serialized_details
+    assert str(error) == "Research request does not satisfy the required schema."
     assert error.details == {
         "schema": "research-request",
         "path": ["user_assertions", 0],
     }
+    assert error.__cause__ is None
+    assert error.__suppress_context__ is True
+    for secret in secrets:
+        assert secret not in str(error)
+        assert secret not in serialized_details
+        assert secret not in serialized_envelope
+        assert secret not in formatted_traceback
 
 
 @pytest.mark.parametrize(

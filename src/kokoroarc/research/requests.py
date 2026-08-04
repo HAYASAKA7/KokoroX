@@ -45,7 +45,7 @@ def normalize_research_request(
                 "schema": "research-request",
                 "path": error.details.get("path", []),
             },
-        ) from error
+        ) from None
 
     normalized = cast(dict[str, Any], normalized_value)
     for field in _SCOPE_FIELDS:
