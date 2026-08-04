@@ -236,7 +236,7 @@ The CLI never performs network access. It does not accept arbitrary output paths
 
 Milestone 7 enables `researched` and `hybrid` request prerequisites without bypassing Milestone 6 validation.
 
-The Character Build Request carries a `research_bundle` input containing an explicit trusted bundle path and expected bundle hash. Authoring loads the bundle, validates it, and requires:
+The Character Build Request carries a `research_bundle` input containing the expected bundle artifact ID and SHA-256, but no filesystem path. The host passes the trusted bundle path separately through the authoring CLI. Request data therefore cannot select an arbitrary file. Authoring loads the explicit path, validates it, binds it to the request identity and hash, and requires:
 
 - matching namespace, character ID, and display identity;
 - matching continuity, timeline, and spoiler scope;
