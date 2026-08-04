@@ -32,7 +32,7 @@ python -m kokoroarc.cli character draft validate --request <request.json> --pack
 python -m kokoroarc.cli character draft compile --request <request.json> --pack <source-pack> --json
 ```
 
-Run each stateless validation twice. Compare the complete JSON values, not selected fields. Continue only when both request results match, both draft results match, `valid` is true, all hard failures are empty, and locale coverage is true for all three first-class locales.
+Run each stateless validation twice. Preserve both complete output bodies from each pair and compare them, not a self-reported match boolean or selected fields. Continue only when both request results match, both draft results match, `valid` is true, all hard failures are empty, and locale coverage is true for all three first-class locales.
 
 Compilation success must report and preserve:
 
@@ -52,5 +52,5 @@ Treat identity mismatch, missing locale, provenance failure, unsafe path, or act
 2. deterministic request/draft validation result;
 3. three-locale coverage;
 4. private draft path and fixed lifecycle fields, if compiled;
-5. advisories, unresolved evidence, and missing prerequisites—explicitly say `none` when empty;
+5. advisories and missing prerequisites, plus a separate `Unresolved evidence:` line—use the literal value `none` when empty;
 6. confirmation that research, external verification, installation, public publication, activation, and relationship-state mutation did not occur.

@@ -1,0 +1,10 @@
+{
+  "schema_version": "1.0",
+  "absent_at_start": [
+    "pack/locales/zh-CN.yaml",
+    "pack/locales/en-US.yaml",
+    "pack/locales/ja-JP.yaml",
+    "pack/tests/positive.yaml",
+    "pack/tests/negative.yaml"
+  ]
+}

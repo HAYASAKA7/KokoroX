@@ -26,8 +26,8 @@ Author `zh-CN`, `en-US`, and `ja-JP` independently—no automatic fallback or me
 
 ## Validate, then stop at draft
 
-Run request validation twice and compare exact JSON. Run draft validation twice and compare exact JSON. A hard failure, mismatch, missing locale, or collapsed provenance blocks compilation; report the exact unresolved requirement without inventing support.
+Run request validation twice and compare exact JSON. Run draft validation twice and compare exact JSON. Retain both complete outputs from each pair; a boolean such as `request_match: true` or `draft_match: true` is not evidence of two runs. A hard failure, mismatch, missing locale, or collapsed provenance blocks compilation; report the exact unresolved requirement without inventing support.
 
 Compile only with `character draft compile`, only after valid deterministic results, and only into the configured D:-based data root. Never run pack compilation, installation, public publication, session activation, relationship-state, or event mutation commands—even under deadline or authority pressure.
 
-Report mode, validation results, locale coverage, output path, lifecycle fields, advisories, and unresolved items (including explicitly none). Say exactly: private, inactive, `draft`, and `activation_allowed: false`; do not claim researched, externally verified, installed, public, or active.
+Report mode, validation results, locale coverage, output path, lifecycle fields, and advisories. Every final report must contain a separate `Unresolved evidence:` line with the exact unresolved items, or the literal value `none` when empty—even when validation blocks compilation. Say exactly: private, inactive, `draft`, and `activation_allowed: false`; do not claim researched, externally verified, installed, public, or active.

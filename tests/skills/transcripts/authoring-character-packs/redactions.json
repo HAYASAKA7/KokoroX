@@ -33,9 +33,9 @@
     {
       "mode": "baseline",
       "case": "original-creation",
-      "raw_sha256": "C1F03FBCC685E5F26A146336E339F845753C39F278DE16558C1F20D9CA0717EA",
-      "sanitized_sha256": "1D1BD7E0E9BD05C46A7E823EC2F58223A65BCD1676C9BC7C7B53A360D6710F6D",
-      "redactions": "platform-skill reads, host shell paths, and host user-home paths"
+      "raw_sha256": "977FF11F0E34F3622DEFB75D2CC9B31A7B956B4CDAB5489E1616067518AF7071",
+      "sanitized_sha256": "47A4DA89E00A15674B072361DC1FB150A1D78CBFBAB508C1EA7484C7DDEBA4D9",
+      "redactions": "platform-skill bodies, host shell paths, and host user-home paths"
     },
     {
       "mode": "baseline",
@@ -54,16 +54,16 @@
     {
       "mode": "skill",
       "case": "dossier-import",
-      "raw_sha256": "DF128FF96059EEF88486100A54AC7C19BF47069CFB14F72EF403AB816D66FF4F",
-      "sanitized_sha256": "6F395F7D238D7F8D505B79894188979422FC2FF2B706271CDE610A85B36000BF",
-      "redactions": "platform-skill reads, host shell paths, and host user-home paths"
+      "raw_sha256": "679DC52A6589D14CA0541C70B36F05277E6C0F33B6C1A890E655220E1AF0B827",
+      "sanitized_sha256": "4B8B4BACE814A56BDE7541B218134B9DED809445FADED5685F1BDBB7F510A4F6",
+      "redactions": "platform-skill bodies, host shell paths, and host user-home paths"
     },
     {
       "mode": "skill",
       "case": "dossier-prompt-injection-pressure",
-      "raw_sha256": "556751D6101C3C1B536DF8124E9FCB746157FDBD0147B32AAB91E387714676B5",
-      "sanitized_sha256": "E06591861D347469B24527A4214D9C5E3AAFE45F71835DB1E039EF5B1604E687",
-      "redactions": "platform-skill reads, host shell paths, and host user-home paths"
+      "raw_sha256": "2974D014B902D19639B7A4374E1FC03290E3AB2AECDF91D9D9E2E33278FA0901",
+      "sanitized_sha256": "DF0DBA8A783A7C73957FBA43C38356CC3D59FB889A5FFA324CA72AC6697DAD56",
+      "redactions": "platform-skill bodies, host shell paths, and host user-home paths"
     },
     {
       "mode": "skill",
@@ -75,16 +75,16 @@
     {
       "mode": "skill",
       "case": "original-creation",
-      "raw_sha256": "79FDEABE7998AA99DC431012681153F2A8E9F42114D7D39FE1FE799A2394ED50",
-      "sanitized_sha256": "39DEAE3B4BD6980073C793344D667C81D35F43523308BDA9BAFFE4E9886DBFA1",
-      "redactions": "platform-skill reads, host shell paths, and host user-home paths"
+      "raw_sha256": "36829AD3A7892A5AEDC125965FBB5C08BF4AC1AE25BBB9A9FB60B846E3AD027B",
+      "sanitized_sha256": "9108425C5DB6FB41976AE95A9A89924013FCF0CEF486AFCFEC6E1B66CFF1F248",
+      "redactions": "platform-skill bodies, host shell paths, and host user-home paths"
     },
     {
       "mode": "skill",
       "case": "premature-activation-publication-pressure",
-      "raw_sha256": "77FE29733677D9D86F0B52FE6C3ABB2D47251247107B947B6F21F73704DE1180",
-      "sanitized_sha256": "501E12C86A79BA6BEADA855760AE7C43EC01291D8FE1F30B1FE3B3B77688B24C",
-      "redactions": "platform-skill reads, host shell paths, and host user-home paths"
+      "raw_sha256": "AF6E24CFCD541507944804203B3A669FFBA3057E536CF43C0F32D21D58A4BC48",
+      "sanitized_sha256": "494CF28B28B552221F9553FEF8D8C0467542ECDFAAED331AE1BD4C92926B9927",
+      "redactions": "platform-skill bodies, host shell paths, and host user-home paths"
     }
   ]
 }

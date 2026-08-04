@@ -1,10 +1,11 @@
-Created and validated the Rin Aster draft.
+Created the five missing artifacts and validated them deterministically.
 
-- Mode: original; source: local `pack`
-- Validation: request and draft validation each ran twice with exact matching JSON; all valid
-- Locales: zh-CN, en-US, ja-JP all covered
-- Draft: [049c8a4dcec7cd71](D:\tmp\kokoroarc-authoring-campaign\skill\original-creation\data\drafts\original\rin-aster\draft\049c8a4dcec7cd71)
-- Lifecycle: private, inactive, `draft`, `activation_allowed: false`
-- Advisories/unresolved items: none
+- Request validation: two identical valid JSON results.
+- Draft validation: two identical valid JSON results; all `zh-CN`, `en-US`, and `ja-JP` covered; no hard failures or advisories.
+- Compiled output: private, inactive, `draft`, `activation_allowed: false`.
 
-No research, external verification, installation, public publication, activation, or relationship-state mutation occurred.
+Private draft: [5b33a7ed41bfdc42](D:\tmp\kokoroarc-authoring-campaign-v2\skill\original-creation\data\drafts\original\rin-aster\draft\5b33a7ed41bfdc42)
+
+The required `AUTHORING_ARTIFACT_EVIDENCE=` inspection was emitted from the five created files. No research, external verification, installation, publication, activation, or state mutation occurred.
+
+Unresolved evidence: none

@@ -1,8 +1,11 @@
-Created and deterministically validated the private Rin Aster draft.
+Authored all five missing artifacts:
 
-- Draft: [draft.json](D:\tmp\kokoroarc-authoring-campaign\baseline\original-creation\data\drafts\original\rin-aster\draft\049c8a4dcec7cd71\draft.json)
-- All locales covered: `zh-CN`, `en-US`, `ja-JP`
-- Validation: valid; no hard failures, advisories, or unresolved warnings
-- Determinism: repeated compilation produced identical artifact and validation hashes
-- Privacy: `visibility: private`, `activation_allowed: false`
-- No compiled, installed, public, or active-session artifact was created.
+- [Locale profiles](D:\tmp\kokoroarc-authoring-campaign-v2\baseline\original-creation\pack\locales)
+- [Positive fixture](D:\tmp\kokoroarc-authoring-campaign-v2\baseline\original-creation\pack\tests\positive.yaml)
+- [Negative fixture](D:\tmp\kokoroarc-authoring-campaign-v2\baseline\original-creation\pack\tests\negative.yaml)
+
+Validation succeeded with complete locale coverage and no hard failures. Created private, inactive draft:
+
+`original/rin-aster/draft/f46ddde6107521fa`
+
+The required `AUTHORING_ARTIFACT_EVIDENCE=` line was emitted from the created source files and initial-state record.
