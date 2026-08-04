@@ -1,1 +1,34 @@
-{"schema_version":"1.0","artifact_id":"research/aoi-kisaragi-fixture/partial-request","created_by":{"component":"kokoroarc","version":"0.0.0.dev0"},"subject":{"subject_id":"aoi-kisaragi-fixture","identity":"Aoi Kisaragi Fixture","franchise":"fixture-arc","aliases":["Aoi"]},"scope":{"medium":"animated serial","work":"Fixture Arc","adaptation":"fixture-primary","continuity":"fixture-primary","timeline_cutoff":"episode-01","spoiler_scope":"episode-01 only"},"questions":["What role does Aoi hold?","What remains unknown?"],"coverage_topics":["role","missing-history"],"user_assertions":[],"user_constraints":["Do not infer unavailable material."],"requested_visibility":"private"}
+{
+  "schema_version": "1.0",
+  "artifact_id": "research/aoi-kisaragi-fixture/partial-request",
+  "created_by": {
+    "component": "kokoroarc",
+    "version": "0.0.0.dev0"
+  },
+  "user_assertions": [],
+  "requested_visibility": "private",
+  "namespace": "research",
+  "character_id": "aoi-kisaragi-fixture",
+  "display_name": "Aoi Kisaragi Fixture",
+  "franchise": "fixture-arc",
+  "aliases": [
+    "Aoi"
+  ],
+  "medium": "animated serial",
+  "work": "Fixture Arc",
+  "adaptation": "fixture-primary",
+  "continuity": "fixture-primary",
+  "timeline_cutoff": "episode-01",
+  "spoiler_scope": "episode-01 only",
+  "research_questions": [
+    "What role does Aoi hold?",
+    "What remains unknown?"
+  ],
+  "required_coverage_topics": [
+    "role",
+    "missing-history"
+  ],
+  "constraints": [
+    "Do not infer unavailable material."
+  ]
+}

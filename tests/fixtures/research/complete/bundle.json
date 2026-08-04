@@ -1,1 +1,186 @@
-{"schema_version":"1.0","artifact_id":"research/aoi-kisaragi-fixture/bundle","created_by":{"component":"kokoroarc","version":"0.0.0.dev0"},"build_status":"research","visibility":"private","activation_allowed":false,"authoring_allowed":true,"identity":{"subject_id":"aoi-kisaragi-fixture","franchise":"fixture-arc"},"scope":{"continuity":"fixture-primary","timeline_cutoff":"episode-01","spoiler_scope":"episode-01 only"},"request_hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","workspace_hash":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","validation_report_hash":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc","source_records":[{"source_id":"source-official-profile"},{"source_id":"source-episode-01"}],"claims":[{"claim_id":"claim-behavior"},{"claim_id":"claim-role"}],"conflicts":[{"conflict_id":"conflict-adaptation-wording"}],"coverage":{"artifact_id":"research/aoi-kisaragi-fixture/coverage"},"limitations":[],"blocking_reasons":[],"bundle_hash":"dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"}
+{
+  "schema_version": "1.0",
+  "artifact_id": "research/aoi-kisaragi-fixture/bundle",
+  "created_by": {
+    "component": "kokoroarc",
+    "version": "0.0.0.dev0"
+  },
+  "build_status": "research",
+  "visibility": "private",
+  "activation_allowed": false,
+  "authoring_allowed": true,
+  "namespace": "research",
+  "character_id": "aoi-kisaragi-fixture",
+  "display_name": "Aoi Kisaragi Fixture",
+  "franchise": "fixture-arc",
+  "aliases": [
+    "Aoi",
+    "Kisaragi"
+  ],
+  "medium": "animated serial",
+  "work": "Fixture Arc",
+  "adaptation": "fixture-primary",
+  "continuity": "fixture-primary",
+  "timeline_cutoff": "episode-01",
+  "spoiler_scope": "episode-01 only",
+  "request_hash": "986465635387372072db3fc845c7114ac634130df1aac7a3fc1ed63a628bda1f",
+  "workspace_hash": "36684e5cea34eea3aeda89a783b237b5f666743fa07b39d9ffc5856a4624cd6e",
+  "validation_report_hash": "64f885a30aa4d73f3eb5afc04e43947414308ca32efd2c22ec8774f3b31503ed",
+  "sources": [
+    {
+      "schema_version": "1.0",
+      "artifact_id": "research/aoi-kisaragi-fixture/source-episode-01",
+      "created_by": {
+        "component": "kokoroarc",
+        "version": "0.0.0.dev0"
+      },
+      "source_id": "source-episode-01",
+      "category": "episode",
+      "locator": "kokoro-evidence:fixture-arc/episode-01",
+      "title": "Fixture Arc Episode 01",
+      "publisher": "Fixture Arc Studio",
+      "accessed_at": "2026-08-04T00:00:00Z",
+      "availability": "available",
+      "content_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "excerpts": [
+        "Aoi pauses, checks the star chart, and gives a calm answer."
+      ],
+      "continuity": "fixture-primary",
+      "spoiler_scope": "episode-01 only",
+      "limitations": [],
+      "trust_notes": [
+        "Fictional episode fixture record."
+      ]
+    },
+    {
+      "schema_version": "1.0",
+      "artifact_id": "research/aoi-kisaragi-fixture/source-official-profile",
+      "created_by": {
+        "component": "kokoroarc",
+        "version": "0.0.0.dev0"
+      },
+      "source_id": "source-official-profile",
+      "category": "official_profile",
+      "locator": "https://evidence.fixture-arc.example/aoi-profile",
+      "title": "Aoi Kisaragi Fixture Profile",
+      "publisher": "Fixture Arc Studio",
+      "accessed_at": "2026-08-04T00:00:00Z",
+      "availability": "available",
+      "content_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "excerpts": [
+        "Aoi serves as the observatory apprentice."
+      ],
+      "continuity": "fixture-primary",
+      "spoiler_scope": "episode-01 only",
+      "limitations": [],
+      "trust_notes": [
+        "Fictional official fixture record."
+      ]
+    }
+  ],
+  "claims": [
+    {
+      "schema_version": "1.0",
+      "artifact_id": "research/aoi-kisaragi-fixture/claim-behavior",
+      "created_by": {
+        "component": "kokoroarc",
+        "version": "0.0.0.dev0"
+      },
+      "claim_id": "claim-behavior",
+      "subject_id": "aoi-kisaragi-fixture",
+      "statement": "Aoi checks evidence before answering under pressure.",
+      "classification": "direct_observation",
+      "support": "direct",
+      "source_ids": [
+        "source-episode-01"
+      ],
+      "supporting_claim_ids": [],
+      "continuity": "fixture-primary",
+      "timeline": "episode-01-behavior",
+      "spoiler_scope": "episode-01 only",
+      "limitations": []
+    },
+    {
+      "schema_version": "1.0",
+      "artifact_id": "research/aoi-kisaragi-fixture/claim-role",
+      "created_by": {
+        "component": "kokoroarc",
+        "version": "0.0.0.dev0"
+      },
+      "claim_id": "claim-role",
+      "subject_id": "aoi-kisaragi-fixture",
+      "statement": "Aoi is an observatory apprentice.",
+      "classification": "direct_fact",
+      "support": "direct",
+      "source_ids": [
+        "source-official-profile"
+      ],
+      "supporting_claim_ids": [],
+      "continuity": "fixture-primary",
+      "timeline": "episode-01",
+      "spoiler_scope": "episode-01 only",
+      "limitations": []
+    }
+  ],
+  "conflicts": [
+    {
+      "schema_version": "1.0",
+      "artifact_id": "research/aoi-kisaragi-fixture/conflict-adaptation-wording",
+      "created_by": {
+        "component": "kokoroarc",
+        "version": "0.0.0.dev0"
+      },
+      "conflict_id": "conflict-adaptation-wording",
+      "claim_ids": [
+        "claim-role",
+        "claim-behavior"
+      ],
+      "kind": "wording",
+      "scopes": [
+        "fixture-primary@episode-01",
+        "fixture-primary@episode-01-behavior"
+      ],
+      "status": "scope_separated",
+      "selected_claim_ids": [
+        "claim-role"
+      ],
+      "resolution_rationale": "Claims apply to distinct fixture scopes."
+    }
+  ],
+  "coverage": {
+    "schema_version": "1.0",
+    "artifact_id": "research/aoi-kisaragi-fixture/coverage",
+    "created_by": {
+      "component": "kokoroarc",
+      "version": "0.0.0.dev0"
+    },
+    "topics": [
+      {
+        "topic_id": "role",
+        "status": "covered",
+        "supporting_claim_ids": [
+          "claim-role"
+        ],
+        "missing_evidence": [],
+        "unavailable_sources": [],
+        "spoiler_restrictions": [],
+        "blocks_authoring": false
+      },
+      {
+        "topic_id": "behavior",
+        "status": "covered",
+        "supporting_claim_ids": [
+          "claim-behavior"
+        ],
+        "missing_evidence": [],
+        "unavailable_sources": [],
+        "spoiler_restrictions": [],
+        "blocks_authoring": false
+      }
+    ],
+    "blocks_authoring": false
+  },
+  "limitations": [],
+  "blocking_reasons": [],
+  "bundle_hash": "ee4fa4f9806bab495e9ef8eab1fd271019123e41e80f36a8f0d5b9c3ab09a66e"
+}

@@ -1,1 +1,19 @@
-{"schema_version":"1.0","artifact_id":"research/aoi-kisaragi-fixture/validation","created_by":{"component":"kokoroarc","version":"0.0.0.dev0"},"hard_findings":[],"advisory_findings":[],"coverage_summary":{"covered":2,"partial":0,"missing":0,"blocked":0},"blocking_reasons":[],"valid":true,"authoring_allowed":true}
+{
+  "schema_version": "1.0",
+  "artifact_id": "research/aoi-kisaragi-fixture/validation",
+  "created_by": {
+    "component": "kokoroarc",
+    "version": "0.0.0.dev0"
+  },
+  "advisory_findings": [],
+  "coverage_summary": {
+    "covered": 2,
+    "partial": 0,
+    "missing": 0,
+    "blocked": 0
+  },
+  "blocking_reasons": [],
+  "valid": true,
+  "authoring_allowed": true,
+  "hard_failures": []
+}

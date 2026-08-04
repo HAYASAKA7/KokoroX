@@ -1,1 +1,35 @@
-{"schema_version":"1.0","artifact_id":"research/aoi-kisaragi-fixture/request","created_by":{"component":"kokoroarc","version":"0.0.0.dev0"},"subject":{"subject_id":"aoi-kisaragi-fixture","identity":"Aoi Kisaragi Fixture","franchise":"fixture-arc","aliases":["Aoi","Kisaragi"]},"scope":{"medium":"animated serial","work":"Fixture Arc","adaptation":"fixture-primary","continuity":"fixture-primary","timeline_cutoff":"episode-01","spoiler_scope":"episode-01 only"},"questions":["What role does Aoi hold?","How does Aoi respond under pressure?"],"coverage_topics":["role","behavior"],"user_assertions":[],"user_constraints":["Keep the research bundle private and inert."],"requested_visibility":"private"}
+{
+  "schema_version": "1.0",
+  "artifact_id": "research/aoi-kisaragi-fixture/request",
+  "created_by": {
+    "component": "kokoroarc",
+    "version": "0.0.0.dev0"
+  },
+  "user_assertions": [],
+  "requested_visibility": "private",
+  "namespace": "research",
+  "character_id": "aoi-kisaragi-fixture",
+  "display_name": "Aoi Kisaragi Fixture",
+  "franchise": "fixture-arc",
+  "aliases": [
+    "Aoi",
+    "Kisaragi"
+  ],
+  "medium": "animated serial",
+  "work": "Fixture Arc",
+  "adaptation": "fixture-primary",
+  "continuity": "fixture-primary",
+  "timeline_cutoff": "episode-01",
+  "spoiler_scope": "episode-01 only",
+  "research_questions": [
+    "What role does Aoi hold?",
+    "How does Aoi respond under pressure?"
+  ],
+  "required_coverage_topics": [
+    "role",
+    "behavior"
+  ],
+  "constraints": [
+    "Keep the research bundle private and inert."
+  ]
+}

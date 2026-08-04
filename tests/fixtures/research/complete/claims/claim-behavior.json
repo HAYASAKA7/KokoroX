@@ -1,1 +1,21 @@
-{"schema_version":"1.0","artifact_id":"research/aoi-kisaragi-fixture/claim-behavior","created_by":{"component":"kokoroarc","version":"0.0.0.dev0"},"claim_id":"claim-behavior","subject_id":"aoi-kisaragi-fixture","statement":"Aoi checks evidence before answering under pressure.","classification":"direct_observation","support":"direct","source_ids":["source-episode-01"],"supporting_claim_ids":[],"continuity":"fixture-primary","timeline":"episode-01","spoiler_scope":"episode-01 only","limitations":[]}
+{
+  "schema_version": "1.0",
+  "artifact_id": "research/aoi-kisaragi-fixture/claim-behavior",
+  "created_by": {
+    "component": "kokoroarc",
+    "version": "0.0.0.dev0"
+  },
+  "claim_id": "claim-behavior",
+  "subject_id": "aoi-kisaragi-fixture",
+  "statement": "Aoi checks evidence before answering under pressure.",
+  "classification": "direct_observation",
+  "support": "direct",
+  "source_ids": [
+    "source-episode-01"
+  ],
+  "supporting_claim_ids": [],
+  "continuity": "fixture-primary",
+  "timeline": "episode-01-behavior",
+  "spoiler_scope": "episode-01 only",
+  "limitations": []
+}

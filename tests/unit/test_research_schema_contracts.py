@@ -103,9 +103,9 @@ def test_claim_conditional_evidence_rules(
     claim = fixture("complete", "claims/claim-role.json")
     claim.update({"classification": classification, "source_ids": source_ids, "supporting_claim_ids": supporting_claim_ids})
     if rationale is None:
-        claim.pop("rationale", None)
+        claim.pop("derivation_rationale", None)
     else:
-        claim["rationale"] = rationale
+        claim["derivation_rationale"] = rationale
     if accepted:
         SCHEMAS.validate("research-claim", claim)
     else:
@@ -118,7 +118,7 @@ def test_claim_conditional_evidence_rules(
         ("resolved_with_rationale", [], None, False),
         ("resolved_with_rationale", ["claim-role"], "The official profile is selected.", True),
         ("scope_separated", [], None, False),
-        ("scope_separated", [], "Each wording applies to a separate adaptation.", True),
+        ("scope_separated", ["claim-role"], "Each wording applies to a separate adaptation.", True),
     ],
 )
 def test_conflict_conditional_resolution_rules(
@@ -150,7 +150,7 @@ def test_report_and_bundle_lifecycle_conditions() -> None:
 
 def test_request_and_source_bounds_are_enforced() -> None:
     request = fixture("complete", "request.json")
-    request["questions"] = ["q"] * 129
+    request["research_questions"] = ["q"] * 129
     invalid("research-request", request)
     source = fixture("complete", "sources/source-official-profile.json")
     source["excerpts"] = ["x"] * 65
@@ -161,22 +161,11 @@ def valid_report() -> dict:
     return {
         "schema_version": "1.0", "artifact_id": "research/aoi-kisaragi-fixture/validation",
         "created_by": {"component": "kokoroarc", "version": "0.0.0.dev0"},
-        "hard_findings": [], "advisory_findings": [],
+        "hard_failures": [], "advisory_findings": [],
         "coverage_summary": {"covered": 2, "partial": 0, "missing": 0, "blocked": 0},
         "blocking_reasons": [], "valid": True, "authoring_allowed": True,
     }
 
 
 def valid_bundle() -> dict:
-    return {
-        "schema_version": "1.0", "artifact_id": "research/aoi-kisaragi-fixture/bundle",
-        "created_by": {"component": "kokoroarc", "version": "0.0.0.dev0"},
-        "build_status": "research", "visibility": "private", "activation_allowed": False, "authoring_allowed": True,
-        "identity": {"subject_id": "aoi-kisaragi-fixture", "franchise": "fixture-arc"},
-        "scope": {"continuity": "fixture-primary", "timeline_cutoff": "episode-01", "spoiler_scope": "episode-01 only"},
-        "request_hash": "a" * 64, "workspace_hash": "b" * 64, "validation_report_hash": "c" * 64,
-        "source_records": [{"source_id": "source-official-profile"}], "claims": [{"claim_id": "claim-role"}],
-        "conflicts": [{"conflict_id": "conflict-adaptation-wording"}],
-        "coverage": {"artifact_id": "research/aoi-kisaragi-fixture/coverage"},
-        "limitations": [], "blocking_reasons": [], "bundle_hash": "d" * 64,
-    }
+    return fixture("complete", "bundle.json")

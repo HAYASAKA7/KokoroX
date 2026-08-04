@@ -1,1 +1,30 @@
-{"schema_version":"1.0","artifact_id":"research/aoi-kisaragi-fixture/partial-validation","created_by":{"component":"kokoroarc","version":"0.0.0.dev0"},"hard_findings":[],"advisory_findings":[{"code":"TOPIC_BLOCKED","path":["topics",1],"message":"The requested history topic lacks permitted evidence."}],"coverage_summary":{"covered":0,"partial":1,"missing":0,"blocked":1},"blocking_reasons":["Missing evidence for the blocked history topic."],"valid":true,"authoring_allowed":false}
+{
+  "schema_version": "1.0",
+  "artifact_id": "research/aoi-kisaragi-fixture/partial-validation",
+  "created_by": {
+    "component": "kokoroarc",
+    "version": "0.0.0.dev0"
+  },
+  "advisory_findings": [
+    {
+      "code": "TOPIC_BLOCKED",
+      "path": [
+        "topics",
+        1
+      ],
+      "message": "The requested history topic lacks permitted evidence."
+    }
+  ],
+  "coverage_summary": {
+    "covered": 0,
+    "partial": 1,
+    "missing": 0,
+    "blocked": 1
+  },
+  "blocking_reasons": [
+    "Missing evidence for the blocked history topic."
+  ],
+  "valid": true,
+  "authoring_allowed": false,
+  "hard_failures": []
+}

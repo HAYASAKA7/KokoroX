@@ -1,7 +1,209 @@
 {
-  "$schema": "https://json-schema.org/draft/2020-12/schema", "$id": "https://kokoroarc.local/schemas/v1/research-validation-report.schema.json", "type": "object", "additionalProperties": false,
-  "required": ["schema_version", "artifact_id", "created_by", "hard_findings", "advisory_findings", "coverage_summary", "blocking_reasons", "valid", "authoring_allowed"],
-  "properties": {"schema_version": {"const": "1.0"}, "artifact_id": {"$ref": "#/$defs/artifact_id"}, "created_by": {"$ref": "#/$defs/created_by"}, "hard_findings": {"type": "array", "maxItems": 256, "uniqueItems": true, "items": {"$ref": "#/$defs/finding"}}, "advisory_findings": {"type": "array", "maxItems": 256, "uniqueItems": true, "items": {"$ref": "#/$defs/finding"}}, "coverage_summary": {"type": "object", "additionalProperties": false, "required": ["covered", "partial", "missing", "blocked"], "properties": {"covered": {"type": "integer", "minimum": 0}, "partial": {"type": "integer", "minimum": 0}, "missing": {"type": "integer", "minimum": 0}, "blocked": {"type": "integer", "minimum": 0}}}, "blocking_reasons": {"type": "array", "maxItems": 128, "uniqueItems": true, "items": {"type": "string", "minLength": 1, "maxLength": 2000}}, "valid": {"type": "boolean"}, "authoring_allowed": {"type": "boolean"}},
-  "allOf": [{"if": {"properties": {"valid": {"const": true}}, "required": ["valid"]}, "then": {"properties": {"hard_findings": {"maxItems": 0}}}, "else": {"properties": {"hard_findings": {"minItems": 1}, "authoring_allowed": {"const": false}}}}, {"if": {"properties": {"authoring_allowed": {"const": true}}, "required": ["authoring_allowed"]}, "then": {"properties": {"valid": {"const": true}, "hard_findings": {"maxItems": 0}, "blocking_reasons": {"maxItems": 0}}}}],
-  "$defs": {"artifact_id": {"type": "string", "minLength": 1, "maxLength": 128, "pattern": "^(?!con(?:/|$))(?!prn(?:/|$))(?!aux(?:/|$))(?!nul(?:/|$))(?!com[1-9](?:/|$))(?!lpt[1-9](?:/|$))(?!.*/(?:con|prn|aux|nul|com[1-9]|lpt[1-9])(?:/|$))[a-z0-9][a-z0-9._/-]{0,127}$"}, "created_by": {"type": "object", "additionalProperties": false, "required": ["component", "version"], "properties": {"component": {"const": "kokoroarc"}, "version": {"type": "string", "minLength": 1, "maxLength": 64}}}, "finding": {"type": "object", "additionalProperties": false, "required": ["code", "path", "message"], "properties": {"code": {"type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[A-Z][A-Z0-9_]*$"}, "path": {"type": "array", "maxItems": 32, "items": {"oneOf": [{"type": "string", "minLength": 1, "maxLength": 128}, {"type": "integer", "minimum": 0}]}}, "message": {"type": "string", "minLength": 1, "maxLength": 4000}}}}
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kokoroarc.local/schemas/v1/research-validation-report.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "artifact_id",
+    "created_by",
+    "hard_failures",
+    "advisory_findings",
+    "coverage_summary",
+    "blocking_reasons",
+    "valid",
+    "authoring_allowed"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.0"
+    },
+    "artifact_id": {
+      "$ref": "#/$defs/artifact_id"
+    },
+    "created_by": {
+      "$ref": "#/$defs/created_by"
+    },
+    "advisory_findings": {
+      "type": "array",
+      "maxItems": 256,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/finding"
+      }
+    },
+    "coverage_summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "covered",
+        "partial",
+        "missing",
+        "blocked"
+      ],
+      "properties": {
+        "covered": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "partial": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "missing": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "blocked": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "blocking_reasons": {
+      "type": "array",
+      "maxItems": 128,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 2000
+      }
+    },
+    "valid": {
+      "type": "boolean"
+    },
+    "authoring_allowed": {
+      "type": "boolean"
+    },
+    "hard_failures": {
+      "type": "array",
+      "maxItems": 256,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/finding"
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "valid": {
+            "const": true
+          }
+        },
+        "required": [
+          "valid"
+        ]
+      },
+      "then": {
+        "properties": {
+          "hard_failures": {
+            "maxItems": 0
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "authoring_allowed": {
+            "const": false
+          },
+          "hard_failures": {
+            "minItems": 1
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "authoring_allowed": {
+            "const": true
+          }
+        },
+        "required": [
+          "authoring_allowed"
+        ]
+      },
+      "then": {
+        "properties": {
+          "valid": {
+            "const": true
+          },
+          "blocking_reasons": {
+            "maxItems": 0
+          },
+          "hard_failures": {
+            "maxItems": 0
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "artifact_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^(?!con(?:/|$))(?!prn(?:/|$))(?!aux(?:/|$))(?!nul(?:/|$))(?!com[1-9](?:/|$))(?!lpt[1-9](?:/|$))(?!.*/(?:con|prn|aux|nul|com[1-9]|lpt[1-9])(?:/|$))[a-z0-9][a-z0-9._/-]{0,127}$"
+    },
+    "created_by": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "component",
+        "version"
+      ],
+      "properties": {
+        "component": {
+          "const": "kokoroarc"
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        }
+      }
+    },
+    "finding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "code",
+        "path",
+        "message"
+      ],
+      "properties": {
+        "code": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[A-Z][A-Z0-9_]*$"
+        },
+        "path": {
+          "type": "array",
+          "maxItems": 32,
+          "items": {
+            "oneOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128
+              },
+              {
+                "type": "integer",
+                "minimum": 0
+              }
+            ]
+          }
+        },
+        "message": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4000
+        }
+      }
+    }
+  }
 }

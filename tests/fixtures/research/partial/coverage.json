@@ -1,1 +1,41 @@
-{"schema_version":"1.0","artifact_id":"research/aoi-kisaragi-fixture/partial-coverage","created_by":{"component":"kokoroarc","version":"0.0.0.dev0"},"topics":[{"topic_id":"role","status":"partial","supporting_claim_ids":["claim-role"],"missing_evidence":["Unavailable official appendix."],"unavailable_sources":["source-official-profile"],"spoiler_restrictions":[]},{"topic_id":"missing-history","status":"blocked","supporting_claim_ids":[],"missing_evidence":["No permitted evidence covers the history topic."],"unavailable_sources":["source-official-profile"],"spoiler_restrictions":["Later episodes are outside the requested spoiler scope."]}],"blocks_authoring":true}
+{
+  "schema_version": "1.0",
+  "artifact_id": "research/aoi-kisaragi-fixture/partial-coverage",
+  "created_by": {
+    "component": "kokoroarc",
+    "version": "0.0.0.dev0"
+  },
+  "topics": [
+    {
+      "topic_id": "role",
+      "status": "partial",
+      "supporting_claim_ids": [
+        "claim-role"
+      ],
+      "missing_evidence": [
+        "Unavailable official appendix."
+      ],
+      "unavailable_sources": [
+        "source-official-profile"
+      ],
+      "spoiler_restrictions": [],
+      "blocks_authoring": false
+    },
+    {
+      "topic_id": "missing-history",
+      "status": "blocked",
+      "supporting_claim_ids": [],
+      "missing_evidence": [
+        "No permitted evidence covers the history topic."
+      ],
+      "unavailable_sources": [
+        "source-official-profile"
+      ],
+      "spoiler_restrictions": [
+        "Later episodes are outside the requested spoiler scope."
+      ],
+      "blocks_authoring": true
+    }
+  ],
+  "blocks_authoring": true
+}

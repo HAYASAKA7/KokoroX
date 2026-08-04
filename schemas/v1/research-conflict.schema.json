@@ -1,13 +1,164 @@
 {
-  "$schema": "https://json-schema.org/draft/2020-12/schema", "$id": "https://kokoroarc.local/schemas/v1/research-conflict.schema.json", "type": "object", "additionalProperties": false,
-  "required": ["schema_version", "artifact_id", "created_by", "conflict_id", "claim_ids", "kind", "scopes", "status", "selected_claim_ids"],
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kokoroarc.local/schemas/v1/research-conflict.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "artifact_id",
+    "created_by",
+    "conflict_id",
+    "claim_ids",
+    "kind",
+    "scopes",
+    "status",
+    "selected_claim_ids"
+  ],
   "properties": {
-    "schema_version": {"const": "1.0"}, "artifact_id": {"$ref": "#/$defs/artifact_id"}, "created_by": {"$ref": "#/$defs/created_by"}, "conflict_id": {"$ref": "#/$defs/id"}, "claim_ids": {"type": "array", "minItems": 2, "maxItems": 64, "uniqueItems": true, "items": {"$ref": "#/$defs/id"}},
-    "kind": {"enum": ["wording", "identity", "timeline", "continuity", "measurement", "source_disagreement"]}, "scopes": {"type": "array", "minItems": 1, "maxItems": 32, "uniqueItems": true, "items": {"type": "string", "minLength": 1, "maxLength": 512}}, "status": {"enum": ["unresolved", "scope_separated", "resolved_with_rationale"]}, "selected_claim_ids": {"type": "array", "maxItems": 64, "uniqueItems": true, "items": {"$ref": "#/$defs/id"}}, "resolution_rationale": {"type": "string", "minLength": 1, "maxLength": 4000}
+    "schema_version": {
+      "const": "1.0"
+    },
+    "artifact_id": {
+      "$ref": "#/$defs/artifact_id"
+    },
+    "created_by": {
+      "$ref": "#/$defs/created_by"
+    },
+    "conflict_id": {
+      "$ref": "#/$defs/id"
+    },
+    "claim_ids": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 64,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/id"
+      }
+    },
+    "kind": {
+      "enum": [
+        "wording",
+        "identity",
+        "timeline",
+        "continuity",
+        "measurement",
+        "source_disagreement"
+      ]
+    },
+    "scopes": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 32,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 512
+      }
+    },
+    "status": {
+      "enum": [
+        "unresolved",
+        "scope_separated",
+        "resolved_with_rationale"
+      ]
+    },
+    "selected_claim_ids": {
+      "type": "array",
+      "maxItems": 64,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/id"
+      }
+    },
+    "resolution_rationale": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 4000
+    }
   },
   "allOf": [
-    {"if": {"properties": {"status": {"const": "resolved_with_rationale"}}, "required": ["status"]}, "then": {"required": ["resolution_rationale"], "properties": {"selected_claim_ids": {"minItems": 1}}}},
-    {"if": {"properties": {"status": {"const": "scope_separated"}}, "required": ["status"]}, "then": {"required": ["resolution_rationale"]}}
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "unresolved"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "selected_claim_ids": {
+            "maxItems": 0
+          }
+        },
+        "not": {
+          "required": [
+            "resolution_rationale"
+          ]
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "enum": [
+              "scope_separated",
+              "resolved_with_rationale"
+            ]
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "then": {
+        "required": [
+          "resolution_rationale"
+        ],
+        "properties": {
+          "selected_claim_ids": {
+            "minItems": 1
+          }
+        }
+      }
+    }
   ],
-  "$defs": {"id": {"type": "string", "minLength": 1, "maxLength": 128, "pattern": "^(?!con(?:[./]|$))(?!prn(?:[./]|$))(?!aux(?:[./]|$))(?!nul(?:[./]|$))(?!com[1-9](?:[./]|$))(?!lpt[1-9](?:[./]|$))[a-z0-9][a-z0-9._-]{0,127}$"}, "artifact_id": {"type": "string", "minLength": 1, "maxLength": 128, "pattern": "^(?!con(?:/|$))(?!prn(?:/|$))(?!aux(?:/|$))(?!nul(?:/|$))(?!com[1-9](?:/|$))(?!lpt[1-9](?:/|$))(?!.*/(?:con|prn|aux|nul|com[1-9]|lpt[1-9])(?:/|$))[a-z0-9][a-z0-9._/-]{0,127}$"}, "created_by": {"type": "object", "additionalProperties": false, "required": ["component", "version"], "properties": {"component": {"const": "kokoroarc"}, "version": {"type": "string", "minLength": 1, "maxLength": 64}}}}
+  "$defs": {
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^(?!con(?:[./]|$))(?!prn(?:[./]|$))(?!aux(?:[./]|$))(?!nul(?:[./]|$))(?!com[1-9](?:[./]|$))(?!lpt[1-9](?:[./]|$))[a-z0-9][a-z0-9._-]{0,127}$"
+    },
+    "artifact_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^(?!con(?:/|$))(?!prn(?:/|$))(?!aux(?:/|$))(?!nul(?:/|$))(?!com[1-9](?:/|$))(?!lpt[1-9](?:/|$))(?!.*/(?:con|prn|aux|nul|com[1-9]|lpt[1-9])(?:/|$))[a-z0-9][a-z0-9._/-]{0,127}$"
+    },
+    "created_by": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "component",
+        "version"
+      ],
+      "properties": {
+        "component": {
+          "const": "kokoroarc"
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        }
+      }
+    }
+  }
 }

@@ -1,1 +1,23 @@
-{"schema_version":"1.0","artifact_id":"research/aoi-kisaragi-fixture/conflict-adaptation-wording","created_by":{"component":"kokoroarc","version":"0.0.0.dev0"},"conflict_id":"conflict-adaptation-wording","claim_ids":["claim-role","claim-behavior"],"kind":"wording","scopes":["fixture-primary","fixture-dub"],"status":"scope_separated","selected_claim_ids":[],"resolution_rationale":"The role label and behavioral wording are retained in their respective fixture scopes."}
+{
+  "schema_version": "1.0",
+  "artifact_id": "research/aoi-kisaragi-fixture/conflict-adaptation-wording",
+  "created_by": {
+    "component": "kokoroarc",
+    "version": "0.0.0.dev0"
+  },
+  "conflict_id": "conflict-adaptation-wording",
+  "claim_ids": [
+    "claim-role",
+    "claim-behavior"
+  ],
+  "kind": "wording",
+  "scopes": [
+    "fixture-primary@episode-01",
+    "fixture-primary@episode-01-behavior"
+  ],
+  "status": "scope_separated",
+  "selected_claim_ids": [
+    "claim-role"
+  ],
+  "resolution_rationale": "Claims apply to distinct fixture scopes."
+}

@@ -1,1 +1,168 @@
-{"schema_version":"1.0","artifact_id":"research/aoi-kisaragi-fixture/partial-bundle","created_by":{"component":"kokoroarc","version":"0.0.0.dev0"},"build_status":"research","visibility":"private","activation_allowed":false,"authoring_allowed":false,"identity":{"subject_id":"aoi-kisaragi-fixture","franchise":"fixture-arc"},"scope":{"continuity":"fixture-primary","timeline_cutoff":"episode-01","spoiler_scope":"episode-01 only"},"request_hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","workspace_hash":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","validation_report_hash":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc","source_records":[{"source_id":"source-official-profile"}],"claims":[{"claim_id":"claim-role"}],"conflicts":[{"conflict_id":"conflict-adaptation-wording"}],"coverage":{"artifact_id":"research/aoi-kisaragi-fixture/partial-coverage"},"limitations":["The requested historical appendix is unavailable."],"blocking_reasons":["Missing evidence for the blocked history topic."],"bundle_hash":"dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"}
+{
+  "schema_version": "1.0",
+  "artifact_id": "research/aoi-kisaragi-fixture/partial-bundle",
+  "created_by": {
+    "component": "kokoroarc",
+    "version": "0.0.0.dev0"
+  },
+  "build_status": "research",
+  "visibility": "private",
+  "activation_allowed": false,
+  "authoring_allowed": false,
+  "namespace": "research",
+  "character_id": "aoi-kisaragi-fixture",
+  "display_name": "Aoi Kisaragi Fixture",
+  "franchise": "fixture-arc",
+  "aliases": [
+    "Aoi"
+  ],
+  "medium": "animated serial",
+  "work": "Fixture Arc",
+  "adaptation": "fixture-primary",
+  "continuity": "fixture-primary",
+  "timeline_cutoff": "episode-01",
+  "spoiler_scope": "episode-01 only",
+  "request_hash": "e926e9c0cf71b1affaf13c6f24e764adb10c2dab2c75dea46a2b69e2750b324c",
+  "workspace_hash": "882cb0b1093ed01c9f99babff1454a5a332ae9a80f2e00b5a75a75ecad4e18f3",
+  "validation_report_hash": "36de2ddea7f628e77bb573c1b9c139f4712646a1e9c40247131effdd36f98a2d",
+  "sources": [
+    {
+      "schema_version": "1.0",
+      "artifact_id": "research/aoi-kisaragi-fixture/partial-source",
+      "created_by": {
+        "component": "kokoroarc",
+        "version": "0.0.0.dev0"
+      },
+      "source_id": "source-official-profile",
+      "category": "official_profile",
+      "locator": "https://evidence.fixture-arc.example/partial-profile",
+      "title": "Partial Fixture Profile",
+      "publisher": "Fixture Arc Studio",
+      "accessed_at": "2026-08-04T00:00:00Z",
+      "availability": "unavailable",
+      "content_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+      "excerpts": [],
+      "continuity": "fixture-primary",
+      "spoiler_scope": "episode-01 only",
+      "limitations": [
+        "The requested historical appendix is unavailable."
+      ],
+      "trust_notes": [
+        "Fictional unavailable-source fixture."
+      ]
+    }
+  ],
+  "claims": [
+    {
+      "schema_version": "1.0",
+      "artifact_id": "research/aoi-kisaragi-fixture/partial-claim-history",
+      "created_by": {
+        "component": "kokoroarc",
+        "version": "0.0.0.dev0"
+      },
+      "claim_id": "claim-history",
+      "subject_id": "aoi-kisaragi-fixture",
+      "statement": "Fictional fixture assertion.",
+      "classification": "user_assertion",
+      "support": "unsupported",
+      "source_ids": [],
+      "supporting_claim_ids": [],
+      "continuity": "fixture-primary",
+      "timeline": "episode-01",
+      "spoiler_scope": "episode-01 only",
+      "limitations": [
+        "Fixture-only assertion."
+      ]
+    },
+    {
+      "schema_version": "1.0",
+      "artifact_id": "research/aoi-kisaragi-fixture/partial-claim-role",
+      "created_by": {
+        "component": "kokoroarc",
+        "version": "0.0.0.dev0"
+      },
+      "claim_id": "claim-role",
+      "subject_id": "aoi-kisaragi-fixture",
+      "statement": "Aoi is described as an observatory apprentice in the available fixture note.",
+      "classification": "user_assertion",
+      "support": "unsupported",
+      "source_ids": [],
+      "supporting_claim_ids": [],
+      "continuity": "fixture-primary",
+      "timeline": "episode-01",
+      "spoiler_scope": "episode-01 only",
+      "limitations": [
+        "The source record is unavailable."
+      ]
+    }
+  ],
+  "conflicts": [
+    {
+      "schema_version": "1.0",
+      "artifact_id": "research/aoi-kisaragi-fixture/partial-conflict",
+      "created_by": {
+        "component": "kokoroarc",
+        "version": "0.0.0.dev0"
+      },
+      "conflict_id": "conflict-adaptation-wording",
+      "claim_ids": [
+        "claim-role",
+        "claim-history"
+      ],
+      "kind": "source_disagreement",
+      "scopes": [
+        "fixture-primary"
+      ],
+      "status": "unresolved",
+      "selected_claim_ids": []
+    }
+  ],
+  "coverage": {
+    "schema_version": "1.0",
+    "artifact_id": "research/aoi-kisaragi-fixture/partial-coverage",
+    "created_by": {
+      "component": "kokoroarc",
+      "version": "0.0.0.dev0"
+    },
+    "topics": [
+      {
+        "topic_id": "role",
+        "status": "partial",
+        "supporting_claim_ids": [
+          "claim-role"
+        ],
+        "missing_evidence": [
+          "Unavailable official appendix."
+        ],
+        "unavailable_sources": [
+          "source-official-profile"
+        ],
+        "spoiler_restrictions": [],
+        "blocks_authoring": false
+      },
+      {
+        "topic_id": "missing-history",
+        "status": "blocked",
+        "supporting_claim_ids": [],
+        "missing_evidence": [
+          "No permitted evidence covers the history topic."
+        ],
+        "unavailable_sources": [
+          "source-official-profile"
+        ],
+        "spoiler_restrictions": [
+          "Later episodes are outside the requested spoiler scope."
+        ],
+        "blocks_authoring": true
+      }
+    ],
+    "blocks_authoring": true
+  },
+  "limitations": [
+    "The requested historical appendix is unavailable."
+  ],
+  "blocking_reasons": [
+    "Missing evidence for the blocked history topic."
+  ],
+  "bundle_hash": "d04a3e887c5f11fbf1d5e6dceff56b1bff0a2a8d6dc55b6235b75e9105dfc424"
+}

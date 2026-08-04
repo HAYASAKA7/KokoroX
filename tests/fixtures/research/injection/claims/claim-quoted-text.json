@@ -1,0 +1,21 @@
+{
+  "schema_version": "1.0",
+  "artifact_id": "research/aoi-kisaragi-fixture/injection-claim-quoted-text",
+  "created_by": {
+    "component": "kokoroarc",
+    "version": "0.0.0.dev0"
+  },
+  "claim_id": "claim-quoted-text",
+  "subject_id": "aoi-kisaragi-fixture",
+  "statement": "Fictional fixture assertion.",
+  "classification": "user_assertion",
+  "support": "unsupported",
+  "source_ids": [],
+  "supporting_claim_ids": [],
+  "continuity": "fixture-primary",
+  "timeline": "episode-01",
+  "spoiler_scope": "episode-01 only",
+  "limitations": [
+    "Fixture-only assertion."
+  ]
+}
