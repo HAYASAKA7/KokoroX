@@ -29,7 +29,28 @@ BUNDLE_CONTRACTS = {
     "conflict": "conflicts",
     "coverage": "coverage",
 }
-PYTHON_ONLY_REGEX = (r"(?P<", r"(?P=", r"(?i", r"(?m", r"(?s", r"(?x", r"(?#", r"\\A", r"\\Z")
+ECMASCRIPT_SUBSET_FORBIDDEN = (
+    r"(?P<",
+    r"(?P=",
+    r"(?<",
+    r"(?a",
+    r"(?i",
+    r"(?L",
+    r"(?m",
+    r"(?s",
+    r"(?u",
+    r"(?x",
+    r"(?#",
+    r"(?(",
+    r"(?|",
+    r"(?R",
+    r"(?0",
+    r"\A",
+    r"\Z",
+    r"\N",
+    r"\g<",
+    r"\k<",
+)
 
 
 def load_fixture(path: str) -> dict:
@@ -96,17 +117,57 @@ def all_schema_patterns() -> list[str]:
     ]
 
 
-def test_all_schema_patterns_are_ecmascript_portable() -> None:
-    patterns = all_schema_patterns()
-    forbidden = {token for token in PYTHON_ONLY_REGEX if any(token in pattern for pattern in patterns)}
-    assert not forbidden, f"Python-only regex syntax found: {sorted(forbidden)}"
+def assert_ecmascript_subset(patterns: list[str]) -> None:
+    assert patterns, "expected at least one schema pattern"
+    forbidden = {
+        token
+        for token in ECMASCRIPT_SUBSET_FORBIDDEN
+        if any(token in pattern for pattern in patterns)
+    }
+    assert not forbidden, (
+        "schema patterns use syntax outside the approved ECMAScript subset: "
+        f"{sorted(forbidden)}"
+    )
 
+
+def confirm_node_patterns(patterns: list[str]) -> None:
     node = shutil.which("node")
     if node is None:
-        pytest.fail("Node is required to verify ECMAScript schema pattern portability")
-    probe = "for (const pattern of JSON.parse(require('fs').readFileSync(0, 'utf8'))) new RegExp(pattern);"
+        pytest.skip("Node is unavailable; static ECMAScript subset validation remains active")
+    probe = "for (const pattern of JSON.parse(require('fs').readFileSync(0, 'utf8'))) new RegExp(pattern, 'u');"
     result = subprocess.run([node, "-e", probe], input=json.dumps(patterns), text=True, capture_output=True)
     assert result.returncode == 0, result.stderr
+
+
+def test_all_schema_patterns_stay_within_the_ecmascript_subset() -> None:
+    assert_ecmascript_subset(all_schema_patterns())
+
+
+def test_node_confirms_all_schema_patterns_when_available() -> None:
+    confirm_node_patterns(all_schema_patterns())
+
+
+@pytest.mark.parametrize(
+    "pattern",
+    [
+        r"(?i:alpha)",
+        r"(?P<name>alpha)",
+        r"(?P=name)",
+        r"(?<=alpha)beta",
+        r"\Aalpha\Z",
+        r"(?# Python comment)alpha",
+    ],
+)
+def test_static_ecmascript_subset_rejects_python_only_syntax(pattern: str) -> None:
+    with pytest.raises(AssertionError, match="outside the approved ECMAScript subset"):
+        assert_ecmascript_subset([pattern])
+
+
+def test_portability_static_gate_remains_meaningful_without_node(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(shutil, "which", lambda executable: None)
+    assert_ecmascript_subset(all_schema_patterns())
+    with pytest.raises(pytest.skip.Exception, match="Node is unavailable"):
+        confirm_node_patterns(all_schema_patterns())
 
 
 def normalize_contract(root: dict, contract: dict) -> dict:

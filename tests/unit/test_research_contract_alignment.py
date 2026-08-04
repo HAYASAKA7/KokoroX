@@ -18,10 +18,6 @@ def load(tree: str, path: str) -> dict:
 
 
 
-def digest(value: object) -> str:
-    return hashlib.sha256(canonical_bytes(value)).hexdigest()
-
-
 def invalid(schema_name: str, document: dict) -> None:
     with pytest.raises(KokoroError) as raised:
         SCHEMAS.validate(schema_name, document)
