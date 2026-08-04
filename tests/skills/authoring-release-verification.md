@@ -1,6 +1,6 @@
 # Milestone 6 authoring release verification
 
-## Scope, prerequisites, and fresh setup
+## Scope
 
 This evidence verifies only Milestone 6, `authoring-character-packs`. It does not approve Milestones 7-9 or the complete standalone suite.
 
@@ -8,15 +8,34 @@ This evidence verifies only Milestone 6, `authoring-character-packs`. It does no
 - Platform: Windows, PowerShell 7.6.4, Python 3.14.0
 - Build base HEAD: `5324281d2ace5fe1306c1cdca195fcd766d3a764`
 - Milestone implementation/evidence range before this correction: `5b68452^..5324281`, based on plan commit `5bb48e38a0ebc2c7ea5db065c0230d9c99d3e4fc`
-- Correction commit: the commit containing this file, with message `fix: make authoring release evidence reproducible`
-- Final temporary root: `D:\tmp\kokoroarc-m6-release-20260804-quality-final`
+- Correction commit: the commit containing this file, with message `fix: verify authoring release evidence claims`
+- Final temporary root: `D:\tmp\kokoroarc-m6-release-20260804-quality2-lf-final`
 
-Run the commands from the repository root in PowerShell 7. The shell must be allowed to create and read the selected `D:\tmp` root. In a managed sandbox, that may require a user-approved, narrowly scoped escalation for `D:\tmp`; this is a harness permission prerequisite, not a KokoroArc administrator requirement.
+## Prepared-host prerequisites and isolated directories
+
+These commands assume a prepared host; directory creation alone does not install the toolchain. Prerequisites are Git, PowerShell 7, a supported Python 3.11+ interpreter, and this project with its dev/build/test dependencies installed. From an activated environment, prepare the project dependencies with:
+
+```powershell
+python -m pip install -e ".[dev]"
+python -c "import build, pytest"
+```
+
+Skill metadata verification additionally requires the Skill Creator's `quick_validate.py`. It is an external prerequisite, not repository content and not a canonical user-specific path. The operator supplies its installed path through trusted host configuration:
+
+```powershell
+$skillCreatorValidator=$env:KOKOROARC_SKILL_VALIDATOR
+if ([string]::IsNullOrWhiteSpace($skillCreatorValidator) -or
+    -not (Test-Path -LiteralPath $skillCreatorValidator -PathType Leaf)) {
+    throw 'Set KOKOROARC_SKILL_VALIDATOR to the installed Skill Creator quick_validate.py.'
+}
+```
+
+Run the remaining commands from the repository root. The shell must be allowed to create and read the selected `D:\tmp` root. In a managed sandbox, that may require a user-approved, narrowly scoped escalation for `D:\tmp`; this is a harness permission prerequisite, not a KokoroArc administrator requirement.
 
 The recorded run began by rejecting a reused root and creating every final operational directory explicitly:
 
 ```powershell
-$releaseRoot='D:\tmp\kokoroarc-m6-release-20260804-quality-final'
+$releaseRoot='D:\tmp\kokoroarc-m6-release-20260804-quality2-lf-final'
 if (Test-Path -LiteralPath $releaseRoot) {
     throw "Release root already exists: $releaseRoot"
 }
@@ -25,15 +44,15 @@ New-Item -ItemType Directory -Force -Path `
     "$releaseRoot\temp", `
     "$releaseRoot\pytest", `
     "$releaseRoot\build-temp", `
-    "$releaseRoot\smoke-final", `
-    "$releaseRoot\smoke-data-final" | Out-Null
+    "$releaseRoot\smoke", `
+    "$releaseRoot\smoke-data" | Out-Null
 ```
 
 Use a new unused root name to reproduce the procedure from fresh state. All test, build, CLI, and capture output stays under that root.
 
 ## Exact distribution build input
 
-The distribution was not described as a build from an unmodified checkout. It was built from base HEAD `5324281d2ace5fe1306c1cdca195fcd766d3a764` plus exactly the final README-only working-tree patch. No Python source, schema, package configuration, Skill, Character Pack, or other packaged input differed from the base commit.
+The distribution was not described as a build from an unmodified checkout. Under the current `pyproject.toml`, its repository inputs are `README.md`, `pyproject.toml`, `src/`, and `schemas/`. It was built from base HEAD `5324281d2ace5fe1306c1cdca195fcd766d3a764` plus exactly the final README-only patch. An independent base-to-current-HEAD check over `pyproject.toml`, `src/`, and `schemas/` returned no changed paths, so every non-README distribution input equals the base commit. Skills, Character Packs, tests, plans, and release evidence are not inputs to these wheel/sdist definitions.
 
 At the build boundary, `git diff --name-only` printed exactly:
 
@@ -46,11 +65,11 @@ The build-input identities were:
 | Identity | Value |
 | --- | --- |
 | Base HEAD | `5324281d2ace5fe1306c1cdca195fcd766d3a764` |
-| README SHA-256 (`Get-FileHash`) | `BE7E43A5D9F29CBE0F3ACCC3813374A9FD95112FF74B4C45D83ED8F467790B99` |
-| README Git blob (`git hash-object`) | `bc0b3af0398740f9c50af61d8bca5371c3b44589` |
-| README normalized patch SHA-256 | `34BF8B44583845C6ABBE70011A7256F01A9217D9955180DB244A1F0E031A153B` |
+| README SHA-256 (`Get-FileHash`) | `EA295EE36843E01074D7D30024AB04CFA3F6948375F09A13D9313BCA0A52132C` |
+| README Git blob (`git hash-object`) | `15a3e8285ab7f16c044ff871e1f40be3ab5d3983` |
+| README normalized patch SHA-256 | `1FCE8488CDD80D308EDBA0450A1AA89D27A56052CEBAA6465A6A2092F511912B` |
 
-“Normalized patch SHA-256” means SHA-256 over the raw output of `git diff --binary -- README.md` after replacing each CRLF byte pair with LF; no other normalization is applied. These copy/paste commands reconstruct and verify that build source in an isolated local clone:
+“Normalized patch SHA-256” means SHA-256 over the raw output of `git diff --binary <base> -- README.md` after replacing each CRLF byte pair with LF; no other normalization is applied. Equivalently: replace each CRLF byte pair with LF; no other normalization. These copy/paste commands reconstruct and verify that build source in an isolated local clone:
 
 ```powershell
 $repoRoot=(Resolve-Path '.').Path
@@ -64,12 +83,12 @@ git -C $buildSource diff --name-only
 git -C $buildSource status --short
 Get-FileHash -LiteralPath "$buildSource\README.md" -Algorithm SHA256
 git -C $buildSource hash-object -- README.md
-git -C $buildSource diff --binary -- README.md
-python -c "import hashlib,subprocess; d=subprocess.run(['git','-C',r'$buildSource','diff','--binary','--','README.md'],check=True,stdout=subprocess.PIPE).stdout.replace(b'\r\n',b'\n'); print(hashlib.sha256(d).hexdigest().upper())"
-git -C $buildSource diff --exit-code 5324281d2ace5fe1306c1cdca195fcd766d3a764 -- . ':(exclude)README.md'
+git -C $buildSource diff --binary 5324281d2ace5fe1306c1cdca195fcd766d3a764 -- README.md
+python -c "import hashlib,subprocess; d=subprocess.run(['git','-C',r'$buildSource','diff','--binary','5324281d2ace5fe1306c1cdca195fcd766d3a764','--','README.md'],check=True,stdout=subprocess.PIPE).stdout.replace(b'\r\n',b'\n'); print(hashlib.sha256(d).hexdigest().upper())"
+git -C $buildSource diff --exit-code 5324281d2ace5fe1306c1cdca195fcd766d3a764 -- pyproject.toml src schemas
 ```
 
-The HEAD and hashes matched the table, the name-only output contained only `README.md`, status contained only ` M README.md`, and the final command exited `0`. This evidence file, the implementation-plan evidence references, and `tests/skills/test_authoring_release_evidence.py` were updated after the build; they are not packaged inputs and were absent from the isolated build-source changes.
+The HEAD and hashes matched the table, the name-only output contained only `README.md`, status contained only ` M README.md`, and the explicit non-README distribution-input command exited `0`. This evidence file, the implementation-plan evidence references, and `tests/skills/test_authoring_release_evidence.py` were updated after the build; they are not packaged inputs and were absent from the isolated build-source changes.
 
 ## Complete verification
 
@@ -82,7 +101,7 @@ $env:TMP=$env:TEMP
 python -m pytest -q --basetemp "$releaseRoot\pytest"
 ```
 
-Exit code: `0`. Result: `1351 passed, 19 skipped`. The 19 expected capability/platform skips comprise 15 symlink or POSIX-symlink-semantics cases, three FIFO cases, and one safe Windows-junction-creation case. There were no failed or errored tests.
+Exit code: `0`. Result: `1353 passed, 19 skipped`. The 19 expected capability/platform skips comprise 15 symlink or POSIX-symlink-semantics cases, three FIFO cases, and one safe Windows-junction-creation case. There were no failed or errored tests.
 
 ### Distribution build and contents
 
@@ -103,25 +122,26 @@ Exit code: `0`. The build ended with `Successfully built kokoroarc-0.0.0.dev0.ta
 
 | Artifact | Bytes | SHA-256 |
 | --- | ---: | --- |
-| `kokoroarc-0.0.0.dev0-py3-none-any.whl` | 77,057 | `7AF6A803E3C9F96DC2BA480E2A5F5A1C98AE05648495FEF9C650F708239BD452` |
-| `kokoroarc-0.0.0.dev0.tar.gz` | 58,504 | `A50DE49BF87F37564F4471DAD40544BB0C2FE8D6B73FE438E1BE51297D554869` |
+| `kokoroarc-0.0.0.dev0-py3-none-any.whl` | 77,148 | `A969E84566EF711463DD76070DE101759F109D7618902FC995691466B03C43A6` |
+| `kokoroarc-0.0.0.dev0.tar.gz` | 58,688 | `D67DF8F4AD7EDF5E54CC203BE366B9838A969FEB6488AD3B5763C447447ED207` |
 
-Archive inspection found 44 wheel entries and 60 sdist entries. Both contained all four authoring modules and all three Milestone 6 schemas. The sdist README SHA-256 was `BE7E43A5D9F29CBE0F3ACCC3813374A9FD95112FF74B4C45D83ED8F467790B99`, equal to the identified build-input README.
+Archive inspection found 44 wheel entries and 60 sdist entries. Both contained all four authoring modules and all three Milestone 6 schemas. The sdist README SHA-256 was `EA295EE36843E01074D7D30024AB04CFA3F6948375F09A13D9313BCA0A52132C`, equal to the identified LF build-input README. `git ls-files --eol README.md` reported `i/lf w/lf`, so a fresh checkout reproduces the same file bytes.
 
 ### Skill validation and diff hygiene
 
 ```powershell
-python C:/Users/cyanl/.codex/skills/.system/skill-creator/scripts/quick_validate.py skills/using-kokoroarc
-python C:/Users/cyanl/.codex/skills/.system/skill-creator/scripts/quick_validate.py skills/authoring-character-packs
+python $skillCreatorValidator skills/using-kokoroarc
+python $skillCreatorValidator skills/authoring-character-packs
 git diff --check
 ```
 
-Both Skill validators exited `0` and printed `Skill is valid!`. The exact `git diff --check` command above exited `0` and reported no bad-whitespace lines. Git also emitted these working-copy conversion warnings on stderr; `git ls-files --eol` reported `i/lf` for all three tracked blobs:
+Both Skill validators exited `0` and printed `Skill is valid!`. The exact `git diff --check` command above exited `0` and reported no bad-whitespace lines. Git also emitted these working-copy conversion warnings on stderr; `git ls-files --eol` reported `i/lf` for all four tracked blobs:
 
 ```text
 warning: in the working copy of 'README.md', LF will be replaced by CRLF the next time Git touches it
 warning: in the working copy of 'docs/superpowers/plans/2026-08-03-kokoroarc-authoring.md', LF will be replaced by CRLF the next time Git touches it
 warning: in the working copy of 'tests/skills/authoring-release-verification.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'tests/skills/test_authoring_release_evidence.py', LF will be replaced by CRLF the next time Git touches it
 ```
 
 | Skill artifact | SHA-256 |
@@ -135,11 +155,11 @@ The behavioral campaign recorded in `authoring-character-packs-results.md` is ba
 
 ## Copy/paste auditable CLI smoke
 
-The setup above creates fresh empty `smoke-final` and `smoke-data-final` directories. The following complete sequence records two request validations, two draft validations, and one compilation while preserving stdout and stderr separately:
+The isolated-directory setup above creates empty `smoke` and `smoke-data` directories. The following complete sequence records two request validations, two draft validations, and one compilation while preserving stdout and stderr separately:
 
 ```powershell
-$smoke="$releaseRoot\smoke-final"
-$dataRoot="$releaseRoot\smoke-data-final"
+$smoke="$releaseRoot\smoke"
+$dataRoot="$releaseRoot\smoke-data"
 $env:PYTHONPATH=(Join-Path $repoRoot 'src')
 $env:KOKOROARC_DATA_DIR=$dataRoot
 
@@ -206,7 +226,7 @@ Get-FileHash -Algorithm SHA256 -LiteralPath `
 | --- | --- | --- |
 | Request validation | two byte-identical complete JSON outputs | `A9DB730C84EF2238D2FDC79D1DDB658B878CAA67922D5082C19E7E005A84EE82` |
 | Draft/source-pack validation | two byte-identical complete JSON outputs | `16921F792156A28CA20445A76A91A884AD5F6F48CE0DB37EB89444CB77A84DED` |
-| Draft compilation | one successful complete JSON output | `54316278D2EE23713636D37F4A268570818F675E49E5EE6D05F40680B5F4B39A` |
+| Draft compilation | one successful complete JSON output | `6BE138D815D6B4D97C4104030F848A4AF174F47205F96211EAE335E3C891EEAF` |
 
 The canonical transcript is five UTF-8 records in invocation order joined by one LF. Each record is `<command>|<exit-code>|<complete stdout>`, and each complete stdout retains its terminal LF. This constructs its hash from the captured files rather than from selected fields:
 
@@ -229,13 +249,13 @@ $canonicalTranscriptHash=[Convert]::ToHexString([Security.Cryptography.SHA256]::
 $canonicalTranscriptHash
 ```
 
-Result: `CA6588B5CCCCDC6E6B6B1EEF419F522D8D4F831210EA4DA5F776088F81E9E14A`.
+Result: `F4307BFD9B42C7B9DA5E78FB284F5E0748AC1BB21EA637A9AB1CBDEBE486AF9C`.
 
 Observed compilation fields:
 
 ```text
 artifact_id=original/rin-aster/draft/049c8a4dcec7cd71
-path=D:\tmp\kokoroarc-m6-release-20260804-quality-final\smoke-data-final\drafts\original\rin-aster\draft\049c8a4dcec7cd71
+path=D:\tmp\kokoroarc-m6-release-20260804-quality2-lf-final\smoke-data\drafts\original\rin-aster\draft\049c8a4dcec7cd71
 build_status=draft
 visibility=private
 activation_allowed=false
@@ -255,13 +275,11 @@ locale_coverage=en-US:true,ja-JP:true,zh-CN:true
 | Skill metadata validates | Both current Skills validated with exit code 0. |
 | Baseline exposes intended gaps | Campaign evidence records baseline RED 5/6 with each claimed gap class bound to a failed assertion. |
 | Skill-enabled cases satisfy declared assertions | Campaign evidence records PASS 6/6 with unique fresh threads. |
-| Existing runtime remains green | Full suite: 1,351 passed, zero failures/errors. |
+| Existing runtime remains green | Full suite: 1,353 passed, zero failures/errors. |
 | Documentation describes actual authoring entry point | README routes original briefs and private dossiers through the repository-local Skill, then labels the CLI example as validation/compilation of already-authored files. |
 
-## Excluded attempt and limitations
+## Excluded attempts and limitations
 
-The first attempt to create the final `D:\tmp` root ran in an unprivileged managed sandbox and was denied before a source clone or build could exist. It is excluded as a harness permission failure; the approved scoped rerun created the fresh root and produced the recorded artifacts.
-
-The first smoke assertion harness expected lifecycle fields below a nonexistent `draft` object. All five product commands in that attempt exited `0`, but the harness exited `1`; it is excluded. The recorded smoke used new `smoke-final` and `smoke-data-final` roots and asserted the schema-correct top-level fields.
+No build or smoke attempt was excluded from the retained `quality2-lf-final` run. The superseded `quality2-final` build used the same Git patch but a mixed-EOL README working file, so it was rejected before commit because a fresh checkout could not reproduce its raw file SHA-256. The earlier `quality-final` evidence recorded one managed-sandbox permission failure and one incorrect smoke-harness assertion. None of those attempts produced or altered the retained artifacts listed here; every iteration used a new root without overwriting or deleting prior material.
 
 The product Skill is cross-platform and resolves a trusted configured data root. `D:\tmp` appears only in this Windows operational evidence. Named external-evidence research remains a missing prerequisite until Milestone 7. Testing/promotion, installation, archive creation, and publication remain outside Milestone 6 and unavailable until later milestones.
