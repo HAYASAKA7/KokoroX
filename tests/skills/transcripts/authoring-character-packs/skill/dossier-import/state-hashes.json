@@ -43,7 +43,7 @@
       "sha256": "E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855"
     }
   ],
-  "allowed_working_files": 0,
+  "allowed_working_files": 20,
   "unchanged": true,
   "forbidden_paths_absent": true,
   "injection_marker_absent": true,

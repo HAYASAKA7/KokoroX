@@ -1,13 +1,11 @@
-Imported and compiled the Rin Aster private dossier draft.
+Imported and compiled the dossier as a validated three-locale draft.
 
-- Mode: `dossier`; source: `data\working\rin-aster-dossier-source`
-- Request validation: two identical successful runs.
-- Draft validation: two identical successful runs; no hard failures/advisories.
-- Locales: `zh-CN`, `en-US`, `ja-JP` all covered.
-- Draft: [495611f773eed895](D:\tmp\kokoroarc-authoring-campaign-v2\skill\dossier-import\data\drafts\original\rin-aster\draft\495611f773eed895)
-- Lifecycle: private, inactive, `draft`, `activation_allowed: false`.
-- Protected installed/public/session/state/event guards remain unchanged.
+- Draft: [f03e8cab6be0cc13](D:\tmp\kokoroarc-authoring-campaign-v3\skill\dossier-import\data\drafts\original\rin-aster\draft\f03e8cab6be0cc13)
+- Mode: private, inactive, `draft`, `activation_allowed: false`
+- Request and draft validations: each ran twice with identical complete retained outputs.
+- Locale coverage: `zh-CN`, `en-US`, `ja-JP` all present.
+- Hard failures/advisories: none.
+
+No research, external verification, installation, publication, activation, or relationship-state mutation occurred.
 
 Unresolved evidence: none
-
-No research, external verification, installation, public publication, activation, or relationship-state mutation occurred.

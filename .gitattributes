@@ -3,3 +3,5 @@ tests/skills/transcripts/** -text
 
 # Skill hashes and packaged instructions must be stable across host line-ending policy.
 skills/using-kokoroarc/** text eol=lf
+# Evaluator prompts are byte-exact captures; a terminal blank line can be evidence.
+tests/skills/transcripts/authoring-character-packs/skill/*/prompt.txt whitespace=-blank-at-eof
