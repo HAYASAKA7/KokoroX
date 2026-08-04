@@ -394,7 +394,7 @@ Use unique roots under D:/tmp and PYTHONPATH=src:
 
 Expected: zero test failures, both Skills valid, wheel and sdist built.
 
-The corrected release build is bound in `tests/skills/authoring-release-verification.md` to base HEAD `5324281d2ace5fe1306c1cdca195fcd766d3a764` plus one identified README-only patch. Under the current build configuration the remaining distribution inputs are exactly `pyproject.toml`, `src/`, and `schemas/`; the plan's release gate requires an empty base-to-current-HEAD diff for those explicit paths. The evidence records independently checked README file/blob/normalized-patch hashes and gives the exact isolated-clone reconstruction commands. Evidence and plan changes made afterward are not distribution inputs.
+The corrected release build is bound in `tests/skills/authoring-release-verification.md` to base HEAD `5324281d2ace5fe1306c1cdca195fcd766d3a764` plus one identified README patch and one identified `.gitattributes` checkout-policy patch. The policy pins `README.md text eol=lf`; `.gitattributes` is not packaged. Under the current build configuration the remaining distribution inputs are exactly `pyproject.toml`, `src/`, and `schemas/`; the plan's release gate requires an empty base-to-current-HEAD diff for those explicit paths, while the build-boundary diff must list exactly `.gitattributes` and `README.md`. The evidence records independently checked README file/blob/normalized-patch hashes, `.gitattributes` blob/normalized-patch hashes, and gives the exact isolated-clone reconstruction commands. Evidence and plan changes made afterward are not distribution inputs.
 
 - [x] **Step 3: Run an auditable authoring CLI smoke test**
 
@@ -404,9 +404,9 @@ Validate an original request, validate its source pack, compile a private draft 
 
 Record commands, counts, expected platform skips, artifact hashes, Skill campaign results, CLI transcript, and commit range. Do not mark any unchecked criterion complete.
 
-`tests/skills/test_authoring_release_evidence.py` parses named evidence sections, independently computes the README SHA-256/Git blob/normalized binary-patch hash, executes the explicit packaged-input scope gate, and regression-checks the repository-local Skill quick start, prepared-host prerequisites, parameterized validator, five CLI captures, byte equality, lifecycle/path/forbidden-root assertions, artifact hashing, canonical transcript construction, and `git diff --check` outcome.
+`tests/skills/test_authoring_release_evidence.py` parses named evidence sections, independently computes the README SHA-256/Git blob/normalized binary-patch hash and `.gitattributes` Git blob/normalized binary-patch hash, checks `git check-attr` reports `README.md text eol=lf`, executes the explicit packaged-input scope gate, and regression-checks the repository-local Skill quick start, prepared-host prerequisites, parameterized validator, five CLI captures, byte equality, lifecycle/path/forbidden-root assertions, artifact hashing, canonical transcript construction, and `git diff --check` outcome. After commit, a fresh clone created with `core.autocrlf=true` must reproduce the documented raw README hash and pass the focused evidence test.
 
 - [x] **Step 5: Commit**
 
-    git add README.md tests/skills/authoring-release-verification.md tests/skills/test_authoring_release_evidence.py docs/superpowers/plans/2026-08-03-kokoroarc-authoring.md
-    git commit -m "fix: verify authoring release evidence claims"
+    git add .gitattributes README.md tests/skills/authoring-release-verification.md tests/skills/test_authoring_release_evidence.py docs/superpowers/plans/2026-08-03-kokoroarc-authoring.md
+    git commit -m "fix: pin release evidence line endings"

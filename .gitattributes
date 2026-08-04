@@ -1,6 +1,9 @@
 # Behavioral evidence contains byte offsets and must survive checkout unchanged.
 tests/skills/transcripts/** -text
 
+# Release evidence hashes README bytes and requires checkout-stable LF.
+README.md text eol=lf
+
 # Skill hashes and packaged instructions must be stable across host line-ending policy.
 skills/using-kokoroarc/** text eol=lf
 # Evaluator prompts are byte-exact captures; a terminal blank line can be evidence.

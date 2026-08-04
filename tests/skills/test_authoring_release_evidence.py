@@ -86,6 +86,27 @@ def test_documented_build_identity_matches_computed_readme_patch() -> None:
     assert "CRLF byte pair with LF; no other normalization" in build
 
 
+def test_readme_checkout_policy_is_lf_and_matches_documented_patch() -> None:
+    attributes = _git_stdout("check-attr", "text", "eol", "--", "README.md").decode()
+    assert attributes.splitlines() == [
+        "README.md: text: set",
+        "README.md: eol: lf",
+    ]
+
+    base = _identity("Base HEAD")
+    documented_blob = _identity(".gitattributes Git blob (`git hash-object`)")
+    documented_patch = _identity(".gitattributes normalized patch SHA-256")
+    assert _git_stdout("hash-object", "--", ".gitattributes").decode().strip() == documented_blob
+
+    raw_patch = _git_stdout("diff", "--binary", base, "--", ".gitattributes")
+    normalized_patch = raw_patch.replace(b"\r\n", b"\n")
+    assert hashlib.sha256(normalized_patch).hexdigest().upper() == documented_patch
+
+    build = _section(EVIDENCE, "Exact distribution build input")
+    assert ".gitattributes\nREADME.md" in build
+    assert "checkout policy" in build
+
+
 def test_only_readme_changed_among_explicit_distribution_inputs() -> None:
     base = _identity("Base HEAD")
     changed = _git_stdout(
@@ -122,10 +143,10 @@ def test_release_evidence_scopes_exact_outcomes_to_named_sections() -> None:
     skills = _subsection(complete, "Skill validation and diff hygiene")
     smoke = _section(EVIDENCE, "Copy/paste auditable CLI smoke")
 
-    assert "Exit code: `0`. Result: `1353 passed, 19 skipped`" in suite
+    assert "Exit code: `0`. Result: `1354 passed, 19 skipped`" in suite
     assert "$env:TEMP" in suite and "$env:TMP" in suite and "--basetemp" in suite
     assert "Exit code: `0`" in distribution
-    assert "77,148" in distribution and "58,688" in distribution
+    assert "77,148" in distribution and "58,693" in distribution
     assert "python $skillCreatorValidator skills/using-kokoroarc" in skills
     assert "python $skillCreatorValidator skills/authoring-character-packs" in skills
     assert "Both Skill validators exited `0`" in skills

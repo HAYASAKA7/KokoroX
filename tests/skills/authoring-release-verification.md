@@ -8,8 +8,8 @@ This evidence verifies only Milestone 6, `authoring-character-packs`. It does no
 - Platform: Windows, PowerShell 7.6.4, Python 3.14.0
 - Build base HEAD: `5324281d2ace5fe1306c1cdca195fcd766d3a764`
 - Milestone implementation/evidence range before this correction: `5b68452^..5324281`, based on plan commit `5bb48e38a0ebc2c7ea5db065c0230d9c99d3e4fc`
-- Correction commit: the commit containing this file, with message `fix: verify authoring release evidence claims`
-- Final temporary root: `D:\tmp\kokoroarc-m6-release-20260804-quality2-lf-final`
+- Correction commit: the commit containing this file, with message `fix: pin release evidence line endings`
+- Final temporary root: `D:\tmp\kokoroarc-m6-release-20260804-quality3-final`
 
 ## Prepared-host prerequisites and isolated directories
 
@@ -35,7 +35,7 @@ Run the remaining commands from the repository root. The shell must be allowed t
 The recorded run began by rejecting a reused root and creating every final operational directory explicitly:
 
 ```powershell
-$releaseRoot='D:\tmp\kokoroarc-m6-release-20260804-quality2-lf-final'
+$releaseRoot='D:\tmp\kokoroarc-m6-release-20260804-quality3-final'
 if (Test-Path -LiteralPath $releaseRoot) {
     throw "Release root already exists: $releaseRoot"
 }
@@ -52,11 +52,12 @@ Use a new unused root name to reproduce the procedure from fresh state. All test
 
 ## Exact distribution build input
 
-The distribution was not described as a build from an unmodified checkout. Under the current `pyproject.toml`, its repository inputs are `README.md`, `pyproject.toml`, `src/`, and `schemas/`. It was built from base HEAD `5324281d2ace5fe1306c1cdca195fcd766d3a764` plus exactly the final README-only patch. An independent base-to-current-HEAD check over `pyproject.toml`, `src/`, and `schemas/` returned no changed paths, so every non-README distribution input equals the base commit. Skills, Character Packs, tests, plans, and release evidence are not inputs to these wheel/sdist definitions.
+The distribution was not described as a build from an unmodified checkout. Under the current `pyproject.toml`, its repository inputs are `README.md`, `pyproject.toml`, `src/`, and `schemas/`. It was built from base HEAD `5324281d2ace5fe1306c1cdca195fcd766d3a764` plus exactly the final README patch and `.gitattributes` checkout-policy patch. This checkout policy pins `README.md text eol=lf`; it controls reproducible checkout bytes but is not an archive input. An independent base-to-current-HEAD check over `pyproject.toml`, `src/`, and `schemas/` returned no changed paths, so every non-README distribution input equals the base commit. Skills, Character Packs, tests, plans, and release evidence are not inputs to these wheel/sdist definitions.
 
 At the build boundary, `git diff --name-only` printed exactly:
 
 ```text
+.gitattributes
 README.md
 ```
 
@@ -65,22 +66,28 @@ The build-input identities were:
 | Identity | Value |
 | --- | --- |
 | Base HEAD | `5324281d2ace5fe1306c1cdca195fcd766d3a764` |
+| .gitattributes Git blob (`git hash-object`) | `a93511f8ec536e0ae9b9c9192000394588311481` |
+| .gitattributes normalized patch SHA-256 | `F36F4289FC96E0F2710C92DAA0AB420E94C302AEA2411F9F5C93540535C4D1FB` |
 | README SHA-256 (`Get-FileHash`) | `EA295EE36843E01074D7D30024AB04CFA3F6948375F09A13D9313BCA0A52132C` |
 | README Git blob (`git hash-object`) | `15a3e8285ab7f16c044ff871e1f40be3ab5d3983` |
 | README normalized patch SHA-256 | `1FCE8488CDD80D308EDBA0450A1AA89D27A56052CEBAA6465A6A2092F511912B` |
 
-“Normalized patch SHA-256” means SHA-256 over the raw output of `git diff --binary <base> -- README.md` after replacing each CRLF byte pair with LF; no other normalization is applied. Equivalently: replace each CRLF byte pair with LF; no other normalization. These copy/paste commands reconstruct and verify that build source in an isolated local clone:
+“Normalized patch SHA-256” means SHA-256 over the raw output of the corresponding `git diff --binary <base> -- <path>` after replacing each CRLF byte pair with LF; no other normalization is applied. Equivalently: replace each CRLF byte pair with LF; no other normalization. These copy/paste commands reconstruct and verify that build source in an isolated local clone:
 
 ```powershell
 $repoRoot=(Resolve-Path '.').Path
 $buildSource="$releaseRoot\build-source"
 git clone --quiet --no-hardlinks --no-checkout $repoRoot $buildSource
 git -C $buildSource checkout --quiet --detach 5324281d2ace5fe1306c1cdca195fcd766d3a764
+Copy-Item -LiteralPath "$repoRoot\.gitattributes" -Destination "$buildSource\.gitattributes"
 Copy-Item -LiteralPath "$repoRoot\README.md" -Destination "$buildSource\README.md"
 
 git -C $buildSource rev-parse HEAD
 git -C $buildSource diff --name-only
 git -C $buildSource status --short
+git -C $buildSource check-attr text eol -- README.md
+git -C $buildSource hash-object -- .gitattributes
+python -c "import hashlib,subprocess; d=subprocess.run(['git','-C',r'$buildSource','diff','--binary','5324281d2ace5fe1306c1cdca195fcd766d3a764','--','.gitattributes'],check=True,stdout=subprocess.PIPE).stdout.replace(b'\r\n',b'\n'); print(hashlib.sha256(d).hexdigest().upper())"
 Get-FileHash -LiteralPath "$buildSource\README.md" -Algorithm SHA256
 git -C $buildSource hash-object -- README.md
 git -C $buildSource diff --binary 5324281d2ace5fe1306c1cdca195fcd766d3a764 -- README.md
@@ -88,7 +95,7 @@ python -c "import hashlib,subprocess; d=subprocess.run(['git','-C',r'$buildSourc
 git -C $buildSource diff --exit-code 5324281d2ace5fe1306c1cdca195fcd766d3a764 -- pyproject.toml src schemas
 ```
 
-The HEAD and hashes matched the table, the name-only output contained only `README.md`, status contained only ` M README.md`, and the explicit non-README distribution-input command exited `0`. This evidence file, the implementation-plan evidence references, and `tests/skills/test_authoring_release_evidence.py` were updated after the build; they are not packaged inputs and were absent from the isolated build-source changes.
+The HEAD and hashes matched the table, the name-only output contained `.gitattributes` and `README.md` in that order, status contained only those two modified paths, `git check-attr` reported `text: set` and `eol: lf` for README, and the explicit non-README distribution-input command exited `0`. This evidence file, the implementation-plan evidence references, and `tests/skills/test_authoring_release_evidence.py` were updated after the build; they are not packaged inputs and were absent from the isolated build-source changes.
 
 ## Complete verification
 
@@ -101,7 +108,7 @@ $env:TMP=$env:TEMP
 python -m pytest -q --basetemp "$releaseRoot\pytest"
 ```
 
-Exit code: `0`. Result: `1353 passed, 19 skipped`. The 19 expected capability/platform skips comprise 15 symlink or POSIX-symlink-semantics cases, three FIFO cases, and one safe Windows-junction-creation case. There were no failed or errored tests.
+Exit code: `0`. Result: `1354 passed, 19 skipped`. The 19 expected capability/platform skips comprise 15 symlink or POSIX-symlink-semantics cases, three FIFO cases, and one safe Windows-junction-creation case. There were no failed or errored tests.
 
 ### Distribution build and contents
 
@@ -122,10 +129,10 @@ Exit code: `0`. The build ended with `Successfully built kokoroarc-0.0.0.dev0.ta
 
 | Artifact | Bytes | SHA-256 |
 | --- | ---: | --- |
-| `kokoroarc-0.0.0.dev0-py3-none-any.whl` | 77,148 | `A969E84566EF711463DD76070DE101759F109D7618902FC995691466B03C43A6` |
-| `kokoroarc-0.0.0.dev0.tar.gz` | 58,688 | `D67DF8F4AD7EDF5E54CC203BE366B9838A969FEB6488AD3B5763C447447ED207` |
+| `kokoroarc-0.0.0.dev0-py3-none-any.whl` | 77,148 | `99865E5A7CF02D9AA8EB201D5B5EE49F3700D0D316E179EA94DB99FC5DAD9E1A` |
+| `kokoroarc-0.0.0.dev0.tar.gz` | 58,693 | `24BCBF463651E197D0B4584F82E2E0C48102B1A4DA425F5A554C114749A6D62D` |
 
-Archive inspection found 44 wheel entries and 60 sdist entries. Both contained all four authoring modules and all three Milestone 6 schemas. The sdist README SHA-256 was `EA295EE36843E01074D7D30024AB04CFA3F6948375F09A13D9313BCA0A52132C`, equal to the identified LF build-input README. `git ls-files --eol README.md` reported `i/lf w/lf`, so a fresh checkout reproduces the same file bytes.
+Archive inspection found 44 wheel entries and 60 sdist entries. Both contained all four authoring modules and all three Milestone 6 schemas; `.gitattributes` was absent from both archives. The sdist README SHA-256 was `EA295EE36843E01074D7D30024AB04CFA3F6948375F09A13D9313BCA0A52132C`, equal to the identified LF build-input README. `git ls-files --eol README.md` reported `i/lf w/lf attr/text eol=lf`; the post-commit fresh-clone gate repeats this proof with `core.autocrlf=true` and requires the same raw README SHA-256.
 
 ### Skill validation and diff hygiene
 
@@ -135,10 +142,10 @@ python $skillCreatorValidator skills/authoring-character-packs
 git diff --check
 ```
 
-Both Skill validators exited `0` and printed `Skill is valid!`. The exact `git diff --check` command above exited `0` and reported no bad-whitespace lines. Git also emitted these working-copy conversion warnings on stderr; `git ls-files --eol` reported `i/lf` for all four tracked blobs:
+Both Skill validators exited `0` and printed `Skill is valid!`. The exact `git diff --check` command above exited `0` and reported no bad-whitespace lines. Git also emitted these working-copy conversion warnings on stderr. README emitted no warning because its attribute pins LF; `git ls-files --eol` reported `i/lf` for all four warned tracked blobs:
 
 ```text
-warning: in the working copy of 'README.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of '.gitattributes', LF will be replaced by CRLF the next time Git touches it
 warning: in the working copy of 'docs/superpowers/plans/2026-08-03-kokoroarc-authoring.md', LF will be replaced by CRLF the next time Git touches it
 warning: in the working copy of 'tests/skills/authoring-release-verification.md', LF will be replaced by CRLF the next time Git touches it
 warning: in the working copy of 'tests/skills/test_authoring_release_evidence.py', LF will be replaced by CRLF the next time Git touches it
@@ -226,7 +233,7 @@ Get-FileHash -Algorithm SHA256 -LiteralPath `
 | --- | --- | --- |
 | Request validation | two byte-identical complete JSON outputs | `A9DB730C84EF2238D2FDC79D1DDB658B878CAA67922D5082C19E7E005A84EE82` |
 | Draft/source-pack validation | two byte-identical complete JSON outputs | `16921F792156A28CA20445A76A91A884AD5F6F48CE0DB37EB89444CB77A84DED` |
-| Draft compilation | one successful complete JSON output | `6BE138D815D6B4D97C4104030F848A4AF174F47205F96211EAE335E3C891EEAF` |
+| Draft compilation | one successful complete JSON output | `E86D4C4A430F86F39EE17819E79506BB7F958D39E05020957906D58E1677C626` |
 
 The canonical transcript is five UTF-8 records in invocation order joined by one LF. Each record is `<command>|<exit-code>|<complete stdout>`, and each complete stdout retains its terminal LF. This constructs its hash from the captured files rather than from selected fields:
 
@@ -249,13 +256,13 @@ $canonicalTranscriptHash=[Convert]::ToHexString([Security.Cryptography.SHA256]::
 $canonicalTranscriptHash
 ```
 
-Result: `F4307BFD9B42C7B9DA5E78FB284F5E0748AC1BB21EA637A9AB1CBDEBE486AF9C`.
+Result: `D62809231081BA18847F6DE4201D04A4F99AD9765B0762E1484FBD2FC7361BD2`.
 
 Observed compilation fields:
 
 ```text
 artifact_id=original/rin-aster/draft/049c8a4dcec7cd71
-path=D:\tmp\kokoroarc-m6-release-20260804-quality2-lf-final\smoke-data\drafts\original\rin-aster\draft\049c8a4dcec7cd71
+path=D:\tmp\kokoroarc-m6-release-20260804-quality3-final\smoke-data\drafts\original\rin-aster\draft\049c8a4dcec7cd71
 build_status=draft
 visibility=private
 activation_allowed=false
@@ -275,11 +282,11 @@ locale_coverage=en-US:true,ja-JP:true,zh-CN:true
 | Skill metadata validates | Both current Skills validated with exit code 0. |
 | Baseline exposes intended gaps | Campaign evidence records baseline RED 5/6 with each claimed gap class bound to a failed assertion. |
 | Skill-enabled cases satisfy declared assertions | Campaign evidence records PASS 6/6 with unique fresh threads. |
-| Existing runtime remains green | Full suite: 1,353 passed, zero failures/errors. |
+| Existing runtime remains green | Full suite: 1,354 passed, zero failures/errors. |
 | Documentation describes actual authoring entry point | README routes original briefs and private dossiers through the repository-local Skill, then labels the CLI example as validation/compilation of already-authored files. |
 
 ## Excluded attempts and limitations
 
-No build or smoke attempt was excluded from the retained `quality2-lf-final` run. The superseded `quality2-final` build used the same Git patch but a mixed-EOL README working file, so it was rejected before commit because a fresh checkout could not reproduce its raw file SHA-256. The earlier `quality-final` evidence recorded one managed-sandbox permission failure and one incorrect smoke-harness assertion. None of those attempts produced or altered the retained artifacts listed here; every iteration used a new root without overwriting or deleting prior material.
+No build or smoke attempt was excluded from the retained `quality3-final` run. The superseded `quality2-lf-final` run had stable LF bytes in its working tree but lacked a committed checkout policy, so a fresh checkout with `core.autocrlf=true` could not reproduce its raw README SHA-256. The earlier `quality2-final` build used a mixed-EOL README working file and was likewise rejected before commit. The earlier `quality-final` evidence recorded one managed-sandbox permission failure and one incorrect smoke-harness assertion. None of those attempts produced or altered the retained artifacts listed here; every iteration used a new root without overwriting or deleting prior material.
 
 The product Skill is cross-platform and resolves a trusted configured data root. `D:\tmp` appears only in this Windows operational evidence. Named external-evidence research remains a missing prerequisite until Milestone 7. Testing/promotion, installation, archive creation, and publication remain outside Milestone 6 and unavailable until later milestones.
