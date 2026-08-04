@@ -8,6 +8,7 @@ import unicodedata
 
 import pytest
 
+import kokoroarc.research.requests as research_requests
 from kokoroarc.errors import KokoroError
 from kokoroarc.packs.compiler import canonical_bytes
 from kokoroarc.research import normalize_research_request
@@ -25,6 +26,7 @@ COUNT_LIMITS = {
     "user_assertions": 128,
     "constraints": 128,
 }
+SAFE_CANONICAL_MESSAGE = "Artifact cannot be represented as canonical JSON."
 
 
 @pytest.fixture
@@ -43,6 +45,30 @@ def invalid_request(
     with pytest.raises(KokoroError) as raised:
         normalize_research_request(request, registry)
     return raised.value
+
+
+def assert_safe_canonical_error(error: KokoroError, secrets: tuple[str, ...]) -> None:
+    serialized_details = json.dumps(error.details, ensure_ascii=False, sort_keys=True)
+    serialized_envelope = json.dumps(
+        error.envelope(), ensure_ascii=False, sort_keys=True
+    )
+    assert error.code == "INVALID_PACK_DATA"
+    assert str(error) == SAFE_CANONICAL_MESSAGE
+    assert error.details == {"path": []}
+    assert error.retryable is False
+    assert error.envelope() == {
+        "ok": False,
+        "error": {
+            "code": "INVALID_PACK_DATA",
+            "message": SAFE_CANONICAL_MESSAGE,
+            "retryable": False,
+            "details": {"path": []},
+        },
+    }
+    for secret in secrets:
+        assert secret not in str(error)
+        assert secret not in serialized_details
+        assert secret not in serialized_envelope
 
 
 def count_values(field: str, count: int) -> list[str]:
@@ -254,3 +280,79 @@ def test_schema_validation_error_does_not_leak_assertion_or_source_payload(
         "schema": "research-request",
         "path": ["user_assertions", 0],
     }
+
+
+@pytest.mark.parametrize(
+    "payload,secrets",
+    [
+        (
+            {
+                "SENSITIVE_ASSERTION_BRANCH": {
+                    "SENSITIVE_SOURCE_OBJECT_KEY": object()
+                }
+            },
+            ("SENSITIVE_ASSERTION_BRANCH", "SENSITIVE_SOURCE_OBJECT_KEY"),
+        ),
+        (
+            {"PRIVATE_SOURCE_PAYLOAD_KEY": float("nan")},
+            ("PRIVATE_SOURCE_PAYLOAD_KEY",),
+        ),
+    ],
+)
+def test_canonicalization_errors_do_not_leak_nested_attacker_controlled_paths(
+    registry: SchemaRegistry,
+    complete_request: dict[str, Any],
+    payload: object,
+    secrets: tuple[str, ...],
+) -> None:
+    complete_request["user_assertions"] = cast(Any, [payload])
+
+    error = invalid_request(registry, complete_request)
+
+    assert_safe_canonical_error(error, secrets)
+
+
+def test_ordinary_canonical_incompatibility_uses_fixed_empty_safe_path(
+    registry: SchemaRegistry, complete_request: dict[str, Any]
+) -> None:
+    complete_request["constraints"] = cast(Any, [object()])
+
+    error = invalid_request(registry, complete_request)
+
+    assert_safe_canonical_error(error, ())
+
+
+def test_non_invalid_pack_kokoro_error_from_canonicalizer_is_unchanged(
+    monkeypatch: pytest.MonkeyPatch,
+    registry: SchemaRegistry,
+    complete_request: dict[str, Any],
+) -> None:
+    expected = KokoroError("UNEXPECTED_CANONICAL_ERROR", "Programmer fault.")
+
+    def raise_unexpected(value: object) -> bytes:
+        raise expected
+
+    monkeypatch.setattr(research_requests, "canonical_bytes", raise_unexpected)
+
+    with pytest.raises(KokoroError) as raised:
+        normalize_research_request(complete_request, registry)
+
+    assert raised.value is expected
+
+
+def test_non_kokoro_canonicalizer_fault_is_not_caught(
+    monkeypatch: pytest.MonkeyPatch,
+    registry: SchemaRegistry,
+    complete_request: dict[str, Any],
+) -> None:
+    expected = RuntimeError("Programmer fault.")
+
+    def raise_unexpected(value: object) -> bytes:
+        raise expected
+
+    monkeypatch.setattr(research_requests, "canonical_bytes", raise_unexpected)
+
+    with pytest.raises(RuntimeError) as raised:
+        normalize_research_request(complete_request, registry)
+
+    assert raised.value is expected

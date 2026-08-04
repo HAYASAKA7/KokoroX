@@ -18,7 +18,18 @@ def normalize_research_request(
     value: dict[str, Any], schemas: SchemaRegistry
 ) -> dict[str, Any]:
     """Return a validated canonical copy of a character research request."""
-    normalized_value = json.loads(canonical_bytes(value))
+    try:
+        canonical_value = canonical_bytes(value)
+    except KokoroError as error:
+        if error.code != "INVALID_PACK_DATA":
+            raise
+        raise KokoroError(
+            "INVALID_PACK_DATA",
+            "Artifact cannot be represented as canonical JSON.",
+            details={"path": []},
+        ) from None
+
+    normalized_value = json.loads(canonical_value)
     if isinstance(normalized_value, dict):
         normalized_value.setdefault("requested_visibility", "private")
 
