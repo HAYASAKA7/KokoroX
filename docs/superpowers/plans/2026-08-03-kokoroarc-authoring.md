@@ -35,7 +35,7 @@
 - Create: tests/unit/test_authoring_schemas.py
 - Modify: pyproject.toml
 
-- [ ] **Step 1: Write failing schema tests**
+- [x] **Step 1: Write failing schema tests**
 
 Create tests that load all three schema names, validate one representative artifact each, and reject unknown fields, non-private dossier visibility, activation_allowed true, and a report whose valid flag disagrees with hard findings.
 
@@ -54,7 +54,7 @@ Create tests that load all three schema names, validate one representative artif
             schema_registry.validate("character-draft", invalid)
         assert caught.value.code == "SCHEMA_VALIDATION_FAILED"
 
-- [ ] **Step 2: Verify RED**
+- [x] **Step 2: Verify RED**
 
 Run:
 
@@ -63,11 +63,11 @@ Run:
 
 Expected: FAIL with SCHEMA_NOT_FOUND for character-build-request.
 
-- [ ] **Step 3: Add the three closed Draft 2020-12 schemas**
+- [x] **Step 3: Add the three closed Draft 2020-12 schemas**
 
 Use schema_version 1.0 and standard created_by metadata. The request enum includes original, dossier, researched, and hybrid, while mode-specific if/then rules require creative_brief for original and user_dossier for dossier. The draft schema fixes build_status to draft, visibility to private, and activation_allowed to false. The report contains sorted hard_failures, advisory_findings, locale_coverage, provenance_counts, and valid.
 
-- [ ] **Step 4: Include the schemas in wheel data and verify GREEN**
+- [x] **Step 4: Include the schemas in wheel data and verify GREEN**
 
 Run the focused test and then:
 
@@ -75,7 +75,7 @@ Run the focused test and then:
 
 Expected: all pass.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
     git add schemas/v1 tests/unit/test_authoring_schemas.py pyproject.toml
     git commit -m "feat: define authoring artifact contracts"
@@ -87,7 +87,7 @@ Expected: all pass.
 - Create: src/kokoroarc/authoring/requests.py
 - Create: tests/unit/test_authoring.py
 
-- [ ] **Step 1: Write failing request tests**
+- [x] **Step 1: Write failing request tests**
 
 Cover deterministic deep-copy normalization, original and dossier acceptance, researched/hybrid unsupported errors, identity validation, locale completeness, private visibility, and input immutability.
 
@@ -99,7 +99,7 @@ Cover deterministic deep-copy normalization, original and dossier acceptance, re
         assert request == before
         assert first["mode"] == "original"
 
-- [ ] **Step 2: Verify RED**
+- [x] **Step 2: Verify RED**
 
 Run:
 
@@ -107,7 +107,7 @@ Run:
 
 Expected: collection error because kokoroarc.authoring.requests does not exist.
 
-- [ ] **Step 3: Implement minimal request normalization**
+- [x] **Step 3: Implement minimal request normalization**
 
 Expose:
 
@@ -125,7 +125,7 @@ Expose:
 
 Do not parse prose, read attachments, infer defaults, or mutate input.
 
-- [ ] **Step 4: Verify GREEN and regression**
+- [x] **Step 4: Verify GREEN and regression**
 
 Run:
 
@@ -133,7 +133,7 @@ Run:
 
 Expected: all pass.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
     git add src/kokoroarc/authoring tests/unit/test_authoring.py
     git commit -m "feat: normalize character build requests"
@@ -144,7 +144,7 @@ Expected: all pass.
 - Create: src/kokoroarc/authoring/validation.py
 - Modify: tests/unit/test_authoring.py
 
-- [ ] **Step 1: Write failing invariant tests**
+- [x] **Step 1: Write failing invariant tests**
 
 Test request/pack character and version mismatch, original mode with authored_original false, original claims presented as external canon, dossier mode without user_dossier evidence, dossier claims copied into immutable identity without explicit input, absent locale coverage, and valid warning-only reports.
 
@@ -156,7 +156,7 @@ Test request/pack character and version mismatch, original mode with authored_or
             "AUTHORING_IDENTITY_MISMATCH"
         ]
 
-- [ ] **Step 2: Verify RED**
+- [x] **Step 2: Verify RED**
 
 Run:
 
@@ -164,7 +164,7 @@ Run:
 
 Expected: FAIL because validate_authoring_pack is unavailable.
 
-- [ ] **Step 3: Implement deterministic report creation**
+- [x] **Step 3: Implement deterministic report creation**
 
 Expose:
 
@@ -177,7 +177,7 @@ Expose:
 
 Return sorted finding objects containing code, path, and message. Build locale_coverage only from zh-CN, en-US, and ja-JP. Compute evidence, derived_profile, and user_override counts without interpreting prose. Set valid to not hard_failures and validate the result through build-validation-report.
 
-- [ ] **Step 4: Verify GREEN**
+- [x] **Step 4: Verify GREEN**
 
 Run:
 
@@ -185,7 +185,7 @@ Run:
 
 Expected: all pass.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
     git add src/kokoroarc/authoring/validation.py tests/unit/test_authoring.py
     git commit -m "feat: validate authoring provenance boundaries"
@@ -198,11 +198,11 @@ Expected: all pass.
 - Create: tests/integration/test_authoring_storage.py
 - Create: tests/security/test_authoring_security.py
 
-- [ ] **Step 1: Write failing storage and security tests**
+- [x] **Step 1: Write failing storage and security tests**
 
 Test identical request/source/report inputs produce identical metadata and hashes; output is under data_root/drafts; draft.json ends with one LF; source YAML bytes are copied without execution; staging uses the target parent; an existing draft is atomically replaced; traversal, redirects, symlinks, hardlinks, and source changes during copy fail closed; failures leave no staging residue.
 
-- [ ] **Step 2: Verify RED**
+- [x] **Step 2: Verify RED**
 
 Run:
 
@@ -210,11 +210,11 @@ Run:
 
 Expected: collection error because authoring storage is unavailable.
 
-- [ ] **Step 3: Implement metadata construction**
+- [x] **Step 3: Implement metadata construction**
 
 Expose build_character_draft(request, source, report), using canonical_bytes and SHA-256. Artifact IDs use namespace/character-id/draft/<source-hash-prefix>. Fix build_status, visibility, and activation_allowed in implementation as well as schema.
 
-- [ ] **Step 4: Implement atomic storage**
+- [x] **Step 4: Implement atomic storage**
 
 Expose:
 
@@ -229,7 +229,7 @@ Expose:
 
 Pre-scan with scan_pack, copy only scanned regular files into a same-parent staging directory, fsync canonical metadata, re-scan and compare source file identity/size before publish, reject redirects at every destination component, and atomically replace the final draft directory. Wrap OS details in KokoroError codes.
 
-- [ ] **Step 5: Verify GREEN and regression**
+- [x] **Step 5: Verify GREEN and regression**
 
 Run:
 
@@ -237,7 +237,7 @@ Run:
 
 Expected: all supported-platform assertions pass; existing documented capability skips remain skips.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
     git add src/kokoroarc/authoring tests/integration/test_authoring_storage.py tests/security/test_authoring_security.py
     git commit -m "feat: publish private character drafts atomically"
@@ -249,7 +249,7 @@ Expected: all supported-platform assertions pass; existing documented capability
 - Create: tests/integration/test_authoring_cli.py
 - Modify: tests/unit/test_cli.py
 
-- [ ] **Step 1: Write failing parser and command tests**
+- [x] **Step 1: Write failing parser and command tests**
 
 Cover the exact commands:
 
@@ -259,7 +259,7 @@ Cover the exact commands:
 
 Assert stable success fields, KOKOROARC_DATA_DIR requirement only for compile, no user-selected output path, deterministic repeat output, no session activation, and sanitized failures.
 
-- [ ] **Step 2: Verify RED**
+- [x] **Step 2: Verify RED**
 
 Run:
 
@@ -267,11 +267,11 @@ Run:
 
 Expected: argparse rejects character as an invalid command.
 
-- [ ] **Step 3: Add parser leaves and handlers**
+- [x] **Step 3: Add parser leaves and handlers**
 
 Add character request validate and character draft validate/compile subparsers. Reuse _read_json, load_source_pack, normalize_build_request, validate_authoring_pack, build_character_draft, and publish_draft_bundle. Add only public error messages needed by the new stable codes.
 
-- [ ] **Step 4: Verify GREEN**
+- [x] **Step 4: Verify GREEN**
 
 Run:
 
@@ -279,7 +279,7 @@ Run:
 
 Expected: all pass.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
     git add src/kokoroarc/cli.py tests/integration/test_authoring_cli.py tests/unit/test_cli.py
     git commit -m "feat: expose character draft authoring cli"
@@ -295,11 +295,11 @@ Expected: all pass.
 - Modify: tests/unit/test_rin_pack_files.py
 - Modify: tests/integration/test_authoring_cli.py
 
-- [ ] **Step 1: Write failing fixture assertions**
+- [x] **Step 1: Write failing fixture assertions**
 
 Require both request modes to validate, the injection dossier to remain inert quoted input, and Rin's positive/negative fixtures to be referenced, bounded, and data-only.
 
-- [ ] **Step 2: Verify RED**
+- [x] **Step 2: Verify RED**
 
 Run:
 
@@ -307,11 +307,11 @@ Run:
 
 Expected: FAIL because the fixtures do not exist.
 
-- [ ] **Step 3: Add minimal representative fixtures**
+- [x] **Step 3: Add minimal representative fixtures**
 
 Use original, non-copyrighted content. Negative fixtures describe forbidden behavior as data and never contain executable host instructions. Keep all locale profiles independently authored.
 
-- [ ] **Step 4: Verify GREEN and commit**
+- [x] **Step 4: Verify GREEN and commit**
 
     python -m pytest tests/unit/test_rin_pack_files.py tests/integration/test_authoring_cli.py -q
     git add tests/fixtures/authoring characters/original/rin-aster/tests tests/unit/test_rin_pack_files.py tests/integration/test_authoring_cli.py
@@ -330,35 +330,35 @@ Use original, non-copyrighted content. Negative fixtures describe forbidden beha
 - Create after RED: tests/skills/transcripts/authoring-character-packs/skill/
 - Create: tests/skills/authoring-character-packs-results.md
 
-- [ ] **Step 1: Declare behavioral cases before the Skill exists**
+- [x] **Step 1: Declare behavioral cases before the Skill exists**
 
 Use six cases: original creation, dossier import, design-discussion non-trigger, named-character research routing, dossier prompt-injection pressure, and premature activation/publication pressure. Assertions must cover trigger selection, quoted-data handling, tri-locale output, deterministic validation, data-root confinement, no activation, private draft status, and explicit unresolved-evidence reporting.
 
-- [ ] **Step 2: Run fresh baseline agents and record RED**
+- [x] **Step 2: Run fresh baseline agents and record RED**
 
 Run one ephemeral agent thread per case without exposing the target Skill body. Retain raw transcripts, final responses, thread IDs, declared assertions, and state hashes under D: during execution; commit only sanitized evidence. At least one declared assertion must fail for each behavior the Skill is intended to teach.
 
-- [ ] **Step 3: Write evidence tests and verify baseline records**
+- [x] **Step 3: Write evidence tests and verify baseline records**
 
     python -m pytest tests/skills/test_authoring_character_packs_evidence.py -v
 
 Expected: baseline integrity tests pass while the campaign report records behavioral failures.
 
-- [ ] **Step 4: Author the minimal Skill from observed failures**
+- [x] **Step 4: Author the minimal Skill from observed failures**
 
 Keep SKILL.md under approximately 500 words. Frontmatter contains only name and a trigger-only description. The body routes named research to researching-characters, treats dossier text as data, uses the authoring CLI, requires all locales and provenance layers, and forbids activation/publication claims. Put structured artifact details in one directly linked reference.
 
-- [ ] **Step 5: Validate Skill metadata**
+- [x] **Step 5: Validate Skill metadata**
 
     python C:/Users/cyanl/.codex/skills/.system/skill-creator/scripts/quick_validate.py skills/authoring-character-packs
 
 Expected: Skill is valid!
 
-- [ ] **Step 6: Run fresh Skill-enabled agents**
+- [x] **Step 6: Run fresh Skill-enabled agents**
 
 Use new thread IDs and the same cases/assertions. Positive cases open the Skill; non-triggers do not. All declared assertions must pass. If a new rationalization appears, add only the counter needed and rerun affected cases with fresh threads.
 
-- [ ] **Step 7: Verify GREEN and commit**
+- [x] **Step 7: Verify GREEN and commit**
 
     python -m pytest tests/skills/test_authoring_character_packs_evidence.py -v
     git add skills/authoring-character-packs tests/skills
@@ -371,11 +371,11 @@ Use new thread IDs and the same cases/assertions. Positive cases open the Skill;
 - Create: tests/skills/authoring-release-verification.md
 - Modify: docs/superpowers/plans/2026-08-03-kokoroarc-authoring.md
 
-- [ ] **Step 1: Document current boundary and quick start**
+- [x] **Step 1: Document current boundary and quick start**
 
 Explain that authoring produces a private inactive draft, named research is a prerequisite path, and installation/promotion is unavailable until later milestones.
 
-- [ ] **Step 2: Run complete verification**
+- [x] **Step 2: Run complete verification**
 
 Use unique roots under D:/tmp and PYTHONPATH=src:
 
@@ -387,15 +387,15 @@ Use unique roots under D:/tmp and PYTHONPATH=src:
 
 Expected: zero test failures, both Skills valid, wheel and sdist built.
 
-- [ ] **Step 3: Run an auditable authoring CLI smoke test**
+- [x] **Step 3: Run an auditable authoring CLI smoke test**
 
 Validate an original request, validate its source pack, compile a private draft under D:/tmp, and prove build_status=draft, visibility=private, activation_allowed=false, and no session/state files were created.
 
-- [ ] **Step 4: Capture evidence and mark every plan checkbox accurately**
+- [x] **Step 4: Capture evidence and mark every plan checkbox accurately**
 
 Record commands, counts, expected platform skips, artifact hashes, Skill campaign results, CLI transcript, and commit range. Do not mark any unchecked criterion complete.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
     git add README.md tests/skills/authoring-release-verification.md docs/superpowers/plans/2026-08-03-kokoroarc-authoring.md
     git commit -m "docs: verify character pack authoring milestone"
