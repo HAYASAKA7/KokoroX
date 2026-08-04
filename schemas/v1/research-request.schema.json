@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kokoroarc.local/schemas/v1/research-request.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "artifact_id", "created_by", "subject", "scope", "questions", "coverage_topics", "user_assertions", "user_constraints", "requested_visibility"],
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "artifact_id": {"$ref": "#/$defs/artifact_id"},
+    "created_by": {"$ref": "#/$defs/created_by"},
+    "subject": {"type": "object", "additionalProperties": false, "required": ["subject_id", "identity", "franchise", "aliases"], "properties": {"subject_id": {"$ref": "#/$defs/id"}, "identity": {"type": "string", "minLength": 1, "maxLength": 256}, "franchise": {"type": "string", "minLength": 1, "maxLength": 256}, "aliases": {"type": "array", "minItems": 1, "maxItems": 32, "uniqueItems": true, "items": {"type": "string", "minLength": 1, "maxLength": 256}}}},
+    "scope": {"type": "object", "additionalProperties": false, "required": ["medium", "work", "adaptation", "continuity", "timeline_cutoff", "spoiler_scope"], "properties": {"medium": {"type": "string", "minLength": 1, "maxLength": 128}, "work": {"type": "string", "minLength": 1, "maxLength": 256}, "adaptation": {"type": "string", "minLength": 1, "maxLength": 256}, "continuity": {"type": "string", "minLength": 1, "maxLength": 256}, "timeline_cutoff": {"type": "string", "minLength": 1, "maxLength": 256}, "spoiler_scope": {"type": "string", "minLength": 1, "maxLength": 512}}},
+    "questions": {"type": "array", "minItems": 1, "maxItems": 128, "uniqueItems": true, "items": {"type": "string", "minLength": 1, "maxLength": 2000}},
+    "coverage_topics": {"type": "array", "minItems": 1, "maxItems": 128, "uniqueItems": true, "items": {"$ref": "#/$defs/id"}},
+    "user_assertions": {"type": "array", "maxItems": 128, "uniqueItems": true, "items": {"type": "string", "minLength": 1, "maxLength": 4000}},
+    "user_constraints": {"type": "array", "maxItems": 128, "uniqueItems": true, "items": {"type": "string", "minLength": 1, "maxLength": 4000}},
+    "requested_visibility": {"const": "private"}
+  },
+  "$defs": {
+    "id": {"type": "string", "minLength": 1, "maxLength": 128, "pattern": "^(?!con(?:[./]|$))(?!prn(?:[./]|$))(?!aux(?:[./]|$))(?!nul(?:[./]|$))(?!com[1-9](?:[./]|$))(?!lpt[1-9](?:[./]|$))[a-z0-9][a-z0-9._-]{0,127}$"},
+    "artifact_id": {"type": "string", "minLength": 1, "maxLength": 128, "pattern": "^(?!con(?:/|$))(?!prn(?:/|$))(?!aux(?:/|$))(?!nul(?:/|$))(?!com[1-9](?:/|$))(?!lpt[1-9](?:/|$))(?!.*/(?:con|prn|aux|nul|com[1-9]|lpt[1-9])(?:/|$))[a-z0-9][a-z0-9._/-]{0,127}$"},
+    "created_by": {"type": "object", "additionalProperties": false, "required": ["component", "version"], "properties": {"component": {"const": "kokoroarc"}, "version": {"type": "string", "minLength": 1, "maxLength": 64}}}
+  }
+}

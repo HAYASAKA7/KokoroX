@@ -8,3 +8,6 @@ README.md text eol=lf
 skills/using-kokoroarc/** text eol=lf
 # Evaluator prompts are byte-exact captures; a terminal blank line can be evidence.
 tests/skills/transcripts/authoring-character-packs/skill/*/prompt.txt whitespace=-blank-at-eof
+
+# Research workspace manifests hash their fixture artifact bytes.
+tests/fixtures/research/** text eol=lf

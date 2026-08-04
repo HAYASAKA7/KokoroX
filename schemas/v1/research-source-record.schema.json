@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kokoroarc.local/schemas/v1/research-source-record.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "artifact_id", "created_by", "source_id", "category", "locator", "title", "publisher", "accessed_at", "availability", "content_sha256", "excerpts", "continuity", "spoiler_scope", "limitations", "trust_notes"],
+  "properties": {
+    "schema_version": {"const": "1.0"}, "artifact_id": {"$ref": "#/$defs/artifact_id"}, "created_by": {"$ref": "#/$defs/created_by"}, "source_id": {"$ref": "#/$defs/id"},
+    "category": {"enum": ["official_profile", "episode", "chapter", "interview", "guide", "database", "user_supplied"]},
+    "locator": {"type": "string", "minLength": 1, "maxLength": 2048, "pattern": "^(?:kokoro-evidence:[a-z0-9][a-z0-9._/-]{0,255}|https://(?![^/?#@]*@)[A-Za-z0-9.-]+(?::[0-9]{1,5})?(?:/[^\\s]*)?)$"},
+    "title": {"type": "string", "minLength": 1, "maxLength": 512}, "publisher": {"type": "string", "minLength": 1, "maxLength": 256}, "accessed_at": {"type": "string", "format": "date-time", "maxLength": 64},
+    "availability": {"enum": ["available", "unavailable", "partial", "archived"]}, "content_sha256": {"$ref": "#/$defs/sha256"},
+    "excerpts": {"type": "array", "maxItems": 64, "uniqueItems": true, "items": {"type": "string", "minLength": 1, "maxLength": 8000}},
+    "continuity": {"type": "string", "minLength": 1, "maxLength": 256}, "spoiler_scope": {"type": "string", "minLength": 1, "maxLength": 512},
+    "limitations": {"type": "array", "maxItems": 64, "uniqueItems": true, "items": {"type": "string", "minLength": 1, "maxLength": 2000}}, "trust_notes": {"type": "array", "maxItems": 64, "uniqueItems": true, "items": {"type": "string", "minLength": 1, "maxLength": 2000}}
+  },
+  "$defs": {
+    "id": {"type": "string", "minLength": 1, "maxLength": 128, "pattern": "^(?!con(?:[./]|$))(?!prn(?:[./]|$))(?!aux(?:[./]|$))(?!nul(?:[./]|$))(?!com[1-9](?:[./]|$))(?!lpt[1-9](?:[./]|$))[a-z0-9][a-z0-9._-]{0,127}$"},
+    "artifact_id": {"type": "string", "minLength": 1, "maxLength": 128, "pattern": "^(?!con(?:/|$))(?!prn(?:/|$))(?!aux(?:/|$))(?!nul(?:/|$))(?!com[1-9](?:/|$))(?!lpt[1-9](?:/|$))(?!.*/(?:con|prn|aux|nul|com[1-9]|lpt[1-9])(?:/|$))[a-z0-9][a-z0-9._/-]{0,127}$"},
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "created_by": {"type": "object", "additionalProperties": false, "required": ["component", "version"], "properties": {"component": {"const": "kokoroarc"}, "version": {"type": "string", "minLength": 1, "maxLength": 64}}}
+  }
+}
