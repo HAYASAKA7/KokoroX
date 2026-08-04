@@ -12,11 +12,12 @@
   ],
   "kind": "wording",
   "scopes": [
-    "fixture-primary"
+    "fixture-primary@episode-01",
+    "fixture-primary@episode-01-quoted"
   ],
   "status": "scope_separated",
   "selected_claim_ids": [
     "claim-role"
   ],
-  "resolution_rationale": "Claims apply to distinct fixture scopes."
+  "resolution_rationale": "Quoted injection-like wording is retained separately from the direct observation scope."
 }

@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest
 
 from kokoroarc.errors import KokoroError
+from kokoroarc.packs.compiler import canonical_bytes
 from kokoroarc.schemas import SchemaRegistry
 
 
@@ -16,9 +17,6 @@ ROOT = Path("tests/fixtures/research")
 def load(tree: str, path: str) -> dict:
     return json.loads((ROOT / tree / path).read_text(encoding="utf-8"))
 
-
-def canonical_bytes(value: object) -> bytes:
-    return (json.dumps(value, ensure_ascii=False, separators=(",", ":"), sort_keys=True) + "\n").encode("utf-8")
 
 
 def digest(value: object) -> str:

@@ -12,20 +12,12 @@
   "namespace": "research",
   "character_id": "aoi-kisaragi-fixture",
   "display_name": "Aoi Kisaragi Fixture",
-  "franchise": "fixture-arc",
-  "aliases": [
-    "Aoi",
-    "Kisaragi"
-  ],
-  "medium": "animated serial",
-  "work": "Fixture Arc",
-  "adaptation": "fixture-primary",
   "continuity": "fixture-primary",
   "timeline_cutoff": "episode-01",
   "spoiler_scope": "episode-01 only",
-  "request_hash": "986465635387372072db3fc845c7114ac634130df1aac7a3fc1ed63a628bda1f",
-  "workspace_hash": "36684e5cea34eea3aeda89a783b237b5f666743fa07b39d9ffc5856a4624cd6e",
-  "validation_report_hash": "64f885a30aa4d73f3eb5afc04e43947414308ca32efd2c22ec8774f3b31503ed",
+  "request_hash": "69186119803507572383270147a44a803de803e02197cc57a90a0489f4454b15",
+  "workspace_hash": "274e4ecc77efc412c7e0aa1e6e4aa19339dffeb25311e4bf658aefe73822a300",
+  "validation_report_hash": "78fc8a7e8db234f32aca04d6a1b1b690768f77e579d241bde8ffbb99eff0aa26",
   "sources": [
     {
       "schema_version": "1.0",
@@ -182,5 +174,5 @@
   },
   "limitations": [],
   "blocking_reasons": [],
-  "bundle_hash": "ee4fa4f9806bab495e9ef8eab1fd271019123e41e80f36a8f0d5b9c3ab09a66e"
+  "bundle_hash": "17489944d8e90085163b9b29c1e8f10df0afc969d4e52ae598ace63c07a2b20a"
 }

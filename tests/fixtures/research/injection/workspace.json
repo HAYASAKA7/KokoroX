@@ -18,7 +18,7 @@
   "claims": [
     {
       "path": "claims/claim-quoted-text.json",
-      "sha256": "66c30427b2ec54eb28123f753dc1f82430b99e1f98484d2ed5c4e5887574302f"
+      "sha256": "85433bb7fbf197d49120e4300431b329bf059fb7d1691dea82ba6af7fd83a20f"
     },
     {
       "path": "claims/claim-role.json",
@@ -28,7 +28,7 @@
   "conflicts": [
     {
       "path": "conflicts/conflict-adaptation-wording.json",
-      "sha256": "4c3468456e930dedbef261cfe8e52db590db350f6eb5f4c66e40fc75ab6a1d90"
+      "sha256": "9d8e5fa80af981641f84eeb14cd3433138b53f4c5369ea42fe84e0ccd535b253"
     }
   ],
   "coverage": {

@@ -14,11 +14,6 @@
     "namespace",
     "character_id",
     "display_name",
-    "franchise",
-    "aliases",
-    "medium",
-    "work",
-    "adaptation",
     "continuity",
     "timeline_cutoff",
     "spoiler_scope",
@@ -62,37 +57,6 @@
       "$ref": "#/$defs/id"
     },
     "display_name": {
-      "type": "string",
-      "minLength": 1,
-      "maxLength": 256
-    },
-    "franchise": {
-      "type": "string",
-      "minLength": 1,
-      "maxLength": 256
-    },
-    "aliases": {
-      "type": "array",
-      "minItems": 1,
-      "maxItems": 128,
-      "uniqueItems": true,
-      "items": {
-        "type": "string",
-        "minLength": 1,
-        "maxLength": 256
-      }
-    },
-    "medium": {
-      "type": "string",
-      "minLength": 1,
-      "maxLength": 256
-    },
-    "work": {
-      "type": "string",
-      "minLength": 1,
-      "maxLength": 256
-    },
-    "adaptation": {
       "type": "string",
       "minLength": 1,
       "maxLength": 256
@@ -744,7 +708,7 @@
       "type": "string",
       "minLength": 1,
       "maxLength": 128,
-      "pattern": "^[a-z0-9][a-z0-9._-]{0,127}$"
+      "pattern": "^(?!con(?:[./]|$))(?!prn(?:[./]|$))(?!aux(?:[./]|$))(?!nul(?:[./]|$))(?!com[1-9](?:[./]|$))(?!lpt[1-9](?:[./]|$))[a-z0-9][a-z0-9._-]{0,127}$"
     },
     "sha256": {
       "type": "string",
