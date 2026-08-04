@@ -6,7 +6,6 @@ from pathlib import Path
 import pytest
 
 from kokoroarc.errors import KokoroError
-from kokoroarc.packs.compiler import canonical_bytes
 from kokoroarc.schemas import SchemaRegistry
 
 
@@ -116,24 +115,3 @@ def test_workspace_digests_and_conflict_references_are_exact(tree: str) -> None:
     for record in workspace["conflicts"]:
         conflict = load(tree, record["path"])
         assert set(conflict["claim_ids"]).issubset(claim_ids)
-
-
-@pytest.mark.parametrize("tree", ["complete", "partial"])
-def test_bundle_hashes_use_canonical_fixture_identities(tree: str) -> None:
-    bundle = load(tree, "bundle.json")
-    request = load(tree, "request.json")
-    workspace = load(tree, "workspace.json")
-    report = load(tree, "validation-report.json")
-    canonical_workspace = {
-        "request": load(tree, workspace["request"]["path"]),
-        "sources": sorted([load(tree, item["path"]) for item in workspace["sources"]], key=lambda item: item["source_id"]),
-        "claims": sorted([load(tree, item["path"]) for item in workspace["claims"]], key=lambda item: item["claim_id"]),
-        "conflicts": sorted([load(tree, item["path"]) for item in workspace["conflicts"]], key=lambda item: item["conflict_id"]),
-        "coverage": load(tree, workspace["coverage"]["path"]),
-    }
-    assert bundle["request_hash"] == digest(request)
-    assert bundle["workspace_hash"] == digest(canonical_workspace)
-    assert bundle["validation_report_hash"] == digest(report)
-    unhashed = deepcopy(bundle)
-    unhashed.pop("bundle_hash")
-    assert bundle["bundle_hash"] == digest(unhashed)

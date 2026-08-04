@@ -234,13 +234,13 @@
       "type": "string",
       "minLength": 1,
       "maxLength": 128,
-      "pattern": "^(?!(?i:con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\\.|$))[a-z0-9][a-z0-9._-]{0,127}$"
+      "pattern": "^(?!con(?:\\.|$))(?!prn(?:\\.|$))(?!aux(?:\\.|$))(?!nul(?:\\.|$))(?!com[1-9](?:\\.|$))(?!lpt[1-9](?:\\.|$))[a-z0-9][a-z0-9._-]{0,127}$"
     },
     "artifact_id": {
       "type": "string",
       "minLength": 1,
       "maxLength": 128,
-      "pattern": "^(?!(?i:con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\\.|/|$))(?!.*\\/(?i:con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\\.|/|$))[a-z0-9][a-z0-9._/-]{0,127}$"
+      "pattern": "^(?!con(?:\\.|/|$))(?!prn(?:\\.|/|$))(?!aux(?:\\.|/|$))(?!nul(?:\\.|/|$))(?!com[1-9](?:\\.|/|$))(?!lpt[1-9](?:\\.|/|$))(?!.*\\/(?:con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\\.|/|$))[a-z0-9](?:[a-z0-9._-]*[a-z0-9_-])?(?:/[a-z0-9](?:[a-z0-9._-]*[a-z0-9_-])?)*$"
     },
     "created_by": {
       "type": "object",

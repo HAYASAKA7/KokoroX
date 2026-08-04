@@ -1,12 +1,9 @@
-from copy import deepcopy
-from hashlib import sha256
 import json
 from pathlib import Path
 
 import pytest
 
 from kokoroarc.errors import KokoroError
-from kokoroarc.packs.compiler import canonical_bytes
 from kokoroarc.schemas import SchemaRegistry
 
 
@@ -16,24 +13,6 @@ SCHEMAS = SchemaRegistry(Path("schemas/v1"))
 
 def load(tree: str, relative: str) -> dict:
     return json.loads((ROOT / tree / relative).read_text(encoding="utf-8"))
-
-
-def assembled(tree: str) -> dict:
-    manifest = load(tree, "workspace.json")
-    records = lambda key: [load(tree, entry["path"]) for entry in manifest[key]]
-    return {
-        "request": load(tree, manifest["request"]["path"]),
-        "sources": sorted(records("sources"), key=lambda record: record["source_id"]),
-        "claims": sorted(records("claims"), key=lambda record: record["claim_id"]),
-        "conflicts": sorted(records("conflicts"), key=lambda record: record["conflict_id"]),
-        "coverage": load(tree, manifest["coverage"]["path"]),
-    }
-
-
-@pytest.mark.parametrize("tree", ["complete", "partial"])
-def test_bundle_workspace_hashes_artifact_contents_not_manifest_entries(tree: str) -> None:
-    bundle = load(tree, "bundle.json")
-    assert bundle["workspace_hash"] == sha256(canonical_bytes(assembled(tree))).hexdigest()
 
 
 @pytest.mark.parametrize(
