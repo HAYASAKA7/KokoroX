@@ -369,6 +369,7 @@ Use new thread IDs and the same cases/assertions. Positive cases open the Skill;
 **Files:**
 - Modify: README.md
 - Create: tests/skills/authoring-release-verification.md
+- Create: tests/skills/test_authoring_release_evidence.py
 - Modify: docs/superpowers/plans/2026-08-03-kokoroarc-authoring.md
 
 - [x] **Step 1: Document current boundary and quick start**
@@ -379,13 +380,16 @@ Explain that authoring produces a private inactive draft, named research is a pr
 
 Use unique roots under D:/tmp and PYTHONPATH=src:
 
+    New-Item -ItemType Directory -Force <root>,<temp>,<pytest>,<build-temp>,<smoke>,<smoke-data>
     python -m pytest -q
-    python -m build --outdir D:/tmp/kokoroarc-authoring-dist-20260803-final
+    python -m build --outdir <root>/dist
     python C:/Users/cyanl/.codex/skills/.system/skill-creator/scripts/quick_validate.py skills/using-kokoroarc
     python C:/Users/cyanl/.codex/skills/.system/skill-creator/scripts/quick_validate.py skills/authoring-character-packs
     git diff --check
 
 Expected: zero test failures, both Skills valid, wheel and sdist built.
+
+The corrected release build is bound in `tests/skills/authoring-release-verification.md` to base HEAD `5324281d2ace5fe1306c1cdca195fcd766d3a764` plus one identified README-only patch. The evidence records the README file/blob/normalized-patch hashes, proves no other packaged input changed, and gives the exact isolated-clone reconstruction commands. Evidence and plan changes made afterward are not represented as package inputs.
 
 - [x] **Step 3: Run an auditable authoring CLI smoke test**
 
@@ -395,7 +399,9 @@ Validate an original request, validate its source pack, compile a private draft 
 
 Record commands, counts, expected platform skips, artifact hashes, Skill campaign results, CLI transcript, and commit range. Do not mark any unchecked criterion complete.
 
+`tests/skills/test_authoring_release_evidence.py` regression-checks the repository-local Skill quick start, exact build-source identity, directory initialization, five CLI captures, byte equality, lifecycle/path/forbidden-root assertions, artifact hashing, canonical transcript construction, and `git diff --check` evidence.
+
 - [x] **Step 5: Commit**
 
-    git add README.md tests/skills/authoring-release-verification.md docs/superpowers/plans/2026-08-03-kokoroarc-authoring.md
-    git commit -m "docs: verify character pack authoring milestone"
+    git add README.md tests/skills/authoring-release-verification.md tests/skills/test_authoring_release_evidence.py docs/superpowers/plans/2026-08-03-kokoroarc-authoring.md
+    git commit -m "fix: make authoring release evidence reproducible"
