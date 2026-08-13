@@ -223,7 +223,9 @@ def import_run(
             [f"captures/{left}", f"captures/{right}"]
             for left, right in DETERMINISM_PAIRS[case["id"]]
         ]
-    outcomes = adjudicate_assertions(case, destination, pairs)
+    outcomes = adjudicate_assertions(
+        case, destination, pairs, trusted_run_root=source
+    )
 
     result = {
         "schema_version": "1.0",

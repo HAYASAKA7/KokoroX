@@ -10,19 +10,23 @@ CREDENTIAL_REPLACEMENT = "<redacted-credential>"
 
 
 _USER_PROFILE = re.compile(
-    r"[A-Za-z]:[\\/]+Users[\\/]+[^\\/\s\"']+(?:[\\/][^\s\"']*)?",
+    r"[A-Za-z]:[\\/]+Users[\\/]+[^\\/\s\"']+",
     re.IGNORECASE,
 )
 _ENVIRONMENT_ASSIGNMENT = re.compile(
     r"(?P<prefix>[\"']?[A-Z0-9_-]*(?:API[_-]?KEY|ACCESS[_-]?KEY|"
     r"PRIVATE[_-]?KEY|CLIENT[_-]?SECRET|SECRET|TOKEN|PASSWORD|PASSWD|"
     r"CREDENTIALS?)"
-    r"[\"']?\s*[:=]\s*)(?P<value>[\"']?[^\s,}\]\r\n]+[\"']?)",
+    r"[\"']?\s*[:=]\s*)"
+    r"(?P<value>(?P<environment_quote>\\?[\"']).*?"
+    r"(?P=environment_quote)|[^\s,}\]\r\n]+)",
     re.IGNORECASE,
 )
 _AUTHORIZATION = re.compile(
-    r"(?P<prefix>Authorization\s*[:=]\s*(?:Bearer|Basic|Token)\s+)"
-    r"(?P<value>\S+)",
+    r"(?P<prefix>(?:\\?[\"'])?Authorization(?:\\?[\"'])?\s*[:=]\s*)"
+    r"(?P<value>(?P<authorization_quote>\\?[\"'])"
+    r"(?:Bearer|Basic|Token)\s+.*?(?P=authorization_quote)|"
+    r"(?:Bearer|Basic|Token)\s+[^\s,}\]\r\n]+)",
     re.IGNORECASE,
 )
 _URL_CREDENTIALS = re.compile(
@@ -37,8 +41,8 @@ _KNOWN_CREDENTIALS = (
     re.compile(r"\bAKIA[0-9A-Z]{16}\b"),
     re.compile(r"\bAIza[0-9A-Za-z_-]{30,}\b"),
     re.compile(
-        r"-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----.*?"
-        r"-----END (?:RSA |EC |OPENSSH )?PRIVATE KEY-----",
+        r"-----BEGIN (?P<label>(?:(?:RSA|EC|OPENSSH|ENCRYPTED) )?PRIVATE KEY)"
+        r"-----.*?-----END (?P=label)-----",
         re.DOTALL,
     ),
 )
@@ -46,12 +50,21 @@ _KNOWN_CREDENTIALS = (
 
 def _replace_value(match: re.Match[str], replacement: str) -> str:
     value = match.group("value")
-    if value.casefold().strip("\"'").startswith("<redacted-"):
+    escaped_quote = (
+        value[:2]
+        if len(value) >= 4 and value[0] == "\\" and value[1] in {"\"", "'"}
+        else ""
+    )
+    quote = value[0] if not escaped_quote and value[:1] in {"\"", "'"} else ""
+    delimiter = escaped_quote or quote
+    unquoted = (
+        value[len(delimiter) : -len(delimiter)]
+        if delimiter and value.endswith(delimiter)
+        else value
+    )
+    if unquoted.casefold().startswith("<redacted-"):
         return match.group(0)
-    quote = value[0] if value[:1] in {"\"", "'"} else ""
-    if quote and value[-1:] != quote:
-        quote = ""
-    redacted = f"{quote}{replacement}{quote}" if quote else replacement
+    redacted = f"{delimiter}{replacement}{delimiter}" if delimiter else replacement
     return f"{match.group('prefix')}{redacted}"
 
 

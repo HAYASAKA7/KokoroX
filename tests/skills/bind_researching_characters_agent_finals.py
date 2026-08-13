@@ -163,7 +163,24 @@ def bind_run(
     selected_lines = [raw_lines[index] for index in selected_indexes]
     retained = b"".join(selected_lines)
     retained_text = retained.decode("utf-8")
-    if contains_sensitive_material(retained_text):
+    decoded_strings: list[str] = []
+
+    def collect_strings(value: object) -> None:
+        if isinstance(value, str):
+            decoded_strings.append(value)
+        elif isinstance(value, dict):
+            for key, item in value.items():
+                collect_strings(key)
+                collect_strings(item)
+        elif isinstance(value, list):
+            for item in value:
+                collect_strings(item)
+
+    for event in selected_events:
+        collect_strings(event)
+    if contains_sensitive_material(retained_text) or any(
+        contains_sensitive_material(value) for value in decoded_strings
+    ):
         raise RuntimeError(f"final event contains forbidden sensitive material: {session_path}")
 
     events_path = run_root / "agent-final-events.jsonl"

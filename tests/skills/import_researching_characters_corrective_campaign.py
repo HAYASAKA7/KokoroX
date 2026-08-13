@@ -225,7 +225,9 @@ def import_run(source_root: Path, approval_root: Path, case: dict) -> dict:
     deviations = list(HARNESS_DEVIATIONS.get(case_id, ()))
     harness_status = "completed_with_disclosed_deviations" if deviations else "completed"
     pairs = verify_determinism(source, case_id)
-    outcomes = adjudicate_assertions(case, destination, pairs)
+    outcomes = adjudicate_assertions(
+        case, destination, pairs, trusted_run_root=source
+    )
     behavior_status = (
         "passed" if all(item["passed"] for item in outcomes) else "failed"
     )
