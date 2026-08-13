@@ -832,6 +832,167 @@ def test_cli_assertions_reject_nonexecuting_powershell_regions_with_claimed_argv
         assert outcomes[assertion] is False
 
 
+@pytest.mark.parametrize(
+    "mutation",
+    (
+        "help_only",
+        "missing_arguments",
+        "changed_path",
+        "alternate_switch",
+        "post_action_failure",
+        "trailing_output",
+        "stdout_capture_mismatch",
+        "stderr_capture_mismatch",
+    ),
+)
+def test_cli_assertions_bind_complete_wrapper_execution_to_claimed_record(
+    tmp_path: Path,
+    mutation: str,
+) -> None:
+    from researching_characters_adjudication import adjudicate_assertions
+
+    run, run_root, report = _mutable_run(
+        tmp_path, "2026-08-13-approved2", "partial-unavailable-source"
+    )
+    wrappers = [
+        record
+        for record in report["commands"]
+        if isinstance(record, dict)
+        and isinstance(record.get("argv"), list)
+        and isinstance(record.get("command"), str)
+        and "$ErrorActionPreference" in record["command"]
+        and "kokoroarc.cli research" in record["command"]
+    ]
+    assert len(wrappers) == 7
+    invocation = re.compile(
+        r"python -m kokoroarc\.cli "
+        r"(?P<action>research (?:request validate|workspace validate|"
+        r"bundle (?:compile|validate)))"
+        r".*?(?=\s+2>)",
+        re.IGNORECASE,
+    )
+    changed_paths = {
+        "research request validate": "--input workspace\\other.json --json",
+        "research workspace validate": "--workspace other-workspace --json",
+        "research bundle compile": "--workspace other-workspace --json",
+        "research bundle validate": "--bundle other-bundle --json",
+    }
+    for record in wrappers:
+        command = record["command"]
+        match = invocation.search(command)
+        assert match is not None
+        action = " ".join(match.group("action").casefold().split())
+        if mutation == "help_only":
+            replacement = f"python -m kokoroarc.cli {action} --help"
+            command = invocation.sub(lambda _match: replacement, command, count=1)
+        elif mutation == "missing_arguments":
+            replacement = f"python -m kokoroarc.cli {action}"
+            command = invocation.sub(lambda _match: replacement, command, count=1)
+        elif mutation == "changed_path":
+            replacement = (
+                f"python -m kokoroarc.cli {action} {changed_paths[action]}"
+            )
+            command = invocation.sub(lambda _match: replacement, command, count=1)
+        elif mutation == "alternate_switch":
+            replacement = f"python -m kokoroarc.cli {action} --version"
+            command = invocation.sub(lambda _match: replacement, command, count=1)
+        elif mutation == "post_action_failure":
+            command += "; exit 1"
+        elif mutation == "trailing_output":
+            command += "; Write-Output unexpected"
+        elif mutation == "stdout_capture_mismatch":
+            command = re.sub(
+                r"(?i)(Tee-Object\s+-FilePath\s+)'[^']+'",
+                r"\1'captures\\mismatched.stdout.txt'",
+                command,
+                count=1,
+            )
+        elif mutation == "stderr_capture_mismatch":
+            command = re.sub(
+                r"(?i)(2>\s*)'[^']+'",
+                r"\1'captures\\mismatched.stderr.txt'",
+                command,
+                count=1,
+            )
+        else:  # pragma: no cover - parameter list is closed above
+            raise AssertionError(mutation)
+        record["command"] = command
+    _write_json(run_root / "agent-report.json", report)
+    case = next(item for item in _cases() if item["id"] == run["case_id"])
+
+    outcomes = {
+        item["id"]: item["passed"]
+        for item in adjudicate_assertions(
+            case,
+            run_root,
+            run["determinism_pairs"],
+            trusted_run_root=_trusted_run_root(run),
+        )
+    }
+
+    for assertion in (
+        "validate_request_twice",
+        "validate_workspace_twice",
+        "compile_private_bundle",
+        "validate_bundle_twice",
+        "confine_output",
+    ):
+        assert outcomes[assertion] is False, (assertion, outcomes)
+
+
+def test_cli_assertions_reject_partial_direct_command_summary(
+    tmp_path: Path,
+) -> None:
+    from researching_characters_adjudication import adjudicate_assertions
+
+    run, run_root, report = _mutable_run(
+        tmp_path, "2026-08-13-approved2", "eligible-researched-handoff"
+    )
+    next_option = {
+        "research request validate": "--input",
+        "research workspace validate": "--workspace",
+        "research bundle compile": "--workspace",
+        "research bundle validate": "--bundle",
+    }
+    changed = 0
+    for record in report["commands"]:
+        if not isinstance(record, dict) or not isinstance(record.get("argv"), list):
+            continue
+        command = record.get("command")
+        if not isinstance(command, str):
+            continue
+        action = next(
+            (item for item in next_option if command.casefold().endswith(item)),
+            None,
+        )
+        if action is None:
+            continue
+        record["command"] = f"{command} {next_option[action]}"
+        changed += 1
+    assert changed == 7
+    _write_json(run_root / "agent-report.json", report)
+    case = next(item for item in _cases() if item["id"] == run["case_id"])
+
+    outcomes = {
+        item["id"]: item["passed"]
+        for item in adjudicate_assertions(
+            case,
+            run_root,
+            run["determinism_pairs"],
+            trusted_run_root=_trusted_run_root(run),
+        )
+    }
+
+    for assertion in (
+        "validate_request_twice",
+        "validate_workspace_twice",
+        "compile_private_bundle",
+        "validate_bundle_twice",
+        "confine_output",
+    ):
+        assert outcomes[assertion] is False
+
+
 def test_compile_output_is_bound_to_trusted_campaign_run_root(
     tmp_path: Path,
 ) -> None:

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 import re
-import shlex
 from pathlib import Path, PurePosixPath, PureWindowsPath
 
 from researching_characters_sanitization import contains_sensitive_material
@@ -51,100 +50,94 @@ _ALLOWED_OUTPUT_FILES = {"agent-report.json", "final.md"}
 _HEX_64 = re.compile(r"[0-9a-f]{64}", re.IGNORECASE)
 _PYTHON_EXECUTABLES = {"py", "py.exe", "python", "python.exe"}
 _KOKORO_EXECUTABLES = {"kokoro", "kokoro.exe"}
-_CLI_WRAPPER_INVOCATION = re.compile(
-    r"(?i)(?:^|;\s*)(?:[^\s\"']*[\\/])?(?:python|py)(?:\.exe)?"
-    r"\s+-m\s+kokoroarc\.cli\s+"
-    r"(?P<action>research\s+(?:request\s+validate|workspace\s+validate|"
-    r"bundle\s+(?:compile|validate)))(?:\s|$)"
+_POWERSHELL_CLI_WRAPPER = re.compile(
+    r"""
+    \A\s*
+    \$ErrorActionPreference\s*=\s*'Stop'\s*;\s*
+    \$env:PYTHONPATH\s*=\s*'[^'\r\n]+'\s*;\s*
+    \$env:KOKOROARC_DATA_DIR\s*=\s*
+        \(\s*Resolve-Path\s+-LiteralPath\s+'run-data'\s*\)\.Path\s*;\s*
+    \$env:TEMP\s*=\s*
+        \(\s*Resolve-Path\s+-LiteralPath\s+'run-temp'\s*\)\.Path\s*;\s*
+    \$env:TMP\s*=\s*\$env:TEMP\s*;\s*
+    \$env:KOKOROARC_TEMP_DIR\s*=\s*\$env:TEMP\s*;\s*
+    (?P<invocation>[^;|<>\r\n]+?)
+    \s+2>\s*'(?P<stderr>[^'\r\n]+)'\s*
+    \|\s*Tee-Object\s+-FilePath\s*'(?P<stdout>[^'\r\n]+)'\s*;\s*
+    if\s*\(\s*\$LASTEXITCODE\s+-ne\s+0\s*\)\s*
+        \{\s*exit\s+\$LASTEXITCODE\s*\}\s*
+    \Z
+    """,
+    re.IGNORECASE | re.VERBOSE,
 )
-_SHELL_TERMINATOR = re.compile(r"(?i)\b(?:break|continue|exit|return|throw)\b")
 
 
-def _unquoted_shell_code(value: str) -> str:
-    """Mask quoted/comment text before looking for an executable shell segment."""
-    masked = list(value)
+def _shell_words(
+    value: str,
+    *,
+    single_quotes_only: bool = False,
+    allow_placeholders: bool = False,
+) -> list[str]:
+    """Tokenize a non-evaluated command while rejecting shell syntax."""
+    words: list[str] = []
+    word: list[str] = []
     quote: str | None = None
-    block_comment_depth = 0
+    token_started = False
     index = 0
     while index < len(value):
         character = value[index]
-        pair = value[index : index + 2]
-        if block_comment_depth:
-            masked[index] = " "
-            if pair == "<#":
-                block_comment_depth += 1
-                if index + 1 < len(value):
-                    masked[index + 1] = " "
-                index += 2
-                continue
-            if pair == "#>":
-                block_comment_depth -= 1
-                if index + 1 < len(value):
-                    masked[index + 1] = " "
-                index += 2
-                continue
-        elif quote is not None:
-            masked[index] = " "
-            if character == "`" and index + 1 < len(value):
-                index += 1
-                masked[index] = " "
-            elif character == "\\" and index + 1 < len(value):
-                index += 1
-                masked[index] = " "
-            elif character == quote:
+        if quote is not None:
+            if character == quote:
                 if (
                     quote == "'"
                     and index + 1 < len(value)
                     and value[index + 1] == "'"
                 ):
-                    index += 1
-                    masked[index] = " "
-                else:
-                    quote = None
-        elif pair == "<#":
-            block_comment_depth = 1
-            masked[index] = " "
-            if index + 1 < len(value):
-                masked[index + 1] = " "
-            index += 2
+                    word.append("'")
+                    index += 2
+                    continue
+                quote = None
+            elif quote == '"' and character in {"`", "$"}:
+                return []
+            else:
+                word.append(character)
+            index += 1
             continue
-        elif character in {"'", '"'}:
+
+        if character.isspace():
+            if token_started:
+                words.append("".join(word))
+                word = []
+                token_started = False
+        elif character == "'":
             quote = character
-            masked[index] = " "
-        elif character == "#":
-            while index < len(value) and value[index] not in "\r\n":
-                masked[index] = " "
-                index += 1
-            continue
+            token_started = True
+        elif character == '"' and not single_quotes_only:
+            quote = character
+            token_started = True
+        elif character == "<" and allow_placeholders and not token_started:
+            end = value.find(">", index + 1)
+            placeholder = value[index : end + 1] if end >= 0 else ""
+            if (
+                re.fullmatch(r"<[A-Za-z0-9_-]+>", placeholder) is None
+                or (end + 1 < len(value) and not value[end + 1].isspace())
+            ):
+                return []
+            word.append(placeholder)
+            token_started = True
+            index = end
+        elif character in "`$#;|&<>(){}[]" or character == '"':
+            return []
+        else:
+            word.append(character)
+            token_started = True
         index += 1
-    return "".join(masked)
 
-
-def _top_level_wrapper_actions(command: str) -> set[str]:
-    """Return only CLI actions that occur outside quoted, commented, or nested code."""
-    masked = _unquoted_shell_code(command)
-    opening = {"(", "[", "{"}
-    closing = {")": "(", "]": "[", "}": "{"}
-    stack: list[str] = []
-    top_level = [False] * len(masked)
-    for index, character in enumerate(masked):
-        top_level[index] = not stack
-        if character in opening:
-            stack.append(character)
-        elif character in closing:
-            if not stack or stack[-1] != closing[character]:
-                return set()
-            stack.pop()
-    if stack:
-        return set()
-    actions: set[str] = set()
-    for match in _CLI_WRAPPER_INVOCATION.finditer(masked):
-        if not top_level[match.start()]:
-            continue
-        if _SHELL_TERMINATOR.search(masked[: match.start()]):
-            continue
-        actions.add(" ".join(match.group("action").casefold().split()))
-    return actions
+    if quote is not None:
+        return []
+    if token_started:
+        words.append("".join(word))
+    return words
 
 
 def _read_json(path: Path) -> dict:
@@ -165,6 +158,69 @@ def _normalized_path(value: str) -> str:
 
 def _executable_name(value: str) -> str:
     return value.strip().strip("\"'").replace("\\", "/").rsplit("/", 1)[-1].casefold()
+
+
+def _same_cli_token(left: str, right: str, index: int) -> bool:
+    if index == 0:
+        left_name = _executable_name(left)
+        right_name = _executable_name(right)
+        if left_name in _PYTHON_EXECUTABLES:
+            return right_name in _PYTHON_EXECUTABLES
+        if left_name in _KOKORO_EXECUTABLES:
+            return right_name in _KOKORO_EXECUTABLES
+        return False
+    return left.replace("\\", "/").casefold() == right.replace("\\", "/").casefold()
+
+
+def _cli_tokens_match(left: list[str], right: list[str]) -> bool:
+    return len(left) == len(right) and all(
+        _same_cli_token(left_token, right_token, index)
+        for index, (left_token, right_token) in enumerate(zip(left, right))
+    )
+
+
+def _direct_summary_binds_declared_tokens(
+    summary_tokens: list[str], declared_tokens: list[str]
+) -> bool:
+    if not summary_tokens or not declared_tokens:
+        return False
+    if len(summary_tokens) == 1:
+        return _same_cli_token(summary_tokens[0], declared_tokens[0], 0)
+    if _cli_tokens_match(summary_tokens, declared_tokens):
+        return True
+    executable = _executable_name(declared_tokens[0])
+    action_length = 6 if executable in _PYTHON_EXECUTABLES else 4
+    return len(summary_tokens) == action_length and _cli_tokens_match(
+        summary_tokens, declared_tokens[:action_length]
+    )
+
+
+def _record_capture_value(record: dict, stream: str) -> str | None:
+    for key in (f"{stream}_file", f"{stream}_capture"):
+        if key in record:
+            value = record[key]
+            if not isinstance(value, str) or not value.strip():
+                return None
+            return _normalized_path(value.strip())
+    return None
+
+
+def _wrapper_binds_declared_record(
+    command_text: str,
+    declared_tokens: list[str],
+    record: dict,
+) -> bool:
+    match = _POWERSHELL_CLI_WRAPPER.fullmatch(command_text)
+    if match is None:
+        return False
+    invocation = _shell_words(match.group("invocation"), single_quotes_only=True)
+    if not invocation or not _cli_tokens_match(invocation, declared_tokens):
+        return False
+    return all(
+        _record_capture_value(record, stream)
+        == _normalized_path(match.group(stream).strip())
+        for stream in ("stdout", "stderr")
+    )
 
 
 def _declared_cli_tokens(record: dict) -> list[str]:
@@ -189,16 +245,10 @@ def _declared_cli_tokens(record: dict) -> list[str]:
         return []
     if not command_text:
         return []
-    try:
-        return shlex.split(command_text, posix=False)
-    except ValueError:
-        return []
+    return _shell_words(command_text, allow_placeholders=True)
 
 
-def _declared_cli_action(record: object) -> str | None:
-    if not isinstance(record, dict):
-        return None
-    tokens = _declared_cli_tokens(record)
+def _cli_action_from_tokens(tokens: list[str]) -> str | None:
     if not tokens:
         return None
     lowered = [token.casefold() for token in tokens]
@@ -216,17 +266,47 @@ def _declared_cli_action(record: object) -> str | None:
     action = " ".join(action_tokens)
     if action not in _CLI_ACTIONS:
         return None
+    return action
+
+
+def _declared_cli_action(record: object) -> str | None:
+    if not isinstance(record, dict):
+        return None
+    tokens = _declared_cli_tokens(record)
+    action = _cli_action_from_tokens(tokens)
+    if action is None:
+        return None
 
     command = record.get("command")
     command_text = command.strip() if isinstance(command, str) else ""
     argv = record.get("argv")
     if isinstance(argv, list) and command_text:
-        command_executable = _executable_name(command_text)
-        if command_executable not in _PYTHON_EXECUTABLES | _KOKORO_EXECUTABLES:
-            wrapper_actions = _top_level_wrapper_actions(command_text)
-            if action not in wrapper_actions:
+        command_tokens = _shell_words(command_text, allow_placeholders=True)
+        command_executable = (
+            _executable_name(command_tokens[0]) if command_tokens else ""
+        )
+        if command_executable in _PYTHON_EXECUTABLES | _KOKORO_EXECUTABLES:
+            if not _direct_summary_binds_declared_tokens(command_tokens, tokens):
                 return None
+        elif not _wrapper_binds_declared_record(command_text, tokens, record):
+            return None
     return action
+
+
+def _cli_records_are_bound(report: dict) -> bool:
+    raw = report.get("commands") or []
+    if not isinstance(raw, list):
+        return False
+    for record in raw:
+        if not isinstance(record, dict):
+            continue
+        tokens = _declared_cli_tokens(record)
+        if (
+            _cli_action_from_tokens(tokens) is not None
+            and _declared_cli_action(record) is None
+        ):
+            return False
+    return True
 
 
 def _canonical_command(record: object) -> str:
@@ -811,7 +891,7 @@ def _observed_assertions(
     compile_private = _bundle_outputs_match(compile_output, bundle_output)
 
     source_paths = [path for path in normalized_opened if "/sources/" in f"/{path}"]
-    commands_safe = _safe_commands(report)
+    commands_safe = _safe_commands(report) and _cli_records_are_bound(report)
     inert = bool(source_paths) and commands_safe
     no_secret_value = not contains_sensitive_material(retained_text)
 
