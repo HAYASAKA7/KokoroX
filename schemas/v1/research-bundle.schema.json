@@ -74,7 +74,7 @@
     "spoiler_scope": {
       "type": "string",
       "minLength": 1,
-      "maxLength": 256
+      "maxLength": 512
     },
     "request_hash": {
       "$ref": "#/$defs/sha256"
