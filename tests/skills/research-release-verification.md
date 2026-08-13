@@ -9,14 +9,16 @@ This record covers the inline product, CLI, Skill-structure, smoke, and distribu
 - Isolated root: `D:\tmp\kokoroarc-m7-release-20260813-inline1`
 - Behavioral campaign: CORRECTIVE PASS 11/11 (first batch remains Skill PASS 10/11, RED 1/11)
 - Corrective harness: COMPLETED WITH DISCLOSED DEVIATIONS
-- Exact-final verification: PASS ON POST-SETTLEMENT REMEDIATION TREE; FRESH REVIEWS PENDING
+- Exact-final verification: PASS ON REPLAY-HARDENING SETTLED TREE; FRESH REVIEWS PENDING
 - Review of commit `b07338101b37c66080f9b7f82de7a84919d9b56c`: IMPORTANT FINDINGS REMEDIATED
 - Fresh specification review of `6afcbeccbc43814700e42c4626a6a9b8e1bddce0`: PASS
-- Fresh quality review of `6afcbeccbc43814700e42c4626a6a9b8e1bddce0`: IMPORTANT FINDINGS UNDER REMEDIATION
-- Fresh specification review of post-settlement remediation: PENDING
-- Fresh quality review of post-settlement remediation: PENDING
+- Fresh quality review of `6afcbeccbc43814700e42c4626a6a9b8e1bddce0`: IMPORTANT FINDINGS REMEDIATED
+- Fresh specification review of `646fc91f27eb723334f4ff4b25309985b56046a3`: IMPORTANT FINDINGS REMEDIATED
+- Fresh quality review of `646fc91f27eb723334f4ff4b25309985b56046a3`: IMPORTANT FINDINGS REMEDIATED
+- Fresh specification review of replay-hardening settled tree: PENDING
+- Fresh quality review of replay-hardening settled tree: PENDING
 
-The approved 22-run first campaign remains behaviorally immutable, including its one failed Skill case. The separately approved 11-run corrective Skill-only campaign passed all declared behavioral assertions against the current Skill. Ten harness/report deviations across seven cases are retained and disclosed; they do not reclassify behavior or erase the failed first campaign. Review of the first release-evidence commit found Important checkout, whitespace-gate, assertion-adjudication, and final-message-binding gaps. The first remediation fixed those gaps, but fresh quality review of the settled commit then found additional fail-open adjudication and incomplete sanitizer coverage. Those findings are being remediated. Task 11 requires a new exact-commit gate and two new independent reviews. No canon-accuracy claim or complete-suite approval is implied by the checks below.
+The approved 22-run first campaign remains behaviorally immutable, including its one failed Skill case. The separately approved 11-run corrective Skill-only campaign passed all declared behavioral assertions against the current Skill. Ten harness/report deviations across seven cases are retained and disclosed; they do not reclassify behavior or erase the failed first campaign. Review of the first release-evidence commit found Important checkout, whitespace-gate, assertion-adjudication, and final-message-binding gaps. Later reviews found additional fail-open adjudication, command-provenance, confinement, inert-source, sanitizer, and raw-replay gaps. Commit `a3fcdb809945cf823f3dd860c65666f0cab6b4be` remediates the latest findings and passes its exact implementation gate. Task 11 still requires both independent reviews to pass on the settled release-record tree. No canon-accuracy claim or complete-suite approval is implied by the checks below.
 
 ## Current Skill identity
 
@@ -261,6 +263,34 @@ The release-record tree, including this result block and its unchanged executabl
 
 The post-settlement remediation exact status is **PASS ON POST-SETTLEMENT REMEDIATION TREE; FRESH REVIEWS PENDING**. Task 11 and Milestone 7 remain open until fresh specification and quality reviews of the settled commit both report no Critical or Important findings.
 
+## Replay-hardening review remediation
+
+Fresh specification and quality reviews of exact commit `646fc91f27eb723334f4ff4b25309985b56046a3` both reported FAIL with Important findings. Their independent corpus audits still found the retained campaign authentic: all 785 ledger-bound raw files matched the two approved D:-based roots, all 33 final messages rebound to their original session logs, and the detached checkout preserved all 984 evidence files. The combined closure defects were:
+
+1. CLI actions were label-bound rather than executable-bound, so a record such as `Write-Output research request validate` could inherit valid captures and pass without invoking KokoroArc;
+2. an absolute compile output outside the approved run root could pass when its path suffix resembled the expected private bundle path;
+3. authorization and inert-source checks accepted commands including `cmd /d /c set` and `node workspace/sources/payload.js`; and
+4. the shared sanitizer only partially handled quoted multiword secrets, JSON Authorization values, encrypted private keys, and serialized forms. Its changed user-profile pattern also prevented the current importer from reproducing 12 sanitized historical files.
+
+Commit `a3fcdb809945cf823f3dd860c65666f0cab6b4be`, tree `5f545d2695d5c4bf849876307c2018e21c6cb16e`, closes those paths with regression-first changes. Action evidence now requires an exact supported KokoroArc executable/argv form, including a valid CLI command segment inside approved wrappers. Importers provide a trusted raw-run root independently of the evaluator report; compiled output must resolve exactly beneath that root, and output confinement fails when compilation cannot be bound. Command safety scans both raw wrapper text and structured argv, rejects environment dumps, unapproved interpreters, and executable source forms, and binds source-secret safety to the same fail-closed result.
+
+The shared sanitizer preserves the historical user-profile path suffix while covering quoted multiword secrets, plain and serialized JSON Authorization values, encrypted private-key blocks, and serialized credential assignments. The final-event binder scans decoded selected-event values recursively. A full replay using the current importer reproduced all 785 ledger-bound raw files byte-for-byte, including the 12 files with redactions, with zero raw-hash, retained-hash, redaction-count, or regenerated-byte mismatches.
+
+The exact implementation gate is retained at `D:\tmp\kokoroarc-m7-replay-hardening-exact-a3fcdb8-01`. With `PYTHONPATH=src`, disabled pytest caching, and all temporary paths confined beneath that root, the complete suite exited `0`: **`1942 passed, 24 skipped` in 164.08 seconds**. There were no failures or errors; every skip was an explicit Windows symlink, junction, or FIFO capability case. Captured stdout was 7,236 bytes with SHA-256 `23967ABA7BF55C58C12560516DDB12535A8FC59DF00C77954A2E17A10578FA8`; stderr was empty with SHA-256 `E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855`.
+
+The fixed-epoch build used `SOURCE_DATE_EPOCH=1786608259`, exited `0`, and produced:
+
+| Artifact | Bytes | SHA-256 |
+| --- | ---: | --- |
+| `kokoroarc-0.0.0.dev0-py3-none-any.whl` | 111,414 | `0F9D3B900E26B47E8F7C8A077931600351D051708881F473DBAF0C076E29ED6D` |
+| `kokoroarc-0.0.0.dev0.tar.gz` | 86,061 | `166B16F1883B3CE838744A7DE6FED4EF57085035C1B6CB79C0AC2AB6EABD1F0D` |
+
+The wheel retained 58 entries and the sdist 75; both contained all six research modules and all eight research schemas. The embedded README SHA-256 remained `0F345F780A742B8552C34134641B8BA23C15B615D8A67F5E996F7303E9B5881D`, and the normalized sdist content-manifest SHA-256 remained `4E1ADA14555CCF663C9E87545AC476013E8726E43D3E894FF4CBF469E2C54776`. All three standard Skill validators exited `0`, printed `Skill is valid!`, and retained empty stderr. The exact Task 11 range passed `git diff --check` with empty output, and the implementation worktree was clean.
+
+A detached clone at `D:\tmp\kokoroarc-m7-fresh-checkout-a3fcdb8-01` configured with `core.autocrlf=true` passed the **51 tests** in the focused research/release verifier in 9.59 seconds. Captured stdout SHA-256 was `74FA2331E2AB269DCFAAE95D001DC9DB433D4BD772BEF3B6F314C84C8FB536A0`; stderr was empty. It preserved all 984 retained evidence files byte-for-byte, retained the three declared Skill hashes with zero CRLF pairs, passed the exact-range whitespace check, and remained clean.
+
+The release-record tree containing this section and its executable assertion is assigned the settled root `D:\tmp\kokoroarc-m7-replay-hardening-settled-01`. Before review, that exact commit must pass the complete suite with the additional release-record test, the same fixed-epoch package identities, all three validators, the 785-file raw replay, the exact-range whitespace/status gate, and a detached `core.autocrlf=true` checkout. The status is **PASS ON REPLAY-HARDENING SETTLED TREE; FRESH REVIEWS PENDING** only while those retained artifacts exist and match that exact commit.
+
 ## Verified product gates before this record
 
 - Task 8 exact research-to-authoring gate: `380 passed, 7 skipped`.
@@ -273,8 +303,8 @@ These results were obtained before the release-document changes. The settled-inp
 
 ## Remaining closure gates
 
-1. Commit the settled post-settlement remediation release record after its exact-tree rerun.
+1. Commit the replay-hardening release record and complete its exact-tree rerun under the assigned D:-based root.
 2. Obtain fresh independent specification and quality reviews on that exact commit.
 3. Close Milestone 7 only after both reviews report PASS with no Critical or Important findings.
 
-Current status: Behavioral campaign: CORRECTIVE PASS 11/11. Corrective harness: COMPLETED WITH DISCLOSED DEVIATIONS. Exact-final verification: PASS ON POST-SETTLEMENT REMEDIATION TREE; FRESH REVIEWS PENDING. Fresh specification review of post-settlement remediation: PENDING. Fresh quality review of post-settlement remediation: PENDING.
+Current status: Behavioral campaign: CORRECTIVE PASS 11/11. Corrective harness: COMPLETED WITH DISCLOSED DEVIATIONS. Exact-final verification: PASS ON REPLAY-HARDENING SETTLED TREE; FRESH REVIEWS PENDING. Fresh specification review of replay-hardening settled tree: PENDING. Fresh quality review of replay-hardening settled tree: PENDING.

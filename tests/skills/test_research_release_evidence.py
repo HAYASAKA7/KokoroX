@@ -75,11 +75,13 @@ def test_release_evidence_records_smoke_and_exact_milestone_boundary() -> None:
         "Milestone 7 does not approve the complete standalone suite",
         "Behavioral campaign: CORRECTIVE PASS 11/11",
         "Corrective harness: COMPLETED WITH DISCLOSED DEVIATIONS",
-        "Exact-final verification: PASS ON POST-SETTLEMENT REMEDIATION TREE; FRESH REVIEWS PENDING",
+        "Exact-final verification: PASS ON REPLAY-HARDENING SETTLED TREE; FRESH REVIEWS PENDING",
         "Fresh specification review of `6afcbeccbc43814700e42c4626a6a9b8e1bddce0`: PASS",
-        "Fresh quality review of `6afcbeccbc43814700e42c4626a6a9b8e1bddce0`: IMPORTANT FINDINGS UNDER REMEDIATION",
-        "Fresh specification review of post-settlement remediation: PENDING",
-        "Fresh quality review of post-settlement remediation: PENDING",
+        "Fresh quality review of `6afcbeccbc43814700e42c4626a6a9b8e1bddce0`: IMPORTANT FINDINGS REMEDIATED",
+        "Fresh specification review of `646fc91f27eb723334f4ff4b25309985b56046a3`: IMPORTANT FINDINGS REMEDIATED",
+        "Fresh quality review of `646fc91f27eb723334f4ff4b25309985b56046a3`: IMPORTANT FINDINGS REMEDIATED",
+        "Fresh specification review of replay-hardening settled tree: PENDING",
+        "Fresh quality review of replay-hardening settled tree: PENDING",
     ):
         assert text in evidence
 
@@ -194,6 +196,31 @@ def test_release_evidence_records_post_settlement_quality_remediation() -> None:
         "all 984 retained evidence blobs byte-for-byte",
         r"D:\tmp\kokoroarc-m7-quality-remediation-settled-01",
         "PASS ON POST-SETTLEMENT REMEDIATION TREE; FRESH REVIEWS PENDING",
+    ):
+        assert text in evidence
+
+
+def test_release_evidence_records_replay_hardening_review_remediation() -> None:
+    evidence = EVIDENCE_PATH.read_text(encoding="utf-8")
+    for text in (
+        "Replay-hardening review remediation",
+        "646fc91f27eb723334f4ff4b25309985b56046a3",
+        "label-bound rather than executable-bound",
+        "trusted raw-run root",
+        "`cmd /d /c set`",
+        "quoted multiword secrets",
+        "all 785 ledger-bound raw files",
+        "a3fcdb809945cf823f3dd860c65666f0cab6b4be",
+        "5f545d2695d5c4bf849876307c2018e21c6cb16e",
+        r"D:\tmp\kokoroarc-m7-replay-hardening-exact-a3fcdb8-01",
+        "1942 passed, 24 skipped",
+        "23967ABA7BF55C58C12560516DDB12535A8FC59DF00C77954A2E17A10578FA8",
+        "166B16F1883B3CE838744A7DE6FED4EF57085035C1B6CB79C0AC2AB6EABD1F0D",
+        r"D:\tmp\kokoroarc-m7-fresh-checkout-a3fcdb8-01",
+        "51 tests",
+        "74FA2331E2AB269DCFAAE95D001DC9DB433D4BD772BEF3B6F314C84C8FB536A0",
+        r"D:\tmp\kokoroarc-m7-replay-hardening-settled-01",
+        "PASS ON REPLAY-HARDENING SETTLED TREE; FRESH REVIEWS PENDING",
     ):
         assert text in evidence
 
