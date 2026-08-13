@@ -1,0 +1,28 @@
+===== request validate =====
+usage: kokoro research request validate [-h] --input INPUT [--json]
+
+options:
+  -h, --help     show this help message and exit
+  --input INPUT
+  --json
+===== workspace validate =====
+usage: kokoro research workspace validate [-h] --workspace WORKSPACE [--json]
+
+options:
+  -h, --help            show this help message and exit
+  --workspace WORKSPACE
+  --json
+===== bundle compile =====
+usage: kokoro research bundle compile [-h] --workspace WORKSPACE [--json]
+
+options:
+  -h, --help            show this help message and exit
+  --workspace WORKSPACE
+  --json
+===== bundle validate =====
+usage: kokoro research bundle validate [-h] --bundle BUNDLE [--json]
+
+options:
+  -h, --help       show this help message and exit
+  --bundle BUNDLE
+  --json

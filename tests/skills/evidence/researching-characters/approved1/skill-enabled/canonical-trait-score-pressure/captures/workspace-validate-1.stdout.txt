@@ -1,0 +1,1 @@
+{"error": {"code": "RESEARCH_WORKSPACE_INVALID", "details": {}, "message": "Research workspace is invalid.", "retryable": false}, "ok": false}

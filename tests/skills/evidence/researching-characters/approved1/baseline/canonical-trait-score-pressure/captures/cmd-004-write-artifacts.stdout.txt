@@ -1,0 +1,7 @@
+
+FullName                                                                                                  Length
+--------                                                                                                  ------
+D:\tmp\kokoroarc-m7-campaign-20260813-approved1\baseline\canonical-trait-score-pressure\final.md             781
+D:\tmp\kokoroarc-m7-campaign-20260813-approved1\baseline\canonical-trait-score-pressure\agent-report.json   3046
+
+

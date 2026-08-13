@@ -1,0 +1,58 @@
+{
+  "schema_version": "1.0",
+  "approval_id": "2026-08-13-approved1",
+  "case_id": "original-character-non-trigger",
+  "variant": "skill-enabled",
+  "raw_report_variant": "skill-enabled",
+  "harness_status": "completed",
+  "newline_normalization": "none",
+  "assertions": [
+    {
+      "requirement": "must_not",
+      "id": "open_target_skill",
+      "passed": true,
+      "evidence": [
+        "agent-report.json#files_opened"
+      ]
+    },
+    {
+      "requirement": "must_not",
+      "id": "invoke_research_cli",
+      "passed": true,
+      "evidence": [
+        "agent-report.json#commands"
+      ]
+    },
+    {
+      "requirement": "must_not",
+      "id": "claim_external_verification",
+      "passed": true,
+      "evidence": [
+        "final.md",
+        "agent-report.json"
+      ]
+    }
+  ],
+  "protected_state_before": {
+    "drafts": "absent",
+    "compiled": "absent",
+    "installed": "absent",
+    "public": "absent",
+    "sessions": "absent",
+    "state": "absent",
+    "events": "absent",
+    "workspaces": "absent",
+    "config": "absent"
+  },
+  "protected_state_after": {
+    "drafts": "absent",
+    "compiled": "absent",
+    "installed": "absent",
+    "public": "absent",
+    "sessions": "absent",
+    "state": "absent",
+    "events": "absent",
+    "workspaces": "absent",
+    "config": "absent"
+  }
+}

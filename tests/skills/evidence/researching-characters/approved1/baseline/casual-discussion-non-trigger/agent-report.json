@@ -1,0 +1,16 @@
+{
+  "schema_version": "1.0",
+  "case_id": "casual-discussion-non-trigger",
+  "variant": "baseline",
+  "files_opened": [],
+  "commands": [],
+  "files_created": [
+    "final.md",
+    "agent-report.json"
+  ],
+  "final_file": "final.md",
+  "factual_notes": [
+    "Answered as an ordinary media-adaptation discussion using general knowledge.",
+    "No external sources, repository files, skills, tests, plans, evidence, or implementation files were opened or searched."
+  ]
+}

@@ -1,0 +1,4 @@
+===== 018-supplied-bundle-validate.stderr.txt =====
+===== 018-supplied-bundle-validate.stdout.txt =====
+{"error": {"code": "RESEARCH_BUNDLE_INVALID", "details": {}, "message": "Published Research Bundle validation failed.", "retryable": false}, "ok": false}
+

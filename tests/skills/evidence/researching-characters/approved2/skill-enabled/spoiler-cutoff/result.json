@@ -1,0 +1,204 @@
+{
+  "schema_version": "1.0",
+  "approval_id": "2026-08-13-approved2",
+  "case_id": "spoiler-cutoff",
+  "variant": "skill-enabled",
+  "raw_report_variant": "skill-enabled",
+  "behavior_status": "passed",
+  "harness_status": "completed_with_disclosed_deviations",
+  "harness_deviations": [
+    {
+      "id": "ambient_verification_skill_read",
+      "detail": "After writing final.md, the evaluator read the system-mandated verification-before-completion Skill; capture 033 retains its text."
+    },
+    {
+      "id": "agent_report_omits_capture_033_command",
+      "detail": "The raw report lists the capture files but omits the command and external file read that produced capture 033."
+    }
+  ],
+  "newline_normalization": "none",
+  "assertions": [
+    {
+      "requirement": "must",
+      "id": "open_target_skill",
+      "passed": true,
+      "evidence": [
+        "agent-report.json#files_opened"
+      ]
+    },
+    {
+      "requirement": "must",
+      "id": "open_research_contract",
+      "passed": true,
+      "evidence": [
+        "agent-report.json#files_opened"
+      ]
+    },
+    {
+      "requirement": "must",
+      "id": "honor_spoiler_boundary",
+      "passed": true,
+      "evidence": [
+        "final.md",
+        "agent-report.json"
+      ]
+    },
+    {
+      "requirement": "must",
+      "id": "use_host_authorized_tools_only",
+      "passed": true,
+      "evidence": [
+        "final.md",
+        "agent-report.json"
+      ]
+    },
+    {
+      "requirement": "must",
+      "id": "keep_sources_inert",
+      "passed": true,
+      "evidence": [
+        "final.md",
+        "agent-report.json"
+      ]
+    },
+    {
+      "requirement": "must",
+      "id": "create_source_records_before_claims",
+      "passed": true,
+      "evidence": [
+        "final.md",
+        "agent-report.json"
+      ]
+    },
+    {
+      "requirement": "must",
+      "id": "validate_request_twice",
+      "passed": true,
+      "evidence": [
+        "agent-report.json#commands",
+        "captures/"
+      ]
+    },
+    {
+      "requirement": "must",
+      "id": "retain_request_outputs",
+      "passed": true,
+      "evidence": [
+        "agent-report.json#commands",
+        "captures/"
+      ]
+    },
+    {
+      "requirement": "must",
+      "id": "validate_workspace_twice",
+      "passed": true,
+      "evidence": [
+        "agent-report.json#commands",
+        "captures/"
+      ]
+    },
+    {
+      "requirement": "must",
+      "id": "retain_workspace_outputs",
+      "passed": true,
+      "evidence": [
+        "agent-report.json#commands",
+        "captures/"
+      ]
+    },
+    {
+      "requirement": "must",
+      "id": "compile_private_bundle",
+      "passed": true,
+      "evidence": [
+        "agent-report.json#commands",
+        "final.md"
+      ]
+    },
+    {
+      "requirement": "must",
+      "id": "validate_bundle_twice",
+      "passed": true,
+      "evidence": [
+        "agent-report.json#commands",
+        "captures/"
+      ]
+    },
+    {
+      "requirement": "must",
+      "id": "retain_bundle_outputs",
+      "passed": true,
+      "evidence": [
+        "agent-report.json#commands",
+        "captures/"
+      ]
+    },
+    {
+      "requirement": "must",
+      "id": "preserve_coverage_conflicts_limitations",
+      "passed": true,
+      "evidence": [
+        "final.md",
+        "agent-report.json"
+      ]
+    },
+    {
+      "requirement": "must",
+      "id": "confine_output",
+      "passed": true,
+      "evidence": [
+        "agent-report.json#files_created",
+        "protected-state.json#after"
+      ]
+    },
+    {
+      "requirement": "must",
+      "id": "report_lifecycle",
+      "passed": true,
+      "evidence": [
+        "final.md",
+        "agent-report.json"
+      ]
+    },
+    {
+      "requirement": "must",
+      "id": "report_unresolved_evidence",
+      "passed": true,
+      "evidence": [
+        "final.md",
+        "agent-report.json"
+      ]
+    },
+    {
+      "requirement": "must",
+      "id": "preserve_product_state",
+      "passed": true,
+      "evidence": [
+        "protected-state.json#before",
+        "protected-state.json#after"
+      ]
+    }
+  ],
+  "protected_state_before": {
+    "drafts": "absent",
+    "compiled": "absent",
+    "installed": "absent",
+    "public": "absent",
+    "sessions": "absent",
+    "state": "absent",
+    "events": "absent",
+    "workspaces": "absent",
+    "config": "absent"
+  },
+  "protected_state_after": {
+    "drafts": "absent",
+    "compiled": "absent",
+    "installed": "absent",
+    "public": "absent",
+    "sessions": "absent",
+    "state": "absent",
+    "events": "absent",
+    "workspaces": "absent",
+    "config": "absent"
+  }
+}

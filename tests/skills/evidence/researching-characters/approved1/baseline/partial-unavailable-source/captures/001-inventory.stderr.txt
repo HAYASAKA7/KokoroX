@@ -1,0 +1,12 @@
+Script failed
+Wall time 4.2 seconds
+Output:
+Script error:
+Exit code: 1
+Wall time: 4.1 seconds
+Output:
+error: Can't create the symlink for multishells at "<redacted-user-profile>\AppData\Local\fnm_multishells\46608_1786610866546". Maybe there are some issues with permissions for the directory? 拒绝访问。 (os error 5)
+Invoke-Expression: <redacted-user-profile>\Documents\WindowsPowerShell\Microsoft.PowerShell_profile.ps1:171
+Line 171: fnm env --use-on-cd | Out-String | Invoke-Expression
+Cannot bind argument to parameter 'Command' because it is an empty string.
+Out-File: Access to the path 'D:\tmp\kokoroarc-m7-campaign-20260813-approved1\baseline\partial-unavailable-source\captures\001-inventory.stdout.txt' is denied.

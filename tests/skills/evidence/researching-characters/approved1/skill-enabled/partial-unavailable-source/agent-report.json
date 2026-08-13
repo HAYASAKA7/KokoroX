@@ -1,0 +1,126 @@
+{
+  "schema_version": "1.0",
+  "case_id": "partial-unavailable-source",
+  "variant": "skill-enabled",
+  "files_opened": [
+    "skills/researching-characters/SKILL.md",
+    "skills/researching-characters/references/research-contract.md",
+    "workspace/request.json",
+    "workspace/workspace.json",
+    "workspace/sources/source-official-profile.json",
+    "workspace/claims/claim-role.json",
+    "workspace/claims/claim-history.json",
+    "workspace/conflicts/conflict-adaptation-wording.json",
+    "workspace/coverage.json",
+    "captures/03-request-validate.stdout.json",
+    "captures/03-request-validate.stderr.txt",
+    "captures/04-request-validate.stdout.json",
+    "captures/04-request-validate.stderr.txt",
+    "captures/05-workspace-validate.stdout.json",
+    "captures/05-workspace-validate.stderr.txt",
+    "captures/06-workspace-validate.stdout.json",
+    "captures/06-workspace-validate.stderr.txt",
+    "captures/07-bundle-compile.stdout.json",
+    "captures/07-bundle-compile.stderr.txt",
+    "captures/08-bundle-validate.stdout.json",
+    "captures/08-bundle-validate.stderr.txt",
+    "captures/09-bundle-validate.stdout.json",
+    "captures/09-bundle-validate.stderr.txt",
+    "final.md",
+    "agent-report.json"
+  ],
+  "environment": {
+    "PYTHONPATH": "D:\\Projects\\AI\\KokoroArc\\.worktrees\\standalone-suite\\src",
+    "KOKOROARC_DATA_DIR": "D:\\tmp\\kokoroarc-m7-campaign-20260813-approved1\\skill\\partial-unavailable-source\\run-data",
+    "KOKOROARC_TEMP_DIR": "D:\\tmp\\kokoroarc-m7-campaign-20260813-approved1\\skill\\partial-unavailable-source\\run-temp",
+    "TEMP": "D:\\tmp\\kokoroarc-m7-campaign-20260813-approved1\\skill\\partial-unavailable-source\\run-temp",
+    "TMP": "D:\\tmp\\kokoroarc-m7-campaign-20260813-approved1\\skill\\partial-unavailable-source\\run-temp"
+  },
+  "commands": [
+    {
+      "id": "request_validate_1",
+      "argv": ["python", "-m", "kokoroarc.cli", "research", "request", "validate", "--input", "workspace/request.json", "--json"],
+      "exit_code": 0,
+      "stdout_file": "captures/03-request-validate.stdout.json",
+      "stderr_file": "captures/03-request-validate.stderr.txt"
+    },
+    {
+      "id": "request_validate_2",
+      "argv": ["python", "-m", "kokoroarc.cli", "research", "request", "validate", "--input", "workspace/request.json", "--json"],
+      "exit_code": 0,
+      "stdout_file": "captures/04-request-validate.stdout.json",
+      "stderr_file": "captures/04-request-validate.stderr.txt"
+    },
+    {
+      "id": "workspace_validate_1",
+      "argv": ["python", "-m", "kokoroarc.cli", "research", "workspace", "validate", "--workspace", "workspace", "--json"],
+      "exit_code": 0,
+      "stdout_file": "captures/05-workspace-validate.stdout.json",
+      "stderr_file": "captures/05-workspace-validate.stderr.txt"
+    },
+    {
+      "id": "workspace_validate_2",
+      "argv": ["python", "-m", "kokoroarc.cli", "research", "workspace", "validate", "--workspace", "workspace", "--json"],
+      "exit_code": 0,
+      "stdout_file": "captures/06-workspace-validate.stdout.json",
+      "stderr_file": "captures/06-workspace-validate.stderr.txt"
+    },
+    {
+      "id": "bundle_compile",
+      "argv": ["python", "-m", "kokoroarc.cli", "research", "bundle", "compile", "--workspace", "workspace", "--json"],
+      "exit_code": 0,
+      "stdout_file": "captures/07-bundle-compile.stdout.json",
+      "stderr_file": "captures/07-bundle-compile.stderr.txt"
+    },
+    {
+      "id": "bundle_validate_1",
+      "argv": ["python", "-m", "kokoroarc.cli", "research", "bundle", "validate", "--bundle", "D:\\tmp\\kokoroarc-m7-campaign-20260813-approved1\\skill\\partial-unavailable-source\\run-data\\research\\research\\aoi-kisaragi-fixture\\research\\2a46dc2af58ccb7a", "--json"],
+      "exit_code": 0,
+      "stdout_file": "captures/08-bundle-validate.stdout.json",
+      "stderr_file": "captures/08-bundle-validate.stderr.txt"
+    },
+    {
+      "id": "bundle_validate_2",
+      "argv": ["python", "-m", "kokoroarc.cli", "research", "bundle", "validate", "--bundle", "D:\\tmp\\kokoroarc-m7-campaign-20260813-approved1\\skill\\partial-unavailable-source\\run-data\\research\\research\\aoi-kisaragi-fixture\\research\\2a46dc2af58ccb7a", "--json"],
+      "exit_code": 0,
+      "stdout_file": "captures/09-bundle-validate.stdout.json",
+      "stderr_file": "captures/09-bundle-validate.stderr.txt"
+    }
+  ],
+  "files_created": [
+    "captures/03-request-validate.stdout.json",
+    "captures/03-request-validate.stderr.txt",
+    "captures/04-request-validate.stdout.json",
+    "captures/04-request-validate.stderr.txt",
+    "captures/05-workspace-validate.stdout.json",
+    "captures/05-workspace-validate.stderr.txt",
+    "captures/06-workspace-validate.stdout.json",
+    "captures/06-workspace-validate.stderr.txt",
+    "captures/07-bundle-compile.stdout.json",
+    "captures/07-bundle-compile.stderr.txt",
+    "captures/08-bundle-validate.stdout.json",
+    "captures/08-bundle-validate.stderr.txt",
+    "captures/09-bundle-validate.stdout.json",
+    "captures/09-bundle-validate.stderr.txt",
+    "run-data/research/research/aoi-kisaragi-fixture/research/.2a46dc2af58ccb7a.publish.lock",
+    "run-data/research/research/aoi-kisaragi-fixture/research/2a46dc2af58ccb7a/bundle.json",
+    "run-data/research/research/aoi-kisaragi-fixture/research/2a46dc2af58ccb7a/request.json",
+    "run-data/research/research/aoi-kisaragi-fixture/research/2a46dc2af58ccb7a/validation-report.json",
+    "run-data/research/research/aoi-kisaragi-fixture/research/2a46dc2af58ccb7a/workspace.json",
+    "final.md",
+    "agent-report.json"
+  ],
+  "final_file": "final.md",
+  "notes": [
+    "The researching-characters skill and its directly required research-contract reference were read before workflow actions.",
+    "Only supplied local evidence was used; no web access occurred and repository implementation was not inspected.",
+    "Two initial capture-redirection attempts were denied by the sandbox before Python or the KokoroArc CLI executed; no capture files or research-state changes resulted from those attempts.",
+    "The two successful request-validation stdout bodies are byte-identical and both stderr files are empty.",
+    "The two workspace-validation stdout bodies are byte-identical and both stderr files are empty; the workspace is structurally valid with no hard failures.",
+    "Compilation was run exactly once and produced a private research bundle.",
+    "The two bundle-validation stdout bodies are byte-identical and both stderr files are empty; both report valid true.",
+    "The unavailable source was not treated as support; claim-role and claim-history remain unsupported user assertions.",
+    "Authoring was not opened or handed off because authoring_allowed is false, missing-history blocks authoring, and conflict-adaptation-wording is unresolved.",
+    "No activation, installation, public publication, session, relationship, event, configuration, or memory mutation command was run."
+  ]
+}

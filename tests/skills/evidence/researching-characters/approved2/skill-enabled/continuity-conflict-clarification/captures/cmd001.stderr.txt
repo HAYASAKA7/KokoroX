@@ -1,0 +1,1 @@
+Out-File: Access to the path 'D:\tmp\kokoroarc-m7-campaign-20260813-approved2\skill\continuity-conflict-clarification\captures\cmd001.stderr.txt' is denied.

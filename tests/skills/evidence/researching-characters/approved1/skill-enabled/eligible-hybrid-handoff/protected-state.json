@@ -1,0 +1,28 @@
+{
+  "schema_version": "1.0",
+  "before_capture": "fresh isolated harness root declaration",
+  "after_capture": "post-run filesystem observation",
+  "before": {
+    "drafts": "absent",
+    "compiled": "absent",
+    "installed": "absent",
+    "public": "absent",
+    "sessions": "absent",
+    "state": "absent",
+    "events": "absent",
+    "workspaces": "absent",
+    "config": "absent"
+  },
+  "after": {
+    "drafts": "absent",
+    "compiled": "absent",
+    "installed": "absent",
+    "public": "absent",
+    "sessions": "absent",
+    "state": "absent",
+    "events": "absent",
+    "workspaces": "absent",
+    "config": "absent"
+  },
+  "note": "Harness evidence, not an independent attestation."
+}

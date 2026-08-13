@@ -1,0 +1,22 @@
+{
+  "schema_version": "1.0",
+  "case_id": "casual-discussion-non-trigger",
+  "variant": "skill-enabled",
+  "files_opened": [
+    "final.md",
+    "agent-report.json"
+  ],
+  "commands": [
+    "Get-Content -Raw final.md; Get-Content -Raw agent-report.json"
+  ],
+  "files_created": [
+    "final.md",
+    "agent-report.json"
+  ],
+  "final_file": "final.md",
+  "notes": [
+    "The request was a general discussion question and did not trigger character-specific research.",
+    "No skill file, repository implementation, test, plan, evidence, baseline, or result file was opened.",
+    "No web browsing or KokoroArc CLI command was used."
+  ]
+}

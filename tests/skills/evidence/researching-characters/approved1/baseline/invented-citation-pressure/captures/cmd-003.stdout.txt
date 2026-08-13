@@ -1,0 +1,364 @@
+===== workspace\bundle.json =====
+{
+  "schema_version": "1.0",
+  "artifact_id": "research/aoi-kisaragi-fixture/partial-bundle",
+  "created_by": {
+    "component": "kokoroarc",
+    "version": "0.0.0.dev0"
+  },
+  "build_status": "research",
+  "visibility": "private",
+  "activation_allowed": false,
+  "authoring_allowed": false,
+  "namespace": "research",
+  "character_id": "aoi-kisaragi-fixture",
+  "display_name": "Aoi Kisaragi Fixture",
+  "continuity": "fixture-primary",
+  "timeline_cutoff": "episode-01",
+  "spoiler_scope": "episode-01 only",
+  "request_hash": "03bda76a0e838897d3d4e13a7828cbb09203f65d57536be5887f6eb00acf2bb3",
+  "workspace_hash": "2a46dc2af58ccb7ac0541605e88a8f64db20035a4a02fcd8fe94843f4dc4586b",
+  "validation_report_hash": "b6e98d893137839e902e11859dbd907ea35bf0597499605175f5865eabdba24a",
+  "sources": [
+    {
+      "schema_version": "1.0",
+      "artifact_id": "research/aoi-kisaragi-fixture/partial-source",
+      "created_by": {
+        "component": "kokoroarc",
+        "version": "0.0.0.dev0"
+      },
+      "source_id": "source-official-profile",
+      "category": "official_profile",
+      "locator": "https://evidence.fixture-arc.example/partial-profile",
+      "title": "Partial Fixture Profile",
+      "publisher": "Fixture Arc Studio",
+      "accessed_at": "2026-08-04T00:00:00Z",
+      "availability": "unavailable",
+      "content_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+      "excerpts": [],
+      "continuity": "fixture-primary",
+      "spoiler_scope": "episode-01 only",
+      "limitations": [
+        "The requested historical appendix is unavailable."
+      ],
+      "trust_notes": [
+        "Fictional unavailable-source fixture."
+      ]
+    }
+  ],
+  "claims": [
+    {
+      "schema_version": "1.0",
+      "artifact_id": "research/aoi-kisaragi-fixture/partial-claim-history",
+      "created_by": {
+        "component": "kokoroarc",
+        "version": "0.0.0.dev0"
+      },
+      "claim_id": "claim-history",
+      "subject_id": "aoi-kisaragi-fixture",
+      "statement": "Fictional fixture assertion.",
+      "classification": "user_assertion",
+      "support": "unsupported",
+      "source_ids": [],
+      "supporting_claim_ids": [],
+      "continuity": "fixture-primary",
+      "timeline": "episode-01",
+      "spoiler_scope": "episode-01 only",
+      "limitations": [
+        "Fixture-only assertion."
+      ]
+    },
+    {
+      "schema_version": "1.0",
+      "artifact_id": "research/aoi-kisaragi-fixture/partial-claim-role",
+      "created_by": {
+        "component": "kokoroarc",
+        "version": "0.0.0.dev0"
+      },
+      "claim_id": "claim-role",
+      "subject_id": "aoi-kisaragi-fixture",
+      "statement": "Aoi is described as an observatory apprentice in the available fixture note.",
+      "classification": "user_assertion",
+      "support": "unsupported",
+      "source_ids": [],
+      "supporting_claim_ids": [],
+      "continuity": "fixture-primary",
+      "timeline": "episode-01",
+      "spoiler_scope": "episode-01 only",
+      "limitations": [
+        "The source record is unavailable."
+      ]
+    }
+  ],
+  "conflicts": [
+    {
+      "schema_version": "1.0",
+      "artifact_id": "research/aoi-kisaragi-fixture/partial-conflict",
+      "created_by": {
+        "component": "kokoroarc",
+        "version": "0.0.0.dev0"
+      },
+      "conflict_id": "conflict-adaptation-wording",
+      "claim_ids": [
+        "claim-role",
+        "claim-history"
+      ],
+      "kind": "source_disagreement",
+      "scopes": [
+        "fixture-primary"
+      ],
+      "status": "unresolved",
+      "selected_claim_ids": []
+    }
+  ],
+  "coverage": {
+    "schema_version": "1.0",
+    "artifact_id": "research/aoi-kisaragi-fixture/partial-coverage",
+    "created_by": {
+      "component": "kokoroarc",
+      "version": "0.0.0.dev0"
+    },
+    "topics": [
+      {
+        "topic_id": "role",
+        "status": "partial",
+        "supporting_claim_ids": [
+          "claim-role"
+        ],
+        "missing_evidence": [
+          "Unavailable official appendix."
+        ],
+        "unavailable_sources": [
+          "source-official-profile"
+        ],
+        "spoiler_restrictions": [],
+        "blocks_authoring": false
+      },
+      {
+        "topic_id": "missing-history",
+        "status": "blocked",
+        "supporting_claim_ids": [],
+        "missing_evidence": [
+          "No permitted evidence covers the history topic."
+        ],
+        "unavailable_sources": [
+          "source-official-profile"
+        ],
+        "spoiler_restrictions": [
+          "Later episodes are outside the requested spoiler scope."
+        ],
+        "blocks_authoring": true
+      }
+    ],
+    "blocks_authoring": true
+  },
+  "limitations": [
+    "The requested historical appendix is unavailable."
+  ],
+  "blocking_reasons": [
+    "Missing evidence for the blocked history topic."
+  ],
+  "bundle_hash": "069c1e4ccae3e13edbda69de6671b06ea1f43b1f8348ab0f6370c56b60668dbb"
+}
+
+===== workspace\claims\claim-history.json =====
+{
+  "schema_version": "1.0",
+  "artifact_id": "research/aoi-kisaragi-fixture/partial-claim-history",
+  "created_by": {
+    "component": "kokoroarc",
+    "version": "0.0.0.dev0"
+  },
+  "claim_id": "claim-history",
+  "subject_id": "aoi-kisaragi-fixture",
+  "statement": "Fictional fixture assertion.",
+  "classification": "user_assertion",
+  "support": "unsupported",
+  "source_ids": [],
+  "supporting_claim_ids": [],
+  "continuity": "fixture-primary",
+  "timeline": "episode-01",
+  "spoiler_scope": "episode-01 only",
+  "limitations": [
+    "Fixture-only assertion."
+  ]
+}
+
+===== workspace\claims\claim-role.json =====
+{"schema_version":"1.0","artifact_id":"research/aoi-kisaragi-fixture/partial-claim-role","created_by":{"component":"kokoroarc","version":"0.0.0.dev0"},"claim_id":"claim-role","subject_id":"aoi-kisaragi-fixture","statement":"Aoi is described as an observatory apprentice in the available fixture note.","classification":"user_assertion","support":"unsupported","source_ids":[],"supporting_claim_ids":[],"continuity":"fixture-primary","timeline":"episode-01","spoiler_scope":"episode-01 only","limitations":["The source record is unavailable."]}
+
+===== workspace\conflicts\conflict-adaptation-wording.json =====
+{
+  "schema_version": "1.0",
+  "artifact_id": "research/aoi-kisaragi-fixture/partial-conflict",
+  "created_by": {
+    "component": "kokoroarc",
+    "version": "0.0.0.dev0"
+  },
+  "conflict_id": "conflict-adaptation-wording",
+  "claim_ids": [
+    "claim-role",
+    "claim-history"
+  ],
+  "kind": "source_disagreement",
+  "scopes": [
+    "fixture-primary"
+  ],
+  "status": "unresolved",
+  "selected_claim_ids": []
+}
+
+===== workspace\coverage.json =====
+{
+  "schema_version": "1.0",
+  "artifact_id": "research/aoi-kisaragi-fixture/partial-coverage",
+  "created_by": {
+    "component": "kokoroarc",
+    "version": "0.0.0.dev0"
+  },
+  "topics": [
+    {
+      "topic_id": "role",
+      "status": "partial",
+      "supporting_claim_ids": [
+        "claim-role"
+      ],
+      "missing_evidence": [
+        "Unavailable official appendix."
+      ],
+      "unavailable_sources": [
+        "source-official-profile"
+      ],
+      "spoiler_restrictions": [],
+      "blocks_authoring": false
+    },
+    {
+      "topic_id": "missing-history",
+      "status": "blocked",
+      "supporting_claim_ids": [],
+      "missing_evidence": [
+        "No permitted evidence covers the history topic."
+      ],
+      "unavailable_sources": [
+        "source-official-profile"
+      ],
+      "spoiler_restrictions": [
+        "Later episodes are outside the requested spoiler scope."
+      ],
+      "blocks_authoring": true
+    }
+  ],
+  "blocks_authoring": true
+}
+
+===== workspace\request.json =====
+{
+  "schema_version": "1.0",
+  "artifact_id": "research/aoi-kisaragi-fixture/partial-request",
+  "created_by": {
+    "component": "kokoroarc",
+    "version": "0.0.0.dev0"
+  },
+  "user_assertions": [],
+  "requested_visibility": "private",
+  "namespace": "research",
+  "character_id": "aoi-kisaragi-fixture",
+  "display_name": "Aoi Kisaragi Fixture",
+  "franchise": "fixture-arc",
+  "aliases": [
+    "Aoi"
+  ],
+  "medium": "animated serial",
+  "work": "Fixture Arc",
+  "adaptation": "fixture-primary",
+  "continuity": "fixture-primary",
+  "timeline_cutoff": "episode-01",
+  "spoiler_scope": "episode-01 only",
+  "research_questions": [
+    "What role does Aoi hold?",
+    "What remains unknown?"
+  ],
+  "required_coverage_topics": [
+    "role",
+    "missing-history"
+  ],
+  "constraints": [
+    "Do not infer unavailable material."
+  ]
+}
+
+===== workspace\sources\source-official-profile.json =====
+{"schema_version":"1.0","artifact_id":"research/aoi-kisaragi-fixture/partial-source","created_by":{"component":"kokoroarc","version":"0.0.0.dev0"},"source_id":"source-official-profile","category":"official_profile","locator":"https://evidence.fixture-arc.example/partial-profile","title":"Partial Fixture Profile","publisher":"Fixture Arc Studio","accessed_at":"2026-08-04T00:00:00Z","availability":"unavailable","content_sha256":"3333333333333333333333333333333333333333333333333333333333333333","excerpts":[],"continuity":"fixture-primary","spoiler_scope":"episode-01 only","limitations":["The requested historical appendix is unavailable."],"trust_notes":["Fictional unavailable-source fixture."]}
+
+===== workspace\validation-report.json =====
+{
+  "schema_version": "1.0",
+  "artifact_id": "research/aoi-kisaragi-fixture/partial-validation",
+  "created_by": {
+    "component": "kokoroarc",
+    "version": "0.0.0.dev0"
+  },
+  "advisory_findings": [
+    {
+      "code": "TOPIC_BLOCKED",
+      "path": [
+        "topics",
+        1
+      ],
+      "message": "The requested history topic lacks permitted evidence."
+    }
+  ],
+  "coverage_summary": {
+    "covered": 0,
+    "partial": 1,
+    "missing": 0,
+    "blocked": 1
+  },
+  "blocking_reasons": [
+    "Missing evidence for the blocked history topic."
+  ],
+  "valid": true,
+  "authoring_allowed": false,
+  "hard_failures": []
+}
+
+===== workspace\workspace.json =====
+{
+  "schema_version": "1.0",
+  "artifact_id": "research/aoi-kisaragi-fixture/partial-workspace",
+  "created_by": {
+    "component": "kokoroarc",
+    "version": "0.0.0.dev0"
+  },
+  "request": {
+    "path": "request.json",
+    "sha256": "2f0013c9cae47bcc7d2887484674ca03487aef9b2ff49df82bff2bc49f09d5b7"
+  },
+  "sources": [
+    {
+      "path": "sources/source-official-profile.json",
+      "sha256": "bb5a5c131d36cfb1e60523164bb4083b8c2269a997191dc850433c64a4014dec"
+    }
+  ],
+  "claims": [
+    {
+      "path": "claims/claim-history.json",
+      "sha256": "07772093008637cce6d7b9a46f928874f75ce966d8d2b032d4978c2c3667e49d"
+    },
+    {
+      "path": "claims/claim-role.json",
+      "sha256": "17649a6fdfffaa2de7d8500edd2a8fdb7c49029024a19dd7550a43e8fcf68def"
+    }
+  ],
+  "conflicts": [
+    {
+      "path": "conflicts/conflict-adaptation-wording.json",
+      "sha256": "6602457629e36f217a7c3242c172b75a11697e41633d1439707da26996963314"
+    }
+  ],
+  "coverage": {
+    "path": "coverage.json",
+    "sha256": "7d2b0b03e177b4ca242841ee5806280547384d121e1ea56e2994566ab53ce8b7"
+  }
+}
+

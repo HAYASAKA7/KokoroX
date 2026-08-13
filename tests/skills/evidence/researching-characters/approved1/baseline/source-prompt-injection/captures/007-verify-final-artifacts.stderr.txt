@@ -1,0 +1,1 @@
+Exception: Missing stdout capture: captures/007-verify-final-artifacts.stdout.txt

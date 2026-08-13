@@ -1,0 +1,7 @@
+usage: kokoro character [-h] {request,draft} ...
+
+positional arguments:
+  {request,draft}
+
+options:
+  -h, --help       show this help message and exit

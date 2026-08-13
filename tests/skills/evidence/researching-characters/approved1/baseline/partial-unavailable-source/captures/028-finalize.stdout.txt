@@ -1,0 +1,3 @@
+final.md exact content verified
+agent-report.json valid JSON with schema_version 1.0
+capture 001 reconstructed from surfaced failure

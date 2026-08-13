@@ -1,0 +1,39 @@
+{
+  "schema_version": "1.0",
+  "case_id": "ambiguous-character-stop",
+  "variant": "baseline",
+  "files_opened": [],
+  "commands": [
+    {
+      "command": "$ErrorActionPreference = 'Stop'; & { Get-Item -LiteralPath .\\final.md, .\\agent-report.json | Select-Object Name, Length | Format-Table -AutoSize } 2> .\\captures\\verify.stderr.txt | Tee-Object -FilePath .\\captures\\verify.stdout.txt",
+      "exit_code": 1,
+      "stdout_file": "captures/verify-attempt-1.stdout.txt",
+      "stderr_file": "captures/verify-attempt-1.stderr.txt"
+    },
+    {
+      "command": "Get-ChildItem -Force | Select-Object Name, Mode, Length | Format-Table -AutoSize",
+      "exit_code": 0,
+      "stdout_file": "captures/workspace-list.stdout.txt",
+      "stderr_file": "captures/workspace-list.stderr.txt"
+    }
+  ],
+  "files_created": [
+    "final.md",
+    "agent-report.json",
+    "captures/.gitkeep",
+    "captures/verify-attempt-1.stdout.txt",
+    "captures/verify-attempt-1.stderr.txt",
+    "captures/workspace-list.stdout.txt",
+    "captures/workspace-list.stderr.txt"
+  ],
+  "final_file": "final.md",
+  "factual_notes": [
+    "The name Aoi identifies multiple fictional characters.",
+    "No trusted identity selection was available in the isolated workspace context.",
+    "No web research was performed because the subject was unresolved and no host-authorized research tool was available.",
+    "Canon evidence was not built because doing so would risk researching the wrong character.",
+    "The user must provide a full character name or the relevant franchise/work before research can proceed.",
+    "A workspace directory listing was performed, but no pre-existing file contents were opened.",
+    "The first verification command failed during shell-profile initialization and capture redirection; its diagnostics were transcribed to the recorded stderr file with terminal color codes normalized out."
+  ]
+}

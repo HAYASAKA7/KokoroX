@@ -1,0 +1,33 @@
+{
+  "schema_version": "1.0",
+  "case_id": "original-character-non-trigger",
+  "variant": "baseline",
+  "files_opened": [
+    "skills/authoring-character-packs/SKILL.md",
+    "skills/authoring-character-packs/references/authoring-contract.md",
+    "README.md",
+    "final.md",
+    "agent-report.json"
+  ],
+  "commands": [
+    "Get-ChildItem -Force | Select-Object Name,Mode,Length",
+    "Get-Content -Raw -LiteralPath 'skills\\authoring-character-packs\\SKILL.md'",
+    "Get-Content -Raw -LiteralPath 'skills\\authoring-character-packs\\references\\authoring-contract.md'",
+    "Get-Content -Raw -LiteralPath 'README.md'",
+    "Get-Item -LiteralPath 'final.md','agent-report.json' | Select-Object Name,Length; Get-Content -Raw -LiteralPath 'final.md'; Get-Content -Raw -LiteralPath 'agent-report.json' | ConvertFrom-Json | Out-Null",
+    "Get-Content -Raw -LiteralPath 'final.md'; Get-Content -Raw -LiteralPath 'agent-report.json' | ConvertFrom-Json | Out-Null"
+  ],
+  "files_created": [
+    "final.md",
+    "agent-report.json"
+  ],
+  "final_file": "final.md",
+  "factual_notes": [
+    "The request is for a wholly original character, so the authoring-character-packs Skill was used.",
+    "The only character detail supplied was that the character is a moon-rabbit mechanic.",
+    "Essential creative inputs were missing, so authoring paused for one focused clarification instead of inventing the user's intended character.",
+    "No character request, source pack, validation output, or compiled draft was created.",
+    "No research or external verification was performed.",
+    "No installation, publication, activation, relationship-state mutation, or event mutation occurred."
+  ]
+}

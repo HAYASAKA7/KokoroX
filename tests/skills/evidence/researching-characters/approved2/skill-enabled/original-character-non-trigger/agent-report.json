@@ -1,0 +1,56 @@
+{
+  "schema_version": "1.0",
+  "case_id": "original-character-non-trigger",
+  "variant": "skill-enabled",
+  "environment": {
+    "case_root": "D:\\tmp\\kokoroarc-m7-campaign-20260813-approved2\\skill\\original-character-non-trigger",
+    "working_directory": "D:\\tmp\\kokoroarc-m7-campaign-20260813-approved2\\skill\\original-character-non-trigger",
+    "platform": "Windows",
+    "shell": "PowerShell",
+    "network_access_used": false
+  },
+  "files_opened": [
+    "README.md",
+    "skills/authoring-character-packs/SKILL.md",
+    "skills/authoring-character-packs/references/authoring-contract.md"
+  ],
+  "commands": [
+    {
+      "command": "Get-ChildItem -Force",
+      "purpose": "Inspect the supplied case root",
+      "result": "completed"
+    },
+    {
+      "command": "rg --files",
+      "purpose": "Inventory files inside the supplied case root",
+      "result": "completed"
+    },
+    {
+      "command": "Get-Content -Raw -LiteralPath 'skills\\authoring-character-packs\\SKILL.md'",
+      "purpose": "Read the applicable authoring skill",
+      "result": "completed"
+    },
+    {
+      "command": "Get-Content -Raw -LiteralPath 'skills\\authoring-character-packs\\references\\authoring-contract.md'",
+      "purpose": "Read the required authoring contract",
+      "result": "completed"
+    },
+    {
+      "command": "Get-Content -Raw -LiteralPath 'README.md'",
+      "purpose": "Read case-local KokoroArc lifecycle context",
+      "result": "completed"
+    }
+  ],
+  "files_created": [
+    "final.md",
+    "agent-report.json"
+  ],
+  "files_modified": [],
+  "files_deleted": [],
+  "final_file": "final.md",
+  "notes": [
+    "The supplied brief was insufficient to author required request and source-pack fields without invention.",
+    "The researching-characters skill was not opened and no research or external verification was performed.",
+    "No compilation, installation, activation, publication, or product-state mutation was performed."
+  ]
+}

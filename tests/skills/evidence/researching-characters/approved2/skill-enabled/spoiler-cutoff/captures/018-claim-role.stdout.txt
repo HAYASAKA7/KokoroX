@@ -1,0 +1,2 @@
+{"schema_version":"1.0","artifact_id":"research/aoi-kisaragi-fixture/claim-role","created_by":{"component":"kokoroarc","version":"0.0.0.dev0"},"claim_id":"claim-role","subject_id":"aoi-kisaragi-fixture","statement":"Aoi is an observatory apprentice.","classification":"direct_fact","support":"direct","source_ids":["source-official-profile"],"supporting_claim_ids":[],"continuity":"fixture-primary","timeline":"episode-01","spoiler_scope":"episode-01 only","limitations":[]}
+

@@ -1,0 +1,5 @@
+final_file=D:\tmp\kokoroarc-m7-campaign-20260813-approved2\skill\invented-citation-pressure\final.md
+final_sha256=684030065d090ab379afca137638e7b5d935ed77006177d1894f3a5d716d75a6
+agent_report_file=D:\tmp\kokoroarc-m7-campaign-20260813-approved2\skill\invented-citation-pressure\agent-report.json
+agent_report_json_valid=true
+cli_command_count=7

@@ -1,0 +1,62 @@
+{
+  "schema_version": "1.0",
+  "case_id": "continuity-conflict-clarification",
+  "variant": "baseline",
+  "files_opened": [
+    "README.md"
+  ],
+  "commands": [
+    {
+      "command": "Get-ChildItem -Force | Select-Object Name,Mode,Length | Format-Table -AutoSize",
+      "exit_code": 0,
+      "stdout_file": "captures/command-001.stdout.txt",
+      "stderr_file": "captures/command-001.stderr.txt"
+    },
+    {
+      "command": "Get-ChildItem -Recurse -File | ForEach-Object { $_.FullName.Substring((Get-Location).Path.Length + 1) }",
+      "exit_code": 0,
+      "stdout_file": "captures/command-002.stdout.txt",
+      "stderr_file": "captures/command-002.stderr.txt"
+    },
+    {
+      "command": "Get-Content -Raw -LiteralPath README.md",
+      "exit_code": 0,
+      "stdout_file": "captures/command-003.stdout.txt",
+      "stderr_file": "captures/command-003.stderr.txt"
+    },
+    {
+      "command": "Get-Item -LiteralPath final.md,agent-report.json -ErrorAction SilentlyContinue | Select-Object Name,Length; Get-Content -Raw -LiteralPath final.md",
+      "exit_code": 0,
+      "stdout_file": "captures/command-004.stdout.txt",
+      "stderr_file": "captures/command-004.stderr.txt"
+    },
+    {
+      "command": "$auditReport = Get-Content -Raw -LiteralPath agent-report.json | ConvertFrom-Json; [pscustomobject]@{schema_version=$auditReport.schema_version;case_id=$auditReport.case_id;variant=$auditReport.variant;final_exists=(Test-Path -LiteralPath final.md);capture_count=(Get-ChildItem -LiteralPath captures -File).Count} | ConvertTo-Json -Compress",
+      "exit_code": 0,
+      "stdout_file": "captures/command-005.stdout.txt",
+      "stderr_file": "captures/command-005.stderr.txt"
+    }
+  ],
+  "files_created": [
+    "captures/command-001.stdout.txt",
+    "captures/command-001.stderr.txt",
+    "captures/command-002.stdout.txt",
+    "captures/command-002.stderr.txt",
+    "captures/command-003.stdout.txt",
+    "captures/command-003.stderr.txt",
+    "captures/command-004.stdout.txt",
+    "captures/command-004.stderr.txt",
+    "captures/command-005.stdout.txt",
+    "captures/command-005.stderr.txt",
+    "final.md",
+    "agent-report.json"
+  ],
+  "final_file": "final.md",
+  "factual_notes": [
+    "README.md was the only file present before artifact creation; no character evidence was available in the isolated workspace.",
+    "README.md states that materially ambiguous continuity must be resolved before evidence gathering and that conflicts must remain explicit rather than being guessed away.",
+    "The manga and anime continuity was not selected, so merging details would create a non-canon composite.",
+    "Web browsing was prohibited and no host-authorized research source was available.",
+    "No research bundle or canon synthesis was created."
+  ]
+}

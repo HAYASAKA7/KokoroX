@@ -1,0 +1,73 @@
+{
+  "schema_version": "1.0",
+  "raw_root_retention": "approved D:-based corrective campaign root",
+  "redaction_replacement": "<redacted-user-profile>",
+  "files": [
+    {
+      "path": "final.md",
+      "raw_sha256": "d8dc26783cdde0c3cc88d6198c48a08d163b28cdd33dd9f9759259c4dfc65a67",
+      "retained_sha256": "d8dc26783cdde0c3cc88d6198c48a08d163b28cdd33dd9f9759259c4dfc65a67",
+      "redaction_count": 0
+    },
+    {
+      "path": "agent-report.json",
+      "raw_sha256": "78e506219dd928df5963bb1a7c1c09c892b74d7611e109bec59776f78c11e11b",
+      "retained_sha256": "78e506219dd928df5963bb1a7c1c09c892b74d7611e109bec59776f78c11e11b",
+      "redaction_count": 0
+    },
+    {
+      "path": "captures/cmd001.stderr.txt",
+      "raw_sha256": "b2d060f5ce823089eab6b1086295725c514c7fab2206b5df77940b416fe8e5a8",
+      "retained_sha256": "b2d060f5ce823089eab6b1086295725c514c7fab2206b5df77940b416fe8e5a8",
+      "redaction_count": 0
+    },
+    {
+      "path": "captures/cmd001.stdout.txt",
+      "raw_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "retained_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "redaction_count": 0
+    },
+    {
+      "path": "captures/cmd001.tool-result.txt",
+      "raw_sha256": "8f44469411d6cd2a5fb31c181707014b127c17cf86881867a2c002d13e5570bf",
+      "retained_sha256": "8f44469411d6cd2a5fb31c181707014b127c17cf86881867a2c002d13e5570bf",
+      "redaction_count": 0
+    },
+    {
+      "path": "captures/cmd002.stderr.txt",
+      "raw_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "retained_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "redaction_count": 0
+    },
+    {
+      "path": "captures/cmd002.stdout.txt",
+      "raw_sha256": "1d72f50e975631eaea9041eabd399e888701bdee36e5f9663aef96eb3e79fe17",
+      "retained_sha256": "1d72f50e975631eaea9041eabd399e888701bdee36e5f9663aef96eb3e79fe17",
+      "redaction_count": 0
+    },
+    {
+      "path": "captures/cmd003.stderr.txt",
+      "raw_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "retained_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "redaction_count": 0
+    },
+    {
+      "path": "captures/cmd003.stdout.txt",
+      "raw_sha256": "9bd3e34d5e0e4ebf7fa29df8d9fef6471725d960cbb9f906649ee630fbe3a8bd",
+      "retained_sha256": "9bd3e34d5e0e4ebf7fa29df8d9fef6471725d960cbb9f906649ee630fbe3a8bd",
+      "redaction_count": 0
+    },
+    {
+      "path": "captures/cmd004.stderr.txt",
+      "raw_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "retained_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "redaction_count": 0
+    },
+    {
+      "path": "captures/cmd004.stdout.txt",
+      "raw_sha256": "d68d1d804954e053ab0729870af7f820b6eb1a04b5ebb71c164df50d594f6438",
+      "retained_sha256": "d68d1d804954e053ab0729870af7f820b6eb1a04b5ebb71c164df50d594f6438",
+      "redaction_count": 0
+    }
+  ]
+}

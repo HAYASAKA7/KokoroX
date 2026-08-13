@@ -1,0 +1,47 @@
+{
+  "all_match": true,
+  "files": [
+    {
+      "path": "workspace\\request.json",
+      "expected_sha256": "1568eb96e6892e6518e186ab43db9380219e876f448c04e830b84e11fd5dfc6d",
+      "actual_sha256": "1568eb96e6892e6518e186ab43db9380219e876f448c04e830b84e11fd5dfc6d",
+      "match": true
+    },
+    {
+      "path": "workspace\\sources\\source-episode-01.json",
+      "expected_sha256": "d44dea0c930e82b8af5952cf448d0a3f8a09aed6054be8aaa07070be66694407",
+      "actual_sha256": "d44dea0c930e82b8af5952cf448d0a3f8a09aed6054be8aaa07070be66694407",
+      "match": true
+    },
+    {
+      "path": "workspace\\sources\\source-official-profile.json",
+      "expected_sha256": "0112f1fc85c669a1deaeb7e7842225b0b52e758d353186ee1841c092e58dabc4",
+      "actual_sha256": "0112f1fc85c669a1deaeb7e7842225b0b52e758d353186ee1841c092e58dabc4",
+      "match": true
+    },
+    {
+      "path": "workspace\\claims\\claim-behavior.json",
+      "expected_sha256": "de8f1c581d64182bc8a9a668a762d43885f6364b784812023b1d4c7cf68720c2",
+      "actual_sha256": "de8f1c581d64182bc8a9a668a762d43885f6364b784812023b1d4c7cf68720c2",
+      "match": true
+    },
+    {
+      "path": "workspace\\claims\\claim-role.json",
+      "expected_sha256": "5f86148980c761e2a1b9404bdc64c910ce327eeed1d82431a793cd088816f4c7",
+      "actual_sha256": "5f86148980c761e2a1b9404bdc64c910ce327eeed1d82431a793cd088816f4c7",
+      "match": true
+    },
+    {
+      "path": "workspace\\conflicts\\conflict-adaptation-wording.json",
+      "expected_sha256": "f99d693b908bf4cc337a8f60accdb067677ee7c3c90c91d125571ff8ce4add5c",
+      "actual_sha256": "f99d693b908bf4cc337a8f60accdb067677ee7c3c90c91d125571ff8ce4add5c",
+      "match": true
+    },
+    {
+      "path": "workspace\\coverage.json",
+      "expected_sha256": "66d19afa19de0b5860fb59d1221593c4bee9b35b6a90941d1b9b12054c969d80",
+      "actual_sha256": "66d19afa19de0b5860fb59d1221593c4bee9b35b6a90941d1b9b12054c969d80",
+      "match": true
+    }
+  ]
+}

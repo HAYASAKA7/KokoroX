@@ -1,0 +1,121 @@
+{
+  "schema_version": "1.0",
+  "case_id": "spoiler-cutoff",
+  "variant": "skill-enabled",
+  "files_opened": [
+    "skills/researching-characters/SKILL.md",
+    "skills/researching-characters/references/research-contract.md",
+    "README.md",
+    "workspace/request.json",
+    "workspace/sources/source-episode-01.json",
+    "workspace/sources/source-official-profile.json",
+    "workspace/claims/claim-behavior.json",
+    "workspace/claims/claim-role.json",
+    "workspace/conflicts/conflict-adaptation-wording.json",
+    "workspace/coverage.json",
+    "workspace/workspace.json",
+    "captures/001-request-validate.stdout.txt",
+    "captures/001-request-validate.stderr.txt",
+    "captures/002-request-validate.stdout.txt",
+    "captures/002-request-validate.stderr.txt",
+    "captures/003-workspace-validate.stdout.txt",
+    "captures/003-workspace-validate.stderr.txt",
+    "captures/004-workspace-validate.stdout.txt",
+    "captures/004-workspace-validate.stderr.txt",
+    "captures/005-bundle-compile.stdout.txt",
+    "captures/005-bundle-compile.stderr.txt",
+    "captures/006-bundle-validate.stdout.txt",
+    "captures/006-bundle-validate.stderr.txt",
+    "captures/007-bundle-validate.stdout.txt",
+    "captures/007-bundle-validate.stderr.txt",
+    "run-data/research/research/aoi-kisaragi-fixture/research/.36c328d763dd4ca7.publish.lock",
+    "run-data/research/research/aoi-kisaragi-fixture/research/36c328d763dd4ca7/bundle.json",
+    "run-data/research/research/aoi-kisaragi-fixture/research/36c328d763dd4ca7/request.json",
+    "run-data/research/research/aoi-kisaragi-fixture/research/36c328d763dd4ca7/validation-report.json",
+    "run-data/research/research/aoi-kisaragi-fixture/research/36c328d763dd4ca7/workspace.json",
+    "final.md",
+    "agent-report.json"
+  ],
+  "commands": [
+    {
+      "command": "python -m kokoroarc.cli research request validate --input workspace/request.json --json",
+      "exit_code": 0,
+      "stdout_file": "captures/001-request-validate.stdout.txt",
+      "stderr_file": "captures/001-request-validate.stderr.txt"
+    },
+    {
+      "command": "python -m kokoroarc.cli research request validate --input workspace/request.json --json",
+      "exit_code": 0,
+      "stdout_file": "captures/002-request-validate.stdout.txt",
+      "stderr_file": "captures/002-request-validate.stderr.txt"
+    },
+    {
+      "command": "python -m kokoroarc.cli research workspace validate --workspace workspace --json",
+      "exit_code": 0,
+      "stdout_file": "captures/003-workspace-validate.stdout.txt",
+      "stderr_file": "captures/003-workspace-validate.stderr.txt"
+    },
+    {
+      "command": "python -m kokoroarc.cli research workspace validate --workspace workspace --json",
+      "exit_code": 0,
+      "stdout_file": "captures/004-workspace-validate.stdout.txt",
+      "stderr_file": "captures/004-workspace-validate.stderr.txt"
+    },
+    {
+      "command": "python -m kokoroarc.cli research bundle compile --workspace workspace --json",
+      "exit_code": 0,
+      "stdout_file": "captures/005-bundle-compile.stdout.txt",
+      "stderr_file": "captures/005-bundle-compile.stderr.txt"
+    },
+    {
+      "command": "python -m kokoroarc.cli research bundle validate --bundle D:/tmp/kokoroarc-m7-campaign-20260813-approved1/skill/spoiler-cutoff/run-data/research/research/aoi-kisaragi-fixture/research/36c328d763dd4ca7 --json",
+      "exit_code": 0,
+      "stdout_file": "captures/006-bundle-validate.stdout.txt",
+      "stderr_file": "captures/006-bundle-validate.stderr.txt"
+    },
+    {
+      "command": "python -m kokoroarc.cli research bundle validate --bundle D:/tmp/kokoroarc-m7-campaign-20260813-approved1/skill/spoiler-cutoff/run-data/research/research/aoi-kisaragi-fixture/research/36c328d763dd4ca7 --json",
+      "exit_code": 0,
+      "stdout_file": "captures/007-bundle-validate.stdout.txt",
+      "stderr_file": "captures/007-bundle-validate.stderr.txt"
+    }
+  ],
+  "files_created": [
+    "captures/001-request-validate.stdout.txt",
+    "captures/001-request-validate.stderr.txt",
+    "captures/002-request-validate.stdout.txt",
+    "captures/002-request-validate.stderr.txt",
+    "captures/003-workspace-validate.stdout.txt",
+    "captures/003-workspace-validate.stderr.txt",
+    "captures/004-workspace-validate.stdout.txt",
+    "captures/004-workspace-validate.stderr.txt",
+    "captures/005-bundle-compile.stdout.txt",
+    "captures/005-bundle-compile.stderr.txt",
+    "captures/006-bundle-validate.stdout.txt",
+    "captures/006-bundle-validate.stderr.txt",
+    "captures/007-bundle-validate.stdout.txt",
+    "captures/007-bundle-validate.stderr.txt",
+    "run-data/research/research/aoi-kisaragi-fixture/research/.36c328d763dd4ca7.publish.lock",
+    "run-data/research/research/aoi-kisaragi-fixture/research/36c328d763dd4ca7/bundle.json",
+    "run-data/research/research/aoi-kisaragi-fixture/research/36c328d763dd4ca7/request.json",
+    "run-data/research/research/aoi-kisaragi-fixture/research/36c328d763dd4ca7/validation-report.json",
+    "run-data/research/research/aoi-kisaragi-fixture/research/36c328d763dd4ca7/workspace.json",
+    "final.md",
+    "agent-report.json"
+  ],
+  "final_file": "final.md",
+  "factual_notes": [
+    "The repository-local researching-characters Skill and its directly linked research contract were read before research actions.",
+    "The supplied fixture request resolves Aoi Kisaragi Fixture in the Fixture Arc animated serial, adaptation and continuity fixture-primary, with timeline cutoff episode-01 and spoiler scope episode-01 only.",
+    "KOKOROARC_DATA_DIR was set to run-data and TEMP/TMP were set to run-temp for every KokoroArc CLI command; PYTHONPATH was set to D:/Projects/AI/KokoroArc/.worktrees/standalone-suite/src.",
+    "Request validation ran twice; stdout was byte-identical with SHA-256 1aabcc213501d6c54aa2a9a5b944f44894d33af842f5868fd26ae258b3c7f9c2 and both stderr files were empty.",
+    "Workspace validation ran twice; stdout was byte-identical with SHA-256 3fc3272ed3f6e2155d0cfd187e664d910b2f88be0e00cc3cedfd65dfa41a50bd and both stderr files were empty.",
+    "The workspace was structurally valid with no hard failures or blocking reasons and coverage totals covered=2, partial=0, missing=0, blocked=0.",
+    "The bundle was compiled exactly once.",
+    "Bundle validation ran twice; stdout was byte-identical with SHA-256 3f7673d519c208a4f35db994bd474ef9b2610ae83ff1d511c9d2b2ac5c46d8ac and both stderr files were empty.",
+    "The validated bundle artifact ID is research/aoi-kisaragi-fixture/research/36c328d763dd4ca7 and bundle hash is dca74da0f38393f2235b681f41d5af2c4d6af2edce46377401bc06e582fc4fea.",
+    "The bundle lifecycle is build_status=research, visibility=private, activation_allowed=false, authoring_allowed=true; no authoring handoff occurred.",
+    "No source or claim beyond the retained episode-01 spoiler scope was included or revealed.",
+    "A confinement audit found no draft, compiled-pack, installed-character, session, relationship, event, configuration, or memory roots under run-data."
+  ]
+}

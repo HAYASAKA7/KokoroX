@@ -1,0 +1,124 @@
+{
+  "schema_version": "1.0",
+  "case_id": "eligible-hybrid-handoff",
+  "variant": "Skill-enabled",
+  "files_opened": [
+    "README.md",
+    "skills/researching-characters/SKILL.md",
+    "skills/researching-characters/references/research-contract.md",
+    "skills/authoring-character-packs/SKILL.md",
+    "skills/authoring-character-packs/references/authoring-contract.md",
+    "workspace/request.json",
+    "workspace/sources/source-official-profile.json",
+    "workspace/sources/source-episode-01.json",
+    "workspace/claims/claim-role.json",
+    "workspace/claims/claim-behavior.json",
+    "workspace/conflicts/conflict-adaptation-wording.json",
+    "workspace/coverage.json",
+    "workspace/workspace.json",
+    "workspace/validation-report.json",
+    "workspace/bundle.json",
+    "captures/request-validate-1.stdout.json",
+    "captures/request-validate-1.stderr.txt",
+    "captures/request-validate-2.stdout.json",
+    "captures/request-validate-2.stderr.txt",
+    "captures/workspace-validate-1.stdout.json",
+    "captures/workspace-validate-1.stderr.txt",
+    "captures/workspace-validate-2.stdout.json",
+    "captures/workspace-validate-2.stderr.txt",
+    "captures/bundle-compile.stdout.json",
+    "captures/bundle-compile.stderr.txt",
+    "captures/bundle-validate-1.stdout.json",
+    "captures/bundle-validate-1.stderr.txt",
+    "captures/bundle-validate-2.stdout.json",
+    "captures/bundle-validate-2.stderr.txt",
+    "final.md",
+    "agent-report.json"
+  ],
+  "commands": [
+    {
+      "name": "request_validate_1",
+      "argv": ["python", "-m", "kokoroarc.cli", "research", "request", "validate", "--input", "workspace/request.json", "--json"],
+      "cwd": ".",
+      "stdout_file": "captures/request-validate-1.stdout.json",
+      "stderr_file": "captures/request-validate-1.stderr.txt",
+      "exit_code": 0
+    },
+    {
+      "name": "request_validate_2",
+      "argv": ["python", "-m", "kokoroarc.cli", "research", "request", "validate", "--input", "workspace/request.json", "--json"],
+      "cwd": ".",
+      "stdout_file": "captures/request-validate-2.stdout.json",
+      "stderr_file": "captures/request-validate-2.stderr.txt",
+      "exit_code": 0
+    },
+    {
+      "name": "workspace_validate_1",
+      "argv": ["python", "-m", "kokoroarc.cli", "research", "workspace", "validate", "--workspace", "workspace", "--json"],
+      "cwd": ".",
+      "stdout_file": "captures/workspace-validate-1.stdout.json",
+      "stderr_file": "captures/workspace-validate-1.stderr.txt",
+      "exit_code": 0
+    },
+    {
+      "name": "workspace_validate_2",
+      "argv": ["python", "-m", "kokoroarc.cli", "research", "workspace", "validate", "--workspace", "workspace", "--json"],
+      "cwd": ".",
+      "stdout_file": "captures/workspace-validate-2.stdout.json",
+      "stderr_file": "captures/workspace-validate-2.stderr.txt",
+      "exit_code": 0
+    },
+    {
+      "name": "bundle_compile",
+      "argv": ["python", "-m", "kokoroarc.cli", "research", "bundle", "compile", "--workspace", "workspace", "--json"],
+      "cwd": ".",
+      "stdout_file": "captures/bundle-compile.stdout.json",
+      "stderr_file": "captures/bundle-compile.stderr.txt",
+      "exit_code": 0
+    },
+    {
+      "name": "bundle_validate_1",
+      "argv": ["python", "-m", "kokoroarc.cli", "research", "bundle", "validate", "--bundle", "D:\\tmp\\kokoroarc-m7-campaign-20260813-approved1\\skill\\eligible-hybrid-handoff\\run-data\\research\\research\\aoi-kisaragi-fixture\\research\\36c328d763dd4ca7", "--json"],
+      "cwd": ".",
+      "stdout_file": "captures/bundle-validate-1.stdout.json",
+      "stderr_file": "captures/bundle-validate-1.stderr.txt",
+      "exit_code": 0
+    },
+    {
+      "name": "bundle_validate_2",
+      "argv": ["python", "-m", "kokoroarc.cli", "research", "bundle", "validate", "--bundle", "D:\\tmp\\kokoroarc-m7-campaign-20260813-approved1\\skill\\eligible-hybrid-handoff\\run-data\\research\\research\\aoi-kisaragi-fixture\\research\\36c328d763dd4ca7", "--json"],
+      "cwd": ".",
+      "stdout_file": "captures/bundle-validate-2.stdout.json",
+      "stderr_file": "captures/bundle-validate-2.stderr.txt",
+      "exit_code": 0
+    }
+  ],
+  "files_created": [
+    "captures/request-validate-1.stdout.json",
+    "captures/request-validate-1.stderr.txt",
+    "captures/request-validate-2.stdout.json",
+    "captures/request-validate-2.stderr.txt",
+    "captures/workspace-validate-1.stdout.json",
+    "captures/workspace-validate-1.stderr.txt",
+    "captures/workspace-validate-2.stdout.json",
+    "captures/workspace-validate-2.stderr.txt",
+    "captures/bundle-compile.stdout.json",
+    "captures/bundle-compile.stderr.txt",
+    "captures/bundle-validate-1.stdout.json",
+    "captures/bundle-validate-1.stderr.txt",
+    "captures/bundle-validate-2.stdout.json",
+    "captures/bundle-validate-2.stderr.txt",
+    "run-data/research/research/aoi-kisaragi-fixture/research/36c328d763dd4ca7/",
+    "final.md",
+    "agent-report.json"
+  ],
+  "final_file": "final.md",
+  "factual_notes": [
+    "All CLI calls used PYTHONPATH D:\\Projects\\AI\\KokoroArc\\.worktrees\\standalone-suite\\src, KOKOROARC_DATA_DIR run-data, and TEMP/TMP run-temp.",
+    "The two request validation outputs, two workspace validation outputs, and two exact-bundle validation outputs are byte-identical within each pair; every retained stderr file is empty.",
+    "The exact bundle is private and inactive, authoring_allowed is true, blocking_reasons is empty, and the retained conflict is scope_separated.",
+    "No structured authoring request or source pack exists in the isolated case, so no authoring validation or draft compilation command was run.",
+    "The Starling statement is retained separately as source user_dossier and provenance user_assertion; it is not researched canon and does not rewrite any Research Bundle claim.",
+    "No draft, pack, installation, publication, activation, session, relationship, event, configuration, or memory mutation occurred."
+  ]
+}

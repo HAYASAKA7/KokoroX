@@ -1,0 +1,1 @@
+Should I take full creative latitude in a cozy lunar-workshop direction—including inventing the moon-rabbit mechanic’s name, pronouns, backstory, and three locale-specific voices—or would you prefer another tonal anchor? I’ll treat the character as wholly original and won’t use research or external verification.

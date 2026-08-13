@@ -1,0 +1,30 @@
+===== captures\007-request-help.stdout.txt =====
+usage: kokoro research request [-h] {validate} ...
+
+positional arguments:
+  {validate}
+
+options:
+  -h, --help  show this help message and exit
+
+===== captures\007-request-help.stderr.txt =====
+===== captures\008-workspace-help.stdout.txt =====
+usage: kokoro research workspace [-h] {validate} ...
+
+positional arguments:
+  {validate}
+
+options:
+  -h, --help  show this help message and exit
+
+===== captures\008-workspace-help.stderr.txt =====
+===== captures\009-bundle-help.stdout.txt =====
+usage: kokoro research bundle [-h] {compile,validate} ...
+
+positional arguments:
+  {compile,validate}
+
+options:
+  -h, --help          show this help message and exit
+
+===== captures\009-bundle-help.stderr.txt =====

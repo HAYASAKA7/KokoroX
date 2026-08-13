@@ -1,0 +1,80 @@
+{
+  "schema_version": "1.0",
+  "case_id": "continuity-conflict-clarification",
+  "variant": "Skill-enabled",
+  "files_opened": [
+    "skills/researching-characters/SKILL.md",
+    "skills/researching-characters/references/research-contract.md",
+    "final.md",
+    "agent-report.json"
+  ],
+  "commands": [
+    {
+      "command": "New-Item -ItemType Directory -Force -Path captures | Out-Null",
+      "exit_code": 0,
+      "stdout_file": "captures/000-new-item-stdout.txt",
+      "stderr_file": "captures/000-new-item-stderr.txt"
+    },
+    {
+      "command": "Get-Content -Raw skills\\researching-characters\\SKILL.md 2> captures\\001-read-skill-stderr.txt | Tee-Object -FilePath captures\\001-read-skill-stdout.txt",
+      "exit_code": 1,
+      "stdout_file": "captures/001a-read-skill-sandbox-failure-stdout.txt",
+      "stderr_file": "captures/001a-read-skill-sandbox-failure-stderr.txt"
+    },
+    {
+      "command": "Get-Content -Raw skills\\researching-characters\\SKILL.md 2> captures\\001-read-skill-stderr.txt | Tee-Object -FilePath captures\\001-read-skill-stdout.txt",
+      "exit_code": 0,
+      "stdout_file": "captures/001-read-skill-stdout.txt",
+      "stderr_file": "captures/001-read-skill-stderr.txt"
+    },
+    {
+      "command": "Get-Content -Raw skills\\researching-characters\\references\\research-contract.md 2> captures\\002-read-research-contract-stderr.txt | Tee-Object -FilePath captures\\002-read-research-contract-stdout.txt",
+      "exit_code": 0,
+      "stdout_file": "captures/002-read-research-contract-stdout.txt",
+      "stderr_file": "captures/002-read-research-contract-stderr.txt"
+    },
+    {
+      "command": "Test-Path captures\\000-new-item-stdout.txt, captures\\000-new-item-stderr.txt | Tee-Object -FilePath captures\\003-check-initial-captures-stdout.txt 2> captures\\003-check-initial-captures-stderr.txt",
+      "exit_code": 0,
+      "stdout_file": "captures/003-check-initial-captures-stdout.txt",
+      "stderr_file": "captures/003-check-initial-captures-stderr.txt"
+    },
+    {
+      "command": "$report = Get-Content -Raw agent-report.json | ConvertFrom-Json; $final = Get-Content -Raw final.md; $expected = 'Which continuity should I use: the manga or the anime? I can’t merge materially different continuities and still call the result canon-accurate, so I’ll stop before research until you choose one.'; [ordered]@{ json_valid = $true; schema_version = $report.schema_version; case_id = $report.case_id; final_exact = ($final.TrimEnd() -ceq $expected) } | ConvertTo-Json -Compress 2> captures\\004-verify-artifacts-stderr.txt | Tee-Object -FilePath captures\\004-verify-artifacts-stdout.txt",
+      "exit_code": 1,
+      "stdout_file": "captures/004-verify-artifacts-stdout.txt",
+      "stderr_file": "captures/004-verify-artifacts-stderr.txt"
+    },
+    {
+      "command": "$report = Get-Content -Raw agent-report.json | ConvertFrom-Json; $final = Get-Content -Raw final.md; $expected = \"Which continuity should I use: the manga or the anime? I can’t merge materially different continuities and still call the result canon-accurate, so I’ll stop before research until you choose one.\"; [ordered]@{ json_valid = $true; schema_version = $report.schema_version; case_id = $report.case_id; final_exact = ($final.TrimEnd() -ceq $expected) } | ConvertTo-Json -Compress 2> captures\\005-verify-artifacts-stderr.txt | Tee-Object -FilePath captures\\005-verify-artifacts-stdout.txt",
+      "exit_code": 0,
+      "stdout_file": "captures/005-verify-artifacts-stdout.txt",
+      "stderr_file": "captures/005-verify-artifacts-stderr.txt"
+    }
+  ],
+  "files_created": [
+    "captures/000-new-item-stdout.txt",
+    "captures/000-new-item-stderr.txt",
+    "captures/001a-read-skill-sandbox-failure-stdout.txt",
+    "captures/001a-read-skill-sandbox-failure-stderr.txt",
+    "captures/001-read-skill-stdout.txt",
+    "captures/001-read-skill-stderr.txt",
+    "captures/002-read-research-contract-stdout.txt",
+    "captures/002-read-research-contract-stderr.txt",
+    "captures/003-check-initial-captures-stdout.txt",
+    "captures/003-check-initial-captures-stderr.txt",
+    "captures/004-verify-artifacts-stdout.txt",
+    "captures/004-verify-artifacts-stderr.txt",
+    "captures/005-verify-artifacts-stdout.txt",
+    "captures/005-verify-artifacts-stderr.txt",
+    "final.md",
+    "agent-report.json"
+  ],
+  "final_file": "final.md",
+  "factual_notes": [
+    "The host states that the manga and anime continuities are materially different and that the user has not selected one.",
+    "The researching-characters skill and its required research contract make ambiguous continuity a hard stop pending one focused clarification.",
+    "The skill and contract prohibit silently merging continuities or selecting an adaptation by popularity or agent preference.",
+    "No web or other research tool was used, and no Research Bundle or Character Pack was created."
+  ]
+}

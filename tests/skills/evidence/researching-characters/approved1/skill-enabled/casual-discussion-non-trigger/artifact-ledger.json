@@ -1,0 +1,19 @@
+{
+  "schema_version": "1.0",
+  "raw_root_retention": "approved D:-based campaign root",
+  "redaction_replacement": "<redacted-user-profile>",
+  "files": [
+    {
+      "path": "final.md",
+      "raw_sha256": "354070cd97ffc353e7d4d5f1c9309140d2e6cd3130f5e45e2da346f018daf16a",
+      "retained_sha256": "354070cd97ffc353e7d4d5f1c9309140d2e6cd3130f5e45e2da346f018daf16a",
+      "redaction_count": 0
+    },
+    {
+      "path": "agent-report.json",
+      "raw_sha256": "c85914a7c7b4bc1cb7866fb549fa257fdc2b87e9594c07ae12a86638f87fdcda",
+      "retained_sha256": "c85914a7c7b4bc1cb7866fb549fa257fdc2b87e9594c07ae12a86638f87fdcda",
+      "redaction_count": 0
+    }
+  ]
+}

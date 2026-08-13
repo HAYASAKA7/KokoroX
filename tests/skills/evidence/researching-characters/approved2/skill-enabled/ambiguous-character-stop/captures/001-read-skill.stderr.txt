@@ -1,0 +1,10 @@
+MethodInvocationException:
+Line |
+   7 |  [System.IO.File]::WriteAllText($stderrPath, '')
+     |  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+     | Exception calling "WriteAllText" with "2" argument(s): "Access to the path 'D:\tmp\kokoroarc-m7-campaign-20260813-approved2\skill\ambiguous-character-stop\captures\001-read-skill.stderr.txt' is denied."
+out-file:
+Line |
+  12 |    $_ | Out-String | Tee-Object -FilePath $stderrPath | Write-Error
+     |    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+     | Access to the path 'D:\tmp\kokoroarc-m7-campaign-20260813-approved2\skill\ambiguous-character-stop\captures\001-read-skill.stderr.txt' is denied.

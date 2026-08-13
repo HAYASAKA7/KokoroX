@@ -1,0 +1,30 @@
+{
+  "ok": true,
+  "error_count": 0,
+  "errors": [],
+  "agent_report_json_valid": true,
+  "final_file_present": true,
+  "request_validations_equal": true,
+  "workspace_validations_equal": true,
+  "bundle_validations_equal": true,
+  "cli_stderr_empty": true,
+  "compile_count": 1,
+  "bundle_valid": true,
+  "lifecycle": {
+    "build_status": "research",
+    "visibility": "private",
+    "activation_allowed": false,
+    "authoring_allowed": true
+  },
+  "run_data_files": [
+    "research\\research\\aoi-kisaragi-fixture\\research\\.36c328d763dd4ca7.publish.lock",
+    "research\\research\\aoi-kisaragi-fixture\\research\\36c328d763dd4ca7\\bundle.json",
+    "research\\research\\aoi-kisaragi-fixture\\research\\36c328d763dd4ca7\\request.json",
+    "research\\research\\aoi-kisaragi-fixture\\research\\36c328d763dd4ca7\\validation-report.json",
+    "research\\research\\aoi-kisaragi-fixture\\research\\36c328d763dd4ca7\\workspace.json"
+  ],
+  "run_temp_entry_count": 0,
+  "missing_prior_capture_count": 0,
+  "final_sha256": "c8d1f36d8d77bf775073aeff325772865f51c331b22bed24cd09b5a128e7bf2f",
+  "report_sha256": "de9ac96d055389bfce021608f78913e6c2a495adf1516f83d0c81dd064f4d9a4"
+}

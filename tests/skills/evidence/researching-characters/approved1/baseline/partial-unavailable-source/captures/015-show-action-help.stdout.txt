@@ -1,0 +1,36 @@
+===== 011-request-validate-help.stderr.txt =====
+===== 011-request-validate-help.stdout.txt =====
+usage: kokoro research request validate [-h] --input INPUT [--json]
+
+options:
+  -h, --help     show this help message and exit
+  --input INPUT
+  --json
+
+===== 012-workspace-validate-help.stderr.txt =====
+===== 012-workspace-validate-help.stdout.txt =====
+usage: kokoro research workspace validate [-h] --workspace WORKSPACE [--json]
+
+options:
+  -h, --help            show this help message and exit
+  --workspace WORKSPACE
+  --json
+
+===== 013-bundle-validate-help.stderr.txt =====
+===== 013-bundle-validate-help.stdout.txt =====
+usage: kokoro research bundle validate [-h] --bundle BUNDLE [--json]
+
+options:
+  -h, --help       show this help message and exit
+  --bundle BUNDLE
+  --json
+
+===== 014-bundle-compile-help.stderr.txt =====
+===== 014-bundle-compile-help.stdout.txt =====
+usage: kokoro research bundle compile [-h] --workspace WORKSPACE [--json]
+
+options:
+  -h, --help            show this help message and exit
+  --workspace WORKSPACE
+  --json
+

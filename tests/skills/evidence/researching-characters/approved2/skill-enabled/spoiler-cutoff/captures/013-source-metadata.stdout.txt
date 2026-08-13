@@ -1,0 +1,36 @@
+[
+  {
+    "file": "source-episode-01.json",
+    "artifact_id": "research/aoi-kisaragi-fixture/source-episode-01",
+    "category": "episode",
+    "canonical_locator": null,
+    "title": "Fixture Arc Episode 01",
+    "publisher_owner": null,
+    "accessed_at": "2026-08-04T00:00:00Z",
+    "availability": "available",
+    "continuity": "fixture-primary",
+    "spoiler_scope": "episode-01 only",
+    "excerpt_count": 1,
+    "trust_notes": [
+      "Fictional episode fixture record."
+    ],
+    "limitations": []
+  },
+  {
+    "file": "source-official-profile.json",
+    "artifact_id": "research/aoi-kisaragi-fixture/source-official-profile",
+    "category": "official_profile",
+    "canonical_locator": null,
+    "title": "Aoi Kisaragi Fixture Profile",
+    "publisher_owner": null,
+    "accessed_at": "2026-08-04T00:00:00Z",
+    "availability": "available",
+    "continuity": "fixture-primary",
+    "spoiler_scope": "episode-01 only",
+    "excerpt_count": 1,
+    "trust_notes": [
+      "Fictional official fixture record."
+    ],
+    "limitations": []
+  }
+]

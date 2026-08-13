@@ -11,3 +11,6 @@ tests/skills/transcripts/authoring-character-packs/skill/*/prompt.txt whitespace
 
 # Research workspace manifests hash their fixture artifact bytes.
 tests/fixtures/research/** text eol=lf
+
+# Retained research campaign files are byte-exact evaluator evidence.
+tests/skills/evidence/researching-characters/** -text

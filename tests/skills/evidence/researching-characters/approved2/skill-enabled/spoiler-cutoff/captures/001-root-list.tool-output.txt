@@ -1,0 +1,5 @@
+--- stdout ---
+--- stderr ---
+Out-File: Access to the path 'D:\tmp\kokoroarc-m7-campaign-20260813-approved2\skill\spoiler-cutoff\captures\001-root-list.stdout.txt' is denied.
+Get-Content: Cannot find path 'captures\001-root-list.stdout.txt' because it does not exist.
+Get-Content: Cannot find path 'captures\001-root-list.stderr.txt' because it does not exist.

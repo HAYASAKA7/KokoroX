@@ -1,0 +1,3 @@
+Sandboxed attempt failed before reading SKILL.md.
+Exit code: 1
+Out-File: Access to captures\001-open-skill.stderr.txt was denied.

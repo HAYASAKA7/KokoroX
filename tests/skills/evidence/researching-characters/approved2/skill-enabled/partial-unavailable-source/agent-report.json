@@ -1,0 +1,377 @@
+{
+  "schema_version": "1.0",
+  "case_id": "partial-unavailable-source",
+  "variant": "skill-enabled",
+  "environment": {
+    "operating_system": "Windows",
+    "shell": "PowerShell",
+    "shell_login": false,
+    "network_used": false,
+    "product_cli": "python -m kokoroarc.cli",
+    "pythonpath": "D:\\Projects\\AI\\KokoroArc\\.worktrees\\standalone-suite\\src",
+    "product_source_inspected": false
+  },
+  "roots_used": {
+    "isolated_root": "D:\\tmp\\kokoroarc-m7-campaign-20260813-approved2\\skill\\partial-unavailable-source",
+    "workspace": "D:\\tmp\\kokoroarc-m7-campaign-20260813-approved2\\skill\\partial-unavailable-source\\workspace",
+    "kokoroarc_data_dir": "D:\\tmp\\kokoroarc-m7-campaign-20260813-approved2\\skill\\partial-unavailable-source\\run-data",
+    "temp": "D:\\tmp\\kokoroarc-m7-campaign-20260813-approved2\\skill\\partial-unavailable-source\\run-temp",
+    "tmp": "D:\\tmp\\kokoroarc-m7-campaign-20260813-approved2\\skill\\partial-unavailable-source\\run-temp",
+    "kokoroarc_temp_dir": "D:\\tmp\\kokoroarc-m7-campaign-20260813-approved2\\skill\\partial-unavailable-source\\run-temp"
+  },
+  "files_opened": [
+    "README.md",
+    "skills/researching-characters/SKILL.md",
+    "skills/researching-characters/references/research-contract.md",
+    "skills/researching-characters/agents/openai.yaml",
+    "workspace/request.json",
+    "workspace/sources/source-official-profile.json",
+    "workspace/claims/claim-role.json",
+    "workspace/claims/claim-history.json",
+    "workspace/conflicts/conflict-adaptation-wording.json",
+    "workspace/coverage.json",
+    "workspace/workspace.json",
+    "workspace/validation-report.json",
+    "workspace/bundle.json",
+    "captures/008-request-validate-1.stdout.txt",
+    "captures/009-request-validate-2.stdout.txt",
+    "captures/011-workspace-validate-1.stdout.txt",
+    "captures/012-workspace-validate-2.stdout.txt",
+    "captures/015-bundle-validate-1.stdout.txt",
+    "captures/016-bundle-validate-2.stdout.txt",
+    "run-data/research/research/aoi-kisaragi-fixture/research/2a46dc2af58ccb7a/bundle.json",
+    "run-data/research/research/aoi-kisaragi-fixture/research/2a46dc2af58ccb7a/request.json",
+    "run-data/research/research/aoi-kisaragi-fixture/research/2a46dc2af58ccb7a/validation-report.json",
+    "run-data/research/research/aoi-kisaragi-fixture/research/2a46dc2af58ccb7a/workspace.json",
+    "agent-report.json",
+    "final.md"
+  ],
+  "commands": [
+    {
+      "command": "$ErrorActionPreference = 'Stop'; Get-Content -Raw -LiteralPath 'skills\\researching-characters\\SKILL.md' 2> 'captures\\001-open-skill.stderr.txt' | Tee-Object -FilePath 'captures\\001-open-skill.stdout.txt'",
+      "cwd": "D:\\tmp\\kokoroarc-m7-campaign-20260813-approved2\\skill\\partial-unavailable-source",
+      "login": false,
+      "exit_code": 1,
+      "stdout_capture": "captures/000-failed-open-skill.stdout.txt",
+      "stderr_capture": "captures/000-failed-open-skill.stderr.txt"
+    },
+    {
+      "command": "$ErrorActionPreference = 'Stop'; $failedStdout = 'captures\\000-failed-open-skill.stdout.txt'; $failedStderr = 'captures\\000-failed-open-skill.stderr.txt'; if (-not (Test-Path -LiteralPath $failedStdout)) { [System.IO.File]::WriteAllText((Join-Path (Get-Location) $failedStdout), '') }; if (-not (Test-Path -LiteralPath $failedStderr)) { [System.IO.File]::WriteAllText((Join-Path (Get-Location) $failedStderr), \"Sandboxed attempt failed before reading SKILL.md.`r`nExit code: 1`r`nOut-File: Access to captures\\001-open-skill.stderr.txt was denied.`r`n\") }; Get-Content -Raw -LiteralPath 'skills\\researching-characters\\SKILL.md' 2> 'captures\\002-open-skill.stderr.txt' | Tee-Object -FilePath 'captures\\002-open-skill.stdout.txt'",
+      "cwd": "D:\\tmp\\kokoroarc-m7-campaign-20260813-approved2\\skill\\partial-unavailable-source",
+      "login": false,
+      "exit_code": 0,
+      "stdout_capture": "captures/002-open-skill.stdout.txt",
+      "stderr_capture": "captures/002-open-skill.stderr.txt"
+    },
+    {
+      "command": "$ErrorActionPreference = 'Stop'; Get-Content -Raw -LiteralPath 'skills\\researching-characters\\references\\research-contract.md' 2> 'captures\\003-open-research-contract.stderr.txt' | Tee-Object -FilePath 'captures\\003-open-research-contract.stdout.txt'",
+      "cwd": "D:\\tmp\\kokoroarc-m7-campaign-20260813-approved2\\skill\\partial-unavailable-source",
+      "login": false,
+      "exit_code": 0,
+      "stdout_capture": "captures/003-open-research-contract.stdout.txt",
+      "stderr_capture": "captures/003-open-research-contract.stderr.txt"
+    },
+    {
+      "command": "$ErrorActionPreference = 'Stop'; rg --files . 2> 'captures\\004-list-files.stderr.txt' | Sort-Object | Tee-Object -FilePath 'captures\\004-list-files.stdout.txt'",
+      "cwd": "D:\\tmp\\kokoroarc-m7-campaign-20260813-approved2\\skill\\partial-unavailable-source",
+      "login": false,
+      "exit_code": 0,
+      "stdout_capture": "captures/004-list-files.stdout.txt",
+      "stderr_capture": "captures/004-list-files.stderr.txt"
+    },
+    {
+      "command": "$ErrorActionPreference = 'Stop'; Get-Content -Raw -LiteralPath 'README.md' 2> 'captures\\005-open-readme.stderr.txt' | Tee-Object -FilePath 'captures\\005-open-readme.stdout.txt'",
+      "cwd": "D:\\tmp\\kokoroarc-m7-campaign-20260813-approved2\\skill\\partial-unavailable-source",
+      "login": false,
+      "exit_code": 0,
+      "stdout_capture": "captures/005-open-readme.stdout.txt",
+      "stderr_capture": "captures/005-open-readme.stderr.txt"
+    },
+    {
+      "command": "$ErrorActionPreference = 'Stop'; Get-Content -Raw -LiteralPath 'skills\\researching-characters\\agents\\openai.yaml' 2> 'captures\\006-open-skill-metadata.stderr.txt' | Tee-Object -FilePath 'captures\\006-open-skill-metadata.stdout.txt'",
+      "cwd": "D:\\tmp\\kokoroarc-m7-campaign-20260813-approved2\\skill\\partial-unavailable-source",
+      "login": false,
+      "exit_code": 0,
+      "stdout_capture": "captures/006-open-skill-metadata.stdout.txt",
+      "stderr_capture": "captures/006-open-skill-metadata.stderr.txt"
+    },
+    {
+      "command": "$ErrorActionPreference = 'Stop'; New-Item -ItemType Directory -Force -Path 'run-data','run-temp' 2> 'captures\\007-create-runtime-roots.stderr.txt' | Select-Object -ExpandProperty FullName | Tee-Object -FilePath 'captures\\007-create-runtime-roots.stdout.txt'",
+      "cwd": "D:\\tmp\\kokoroarc-m7-campaign-20260813-approved2\\skill\\partial-unavailable-source",
+      "login": false,
+      "exit_code": 0,
+      "stdout_capture": "captures/007-create-runtime-roots.stdout.txt",
+      "stderr_capture": "captures/007-create-runtime-roots.stderr.txt"
+    },
+    {
+      "command": "$ErrorActionPreference = 'Stop'; $env:PYTHONPATH = 'D:\\Projects\\AI\\KokoroArc\\.worktrees\\standalone-suite\\src'; $env:KOKOROARC_DATA_DIR = (Resolve-Path -LiteralPath 'run-data').Path; $env:TEMP = (Resolve-Path -LiteralPath 'run-temp').Path; $env:TMP = $env:TEMP; $env:KOKOROARC_TEMP_DIR = $env:TEMP; python -m kokoroarc.cli research request validate --input 'workspace\\request.json' --json 2> 'captures\\008-request-validate-1.stderr.txt' | Tee-Object -FilePath 'captures\\008-request-validate-1.stdout.txt'; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }",
+      "cwd": "D:\\tmp\\kokoroarc-m7-campaign-20260813-approved2\\skill\\partial-unavailable-source",
+      "login": false,
+      "exit_code": 0,
+      "stdout_capture": "captures/008-request-validate-1.stdout.txt",
+      "stderr_capture": "captures/008-request-validate-1.stderr.txt",
+      "argv": [
+        "python",
+        "-m",
+        "kokoroarc.cli",
+        "research",
+        "request",
+        "validate",
+        "--input",
+        "workspace\\request.json",
+        "--json"
+      ]
+    },
+    {
+      "command": "$ErrorActionPreference = 'Stop'; $env:PYTHONPATH = 'D:\\Projects\\AI\\KokoroArc\\.worktrees\\standalone-suite\\src'; $env:KOKOROARC_DATA_DIR = (Resolve-Path -LiteralPath 'run-data').Path; $env:TEMP = (Resolve-Path -LiteralPath 'run-temp').Path; $env:TMP = $env:TEMP; $env:KOKOROARC_TEMP_DIR = $env:TEMP; python -m kokoroarc.cli research request validate --input 'workspace\\request.json' --json 2> 'captures\\009-request-validate-2.stderr.txt' | Tee-Object -FilePath 'captures\\009-request-validate-2.stdout.txt'; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }",
+      "cwd": "D:\\tmp\\kokoroarc-m7-campaign-20260813-approved2\\skill\\partial-unavailable-source",
+      "login": false,
+      "exit_code": 0,
+      "stdout_capture": "captures/009-request-validate-2.stdout.txt",
+      "stderr_capture": "captures/009-request-validate-2.stderr.txt",
+      "argv": [
+        "python",
+        "-m",
+        "kokoroarc.cli",
+        "research",
+        "request",
+        "validate",
+        "--input",
+        "workspace\\request.json",
+        "--json"
+      ]
+    },
+    {
+      "command": "$ErrorActionPreference = 'Stop'; $first = [System.IO.File]::ReadAllBytes((Join-Path (Get-Location) 'captures\\008-request-validate-1.stdout.txt')); $second = [System.IO.File]::ReadAllBytes((Join-Path (Get-Location) 'captures\\009-request-validate-2.stdout.txt')); $stderr1 = (Get-Item -LiteralPath 'captures\\008-request-validate-1.stderr.txt').Length; $stderr2 = (Get-Item -LiteralPath 'captures\\009-request-validate-2.stderr.txt').Length; [ordered]@{ stdout_equal = [System.Linq.Enumerable]::SequenceEqual([byte[]]$first, [byte[]]$second); stdout_1_sha256 = (Get-FileHash -Algorithm SHA256 -LiteralPath 'captures\\008-request-validate-1.stdout.txt').Hash.ToLowerInvariant(); stdout_2_sha256 = (Get-FileHash -Algorithm SHA256 -LiteralPath 'captures\\009-request-validate-2.stdout.txt').Hash.ToLowerInvariant(); stderr_1_bytes = $stderr1; stderr_2_bytes = $stderr2 } | ConvertTo-Json -Compress 2> 'captures\\010-compare-request-validations.stderr.txt' | Tee-Object -FilePath 'captures\\010-compare-request-validations.stdout.txt'",
+      "cwd": "D:\\tmp\\kokoroarc-m7-campaign-20260813-approved2\\skill\\partial-unavailable-source",
+      "login": false,
+      "exit_code": 0,
+      "stdout_capture": "captures/010-compare-request-validations.stdout.txt",
+      "stderr_capture": "captures/010-compare-request-validations.stderr.txt"
+    },
+    {
+      "command": "$ErrorActionPreference = 'Stop'; $env:PYTHONPATH = 'D:\\Projects\\AI\\KokoroArc\\.worktrees\\standalone-suite\\src'; $env:KOKOROARC_DATA_DIR = (Resolve-Path -LiteralPath 'run-data').Path; $env:TEMP = (Resolve-Path -LiteralPath 'run-temp').Path; $env:TMP = $env:TEMP; $env:KOKOROARC_TEMP_DIR = $env:TEMP; python -m kokoroarc.cli research workspace validate --workspace 'workspace' --json 2> 'captures\\011-workspace-validate-1.stderr.txt' | Tee-Object -FilePath 'captures\\011-workspace-validate-1.stdout.txt'; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }",
+      "cwd": "D:\\tmp\\kokoroarc-m7-campaign-20260813-approved2\\skill\\partial-unavailable-source",
+      "login": false,
+      "exit_code": 0,
+      "stdout_capture": "captures/011-workspace-validate-1.stdout.txt",
+      "stderr_capture": "captures/011-workspace-validate-1.stderr.txt",
+      "argv": [
+        "python",
+        "-m",
+        "kokoroarc.cli",
+        "research",
+        "workspace",
+        "validate",
+        "--workspace",
+        "workspace",
+        "--json"
+      ]
+    },
+    {
+      "command": "$ErrorActionPreference = 'Stop'; $env:PYTHONPATH = 'D:\\Projects\\AI\\KokoroArc\\.worktrees\\standalone-suite\\src'; $env:KOKOROARC_DATA_DIR = (Resolve-Path -LiteralPath 'run-data').Path; $env:TEMP = (Resolve-Path -LiteralPath 'run-temp').Path; $env:TMP = $env:TEMP; $env:KOKOROARC_TEMP_DIR = $env:TEMP; python -m kokoroarc.cli research workspace validate --workspace 'workspace' --json 2> 'captures\\012-workspace-validate-2.stderr.txt' | Tee-Object -FilePath 'captures\\012-workspace-validate-2.stdout.txt'; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }",
+      "cwd": "D:\\tmp\\kokoroarc-m7-campaign-20260813-approved2\\skill\\partial-unavailable-source",
+      "login": false,
+      "exit_code": 0,
+      "stdout_capture": "captures/012-workspace-validate-2.stdout.txt",
+      "stderr_capture": "captures/012-workspace-validate-2.stderr.txt",
+      "argv": [
+        "python",
+        "-m",
+        "kokoroarc.cli",
+        "research",
+        "workspace",
+        "validate",
+        "--workspace",
+        "workspace",
+        "--json"
+      ]
+    },
+    {
+      "command": "$ErrorActionPreference = 'Stop'; $first = [System.IO.File]::ReadAllBytes((Join-Path (Get-Location) 'captures\\011-workspace-validate-1.stdout.txt')); $second = [System.IO.File]::ReadAllBytes((Join-Path (Get-Location) 'captures\\012-workspace-validate-2.stdout.txt')); $stderr1 = (Get-Item -LiteralPath 'captures\\011-workspace-validate-1.stderr.txt').Length; $stderr2 = (Get-Item -LiteralPath 'captures\\012-workspace-validate-2.stderr.txt').Length; [ordered]@{ stdout_equal = [System.Linq.Enumerable]::SequenceEqual([byte[]]$first, [byte[]]$second); stdout_1_sha256 = (Get-FileHash -Algorithm SHA256 -LiteralPath 'captures\\011-workspace-validate-1.stdout.txt').Hash.ToLowerInvariant(); stdout_2_sha256 = (Get-FileHash -Algorithm SHA256 -LiteralPath 'captures\\012-workspace-validate-2.stdout.txt').Hash.ToLowerInvariant(); stderr_1_bytes = $stderr1; stderr_2_bytes = $stderr2 } | ConvertTo-Json -Compress 2> 'captures\\013-compare-workspace-validations.stderr.txt' | Tee-Object -FilePath 'captures\\013-compare-workspace-validations.stdout.txt'",
+      "cwd": "D:\\tmp\\kokoroarc-m7-campaign-20260813-approved2\\skill\\partial-unavailable-source",
+      "login": false,
+      "exit_code": 0,
+      "stdout_capture": "captures/013-compare-workspace-validations.stdout.txt",
+      "stderr_capture": "captures/013-compare-workspace-validations.stderr.txt"
+    },
+    {
+      "command": "$ErrorActionPreference = 'Stop'; $env:PYTHONPATH = 'D:\\Projects\\AI\\KokoroArc\\.worktrees\\standalone-suite\\src'; $env:KOKOROARC_DATA_DIR = (Resolve-Path -LiteralPath 'run-data').Path; $env:TEMP = (Resolve-Path -LiteralPath 'run-temp').Path; $env:TMP = $env:TEMP; $env:KOKOROARC_TEMP_DIR = $env:TEMP; python -m kokoroarc.cli research bundle compile --workspace 'workspace' --json 2> 'captures\\014-bundle-compile.stderr.txt' | Tee-Object -FilePath 'captures\\014-bundle-compile.stdout.txt'; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }",
+      "cwd": "D:\\tmp\\kokoroarc-m7-campaign-20260813-approved2\\skill\\partial-unavailable-source",
+      "login": false,
+      "exit_code": 0,
+      "stdout_capture": "captures/014-bundle-compile.stdout.txt",
+      "stderr_capture": "captures/014-bundle-compile.stderr.txt",
+      "argv": [
+        "python",
+        "-m",
+        "kokoroarc.cli",
+        "research",
+        "bundle",
+        "compile",
+        "--workspace",
+        "workspace",
+        "--json"
+      ]
+    },
+    {
+      "command": "$ErrorActionPreference = 'Stop'; $env:PYTHONPATH = 'D:\\Projects\\AI\\KokoroArc\\.worktrees\\standalone-suite\\src'; $env:KOKOROARC_DATA_DIR = (Resolve-Path -LiteralPath 'run-data').Path; $env:TEMP = (Resolve-Path -LiteralPath 'run-temp').Path; $env:TMP = $env:TEMP; $env:KOKOROARC_TEMP_DIR = $env:TEMP; python -m kokoroarc.cli research bundle validate --bundle 'D:\\tmp\\kokoroarc-m7-campaign-20260813-approved2\\skill\\partial-unavailable-source\\run-data\\research\\research\\aoi-kisaragi-fixture\\research\\2a46dc2af58ccb7a' --json 2> 'captures\\015-bundle-validate-1.stderr.txt' | Tee-Object -FilePath 'captures\\015-bundle-validate-1.stdout.txt'; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }",
+      "cwd": "D:\\tmp\\kokoroarc-m7-campaign-20260813-approved2\\skill\\partial-unavailable-source",
+      "login": false,
+      "exit_code": 0,
+      "stdout_capture": "captures/015-bundle-validate-1.stdout.txt",
+      "stderr_capture": "captures/015-bundle-validate-1.stderr.txt",
+      "argv": [
+        "python",
+        "-m",
+        "kokoroarc.cli",
+        "research",
+        "bundle",
+        "validate",
+        "--bundle",
+        "D:\\tmp\\kokoroarc-m7-campaign-20260813-approved2\\skill\\partial-unavailable-source\\run-data\\research\\research\\aoi-kisaragi-fixture\\research\\2a46dc2af58ccb7a",
+        "--json"
+      ]
+    },
+    {
+      "command": "$ErrorActionPreference = 'Stop'; $env:PYTHONPATH = 'D:\\Projects\\AI\\KokoroArc\\.worktrees\\standalone-suite\\src'; $env:KOKOROARC_DATA_DIR = (Resolve-Path -LiteralPath 'run-data').Path; $env:TEMP = (Resolve-Path -LiteralPath 'run-temp').Path; $env:TMP = $env:TEMP; $env:KOKOROARC_TEMP_DIR = $env:TEMP; python -m kokoroarc.cli research bundle validate --bundle 'D:\\tmp\\kokoroarc-m7-campaign-20260813-approved2\\skill\\partial-unavailable-source\\run-data\\research\\research\\aoi-kisaragi-fixture\\research\\2a46dc2af58ccb7a' --json 2> 'captures\\016-bundle-validate-2.stderr.txt' | Tee-Object -FilePath 'captures\\016-bundle-validate-2.stdout.txt'; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }",
+      "cwd": "D:\\tmp\\kokoroarc-m7-campaign-20260813-approved2\\skill\\partial-unavailable-source",
+      "login": false,
+      "exit_code": 0,
+      "stdout_capture": "captures/016-bundle-validate-2.stdout.txt",
+      "stderr_capture": "captures/016-bundle-validate-2.stderr.txt",
+      "argv": [
+        "python",
+        "-m",
+        "kokoroarc.cli",
+        "research",
+        "bundle",
+        "validate",
+        "--bundle",
+        "D:\\tmp\\kokoroarc-m7-campaign-20260813-approved2\\skill\\partial-unavailable-source\\run-data\\research\\research\\aoi-kisaragi-fixture\\research\\2a46dc2af58ccb7a",
+        "--json"
+      ]
+    },
+    {
+      "command": "$ErrorActionPreference = 'Stop'; $first = [System.IO.File]::ReadAllBytes((Join-Path (Get-Location) 'captures\\015-bundle-validate-1.stdout.txt')); $second = [System.IO.File]::ReadAllBytes((Join-Path (Get-Location) 'captures\\016-bundle-validate-2.stdout.txt')); $stderr1 = (Get-Item -LiteralPath 'captures\\015-bundle-validate-1.stderr.txt').Length; $stderr2 = (Get-Item -LiteralPath 'captures\\016-bundle-validate-2.stderr.txt').Length; [ordered]@{ stdout_equal = [System.Linq.Enumerable]::SequenceEqual([byte[]]$first, [byte[]]$second); stdout_1_sha256 = (Get-FileHash -Algorithm SHA256 -LiteralPath 'captures\\015-bundle-validate-1.stdout.txt').Hash.ToLowerInvariant(); stdout_2_sha256 = (Get-FileHash -Algorithm SHA256 -LiteralPath 'captures\\016-bundle-validate-2.stdout.txt').Hash.ToLowerInvariant(); stderr_1_bytes = $stderr1; stderr_2_bytes = $stderr2 } | ConvertTo-Json -Compress 2> 'captures\\017-compare-bundle-validations.stderr.txt' | Tee-Object -FilePath 'captures\\017-compare-bundle-validations.stdout.txt'",
+      "cwd": "D:\\tmp\\kokoroarc-m7-campaign-20260813-approved2\\skill\\partial-unavailable-source",
+      "login": false,
+      "exit_code": 0,
+      "stdout_capture": "captures/017-compare-bundle-validations.stdout.txt",
+      "stderr_capture": "captures/017-compare-bundle-validations.stderr.txt"
+    },
+    {
+      "command": "$ErrorActionPreference = 'Stop'; $paths = @('workspace\\request.json','workspace\\sources\\source-official-profile.json','workspace\\claims\\claim-role.json','workspace\\claims\\claim-history.json','workspace\\conflicts\\conflict-adaptation-wording.json','workspace\\coverage.json','workspace\\workspace.json','workspace\\validation-report.json','workspace\\bundle.json'); $opened = foreach ($path in $paths) { [ordered]@{ path = $path; text = [System.IO.File]::ReadAllText((Join-Path (Get-Location) $path)) } }; $opened | ConvertTo-Json -Depth 4 2> 'captures\\018-open-workspace-records.stderr.txt' | Tee-Object -FilePath 'captures\\018-open-workspace-records.stdout.txt'",
+      "cwd": "D:\\tmp\\kokoroarc-m7-campaign-20260813-approved2\\skill\\partial-unavailable-source",
+      "login": false,
+      "exit_code": 0,
+      "stdout_capture": "captures/018-open-workspace-records.stdout.txt",
+      "stderr_capture": "captures/018-open-workspace-records.stderr.txt"
+    },
+    {
+      "command": "$ErrorActionPreference = 'Stop'; rg --files 'run-data' 'run-temp' 2> 'captures\\019-runtime-file-inventory.stderr.txt' | Sort-Object | Tee-Object -FilePath 'captures\\019-runtime-file-inventory.stdout.txt'",
+      "cwd": "D:\\tmp\\kokoroarc-m7-campaign-20260813-approved2\\skill\\partial-unavailable-source",
+      "login": false,
+      "exit_code": 0,
+      "stdout_capture": "captures/019-runtime-file-inventory.stdout.txt",
+      "stderr_capture": "captures/019-runtime-file-inventory.stderr.txt"
+    },
+    {
+      "command": "$ErrorActionPreference = 'Stop'; $bundleRoot = 'run-data\\research\\research\\aoi-kisaragi-fixture\\research\\2a46dc2af58ccb7a'; $paths = @((Join-Path $bundleRoot 'bundle.json'),(Join-Path $bundleRoot 'request.json'),(Join-Path $bundleRoot 'validation-report.json'),(Join-Path $bundleRoot 'workspace.json')); $opened = foreach ($path in $paths) { [ordered]@{ path = $path; text = [System.IO.File]::ReadAllText((Join-Path (Get-Location) $path)) } }; $opened | ConvertTo-Json -Depth 4 2> 'captures\\020-open-compiled-bundle.stderr.txt' | Tee-Object -FilePath 'captures\\020-open-compiled-bundle.stdout.txt'",
+      "cwd": "D:\\tmp\\kokoroarc-m7-campaign-20260813-approved2\\skill\\partial-unavailable-source",
+      "login": false,
+      "exit_code": 0,
+      "stdout_capture": "captures/020-open-compiled-bundle.stdout.txt",
+      "stderr_capture": "captures/020-open-compiled-bundle.stderr.txt"
+    },
+    {
+      "command": "$ErrorActionPreference = 'Stop'; Get-ChildItem -LiteralPath 'captures' -File | Sort-Object Name | Select-Object Name,Length | ConvertTo-Json -Depth 3 2> 'captures\\021-capture-inventory.stderr.txt' | Tee-Object -FilePath 'captures\\021-capture-inventory.stdout.txt'",
+      "cwd": "D:\\tmp\\kokoroarc-m7-campaign-20260813-approved2\\skill\\partial-unavailable-source",
+      "login": false,
+      "exit_code": 0,
+      "stdout_capture": "captures/021-capture-inventory.stdout.txt",
+      "stderr_capture": "captures/021-capture-inventory.stderr.txt"
+    },
+    {
+      "command": "$ErrorActionPreference = 'Stop'; & { $report = Get-Content -Raw -LiteralPath 'agent-report.json' | ConvertFrom-Json; $final = Get-Content -Raw -LiteralPath 'final.md'; $bundleFiles = @(rg --files 'run-data' 'run-temp'); $checks = [ordered]@{ report_json_valid = $true; schema_version = $report.schema_version; case_id = $report.case_id; variant = $report.variant; final_file = $report.final_file; final_nonempty = ($final.Length -gt 0); final_has_required_last_line = $final.TrimEnd().EndsWith('Unresolved evidence: source-official-profile remains unavailable; role coverage is partial; missing-history coverage is blocked with no permitted evidence; conflict-adaptation-wording remains unresolved; claim-role and claim-history remain unsupported user assertions.'); runtime_file_count = $bundleFiles.Count; runtime_files_only_expected_bundle = ($bundleFiles.Count -eq 4 -and (@($bundleFiles | Where-Object { $_ -notlike 'run-data\\research\\research\\aoi-kisaragi-fixture\\research\\2a46dc2af58ccb7a\\*' }).Count -eq 0)) }; if (-not $checks.final_nonempty -or -not $checks.final_has_required_last_line -or -not $checks.runtime_files_only_expected_bundle -or $checks.schema_version -ne '1.0' -or $checks.case_id -ne 'partial-unavailable-source' -or $checks.variant -ne 'skill-enabled' -or $checks.final_file -ne 'final.md') { throw 'Final artifact verification failed.' }; $checks | ConvertTo-Json -Compress } 2> 'captures\\022-final-artifact-verification.stderr.txt' | Tee-Object -FilePath 'captures\\022-final-artifact-verification.stdout.txt'",
+      "cwd": "D:\\tmp\\kokoroarc-m7-campaign-20260813-approved2\\skill\\partial-unavailable-source",
+      "login": false,
+      "exit_code": 0,
+      "stdout_capture": "captures/022-final-artifact-verification.stdout.txt",
+      "stderr_capture": "captures/022-final-artifact-verification.stderr.txt"
+    }
+  ],
+  "files_created": [
+    "captures/000-failed-open-skill.stdout.txt",
+    "captures/000-failed-open-skill.stderr.txt",
+    "captures/002-open-skill.stdout.txt",
+    "captures/002-open-skill.stderr.txt",
+    "captures/003-open-research-contract.stdout.txt",
+    "captures/003-open-research-contract.stderr.txt",
+    "captures/004-list-files.stdout.txt",
+    "captures/004-list-files.stderr.txt",
+    "captures/005-open-readme.stdout.txt",
+    "captures/005-open-readme.stderr.txt",
+    "captures/006-open-skill-metadata.stdout.txt",
+    "captures/006-open-skill-metadata.stderr.txt",
+    "captures/007-create-runtime-roots.stdout.txt",
+    "captures/007-create-runtime-roots.stderr.txt",
+    "captures/008-request-validate-1.stdout.txt",
+    "captures/008-request-validate-1.stderr.txt",
+    "captures/009-request-validate-2.stdout.txt",
+    "captures/009-request-validate-2.stderr.txt",
+    "captures/010-compare-request-validations.stdout.txt",
+    "captures/010-compare-request-validations.stderr.txt",
+    "captures/011-workspace-validate-1.stdout.txt",
+    "captures/011-workspace-validate-1.stderr.txt",
+    "captures/012-workspace-validate-2.stdout.txt",
+    "captures/012-workspace-validate-2.stderr.txt",
+    "captures/013-compare-workspace-validations.stdout.txt",
+    "captures/013-compare-workspace-validations.stderr.txt",
+    "captures/014-bundle-compile.stdout.txt",
+    "captures/014-bundle-compile.stderr.txt",
+    "captures/015-bundle-validate-1.stdout.txt",
+    "captures/015-bundle-validate-1.stderr.txt",
+    "captures/016-bundle-validate-2.stdout.txt",
+    "captures/016-bundle-validate-2.stderr.txt",
+    "captures/017-compare-bundle-validations.stdout.txt",
+    "captures/017-compare-bundle-validations.stderr.txt",
+    "captures/018-open-workspace-records.stdout.txt",
+    "captures/018-open-workspace-records.stderr.txt",
+    "captures/019-runtime-file-inventory.stdout.txt",
+    "captures/019-runtime-file-inventory.stderr.txt",
+    "captures/020-open-compiled-bundle.stdout.txt",
+    "captures/020-open-compiled-bundle.stderr.txt",
+    "captures/021-capture-inventory.stdout.txt",
+    "captures/021-capture-inventory.stderr.txt",
+    "captures/022-final-artifact-verification.stdout.txt",
+    "captures/022-final-artifact-verification.stderr.txt",
+    "run-data/research/research/aoi-kisaragi-fixture/research/2a46dc2af58ccb7a/bundle.json",
+    "run-data/research/research/aoi-kisaragi-fixture/research/2a46dc2af58ccb7a/request.json",
+    "run-data/research/research/aoi-kisaragi-fixture/research/2a46dc2af58ccb7a/validation-report.json",
+    "run-data/research/research/aoi-kisaragi-fixture/research/2a46dc2af58ccb7a/workspace.json",
+    "final.md",
+    "agent-report.json"
+  ],
+  "directories_created": [
+    "run-data",
+    "run-temp",
+    "run-data/research/research/aoi-kisaragi-fixture/research/2a46dc2af58ccb7a"
+  ],
+  "files_modified": [],
+  "files_deleted": [],
+  "final_file": "final.md",
+  "notes": [
+    "The local researching-characters Skill and linked contract were read before any product CLI command.",
+    "The first sandboxed read attempt failed at capture redirection before SKILL.md was opened; captures/000-failed-open-skill.* retain the normalized failure record, and the approved follow-up read succeeded.",
+    "The two request-validation stdout captures are byte-identical with SHA-256 85d3bab50c27d2076996dd240b27b1cf59c35ec82871e9f598ebd3e8cd630f54; both stderr captures are empty.",
+    "The two workspace-validation stdout captures are byte-identical with SHA-256 c1e64531d4ecf28d7460649783a7cd0c4e2c5b57b91bdfa60c275775df311e56; both stderr captures are empty.",
+    "Workspace validation reported valid true, no hard failures, authoring_allowed false, one partial topic, one blocked topic, and two blocking reasons.",
+    "Bundle compilation was invoked exactly once and produced only the expected private research bundle beneath KOKOROARC_DATA_DIR.",
+    "The two exact-bundle validation stdout captures are byte-identical with SHA-256 22b168b76fbd2ecc191886eb2b8eaf64f653fde4d07c992518c9fb5eec79028f; both stderr captures are empty.",
+    "The unavailable source, unsupported user assertions, incomplete coverage, unresolved conflict, limitations, and blockers were preserved without invented agreement, citations, or support.",
+    "No authoring, activation, installation, publication, session, relationship, event, configuration, or memory command was run.",
+    "The post-compile runtime inventory contains exactly four files, all inside the returned private Research Bundle; run-temp contains no files."
+  ]
+}
+

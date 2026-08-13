@@ -1,0 +1,2 @@
+{"error": {"code": "RESEARCH_BUNDLE_INVALID", "details": {}, "message": "Published Research Bundle validation failed.", "retryable": false}, "ok": false}
+

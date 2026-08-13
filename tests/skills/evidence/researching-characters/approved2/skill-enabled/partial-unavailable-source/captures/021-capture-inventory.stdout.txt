@@ -1,0 +1,166 @@
+[
+  {
+    "Name": "000-failed-open-skill.stderr.txt",
+    "Length": 133
+  },
+  {
+    "Name": "000-failed-open-skill.stdout.txt",
+    "Length": 0
+  },
+  {
+    "Name": "002-open-skill.stderr.txt",
+    "Length": 0
+  },
+  {
+    "Name": "002-open-skill.stdout.txt",
+    "Length": 3740
+  },
+  {
+    "Name": "003-open-research-contract.stderr.txt",
+    "Length": 0
+  },
+  {
+    "Name": "003-open-research-contract.stdout.txt",
+    "Length": 7202
+  },
+  {
+    "Name": "004-list-files.stderr.txt",
+    "Length": 0
+  },
+  {
+    "Name": "004-list-files.stdout.txt",
+    "Length": 799
+  },
+  {
+    "Name": "005-open-readme.stderr.txt",
+    "Length": 0
+  },
+  {
+    "Name": "005-open-readme.stdout.txt",
+    "Length": 6362
+  },
+  {
+    "Name": "006-open-skill-metadata.stderr.txt",
+    "Length": 0
+  },
+  {
+    "Name": "006-open-skill-metadata.stdout.txt",
+    "Length": 274
+  },
+  {
+    "Name": "007-create-runtime-roots.stderr.txt",
+    "Length": 0
+  },
+  {
+    "Name": "007-create-runtime-roots.stdout.txt",
+    "Length": 182
+  },
+  {
+    "Name": "008-request-validate-1.stderr.txt",
+    "Length": 0
+  },
+  {
+    "Name": "008-request-validate-1.stdout.txt",
+    "Length": 770
+  },
+  {
+    "Name": "009-request-validate-2.stderr.txt",
+    "Length": 0
+  },
+  {
+    "Name": "009-request-validate-2.stdout.txt",
+    "Length": 770
+  },
+  {
+    "Name": "010-compare-request-validations.stderr.txt",
+    "Length": 0
+  },
+  {
+    "Name": "010-compare-request-validations.stdout.txt",
+    "Length": 231
+  },
+  {
+    "Name": "011-workspace-validate-1.stderr.txt",
+    "Length": 0
+  },
+  {
+    "Name": "011-workspace-validate-1.stdout.txt",
+    "Length": 1035
+  },
+  {
+    "Name": "012-workspace-validate-2.stderr.txt",
+    "Length": 0
+  },
+  {
+    "Name": "012-workspace-validate-2.stdout.txt",
+    "Length": 1035
+  },
+  {
+    "Name": "013-compare-workspace-validations.stderr.txt",
+    "Length": 0
+  },
+  {
+    "Name": "013-compare-workspace-validations.stdout.txt",
+    "Length": 231
+  },
+  {
+    "Name": "014-bundle-compile.stderr.txt",
+    "Length": 0
+  },
+  {
+    "Name": "014-bundle-compile.stdout.txt",
+    "Length": 1401
+  },
+  {
+    "Name": "015-bundle-validate-1.stderr.txt",
+    "Length": 0
+  },
+  {
+    "Name": "015-bundle-validate-1.stdout.txt",
+    "Length": 1240
+  },
+  {
+    "Name": "016-bundle-validate-2.stderr.txt",
+    "Length": 0
+  },
+  {
+    "Name": "016-bundle-validate-2.stdout.txt",
+    "Length": 1240
+  },
+  {
+    "Name": "017-compare-bundle-validations.stderr.txt",
+    "Length": 0
+  },
+  {
+    "Name": "017-compare-bundle-validations.stdout.txt",
+    "Length": 231
+  },
+  {
+    "Name": "018-open-workspace-records.stderr.txt",
+    "Length": 0
+  },
+  {
+    "Name": "018-open-workspace-records.stdout.txt",
+    "Length": 12629
+  },
+  {
+    "Name": "019-runtime-file-inventory.stderr.txt",
+    "Length": 0
+  },
+  {
+    "Name": "019-runtime-file-inventory.stdout.txt",
+    "Length": 363
+  },
+  {
+    "Name": "020-open-compiled-bundle.stderr.txt",
+    "Length": 0
+  },
+  {
+    "Name": "020-open-compiled-bundle.stdout.txt",
+    "Length": 10479
+  },
+  {
+    "Name": "021-capture-inventory.stderr.txt",
+    "Length": 0
+  }
+]

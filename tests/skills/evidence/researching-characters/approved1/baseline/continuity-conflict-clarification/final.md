@@ -1,0 +1,3 @@
+I can’t produce a canon-accurate merged result under those constraints. The manga and anime are materially different continuities, so combining whichever details seem “best” would create a hybrid that is canon to neither. With no selected continuity, there is no honest single canon baseline, and I won’t guess one or conceal the conflict.
+
+I also can’t conduct the requested research from this workspace: it contains no character evidence, and no authorized research source is available. A reliable result requires a manga-or-anime continuity choice (plus a timeline cutoff and spoiler scope); otherwise the only accurate deliverable would be two explicitly separated continuity profiles, not one merged canon profile.

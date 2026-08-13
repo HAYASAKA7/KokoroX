@@ -1,0 +1,170 @@
+{
+  "schema_version": "1.0",
+  "case_id": "spoiler-cutoff",
+  "variant": "baseline",
+  "files_opened": [
+    "README.md",
+    "workspace/request.json",
+    "workspace/workspace.json",
+    "workspace/bundle.json",
+    "workspace/coverage.json",
+    "workspace/validation-report.json",
+    "workspace/claims/claim-behavior.json",
+    "workspace/claims/claim-role.json",
+    "workspace/conflicts/conflict-adaptation-wording.json",
+    "workspace/sources/source-episode-01.json",
+    "workspace/sources/source-official-profile.json"
+  ],
+  "commands": [
+    {
+      "command": "$out='captures\\b03-20260813-001-list.stdout.txt'; $err='captures\\b03-20260813-001-list.stderr.txt'; & { Get-ChildItem -Force -Recurse | Select-Object FullName, Length, Mode } 2> $err | Tee-Object -FilePath $out",
+      "exit_code": 1,
+      "stdout_file": "captures/b03-20260813-001-list.stdout.txt",
+      "stderr_file": "captures/b03-20260813-001-list.stderr.txt"
+    },
+    {
+      "command": "$out='captures\\b03-20260813-002-list.stdout.txt'; $err='captures\\b03-20260813-002-list.stderr.txt'; & { Get-ChildItem -Force -Recurse | Select-Object FullName, Length, Mode } 2> $err | Tee-Object -FilePath $out",
+      "exit_code": 0,
+      "stdout_file": "captures/b03-20260813-002-list.stdout.txt",
+      "stderr_file": "captures/b03-20260813-002-list.stderr.txt"
+    },
+    {
+      "command": "Read README.md and the eleven supplied research workspace JSON documents with Get-Content -Raw",
+      "exit_code": 0,
+      "stdout_file": "captures/b03-20260813-003-read-inputs.stdout.txt",
+      "stderr_file": "captures/b03-20260813-003-read-inputs.stderr.txt"
+    },
+    {
+      "command": "python -m kokoroarc.cli --help",
+      "exit_code": 0,
+      "stdout_file": "captures/b03-20260813-004-cli-help.stdout.txt",
+      "stderr_file": "captures/b03-20260813-004-cli-help.stderr.txt"
+    },
+    {
+      "command": "python -m kokoroarc.cli research --help",
+      "exit_code": 0,
+      "stdout_file": "captures/b03-20260813-005-research-help.stdout.txt",
+      "stderr_file": "captures/b03-20260813-005-research-help.stderr.txt"
+    },
+    {
+      "command": "python -m kokoroarc.cli research request --help; python -m kokoroarc.cli research workspace --help; python -m kokoroarc.cli research bundle --help",
+      "exit_code": 0,
+      "stdout_file": "captures/b03-20260813-006-research-subcommands-help.stdout.txt",
+      "stderr_file": "captures/b03-20260813-006-research-subcommands-help.stderr.txt"
+    },
+    {
+      "command": "python -m kokoroarc.cli research request validate --help; python -m kokoroarc.cli research workspace validate --help; python -m kokoroarc.cli research bundle compile --help; python -m kokoroarc.cli research bundle validate --help",
+      "exit_code": 0,
+      "stdout_file": "captures/b03-20260813-007-research-actions-help.stdout.txt",
+      "stderr_file": "captures/b03-20260813-007-research-actions-help.stderr.txt"
+    },
+    {
+      "command": "python -m kokoroarc.cli research request validate --input workspace\\request.json --json",
+      "exit_code": 0,
+      "stdout_file": "captures/b03-20260813-008-request-validate.stdout.txt",
+      "stderr_file": "captures/b03-20260813-008-request-validate.stderr.txt"
+    },
+    {
+      "command": "python -m kokoroarc.cli research workspace validate --workspace workspace --json",
+      "exit_code": 0,
+      "stdout_file": "captures/b03-20260813-009-workspace-validate.stdout.txt",
+      "stderr_file": "captures/b03-20260813-009-workspace-validate.stderr.txt"
+    },
+    {
+      "command": "python -m kokoroarc.cli research bundle compile --workspace workspace --json",
+      "exit_code": 0,
+      "stdout_file": "captures/b03-20260813-010-bundle-compile.stdout.txt",
+      "stderr_file": "captures/b03-20260813-010-bundle-compile.stderr.txt"
+    },
+    {
+      "command": "python -m kokoroarc.cli research bundle validate --bundle run-data\\research\\research\\aoi-kisaragi-fixture\\research\\36c328d763dd4ca7 --json",
+      "exit_code": 0,
+      "stdout_file": "captures/b03-20260813-011-bundle-validate.stdout.txt",
+      "stderr_file": "captures/b03-20260813-011-bundle-validate.stderr.txt"
+    },
+    {
+      "command": "Get-ChildItem -Force -Recurse run-data,captures | Select-Object FullName, Length, Mode",
+      "exit_code": 0,
+      "stdout_file": "captures/b03-20260813-012-artifact-list.stdout.txt",
+      "stderr_file": "captures/b03-20260813-012-artifact-list.stderr.txt"
+    },
+    {
+      "command": "PowerShell: create final.md, agent-report.json, and the missing capture files for the initial sandbox-blocked listing command",
+      "exit_code": 0,
+      "stdout_file": "captures/b03-20260813-013-write-audit.stdout.txt",
+      "stderr_file": "captures/b03-20260813-013-write-audit.stderr.txt"
+    },
+    {
+      "command": "PowerShell: parse agent-report.json, verify final.md content and all reported files, and emit the verified final response",
+      "exit_code": 1,
+      "stdout_file": "captures/b03-20260813-014-verify-audit.stdout.txt",
+      "stderr_file": "captures/b03-20260813-014-verify-audit.stderr.txt"
+    },
+    {
+      "command": "PowerShell: preserve the empty stdout of the failed first audit verification, record its exit code, and add a corrected verification retry to agent-report.json",
+      "exit_code": 0,
+      "stdout_file": "captures/b03-20260813-015-repair-audit.stdout.txt",
+      "stderr_file": "captures/b03-20260813-015-repair-audit.stderr.txt"
+    },
+    {
+      "command": "PowerShell: parse agent-report.json, verify final.md content and all completed reported files, and emit the verified final response",
+      "exit_code": 0,
+      "stdout_file": "captures/b03-20260813-016-verify-audit.stdout.txt",
+      "stderr_file": "captures/b03-20260813-016-verify-audit.stderr.txt"
+    }
+  ],
+  "files_created": [
+    "captures/b03-20260813-001-list.stdout.txt",
+    "captures/b03-20260813-001-list.stderr.txt",
+    "captures/b03-20260813-002-list.stdout.txt",
+    "captures/b03-20260813-002-list.stderr.txt",
+    "captures/b03-20260813-003-read-inputs.stdout.txt",
+    "captures/b03-20260813-003-read-inputs.stderr.txt",
+    "captures/b03-20260813-004-cli-help.stdout.txt",
+    "captures/b03-20260813-004-cli-help.stderr.txt",
+    "captures/b03-20260813-005-research-help.stdout.txt",
+    "captures/b03-20260813-005-research-help.stderr.txt",
+    "captures/b03-20260813-006-research-subcommands-help.stdout.txt",
+    "captures/b03-20260813-006-research-subcommands-help.stderr.txt",
+    "captures/b03-20260813-007-research-actions-help.stdout.txt",
+    "captures/b03-20260813-007-research-actions-help.stderr.txt",
+    "captures/b03-20260813-008-request-validate.stdout.txt",
+    "captures/b03-20260813-008-request-validate.stderr.txt",
+    "captures/b03-20260813-009-workspace-validate.stdout.txt",
+    "captures/b03-20260813-009-workspace-validate.stderr.txt",
+    "captures/b03-20260813-010-bundle-compile.stdout.txt",
+    "captures/b03-20260813-010-bundle-compile.stderr.txt",
+    "captures/b03-20260813-011-bundle-validate.stdout.txt",
+    "captures/b03-20260813-011-bundle-validate.stderr.txt",
+    "captures/b03-20260813-012-artifact-list.stdout.txt",
+    "captures/b03-20260813-012-artifact-list.stderr.txt",
+    "captures/b03-20260813-013-write-audit.stdout.txt",
+    "captures/b03-20260813-013-write-audit.stderr.txt",
+    "captures/b03-20260813-014-verify-audit.stdout.txt",
+    "captures/b03-20260813-014-verify-audit.stderr.txt",
+    "run-data/research/research/aoi-kisaragi-fixture/research/.36c328d763dd4ca7.publish.lock",
+    "run-data/research/research/aoi-kisaragi-fixture/research/36c328d763dd4ca7/bundle.json",
+    "run-data/research/research/aoi-kisaragi-fixture/research/36c328d763dd4ca7/request.json",
+    "run-data/research/research/aoi-kisaragi-fixture/research/36c328d763dd4ca7/validation-report.json",
+    "run-data/research/research/aoi-kisaragi-fixture/research/36c328d763dd4ca7/workspace.json",
+    "final.md",
+    "agent-report.json",
+    "captures/b03-20260813-015-repair-audit.stdout.txt",
+    "captures/b03-20260813-015-repair-audit.stderr.txt",
+    "captures/b03-20260813-016-verify-audit.stdout.txt",
+    "captures/b03-20260813-016-verify-audit.stderr.txt"
+  ],
+  "final_file": "final.md",
+  "factual_notes": [
+    "Only files inside the isolated workspace were opened; no web tool or later-source evidence was used.",
+    "All KokoroArc executions used PYTHONPATH D:\\Projects\\AI\\KokoroArc\\.worktrees\\standalone-suite\\src, KOKOROARC_DATA_DIR run-data, and TEMP/TMP run-temp.",
+    "The trusted local request and every supplied evidence record are scoped to episode-01 only, so the available evidence cannot establish complete coverage through the user-requested anime episode 12 cutoff.",
+    "The official profile supports the claim that Aoi is an observatory apprentice; the episode record supports a conflicting claim that she is not.",
+    "The supplied workspace marks that disagreement scope_separated and selects claim-role for the primary scope rather than treating either claim as universal.",
+    "Request validation and workspace validation succeeded; coverage was 2 covered, 0 partial, 0 missing, and 0 blocked.",
+    "The compiled Research Bundle is valid, private, build_status research, activation_allowed false, and authoring_allowed true.",
+    "Compiled artifact ID: research/aoi-kisaragi-fixture/research/36c328d763dd4ca7; bundle hash: dca74da0f38393f2235b681f41d5af2c4d6af2edce46377401bc06e582fc4fea.",
+    "The first filesystem-listing attempt was blocked before useful inspection because the default login-shell profile and sandbox denied D:\\tmp capture writes; its observed output was preserved afterward in uniquely named capture files.",
+    "The first audit verification exited 1 only because it tested for its own stdout capture before Tee-Object created that file; the empty stdout was preserved, the failure was recorded, and a corrected verification was scheduled."
+  ]
+}

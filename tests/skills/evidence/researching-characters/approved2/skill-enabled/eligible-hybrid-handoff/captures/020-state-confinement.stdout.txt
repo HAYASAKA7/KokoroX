@@ -1,0 +1,8 @@
+run-data files:
+run-data\research\research\aoi-kisaragi-fixture\research\.36c328d763dd4ca7.publish.lock
+run-data\research\research\aoi-kisaragi-fixture\research\36c328d763dd4ca7\bundle.json
+run-data\research\research\aoi-kisaragi-fixture\research\36c328d763dd4ca7\request.json
+run-data\research\research\aoi-kisaragi-fixture\research\36c328d763dd4ca7\validation-report.json
+run-data\research\research\aoi-kisaragi-fixture\research\36c328d763dd4ca7\workspace.json
+run-temp entries:
+forbidden_top_level_present=

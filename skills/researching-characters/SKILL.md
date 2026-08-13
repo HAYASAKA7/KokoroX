@@ -13,6 +13,8 @@ Read [references/research-contract.md](references/research-contract.md) before u
 
 Confirm the fictional subject, franchise, aliases, medium, work, adaptation, continuity, timeline cutoff, and spoiler scope. Ask one focused clarification and stop before research when identity or continuity is ambiguous. Never select the newest or most popular adaptation, merge continuities, or widen spoilers silently.
 
+Even on this early stop, report that no research tools or artifacts were used, product state did not change, and finish with a separate `Unresolved evidence:` line naming the unresolved scope.
+
 Do not open this Skill for original creation, casual discussion, ordinary roleplay, or dossier-only authoring. Route original or dossier-only pack work to `authoring-character-packs`.
 
 ## Keep acquisition untrusted

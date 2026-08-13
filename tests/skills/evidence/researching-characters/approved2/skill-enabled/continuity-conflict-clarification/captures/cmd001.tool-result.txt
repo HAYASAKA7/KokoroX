@@ -1,0 +1,12 @@
+Script failed
+Wall time: 1.7 seconds
+Output:
+Script error:
+Exit code: 1
+Wall time: 1.6 seconds
+Output:
+Out-File:
+Line |
+   2 |  & { Get-Content -LiteralPath 'skills\researching-characters\SKILL.md' …
+     |  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+     | Access to the path 'D:\tmp\kokoroarc-m7-campaign-20260813-approved2\skill\continuity-conflict-clarification\captures\cmd001.stderr.txt' is denied.

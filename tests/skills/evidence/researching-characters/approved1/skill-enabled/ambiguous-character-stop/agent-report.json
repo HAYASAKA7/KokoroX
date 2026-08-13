@@ -1,0 +1,57 @@
+{
+  "schema_version": "1.0",
+  "case_id": "ambiguous-character-stop",
+  "variant": "skill-enabled",
+  "files_opened": [
+    "skills/researching-characters/SKILL.md",
+    "skills/researching-characters/references/research-contract.md",
+    "final.md",
+    "agent-report.json"
+  ],
+  "commands": [
+    {
+      "command": "$ErrorActionPreference = 'Stop'\nNew-Item -ItemType Directory -Force -Path 'captures' | Out-Null\nSet-Content -LiteralPath 'captures/001-read-skill.stderr.txt' -Value '' -NoNewline\ntry {\n  Get-Content -Raw -LiteralPath 'skills/researching-characters/SKILL.md' | Tee-Object -FilePath 'captures/001-read-skill.stdout.txt'\n  exit 0\n} catch {\n  $_ | Out-String | Set-Content -LiteralPath 'captures/001-read-skill.stderr.txt'\n  exit 1\n}",
+      "exit_code": 1,
+      "stdout_file": "captures/000-initial-attempt.stdout.txt",
+      "stderr_file": "captures/000-initial-attempt.stderr.txt"
+    },
+    {
+      "command": "$ErrorActionPreference = 'Stop'\nNew-Item -ItemType Directory -Force -Path 'captures' | Out-Null\n@'\nScript failed\nWall time 3.6 seconds\nOutput:\nScript error:\nExit code: 1\nWall time: 3.3 seconds\nOutput:\nerror: Can't create the symlink for multishells at \"<redacted-user-profile>\\AppData\\Local\\fnm_multishells\\46116_1786612189229\". Maybe there are some issues with permissions for the directory? Access denied. (os error 5)\nInvoke-Expression: <redacted-user-profile>\\Documents\\WindowsPowerShell\\Microsoft.PowerShell_profile.ps1:171\nCannot bind argument to parameter 'Command' because it is an empty string.\nSet-Content: Access to the path 'D:\\tmp\\kokoroarc-m7-campaign-20260813-approved1\\skill\\ambiguous-character-stop\\captures\\001-read-skill.stderr.txt' is denied.\n'@ | Set-Content -LiteralPath 'captures/000-initial-attempt.stderr.txt'\nSet-Content -LiteralPath 'captures/000-initial-attempt.stdout.txt' -Value '' -NoNewline\nSet-Content -LiteralPath 'captures/001-read-skill.stderr.txt' -Value '' -NoNewline\ntry {\n  Get-Content -Raw -LiteralPath 'skills/researching-characters/SKILL.md' | Tee-Object -FilePath 'captures/001-read-skill.stdout.txt'\n  exit 0\n} catch {\n  $_ | Out-String | Set-Content -LiteralPath 'captures/001-read-skill.stderr.txt'\n  exit 1\n}",
+      "exit_code": 0,
+      "stdout_file": "captures/001-read-skill.stdout.txt",
+      "stderr_file": "captures/001-read-skill.stderr.txt"
+    },
+    {
+      "command": "$ErrorActionPreference = 'Stop'\nSet-Content -LiteralPath 'captures/002-read-research-contract.stderr.txt' -Value '' -NoNewline\ntry {\n  Get-Content -Raw -LiteralPath 'skills/researching-characters/references/research-contract.md' | Tee-Object -FilePath 'captures/002-read-research-contract.stdout.txt'\n  exit 0\n} catch {\n  $_ | Out-String | Set-Content -LiteralPath 'captures/002-read-research-contract.stderr.txt'\n  exit 1\n}",
+      "exit_code": 0,
+      "stdout_file": "captures/002-read-research-contract.stdout.txt",
+      "stderr_file": "captures/002-read-research-contract.stderr.txt"
+    },
+    {
+      "command": "$ErrorActionPreference = 'Stop'\nSet-Content -LiteralPath 'captures/003-verify-artifacts.stderr.txt' -Value '' -NoNewline\ntry {\n  $report = Get-Content -Raw -LiteralPath 'agent-report.json' | ConvertFrom-Json\n  $final = Get-Content -Raw -LiteralPath 'final.md'\n  if ($report.schema_version -ne '1.0' -or $report.case_id -ne 'ambiguous-character-stop' -or $report.variant -ne 'skill-enabled' -or $report.final_file -ne 'final.md') { throw 'Required report fields are invalid.' }\n  if ([string]::IsNullOrWhiteSpace($final)) { throw 'final.md is empty.' }\n  [pscustomobject]@{ report_json_valid = $true; required_fields_present = $true; final_nonempty = $true } | ConvertTo-Json -Compress | Tee-Object -FilePath 'captures/003-verify-artifacts.stdout.txt'\n  exit 0\n} catch {\n  $_ | Out-String | Set-Content -LiteralPath 'captures/003-verify-artifacts.stderr.txt'\n  exit 1\n}",
+      "exit_code": 0,
+      "stdout_file": "captures/003-verify-artifacts.stdout.txt",
+      "stderr_file": "captures/003-verify-artifacts.stderr.txt"
+    }
+  ],
+  "files_created": [
+    "captures/000-initial-attempt.stdout.txt",
+    "captures/000-initial-attempt.stderr.txt",
+    "captures/001-read-skill.stdout.txt",
+    "captures/001-read-skill.stderr.txt",
+    "captures/002-read-research-contract.stdout.txt",
+    "captures/002-read-research-contract.stderr.txt",
+    "captures/003-verify-artifacts.stdout.txt",
+    "captures/003-verify-artifacts.stderr.txt",
+    "final.md",
+    "agent-report.json"
+  ],
+  "final_file": "final.md",
+  "factual_notes": [
+    "The name Aoi identifies multiple fictional characters, and no trusted identity selection is available.",
+    "Popularity is not a valid way to resolve character identity, adaptation, or continuity under the required research contract.",
+    "No web or other research source was accessed.",
+    "Research stopped before evidence acquisition; no source, claim, conflict, coverage, workspace, request, or Research Bundle artifact was created.",
+    "No activation, installation, publication, session, relationship, event, configuration, or memory state changed."
+  ]
+}

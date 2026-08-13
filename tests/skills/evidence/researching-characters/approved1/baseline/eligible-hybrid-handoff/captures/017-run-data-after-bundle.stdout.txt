@@ -1,0 +1,10 @@
+d----	1	run-data\research
+d----	1	run-data\research\research
+d----	1	run-data\research\research\aoi-kisaragi-fixture
+d----	1	run-data\research\research\aoi-kisaragi-fixture\research
+-a---	1	run-data\research\research\aoi-kisaragi-fixture\research\.36c328d763dd4ca7.publish.lock
+d----	1	run-data\research\research\aoi-kisaragi-fixture\research\36c328d763dd4ca7
+-a---	4414	run-data\research\research\aoi-kisaragi-fixture\research\36c328d763dd4ca7\bundle.json
+-a---	762	run-data\research\research\aoi-kisaragi-fixture\research\36c328d763dd4ca7\request.json
+-a---	315	run-data\research\research\aoi-kisaragi-fixture\research\36c328d763dd4ca7\validation-report.json
+-a---	4355	run-data\research\research\aoi-kisaragi-fixture\research\36c328d763dd4ca7\workspace.json

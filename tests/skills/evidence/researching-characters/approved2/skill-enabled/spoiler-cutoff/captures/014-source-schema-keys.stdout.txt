@@ -1,0 +1,50 @@
+[
+  {
+    "file": "source-episode-01.json",
+    "top_level_keys": [
+      "schema_version",
+      "artifact_id",
+      "created_by",
+      "source_id",
+      "category",
+      "locator",
+      "title",
+      "publisher",
+      "accessed_at",
+      "availability",
+      "content_sha256",
+      "excerpts",
+      "continuity",
+      "spoiler_scope",
+      "limitations",
+      "trust_notes"
+    ],
+    "excerpt_keys": [
+      "Length"
+    ]
+  },
+  {
+    "file": "source-official-profile.json",
+    "top_level_keys": [
+      "schema_version",
+      "artifact_id",
+      "created_by",
+      "source_id",
+      "category",
+      "locator",
+      "title",
+      "publisher",
+      "accessed_at",
+      "availability",
+      "content_sha256",
+      "excerpts",
+      "continuity",
+      "spoiler_scope",
+      "limitations",
+      "trust_notes"
+    ],
+    "excerpt_keys": [
+      "Length"
+    ]
+  }
+]

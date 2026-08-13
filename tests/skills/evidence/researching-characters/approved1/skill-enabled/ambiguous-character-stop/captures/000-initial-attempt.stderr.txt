@@ -1,0 +1,11 @@
+Script failed
+Wall time 3.6 seconds
+Output:
+Script error:
+Exit code: 1
+Wall time: 3.3 seconds
+Output:
+error: Can't create the symlink for multishells at "<redacted-user-profile>\AppData\Local\fnm_multishells\46116_1786612189229". Maybe there are some issues with permissions for the directory? Access denied. (os error 5)
+Invoke-Expression: <redacted-user-profile>\Documents\WindowsPowerShell\Microsoft.PowerShell_profile.ps1:171
+Cannot bind argument to parameter 'Command' because it is an empty string.
+Set-Content: Access to the path 'D:\tmp\kokoroarc-m7-campaign-20260813-approved1\skill\ambiguous-character-stop\captures\001-read-skill.stderr.txt' is denied.

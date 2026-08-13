@@ -1,0 +1,5 @@
+Out-File:
+Line |
+   2 | Get-ChildItem -Force | Sort-Object Name | ForEach-Object { "{0}`t{1}` …
+     | ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+     | Access to the path 'D:\tmp\kokoroarc-m7-campaign-20260813-approved1\baseline\eligible-hybrid-handoff\captures\001-top-level.stderr.txt' is denied.

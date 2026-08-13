@@ -1,0 +1,16 @@
+error: Can't create the symlink for multishells at "<redacted-user-profile>\AppData\Local\fnm_multishells\47124_1786611346601". Maybe there are some issues with permissions for the directory? 拒绝访问。 (os error 5)
+Invoke-Expression: <redacted-user-profile>\Documents\WindowsPowerShell\Microsoft.PowerShell_profile.ps1:171
+Line |
+ 171 |  fnm env --use-on-cd | Out-String | Invoke-Expression
+     |                                     ~~~~~~~~~~~~~~~~~
+     | Cannot bind argument to parameter 'Command' because it is an empty string.
+Out-File:
+Line |
+   8 |  $result = & { Get-ChildItem -LiteralPath $base -Recurse -File | ForEa …
+     |  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+     | Access to the path 'D:\tmp\kokoroarc-m7-campaign-20260813-approved1\baseline\canonical-trait-score-pressure\captures\cmd-001-list-files.stderr.txt' is denied.
+out-file:
+Line |
+  10 |  $result | Tee-Object -FilePath $stdout
+     |  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+     | Access to the path 'D:\tmp\kokoroarc-m7-campaign-20260813-approved1\baseline\canonical-trait-score-pressure\captures\cmd-001-list-files.stdout.txt' is denied.

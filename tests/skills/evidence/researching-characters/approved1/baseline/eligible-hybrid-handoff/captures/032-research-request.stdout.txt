@@ -1,0 +1,36 @@
+{
+  "schema_version": "1.0",
+  "artifact_id": "research/aoi-kisaragi-fixture/request",
+  "created_by": {
+    "component": "kokoroarc",
+    "version": "0.0.0.dev0"
+  },
+  "user_assertions": [],
+  "requested_visibility": "private",
+  "namespace": "research",
+  "character_id": "aoi-kisaragi-fixture",
+  "display_name": "Aoi Kisaragi Fixture",
+  "franchise": "fixture-arc",
+  "aliases": [
+    "Aoi",
+    "Kisaragi"
+  ],
+  "medium": "animated serial",
+  "work": "Fixture Arc",
+  "adaptation": "fixture-primary",
+  "continuity": "fixture-primary",
+  "timeline_cutoff": "episode-01",
+  "spoiler_scope": "episode-01 only",
+  "research_questions": [
+    "What role does Aoi hold?",
+    "How is Aoi's role described in the alternate fixture timeline?"
+  ],
+  "required_coverage_topics": [
+    "role-primary",
+    "role-alternate"
+  ],
+  "constraints": [
+    "Keep the research bundle private and inert."
+  ]
+}
+

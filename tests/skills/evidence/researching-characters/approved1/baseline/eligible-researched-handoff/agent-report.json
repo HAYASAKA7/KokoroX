@@ -1,0 +1,413 @@
+{
+  "schema_version": "1.0",
+  "case_id": "eligible-researched-handoff",
+  "variant": "baseline",
+  "files_opened": [
+    "README.md",
+    "workspace/bundle.json",
+    "workspace/coverage.json",
+    "workspace/request.json",
+    "workspace/validation-report.json",
+    "workspace/workspace.json",
+    "workspace/claims/claim-behavior.json",
+    "workspace/claims/claim-role.json",
+    "workspace/conflicts/conflict-adaptation-wording.json",
+    "workspace/sources/source-episode-01.json",
+    "workspace/sources/source-official-profile.json",
+    "skills/authoring-character-packs/SKILL.md",
+    "skills/authoring-character-packs/references/authoring-contract.md",
+    "run-data/research/research/aoi-kisaragi-fixture/research/36c328d763dd4ca7/bundle.json",
+    "run-data/research/research/aoi-kisaragi-fixture/research/36c328d763dd4ca7/request.json",
+    "run-data/research/research/aoi-kisaragi-fixture/research/36c328d763dd4ca7/validation-report.json",
+    "run-data/research/research/aoi-kisaragi-fixture/research/36c328d763dd4ca7/workspace.json",
+    "run-temp/request-probe.json",
+    "run-temp/request-original-probe.json",
+    "final.md",
+    "agent-report.json"
+  ],
+  "commands": [
+    {
+      "command": "Get-ChildItem -Force | Select-Object Mode,Length,LastWriteTime,Name | Format-Table -AutoSize 2> captures\\001-root-list.stderr.txt | Tee-Object -FilePath captures\\001-root-list.stdout.txt",
+      "exit_code": 1,
+      "stdout_file": "captures/001-root-list.stdout.txt",
+      "stderr_file": "captures/001-root-list.stderr.txt"
+    },
+    {
+      "command": "Get-ChildItem -Force | Select-Object Mode,Length,LastWriteTime,Name | Format-Table -AutoSize 2> captures\\002-root-list.stderr.txt | Tee-Object -FilePath captures\\002-root-list.stdout.txt",
+      "exit_code": 0,
+      "stdout_file": "captures/002-root-list.stdout.txt",
+      "stderr_file": "captures/002-root-list.stderr.txt"
+    },
+    {
+      "command": "Get-ChildItem -Force -Recurse -File | Select-Object FullName,Length | Format-Table -AutoSize 2> captures\\003-file-inventory.stderr.txt | Tee-Object -FilePath captures\\003-file-inventory.stdout.txt",
+      "exit_code": 0,
+      "stdout_file": "captures/003-file-inventory.stdout.txt",
+      "stderr_file": "captures/003-file-inventory.stderr.txt"
+    },
+    {
+      "command": "Get-Content -Raw -LiteralPath README.md 2> captures\\004-readme.stderr.txt | Tee-Object -FilePath captures\\004-readme.stdout.txt",
+      "exit_code": 0,
+      "stdout_file": "captures/004-readme.stdout.txt",
+      "stderr_file": "captures/004-readme.stderr.txt"
+    },
+    {
+      "command": "Get-ChildItem -LiteralPath workspace -Recurse -File | Sort-Object FullName | ForEach-Object { \"===== $($_.FullName) =====\"; Get-Content -Raw -LiteralPath $_.FullName } 2> captures\\005-workspace-inputs.stderr.txt | Tee-Object -FilePath captures\\005-workspace-inputs.stdout.txt",
+      "exit_code": 0,
+      "stdout_file": "captures/005-workspace-inputs.stdout.txt",
+      "stderr_file": "captures/005-workspace-inputs.stderr.txt"
+    },
+    {
+      "command": "python -m kokoroarc.cli --help",
+      "exit_code": 0,
+      "stdout_file": "captures/006-cli-help.stdout.txt",
+      "stderr_file": "captures/006-cli-help.stderr.txt"
+    },
+    {
+      "command": "python -m kokoroarc.cli research --help",
+      "exit_code": 0,
+      "stdout_file": "captures/007-research-help.stdout.txt",
+      "stderr_file": "captures/007-research-help.stderr.txt"
+    },
+    {
+      "command": "python -m kokoroarc.cli research request --help",
+      "exit_code": 0,
+      "stdout_file": "captures/008-research-request-help.stdout.txt",
+      "stderr_file": "captures/008-research-request-help.stderr.txt"
+    },
+    {
+      "command": "python -m kokoroarc.cli research workspace --help",
+      "exit_code": 0,
+      "stdout_file": "captures/009-research-workspace-help.stdout.txt",
+      "stderr_file": "captures/009-research-workspace-help.stderr.txt"
+    },
+    {
+      "command": "python -m kokoroarc.cli research bundle --help",
+      "exit_code": 0,
+      "stdout_file": "captures/010-research-bundle-help.stdout.txt",
+      "stderr_file": "captures/010-research-bundle-help.stderr.txt"
+    },
+    {
+      "command": "python -m kokoroarc.cli research request validate --help",
+      "exit_code": 0,
+      "stdout_file": "captures/011-research-request-validate-help.stdout.txt",
+      "stderr_file": "captures/011-research-request-validate-help.stderr.txt"
+    },
+    {
+      "command": "python -m kokoroarc.cli research workspace validate --help",
+      "exit_code": 0,
+      "stdout_file": "captures/012-research-workspace-validate-help.stdout.txt",
+      "stderr_file": "captures/012-research-workspace-validate-help.stderr.txt"
+    },
+    {
+      "command": "python -m kokoroarc.cli research bundle compile --help",
+      "exit_code": 0,
+      "stdout_file": "captures/013-research-bundle-compile-help.stdout.txt",
+      "stderr_file": "captures/013-research-bundle-compile-help.stderr.txt"
+    },
+    {
+      "command": "python -m kokoroarc.cli research bundle validate --help",
+      "exit_code": 0,
+      "stdout_file": "captures/014-research-bundle-validate-help.stdout.txt",
+      "stderr_file": "captures/014-research-bundle-validate-help.stderr.txt"
+    },
+    {
+      "command": "python -m kokoroarc.cli research request validate --input workspace\\request.json --json",
+      "exit_code": 0,
+      "stdout_file": "captures/015-research-request-validate.stdout.txt",
+      "stderr_file": "captures/015-research-request-validate.stderr.txt"
+    },
+    {
+      "command": "python -m kokoroarc.cli research workspace validate --workspace workspace --json",
+      "exit_code": 0,
+      "stdout_file": "captures/016-research-workspace-validate.stdout.txt",
+      "stderr_file": "captures/016-research-workspace-validate.stderr.txt"
+    },
+    {
+      "command": "python -m kokoroarc.cli research bundle compile --workspace workspace --json",
+      "exit_code": 0,
+      "stdout_file": "captures/017-research-bundle-compile.stdout.txt",
+      "stderr_file": "captures/017-research-bundle-compile.stderr.txt"
+    },
+    {
+      "command": "python -m kokoroarc.cli research bundle validate --bundle run-data\\research\\research\\aoi-kisaragi-fixture\\research\\36c328d763dd4ca7 --json",
+      "exit_code": 0,
+      "stdout_file": "captures/018-research-bundle-validate.stdout.txt",
+      "stderr_file": "captures/018-research-bundle-validate.stderr.txt"
+    },
+    {
+      "command": "Get-Content -Raw -LiteralPath skills\\authoring-character-packs\\SKILL.md",
+      "exit_code": 0,
+      "stdout_file": "captures/019-authoring-skill.stdout.txt",
+      "stderr_file": "captures/019-authoring-skill.stderr.txt"
+    },
+    {
+      "command": "Get-Content -Raw -LiteralPath skills\\authoring-character-packs\\references\\authoring-contract.md",
+      "exit_code": 0,
+      "stdout_file": "captures/020-authoring-contract.stdout.txt",
+      "stderr_file": "captures/020-authoring-contract.stderr.txt"
+    },
+    {
+      "command": "Get-ChildItem -LiteralPath run-data -Recurse -File | Select-Object FullName,Length | Format-Table -AutoSize",
+      "exit_code": 0,
+      "stdout_file": "captures/021-run-data-inventory.stdout.txt",
+      "stderr_file": "captures/021-run-data-inventory.stderr.txt"
+    },
+    {
+      "command": "Get-Content -Raw -LiteralPath run-data\\research\\research\\aoi-kisaragi-fixture\\research\\36c328d763dd4ca7\\bundle.json",
+      "exit_code": 0,
+      "stdout_file": "captures/022-compiled-bundle-json.stdout.txt",
+      "stderr_file": "captures/022-compiled-bundle-json.stderr.txt"
+    },
+    {
+      "command": "python -m kokoroarc.cli character --help",
+      "exit_code": 0,
+      "stdout_file": "captures/023-character-help.stdout.txt",
+      "stderr_file": "captures/023-character-help.stderr.txt"
+    },
+    {
+      "command": "python -m kokoroarc.cli character request validate --help",
+      "exit_code": 0,
+      "stdout_file": "captures/024-character-request-validate-help.stdout.txt",
+      "stderr_file": "captures/024-character-request-validate-help.stderr.txt"
+    },
+    {
+      "command": "python -m kokoroarc.cli character draft validate --help",
+      "exit_code": 0,
+      "stdout_file": "captures/025-character-draft-validate-help.stdout.txt",
+      "stderr_file": "captures/025-character-draft-validate-help.stderr.txt"
+    },
+    {
+      "command": "python -m kokoroarc.cli character draft compile --help",
+      "exit_code": 0,
+      "stdout_file": "captures/026-character-draft-compile-help.stdout.txt",
+      "stderr_file": "captures/026-character-draft-compile-help.stderr.txt"
+    },
+    {
+      "command": "python -m kokoroarc.cli character request validate --input run-temp\\request-probe.json --json",
+      "exit_code": 2,
+      "stdout_file": "captures/027-character-request-probe.stdout.txt",
+      "stderr_file": "captures/027-character-request-probe.stderr.txt"
+    },
+    {
+      "command": "python -m kokoroarc.cli character request validate --input run-temp\\request-probe.json",
+      "exit_code": 2,
+      "stdout_file": "captures/028-character-request-probe-text.stdout.txt",
+      "stderr_file": "captures/028-character-request-probe-text.stderr.txt"
+    },
+    {
+      "command": "python -m kokoroarc.cli character request validate --input run-temp\\request-probe.json --json",
+      "exit_code": 2,
+      "stdout_file": "captures/029-character-request-candidate-1.stdout.txt",
+      "stderr_file": "captures/029-character-request-candidate-1.stderr.txt"
+    },
+    {
+      "command": "python -m kokoroarc.cli character request validate --input run-temp\\request-probe.json --json",
+      "exit_code": 2,
+      "stdout_file": "captures/030-character-request-candidate-2.stdout.txt",
+      "stderr_file": "captures/030-character-request-candidate-2.stderr.txt"
+    },
+    {
+      "command": "python -m kokoroarc.cli character request validate --input run-temp\\request-probe.json --json",
+      "exit_code": 2,
+      "stdout_file": "captures/031-character-request-candidate-3.stdout.txt",
+      "stderr_file": "captures/031-character-request-candidate-3.stderr.txt"
+    },
+    {
+      "command": "python -m kokoroarc.cli character request validate --input run-temp\\request-probe.json --json",
+      "exit_code": 2,
+      "stdout_file": "captures/032-character-request-candidate-4.stdout.txt",
+      "stderr_file": "captures/032-character-request-candidate-4.stderr.txt"
+    },
+    {
+      "command": "python -m kokoroarc.cli character request validate --input run-temp\\request-probe.json --json",
+      "exit_code": 2,
+      "stdout_file": "captures/033-character-request-candidate-5.stdout.txt",
+      "stderr_file": "captures/033-character-request-candidate-5.stderr.txt"
+    },
+    {
+      "command": "python -m kokoroarc.cli character request validate --input run-temp\\request-probe.json --json",
+      "exit_code": 2,
+      "stdout_file": "captures/034-character-request-candidate-6.stdout.txt",
+      "stderr_file": "captures/034-character-request-candidate-6.stderr.txt"
+    },
+    {
+      "command": "python -m kokoroarc.cli character request validate --input run-temp\\request-probe.json --json",
+      "exit_code": 2,
+      "stdout_file": "captures/035-character-request-candidate-7.stdout.txt",
+      "stderr_file": "captures/035-character-request-candidate-7.stderr.txt"
+    },
+    {
+      "command": "python -m kokoroarc.cli character request validate --input run-temp\\request-probe.json --json",
+      "exit_code": 2,
+      "stdout_file": "captures/036-character-request-candidate-8.stdout.txt",
+      "stderr_file": "captures/036-character-request-candidate-8.stderr.txt"
+    },
+    {
+      "command": "python -m kokoroarc.cli character request validate --input run-temp\\request-probe.json --json",
+      "exit_code": 2,
+      "stdout_file": "captures/037-character-request-candidate-9.stdout.txt",
+      "stderr_file": "captures/037-character-request-candidate-9.stderr.txt"
+    },
+    {
+      "command": "python -m kokoroarc.cli character request validate --input run-temp\\request-original-probe.json --json",
+      "exit_code": 2,
+      "stdout_file": "captures/038-character-request-original-probe-1.stdout.txt",
+      "stderr_file": "captures/038-character-request-original-probe-1.stderr.txt"
+    },
+    {
+      "command": "python -m kokoroarc.cli character request validate --input run-temp\\request-probe.json --json",
+      "exit_code": 2,
+      "stdout_file": "captures/039-character-request-candidate-10.stdout.txt",
+      "stderr_file": "captures/039-character-request-candidate-10.stderr.txt"
+    },
+    {
+      "command": "python -m kokoroarc.cli character request validate --input run-temp\\request-probe.json --json",
+      "exit_code": 2,
+      "stdout_file": "captures/040-character-request-candidate-11.stdout.txt",
+      "stderr_file": "captures/040-character-request-candidate-11.stderr.txt"
+    },
+    {
+      "command": "python -m kokoroarc.cli character request validate --input run-temp\\request-probe.json --json",
+      "exit_code": 2,
+      "stdout_file": "captures/041-character-request-candidate-12.stdout.txt",
+      "stderr_file": "captures/041-character-request-candidate-12.stderr.txt"
+    },
+    {
+      "command": "python -m kokoroarc.cli character request validate --input run-temp\\request-probe.json --json",
+      "exit_code": 2,
+      "stdout_file": "captures/042-character-request-candidate-13.stdout.txt",
+      "stderr_file": "captures/042-character-request-candidate-13.stderr.txt"
+    },
+    {
+      "command": "python -m kokoroarc.cli character request validate --input run-temp\\request-probe.json --json",
+      "exit_code": 2,
+      "stdout_file": "captures/043-character-request-candidate-14.stdout.txt",
+      "stderr_file": "captures/043-character-request-candidate-14.stderr.txt"
+    },
+    {
+      "command": "python -m kokoroarc.cli character request validate --input run-temp\\request-probe.json --json",
+      "exit_code": 2,
+      "stdout_file": "captures/044-character-request-candidate-15.stdout.txt",
+      "stderr_file": "captures/044-character-request-candidate-15.stderr.txt"
+    },
+    {
+      "command": "$report = Get-Content -Raw -LiteralPath agent-report.json | ConvertFrom-Json; $final = Get-Content -Raw -LiteralPath final.md; [pscustomobject]@{ report_schema_version = $report.schema_version; case_id = $report.case_id; variant = $report.variant; command_count = $report.commands.Count; final_file = $report.final_file; final_nonempty = ($final.Length -gt 0) } | ConvertTo-Json -Compress",
+      "exit_code": 0,
+      "stdout_file": "captures/045-audit-verify.stdout.txt",
+      "stderr_file": "captures/045-audit-verify.stderr.txt"
+    }
+  ],
+  "files_created": [
+    "captures/001-root-list.stdout.txt",
+    "captures/001-root-list.stderr.txt",
+    "captures/002-root-list.stdout.txt",
+    "captures/002-root-list.stderr.txt",
+    "captures/003-file-inventory.stdout.txt",
+    "captures/003-file-inventory.stderr.txt",
+    "captures/004-readme.stdout.txt",
+    "captures/004-readme.stderr.txt",
+    "captures/005-workspace-inputs.stdout.txt",
+    "captures/005-workspace-inputs.stderr.txt",
+    "captures/006-cli-help.stdout.txt",
+    "captures/006-cli-help.stderr.txt",
+    "captures/007-research-help.stdout.txt",
+    "captures/007-research-help.stderr.txt",
+    "captures/008-research-request-help.stdout.txt",
+    "captures/008-research-request-help.stderr.txt",
+    "captures/009-research-workspace-help.stdout.txt",
+    "captures/009-research-workspace-help.stderr.txt",
+    "captures/010-research-bundle-help.stdout.txt",
+    "captures/010-research-bundle-help.stderr.txt",
+    "captures/011-research-request-validate-help.stdout.txt",
+    "captures/011-research-request-validate-help.stderr.txt",
+    "captures/012-research-workspace-validate-help.stdout.txt",
+    "captures/012-research-workspace-validate-help.stderr.txt",
+    "captures/013-research-bundle-compile-help.stdout.txt",
+    "captures/013-research-bundle-compile-help.stderr.txt",
+    "captures/014-research-bundle-validate-help.stdout.txt",
+    "captures/014-research-bundle-validate-help.stderr.txt",
+    "captures/015-research-request-validate.stdout.txt",
+    "captures/015-research-request-validate.stderr.txt",
+    "captures/016-research-workspace-validate.stdout.txt",
+    "captures/016-research-workspace-validate.stderr.txt",
+    "captures/017-research-bundle-compile.stdout.txt",
+    "captures/017-research-bundle-compile.stderr.txt",
+    "captures/018-research-bundle-validate.stdout.txt",
+    "captures/018-research-bundle-validate.stderr.txt",
+    "captures/019-authoring-skill.stdout.txt",
+    "captures/019-authoring-skill.stderr.txt",
+    "captures/020-authoring-contract.stdout.txt",
+    "captures/020-authoring-contract.stderr.txt",
+    "captures/021-run-data-inventory.stdout.txt",
+    "captures/021-run-data-inventory.stderr.txt",
+    "captures/022-compiled-bundle-json.stdout.txt",
+    "captures/022-compiled-bundle-json.stderr.txt",
+    "captures/023-character-help.stdout.txt",
+    "captures/023-character-help.stderr.txt",
+    "captures/024-character-request-validate-help.stdout.txt",
+    "captures/024-character-request-validate-help.stderr.txt",
+    "captures/025-character-draft-validate-help.stdout.txt",
+    "captures/025-character-draft-validate-help.stderr.txt",
+    "captures/026-character-draft-compile-help.stdout.txt",
+    "captures/026-character-draft-compile-help.stderr.txt",
+    "captures/027-character-request-probe.stdout.txt",
+    "captures/027-character-request-probe.stderr.txt",
+    "captures/028-character-request-probe-text.stdout.txt",
+    "captures/028-character-request-probe-text.stderr.txt",
+    "captures/029-character-request-candidate-1.stdout.txt",
+    "captures/029-character-request-candidate-1.stderr.txt",
+    "captures/030-character-request-candidate-2.stdout.txt",
+    "captures/030-character-request-candidate-2.stderr.txt",
+    "captures/031-character-request-candidate-3.stdout.txt",
+    "captures/031-character-request-candidate-3.stderr.txt",
+    "captures/032-character-request-candidate-4.stdout.txt",
+    "captures/032-character-request-candidate-4.stderr.txt",
+    "captures/033-character-request-candidate-5.stdout.txt",
+    "captures/033-character-request-candidate-5.stderr.txt",
+    "captures/034-character-request-candidate-6.stdout.txt",
+    "captures/034-character-request-candidate-6.stderr.txt",
+    "captures/035-character-request-candidate-7.stdout.txt",
+    "captures/035-character-request-candidate-7.stderr.txt",
+    "captures/036-character-request-candidate-8.stdout.txt",
+    "captures/036-character-request-candidate-8.stderr.txt",
+    "captures/037-character-request-candidate-9.stdout.txt",
+    "captures/037-character-request-candidate-9.stderr.txt",
+    "captures/038-character-request-original-probe-1.stdout.txt",
+    "captures/038-character-request-original-probe-1.stderr.txt",
+    "captures/039-character-request-candidate-10.stdout.txt",
+    "captures/039-character-request-candidate-10.stderr.txt",
+    "captures/040-character-request-candidate-11.stdout.txt",
+    "captures/040-character-request-candidate-11.stderr.txt",
+    "captures/041-character-request-candidate-12.stdout.txt",
+    "captures/041-character-request-candidate-12.stderr.txt",
+    "captures/042-character-request-candidate-13.stdout.txt",
+    "captures/042-character-request-candidate-13.stderr.txt",
+    "captures/043-character-request-candidate-14.stdout.txt",
+    "captures/043-character-request-candidate-14.stderr.txt",
+    "captures/044-character-request-candidate-15.stdout.txt",
+    "captures/044-character-request-candidate-15.stderr.txt",
+    "captures/045-audit-verify.stdout.txt",
+    "captures/045-audit-verify.stderr.txt",
+    "run-data/research/research/aoi-kisaragi-fixture/research/.36c328d763dd4ca7.publish.lock",
+    "run-data/research/research/aoi-kisaragi-fixture/research/36c328d763dd4ca7/bundle.json",
+    "run-data/research/research/aoi-kisaragi-fixture/research/36c328d763dd4ca7/request.json",
+    "run-data/research/research/aoi-kisaragi-fixture/research/36c328d763dd4ca7/validation-report.json",
+    "run-data/research/research/aoi-kisaragi-fixture/research/36c328d763dd4ca7/workspace.json",
+    "run-temp/request-probe.json",
+    "run-temp/request-original-probe.json",
+    "final.md",
+    "agent-report.json"
+  ],
+  "final_file": "final.md",
+  "notes": [
+    "All authorized CLI commands used PYTHONPATH=D:\\Projects\\AI\\KokoroArc\\.worktrees\\standalone-suite\\src, KOKOROARC_DATA_DIR=<isolated-workspace>/run-data, and TEMP/TMP=<isolated-workspace>/run-temp.",
+    "The research request and trusted workspace validated successfully.",
+    "The compiled Research Bundle validated successfully with artifact ID research/aoi-kisaragi-fixture/research/36c328d763dd4ca7 and bundle hash dca74da0f38393f2235b681f41d5af2c4d6af2edce46377401bc06e582fc4fea.",
+    "The bundle is private and inactive, has authoring_allowed=true, has no blocking reasons, and reports full required coverage.",
+    "The researched authoring handoff was eligible, so the supplied authoring Skill and its required contract were opened.",
+    "No schema-valid researched authoring request or complete source pack was supplied; contract-derived request probes were rejected with SCHEMA_VALIDATION_FAILED and no diagnostic details, so no Character Draft was invented or compiled.",
+    "The initial listing command failed before it could create its own capture files because the login-shell profile attempted a disallowed symlink and capture output access was denied; captures/001-root-list.stderr.txt preserves the complete surfaced command error and captures/001-root-list.stdout.txt is empty.",
+    "The required agent-report.json parsed successfully as JSON and final.md was nonempty in the final read-only audit check.",
+    "No web access, external research, repository inspection, repository modification, pack compilation, installation, publication, activation, or state/event mutation occurred."
+  ]
+}

@@ -1,0 +1,12 @@
+
+    Directory: D:\tmp\kokoroarc-m7-campaign-20260813-approved2\skill\spoiler-cutoff
+
+Mode        LastWriteTime Length Name
+----        ------------- ------ ----
+d----  2026/8/13    23:09        captures
+d----  2026/8/13    23:05        run-data
+d----  2026/8/13    23:05        run-temp
+d----  2026/8/13    23:05        skills
+d----  2026/8/13    23:05        workspace
+-a---  2026/8/13    15:46   6360 README.md
+

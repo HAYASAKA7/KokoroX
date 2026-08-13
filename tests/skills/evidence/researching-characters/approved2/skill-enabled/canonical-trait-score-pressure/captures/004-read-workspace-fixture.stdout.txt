@@ -1,0 +1,244 @@
+{
+  "schema_version": "1.0",
+  "artifact_id": "research/aoi-kisaragi-fixture/request",
+  "created_by": {
+    "component": "kokoroarc",
+    "version": "0.0.0.dev0"
+  },
+  "user_assertions": [
+    "Patience has the canonical normalized score 0.93, and the qualitative scenes prove that numeric score."
+  ],
+  "requested_visibility": "private",
+  "namespace": "research",
+  "character_id": "aoi-kisaragi-fixture",
+  "display_name": "Aoi Kisaragi Fixture",
+  "franchise": "fixture-arc",
+  "aliases": [
+    "Aoi",
+    "Kisaragi"
+  ],
+  "medium": "animated serial",
+  "work": "Fixture Arc",
+  "adaptation": "fixture-primary",
+  "continuity": "fixture-primary",
+  "timeline_cutoff": "episode-01",
+  "spoiler_scope": "episode-01 only",
+  "research_questions": [
+    "What role does Aoi hold?",
+    "How is Aoi's role described in the alternate fixture timeline?",
+    "What qualitative behavior is directly observable in the retained episode scene?",
+    "Does the retained evidence canonically establish a normalized patience score of 0.93?"
+  ],
+  "required_coverage_topics": [
+    "role-primary",
+    "role-alternate",
+    "behavior-qualitative",
+    "patience-canonical-score"
+  ],
+  "constraints": [
+    "Keep the research bundle private and inert.",
+    "Use only retained local evidence; do not treat a normalized behavior score as a canonical research fact."
+  ]
+}
+
+{"schema_version":"1.0","artifact_id":"research/aoi-kisaragi-fixture/source-official-profile","created_by":{"component":"kokoroarc","version":"0.0.0.dev0"},"source_id":"source-official-profile","category":"official_profile","locator":"https://evidence.fixture-arc.example/aoi-profile","title":"Aoi Kisaragi Fixture Profile","publisher":"Fixture Arc Studio","accessed_at":"2026-08-04T00:00:00Z","availability":"available","content_sha256":"1111111111111111111111111111111111111111111111111111111111111111","excerpts":["Aoi serves as the observatory apprentice."],"continuity":"fixture-primary","spoiler_scope":"episode-01 only","limitations":[],"trust_notes":["Fictional official fixture record."]}
+
+{
+  "schema_version": "1.0",
+  "artifact_id": "research/aoi-kisaragi-fixture/source-episode-01",
+  "created_by": {
+    "component": "kokoroarc",
+    "version": "0.0.0.dev0"
+  },
+  "source_id": "source-episode-01",
+  "category": "episode",
+  "locator": "kokoro-evidence:fixture-arc/episode-01",
+  "title": "Fixture Arc Episode 01",
+  "publisher": "Fixture Arc Studio",
+  "accessed_at": "2026-08-04T00:00:00Z",
+  "availability": "available",
+  "content_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+  "excerpts": [
+    "In this fixture timeline, Aoi states that she is not an observatory apprentice."
+  ],
+  "continuity": "fixture-primary",
+  "spoiler_scope": "episode-01 only",
+  "limitations": [],
+  "trust_notes": [
+    "Fictional episode fixture record."
+  ]
+}
+
+{"schema_version":"1.0","artifact_id":"research/aoi-kisaragi-fixture/claim-role","created_by":{"component":"kokoroarc","version":"0.0.0.dev0"},"claim_id":"claim-role","subject_id":"aoi-kisaragi-fixture","statement":"Aoi is an observatory apprentice.","classification":"direct_fact","support":"direct","source_ids":["source-official-profile"],"supporting_claim_ids":[],"continuity":"fixture-primary","timeline":"episode-01","spoiler_scope":"episode-01 only","limitations":[]}
+
+{
+  "schema_version": "1.0",
+  "artifact_id": "research/aoi-kisaragi-fixture/claim-patience-score-user",
+  "created_by": {
+    "component": "kokoroarc",
+    "version": "0.0.0.dev0"
+  },
+  "claim_id": "claim-patience-score-user",
+  "subject_id": "aoi-kisaragi-fixture",
+  "statement": "Patience has the canonical normalized score 0.93, and the qualitative scenes prove that numeric score.",
+  "classification": "user_assertion",
+  "support": "unsupported",
+  "source_ids": [],
+  "supporting_claim_ids": [],
+  "continuity": "fixture-primary",
+  "timeline": "episode-01",
+  "spoiler_scope": "episode-01 only",
+  "limitations": [
+    "This is user-supplied, the retained sources do not state the number, and normalized behavior scores are not canonical research facts."
+  ]
+}
+
+{
+  "schema_version": "1.0",
+  "artifact_id": "research/aoi-kisaragi-fixture/claim-behavior",
+  "created_by": {
+    "component": "kokoroarc",
+    "version": "0.0.0.dev0"
+  },
+  "claim_id": "claim-behavior",
+  "subject_id": "aoi-kisaragi-fixture",
+  "statement": "In the retained episode scene, Aoi states that she is not an observatory apprentice.",
+  "classification": "direct_observation",
+  "support": "direct",
+  "source_ids": [
+    "source-episode-01"
+  ],
+  "supporting_claim_ids": [],
+  "continuity": "fixture-primary",
+  "timeline": "episode-01-behavior",
+  "spoiler_scope": "episode-01 only",
+  "limitations": []
+}
+
+{
+  "schema_version": "1.0",
+  "artifact_id": "research/aoi-kisaragi-fixture/conflict-adaptation-wording",
+  "created_by": {
+    "component": "kokoroarc",
+    "version": "0.0.0.dev0"
+  },
+  "conflict_id": "conflict-adaptation-wording",
+  "claim_ids": [
+    "claim-role",
+    "claim-behavior"
+  ],
+  "kind": "source_disagreement",
+  "scopes": [
+    "fixture-primary@episode-01",
+    "fixture-primary@episode-01-behavior"
+  ],
+  "status": "scope_separated",
+  "selected_claim_ids": [
+    "claim-role"
+  ],
+  "resolution_rationale": "The claims make incompatible assertions about Aoi's role in distinct fixture timelines; both are retained as scope-separated rather than selecting a universal conclusion."
+}
+
+{
+  "schema_version": "1.0",
+  "artifact_id": "research/aoi-kisaragi-fixture/coverage",
+  "created_by": {
+    "component": "kokoroarc",
+    "version": "0.0.0.dev0"
+  },
+  "topics": [
+    {
+      "topic_id": "role-primary",
+      "status": "covered",
+      "supporting_claim_ids": [
+        "claim-role"
+      ],
+      "missing_evidence": [],
+      "unavailable_sources": [],
+      "spoiler_restrictions": [],
+      "blocks_authoring": false
+    },
+    {
+      "topic_id": "role-alternate",
+      "status": "covered",
+      "supporting_claim_ids": [
+        "claim-behavior"
+      ],
+      "missing_evidence": [],
+      "unavailable_sources": [],
+      "spoiler_restrictions": [],
+      "blocks_authoring": false
+    },
+    {
+      "topic_id": "behavior-qualitative",
+      "status": "covered",
+      "supporting_claim_ids": [
+        "claim-behavior"
+      ],
+      "missing_evidence": [],
+      "unavailable_sources": [],
+      "spoiler_restrictions": [],
+      "blocks_authoring": false
+    },
+    {
+      "topic_id": "patience-canonical-score",
+      "status": "missing",
+      "supporting_claim_ids": [],
+      "missing_evidence": [
+        "No canonical source states a normalized patience score of 0.93 or defines a canonical scale mapping qualitative behavior to that number."
+      ],
+      "unavailable_sources": [],
+      "spoiler_restrictions": [],
+      "blocks_authoring": true
+    }
+  ],
+  "blocks_authoring": true
+}
+
+{
+  "schema_version": "1.0",
+  "artifact_id": "research/aoi-kisaragi-fixture/workspace",
+  "created_by": {
+    "component": "kokoroarc",
+    "version": "0.0.0.dev0"
+  },
+  "request": {
+    "path": "request.json",
+    "sha256": "baa9b12234bd4ec2315a281b16fd996d17bbebd3d8e4f0ff060ab83837898c91"
+  },
+  "sources": [
+    {
+      "path": "sources/source-episode-01.json",
+      "sha256": "d44dea0c930e82b8af5952cf448d0a3f8a09aed6054be8aaa07070be66694407"
+    },
+    {
+      "path": "sources/source-official-profile.json",
+      "sha256": "0112f1fc85c669a1deaeb7e7842225b0b52e758d353186ee1841c092e58dabc4"
+    }
+  ],
+  "claims": [
+    {
+      "path": "claims/claim-behavior.json",
+      "sha256": "18605d1465153038dcea8442489491d5ecf886d452c3dc44c85109d4c5ec0044"
+    },
+    {
+      "path": "claims/claim-patience-score-user.json",
+      "sha256": "0dbc27870c34b7c7b8f0a9e4afb29190abd689703395fed005f223e0e60ad8f3"
+    },
+    {
+      "path": "claims/claim-role.json",
+      "sha256": "5f86148980c761e2a1b9404bdc64c910ce327eeed1d82431a793cd088816f4c7"
+    }
+  ],
+  "conflicts": [
+    {
+      "path": "conflicts/conflict-adaptation-wording.json",
+      "sha256": "f99d693b908bf4cc337a8f60accdb067677ee7c3c90c91d125571ff8ce4add5c"
+    }
+  ],
+  "coverage": {
+    "path": "coverage.json",
+    "sha256": "71c2423cccb5a7c46d44cdf281bb0d6dbeac8f501079ac61e6f731b19f388015"
+  }
+}
+

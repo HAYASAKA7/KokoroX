@@ -1,0 +1,10 @@
+json_valid=true
+schema_version=1.0
+case_id=eligible-hybrid-handoff
+variant=skill-enabled
+missing_required_fields=
+missing_command_captures=
+final_file=final.md
+final_exists=True
+final_ends_unresolved_none=true
+final_sha256=4983e515b621844d5876e2a66e675b61ce9d6441173cc44df13a43fa0377fc68

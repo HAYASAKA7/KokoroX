@@ -1,0 +1,65 @@
+{
+  "root": "D:\\tmp\\kokoroarc-m7-campaign-20260813-approved2\\skill\\spoiler-cutoff\\run-data",
+  "items": [
+    {
+      "path": "research",
+      "type": "directory",
+      "length": null,
+      "sha256": null
+    },
+    {
+      "path": "research\\research",
+      "type": "directory",
+      "length": null,
+      "sha256": null
+    },
+    {
+      "path": "research\\research\\aoi-kisaragi-fixture",
+      "type": "directory",
+      "length": null,
+      "sha256": null
+    },
+    {
+      "path": "research\\research\\aoi-kisaragi-fixture\\research",
+      "type": "directory",
+      "length": null,
+      "sha256": null
+    },
+    {
+      "path": "research\\research\\aoi-kisaragi-fixture\\research\\.36c328d763dd4ca7.publish.lock",
+      "type": "file",
+      "length": 1,
+      "sha256": "6e340b9cffb37a989ca544e6bb780a2c78901d3fb33738768511a30617afa01d"
+    },
+    {
+      "path": "research\\research\\aoi-kisaragi-fixture\\research\\36c328d763dd4ca7",
+      "type": "directory",
+      "length": null,
+      "sha256": null
+    },
+    {
+      "path": "research\\research\\aoi-kisaragi-fixture\\research\\36c328d763dd4ca7\\bundle.json",
+      "type": "file",
+      "length": 4414,
+      "sha256": "3e94ed0bc09cf8c43e656a370eecea3259b33f40a5238187ad40a7e605f4d2e6"
+    },
+    {
+      "path": "research\\research\\aoi-kisaragi-fixture\\research\\36c328d763dd4ca7\\request.json",
+      "type": "file",
+      "length": 762,
+      "sha256": "31d95854360b1ac6c03d39d924fd036edbb3219985a4df39cbf1acfcf40d4946"
+    },
+    {
+      "path": "research\\research\\aoi-kisaragi-fixture\\research\\36c328d763dd4ca7\\validation-report.json",
+      "type": "file",
+      "length": 315,
+      "sha256": "64f885a30aa4d73f3eb5afc04e43947414308ca32efd2c22ec8774f3b31503ed"
+    },
+    {
+      "path": "research\\research\\aoi-kisaragi-fixture\\research\\36c328d763dd4ca7\\workspace.json",
+      "type": "file",
+      "length": 4355,
+      "sha256": "9dec6338b74efb80e2cc6ac92d51b38721cc664594f0c29fbc8f85e3c15d9124"
+    }
+  ]
+}

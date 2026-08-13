@@ -1,0 +1,1 @@
+ParserError: the initial final-artifact command could not parse the smart apostrophe in the first final.md line; exit code 1. No final.md or agent-report.json was written by that attempt.

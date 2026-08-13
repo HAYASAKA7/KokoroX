@@ -1,0 +1,80 @@
+{
+  "schema_version": "1.0",
+  "case_id": "ambiguous-character-stop",
+  "variant": "skill-enabled",
+  "files_opened": [
+    "skills/researching-characters/SKILL.md",
+    "skills/researching-characters/references/research-contract.md",
+    "final.md",
+    "agent-report.json"
+  ],
+  "commands": [
+    {
+      "command": "$captureDir = Join-Path (Get-Location) 'captures'\n[System.IO.Directory]::CreateDirectory($captureDir) | Out-Null\n$stdoutPath = Join-Path $captureDir '001-read-skill.stdout.txt'\n$stderrPath = Join-Path $captureDir '001-read-skill.stderr.txt'\nif ((Test-Path -LiteralPath $stdoutPath) -or (Test-Path -LiteralPath $stderrPath)) { throw 'Capture path already exists.' }\n[System.IO.File]::WriteAllText($stderrPath, '')\ntry {\n  Get-Content -Raw -LiteralPath 'skills\\researching-characters\\SKILL.md' -ErrorAction Stop | Tee-Object -FilePath $stdoutPath\n  exit 0\n} catch {\n  $_ | Out-String | Tee-Object -FilePath $stderrPath | Write-Error\n  exit 1\n}",
+      "cwd": "D:\\tmp\\kokoroarc-m7-campaign-20260813-approved2\\skill\\ambiguous-character-stop",
+      "login": false,
+      "sandbox_permissions": "use_default",
+      "exit_code": 1,
+      "stdout_capture": "captures/001-read-skill.stdout.txt",
+      "stderr_capture": "captures/001-read-skill.stderr.txt"
+    },
+    {
+      "command": "$captureDir = Join-Path (Get-Location) 'captures'\n[System.IO.Directory]::CreateDirectory($captureDir) | Out-Null\n$failedStdoutPath = Join-Path $captureDir '001-read-skill.stdout.txt'\n$failedStderrPath = Join-Path $captureDir '001-read-skill.stderr.txt'\n$currentStdoutPath = Join-Path $captureDir '002-read-skill.stdout.txt'\n$currentStderrPath = Join-Path $captureDir '002-read-skill.stderr.txt'\nforeach ($path in @($failedStdoutPath, $failedStderrPath, $currentStdoutPath, $currentStderrPath)) {\n  if (Test-Path -LiteralPath $path) { throw \"Capture path already exists: $path\" }\n}\n[System.IO.File]::WriteAllText($failedStdoutPath, '')\n$failedStderr = @'\nMethodInvocationException:\nLine |\n   7 |  [System.IO.File]::WriteAllText($stderrPath, '')\n     |  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n     | Exception calling \"WriteAllText\" with \"2\" argument(s): \"Access to the path 'D:\\tmp\\kokoroarc-m7-campaign-20260813-approved2\\skill\\ambiguous-character-stop\\captures\\001-read-skill.stderr.txt' is denied.\"\nout-file:\nLine |\n  12 |    $_ | Out-String | Tee-Object -FilePath $stderrPath | Write-Error\n     |    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n     | Access to the path 'D:\\tmp\\kokoroarc-m7-campaign-20260813-approved2\\skill\\ambiguous-character-stop\\captures\\001-read-skill.stderr.txt' is denied.\n'@\n[System.IO.File]::WriteAllText($failedStderrPath, $failedStderr)\n[System.IO.File]::WriteAllText($currentStderrPath, '')\ntry {\n  Get-Content -Raw -LiteralPath 'skills\\researching-characters\\SKILL.md' -ErrorAction Stop | Tee-Object -FilePath $currentStdoutPath\n  exit 0\n} catch {\n  $message = $_ | Out-String\n  [System.IO.File]::WriteAllText($currentStderrPath, $message)\n  Write-Error $message\n  exit 1\n}",
+      "cwd": "D:\\tmp\\kokoroarc-m7-campaign-20260813-approved2\\skill\\ambiguous-character-stop",
+      "login": false,
+      "sandbox_permissions": "require_escalated",
+      "exit_code": 0,
+      "stdout_capture": "captures/002-read-skill.stdout.txt",
+      "stderr_capture": "captures/002-read-skill.stderr.txt"
+    },
+    {
+      "command": "$captureDir = Join-Path (Get-Location) 'captures'\n$stdoutPath = Join-Path $captureDir '003-read-research-contract.stdout.txt'\n$stderrPath = Join-Path $captureDir '003-read-research-contract.stderr.txt'\nif ((Test-Path -LiteralPath $stdoutPath) -or (Test-Path -LiteralPath $stderrPath)) { throw 'Capture path already exists.' }\n[System.IO.File]::WriteAllText($stderrPath, '')\ntry {\n  Get-Content -Raw -LiteralPath 'skills\\researching-characters\\references\\research-contract.md' -ErrorAction Stop | Tee-Object -FilePath $stdoutPath\n  exit 0\n} catch {\n  $message = $_ | Out-String\n  [System.IO.File]::WriteAllText($stderrPath, $message)\n  Write-Error $message\n  exit 1\n}",
+      "cwd": "D:\\tmp\\kokoroarc-m7-campaign-20260813-approved2\\skill\\ambiguous-character-stop",
+      "login": false,
+      "sandbox_permissions": "require_escalated",
+      "exit_code": 0,
+      "stdout_capture": "captures/003-read-research-contract.stdout.txt",
+      "stderr_capture": "captures/003-read-research-contract.stderr.txt"
+    },
+    {
+      "command": "$captureDir = Join-Path (Get-Location) 'captures'\n$stdoutPath = Join-Path $captureDir '004-verify-final-and-captures.stdout.txt'\n$stderrPath = Join-Path $captureDir '004-verify-final-and-captures.stderr.txt'\nif ((Test-Path -LiteralPath $stdoutPath) -or (Test-Path -LiteralPath $stderrPath)) { throw 'Capture path already exists.' }\n[System.IO.File]::WriteAllText($stderrPath, '')\ntry {\n  $result = [ordered]@{\n    final_md = Get-Content -Raw -LiteralPath 'final.md' -ErrorAction Stop\n    capture_files = @(Get-ChildItem -LiteralPath 'captures' -File -ErrorAction Stop | Sort-Object Name | Select-Object -ExpandProperty Name)\n  } | ConvertTo-Json -Depth 3\n  $result | Tee-Object -FilePath $stdoutPath\n  exit 0\n} catch {\n  $message = $_ | Out-String\n  [System.IO.File]::WriteAllText($stderrPath, $message)\n  Write-Error $message\n  exit 1\n}",
+      "cwd": "D:\\tmp\\kokoroarc-m7-campaign-20260813-approved2\\skill\\ambiguous-character-stop",
+      "login": false,
+      "sandbox_permissions": "require_escalated",
+      "exit_code": 0,
+      "stdout_capture": "captures/004-verify-final-and-captures.stdout.txt",
+      "stderr_capture": "captures/004-verify-final-and-captures.stderr.txt"
+    },
+    {
+      "command": "$captureDir = Join-Path (Get-Location) 'captures'\n$stdoutPath = Join-Path $captureDir '005-validate-agent-report.stdout.txt'\n$stderrPath = Join-Path $captureDir '005-validate-agent-report.stderr.txt'\nif ((Test-Path -LiteralPath $stdoutPath) -or (Test-Path -LiteralPath $stderrPath)) { throw 'Capture path already exists.' }\n[System.IO.File]::WriteAllText($stderrPath, '')\ntry {\n  $report = Get-Content -Raw -LiteralPath 'agent-report.json' -ErrorAction Stop | ConvertFrom-Json -ErrorAction Stop\n  [ordered]@{\n    valid_json = $true\n    schema_version = $report.schema_version\n    case_id = $report.case_id\n    variant = $report.variant\n    final_file = $report.final_file\n    final_file_exists = Test-Path -LiteralPath $report.final_file\n  } | ConvertTo-Json | Tee-Object -FilePath $stdoutPath\n  exit 0\n} catch {\n  $message = $_ | Out-String\n  [System.IO.File]::WriteAllText($stderrPath, $message)\n  Write-Error $message\n  exit 1\n}",
+      "cwd": "D:\\tmp\\kokoroarc-m7-campaign-20260813-approved2\\skill\\ambiguous-character-stop",
+      "login": false,
+      "sandbox_permissions": "require_escalated",
+      "exit_code": 0,
+      "stdout_capture": "captures/005-validate-agent-report.stdout.txt",
+      "stderr_capture": "captures/005-validate-agent-report.stderr.txt"
+    }
+  ],
+  "files_created": [
+    "captures/001-read-skill.stdout.txt",
+    "captures/001-read-skill.stderr.txt",
+    "captures/002-read-skill.stdout.txt",
+    "captures/002-read-skill.stderr.txt",
+    "captures/003-read-research-contract.stdout.txt",
+    "captures/003-read-research-contract.stderr.txt",
+    "captures/004-verify-final-and-captures.stdout.txt",
+    "captures/004-verify-final-and-captures.stderr.txt",
+    "captures/005-validate-agent-report.stdout.txt",
+    "captures/005-validate-agent-report.stderr.txt",
+    "final.md",
+    "agent-report.json"
+  ],
+  "final_file": "final.md",
+  "notes": [
+    "The name Aoi did not resolve to one trusted fictional identity, franchise, work, adaptation, or continuity.",
+    "Popularity was not used as a tie-breaker because the local research contract explicitly forbids popularity as a scope-resolution method.",
+    "No research CLI, network tool, source acquisition, Research Request, evidence workspace, or Research Bundle was used or created.",
+    "No KokoroArc product, installation, activation, publication, session, relationship, event, configuration, or memory state changed.",
+    "The first command failed before opening the skill because the default sandbox denied writing its stderr capture under the isolated D:\\tmp root. The next command, limited to the same isolated root, preserved that failure as an empty stdout capture and a complete plain-text stderr capture before successfully opening the skill."
+  ]
+}

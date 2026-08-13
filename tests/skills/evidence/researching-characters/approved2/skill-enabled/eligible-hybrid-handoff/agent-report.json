@@ -1,0 +1,275 @@
+{
+  "schema_version": "1.0",
+  "case_id": "eligible-hybrid-handoff",
+  "variant": "skill-enabled",
+  "environment": {
+    "os": "Windows",
+    "shell": "PowerShell",
+    "cwd": "D:\\tmp\\kokoroarc-m7-campaign-20260813-approved2\\skill\\eligible-hybrid-handoff",
+    "case_root": "D:\\tmp\\kokoroarc-m7-campaign-20260813-approved2\\skill\\eligible-hybrid-handoff",
+    "pythonpath": "D:\\Projects\\AI\\KokoroArc\\.worktrees\\standalone-suite\\src",
+    "kokoroarc_data_dir": "D:\\tmp\\kokoroarc-m7-campaign-20260813-approved2\\skill\\eligible-hybrid-handoff\\run-data",
+    "temp": "D:\\tmp\\kokoroarc-m7-campaign-20260813-approved2\\skill\\eligible-hybrid-handoff\\run-temp",
+    "tmp": "D:\\tmp\\kokoroarc-m7-campaign-20260813-approved2\\skill\\eligible-hybrid-handoff\\run-temp",
+    "kokoroarc_temp_dir": "D:\\tmp\\kokoroarc-m7-campaign-20260813-approved2\\skill\\eligible-hybrid-handoff\\run-temp",
+    "network_access_used": false,
+    "repository_source_accessed": false,
+    "subagents_used": false
+  },
+  "files_opened": [
+    "README.md",
+    "skills/researching-characters/SKILL.md",
+    "skills/researching-characters/references/research-contract.md",
+    "workspace/request.json",
+    "workspace/sources/source-episode-01.json",
+    "workspace/sources/source-official-profile.json",
+    "workspace/claims/claim-behavior.json",
+    "workspace/claims/claim-role.json",
+    "workspace/conflicts/conflict-adaptation-wording.json",
+    "workspace/coverage.json",
+    "workspace/workspace.json",
+    "workspace/validation-report.json",
+    "workspace/bundle.json",
+    "skills/authoring-character-packs/SKILL.md",
+    "skills/authoring-character-packs/references/authoring-contract.md",
+    "run-data/research/research/aoi-kisaragi-fixture/research/36c328d763dd4ca7/bundle.json",
+    "run-data/research/research/aoi-kisaragi-fixture/research/36c328d763dd4ca7/request.json",
+    "run-data/research/research/aoi-kisaragi-fixture/research/36c328d763dd4ca7/validation-report.json",
+    "run-data/research/research/aoi-kisaragi-fixture/research/36c328d763dd4ca7/workspace.json",
+    "final.md",
+    "agent-report.json"
+  ],
+  "commands": [
+    {
+      "command": "Get-Content",
+      "argv": ["Get-Content", "-LiteralPath", "README.md", "-Raw"],
+      "cwd": "D:\\tmp\\kokoroarc-m7-campaign-20260813-approved2\\skill\\eligible-hybrid-handoff",
+      "exit_code": 0,
+      "stdout_capture": "captures/001-readme.stdout.txt",
+      "stderr_capture": "captures/001-readme.stderr.txt"
+    },
+    {
+      "command": "Get-ChildItem",
+      "argv": ["Get-ChildItem", "-Force", "-Recurse"],
+      "cwd": "D:\\tmp\\kokoroarc-m7-campaign-20260813-approved2\\skill\\eligible-hybrid-handoff",
+      "exit_code": 0,
+      "stdout_capture": "captures/002-tree.stdout.txt",
+      "stderr_capture": "captures/002-tree.stderr.txt"
+    },
+    {
+      "command": "Get-Content",
+      "argv": ["Get-Content", "-LiteralPath", "skills/researching-characters/SKILL.md", "-Raw"],
+      "cwd": "D:\\tmp\\kokoroarc-m7-campaign-20260813-approved2\\skill\\eligible-hybrid-handoff",
+      "exit_code": 0,
+      "stdout_capture": "captures/003-research-skill.stdout.txt",
+      "stderr_capture": "captures/003-research-skill.stderr.txt"
+    },
+    {
+      "command": "Get-Content",
+      "argv": ["Get-Content", "-LiteralPath", "skills/researching-characters/references/research-contract.md", "-Raw"],
+      "cwd": "D:\\tmp\\kokoroarc-m7-campaign-20260813-approved2\\skill\\eligible-hybrid-handoff",
+      "exit_code": 0,
+      "stdout_capture": "captures/004-research-contract.stdout.txt",
+      "stderr_capture": "captures/004-research-contract.stderr.txt"
+    },
+    {
+      "command": "python",
+      "argv": ["python", "-m", "kokoroarc.cli", "research", "request", "validate", "--input", "D:\\tmp\\kokoroarc-m7-campaign-20260813-approved2\\skill\\eligible-hybrid-handoff\\workspace\\request.json", "--json"],
+      "cwd": "D:\\tmp\\kokoroarc-m7-campaign-20260813-approved2\\skill\\eligible-hybrid-handoff",
+      "exit_code": 0,
+      "stdout_capture": "captures/005-request-validate-1.stdout.txt",
+      "stderr_capture": "captures/005-request-validate-1.stderr.txt"
+    },
+    {
+      "command": "python",
+      "argv": ["python", "-m", "kokoroarc.cli", "research", "request", "validate", "--input", "D:\\tmp\\kokoroarc-m7-campaign-20260813-approved2\\skill\\eligible-hybrid-handoff\\workspace\\request.json", "--json"],
+      "cwd": "D:\\tmp\\kokoroarc-m7-campaign-20260813-approved2\\skill\\eligible-hybrid-handoff",
+      "exit_code": 0,
+      "stdout_capture": "captures/006-request-validate-2.stdout.txt",
+      "stderr_capture": "captures/006-request-validate-2.stderr.txt"
+    },
+    {
+      "command": "Compare-CaptureBytes",
+      "argv": ["captures/005-request-validate-1.stdout.txt", "captures/006-request-validate-2.stdout.txt", "captures/005-request-validate-1.stderr.txt", "captures/006-request-validate-2.stderr.txt"],
+      "cwd": "D:\\tmp\\kokoroarc-m7-campaign-20260813-approved2\\skill\\eligible-hybrid-handoff",
+      "exit_code": 0,
+      "stdout_capture": "captures/007-request-compare.stdout.txt",
+      "stderr_capture": "captures/007-request-compare.stderr.txt"
+    },
+    {
+      "command": "Read-WorkspaceFiles",
+      "argv": ["Get-ChildItem", "workspace", "-Recurse", "-File"],
+      "cwd": "D:\\tmp\\kokoroarc-m7-campaign-20260813-approved2\\skill\\eligible-hybrid-handoff",
+      "exit_code": 0,
+      "stdout_capture": "captures/008-workspace-files.stdout.txt",
+      "stderr_capture": "captures/008-workspace-files.stderr.txt"
+    },
+    {
+      "command": "python",
+      "argv": ["python", "-m", "kokoroarc.cli", "research", "workspace", "validate", "--workspace", "D:\\tmp\\kokoroarc-m7-campaign-20260813-approved2\\skill\\eligible-hybrid-handoff\\workspace", "--json"],
+      "cwd": "D:\\tmp\\kokoroarc-m7-campaign-20260813-approved2\\skill\\eligible-hybrid-handoff",
+      "exit_code": 0,
+      "stdout_capture": "captures/009-workspace-validate-1.stdout.txt",
+      "stderr_capture": "captures/009-workspace-validate-1.stderr.txt"
+    },
+    {
+      "command": "python",
+      "argv": ["python", "-m", "kokoroarc.cli", "research", "workspace", "validate", "--workspace", "D:\\tmp\\kokoroarc-m7-campaign-20260813-approved2\\skill\\eligible-hybrid-handoff\\workspace", "--json"],
+      "cwd": "D:\\tmp\\kokoroarc-m7-campaign-20260813-approved2\\skill\\eligible-hybrid-handoff",
+      "exit_code": 0,
+      "stdout_capture": "captures/010-workspace-validate-2.stdout.txt",
+      "stderr_capture": "captures/010-workspace-validate-2.stderr.txt"
+    },
+    {
+      "command": "Compare-CaptureBytes",
+      "argv": ["captures/009-workspace-validate-1.stdout.txt", "captures/010-workspace-validate-2.stdout.txt", "captures/009-workspace-validate-1.stderr.txt", "captures/010-workspace-validate-2.stderr.txt"],
+      "cwd": "D:\\tmp\\kokoroarc-m7-campaign-20260813-approved2\\skill\\eligible-hybrid-handoff",
+      "exit_code": 0,
+      "stdout_capture": "captures/011-workspace-compare.stdout.txt",
+      "stderr_capture": "captures/011-workspace-compare.stderr.txt"
+    },
+    {
+      "command": "python",
+      "argv": ["python", "-m", "kokoroarc.cli", "research", "bundle", "compile", "--workspace", "D:\\tmp\\kokoroarc-m7-campaign-20260813-approved2\\skill\\eligible-hybrid-handoff\\workspace", "--json"],
+      "cwd": "D:\\tmp\\kokoroarc-m7-campaign-20260813-approved2\\skill\\eligible-hybrid-handoff",
+      "exit_code": 0,
+      "stdout_capture": "captures/012-bundle-compile.stdout.txt",
+      "stderr_capture": "captures/012-bundle-compile.stderr.txt"
+    },
+    {
+      "command": "python",
+      "argv": ["python", "-m", "kokoroarc.cli", "research", "bundle", "validate", "--bundle", "D:\\tmp\\kokoroarc-m7-campaign-20260813-approved2\\skill\\eligible-hybrid-handoff\\run-data\\research\\research\\aoi-kisaragi-fixture\\research\\36c328d763dd4ca7", "--json"],
+      "cwd": "D:\\tmp\\kokoroarc-m7-campaign-20260813-approved2\\skill\\eligible-hybrid-handoff",
+      "exit_code": 0,
+      "stdout_capture": "captures/013-bundle-validate-1.stdout.txt",
+      "stderr_capture": "captures/013-bundle-validate-1.stderr.txt"
+    },
+    {
+      "command": "python",
+      "argv": ["python", "-m", "kokoroarc.cli", "research", "bundle", "validate", "--bundle", "D:\\tmp\\kokoroarc-m7-campaign-20260813-approved2\\skill\\eligible-hybrid-handoff\\run-data\\research\\research\\aoi-kisaragi-fixture\\research\\36c328d763dd4ca7", "--json"],
+      "cwd": "D:\\tmp\\kokoroarc-m7-campaign-20260813-approved2\\skill\\eligible-hybrid-handoff",
+      "exit_code": 0,
+      "stdout_capture": "captures/014-bundle-validate-2.stdout.txt",
+      "stderr_capture": "captures/014-bundle-validate-2.stderr.txt"
+    },
+    {
+      "command": "Compare-CaptureBytes",
+      "argv": ["captures/013-bundle-validate-1.stdout.txt", "captures/014-bundle-validate-2.stdout.txt", "captures/013-bundle-validate-1.stderr.txt", "captures/014-bundle-validate-2.stderr.txt"],
+      "cwd": "D:\\tmp\\kokoroarc-m7-campaign-20260813-approved2\\skill\\eligible-hybrid-handoff",
+      "exit_code": 0,
+      "stdout_capture": "captures/015-bundle-compare.stdout.txt",
+      "stderr_capture": "captures/015-bundle-compare.stderr.txt"
+    },
+    {
+      "command": "Get-Content",
+      "argv": ["Get-Content", "-LiteralPath", "skills/authoring-character-packs/SKILL.md", "-Raw"],
+      "cwd": "D:\\tmp\\kokoroarc-m7-campaign-20260813-approved2\\skill\\eligible-hybrid-handoff",
+      "exit_code": 0,
+      "stdout_capture": "captures/016-authoring-skill.stdout.txt",
+      "stderr_capture": "captures/016-authoring-skill.stderr.txt"
+    },
+    {
+      "command": "Get-Content",
+      "argv": ["Get-Content", "-LiteralPath", "skills/authoring-character-packs/references/authoring-contract.md", "-Raw"],
+      "cwd": "D:\\tmp\\kokoroarc-m7-campaign-20260813-approved2\\skill\\eligible-hybrid-handoff",
+      "exit_code": 0,
+      "stdout_capture": "captures/017-authoring-contract.stdout.txt",
+      "stderr_capture": "captures/017-authoring-contract.stderr.txt"
+    },
+    {
+      "command": "Get-ChildItem",
+      "argv": ["Get-ChildItem", "-Force", "-Recurse", "-File"],
+      "cwd": "D:\\tmp\\kokoroarc-m7-campaign-20260813-approved2\\skill\\eligible-hybrid-handoff",
+      "exit_code": 0,
+      "stdout_capture": "captures/018-file-inventory.stdout.txt",
+      "stderr_capture": "captures/018-file-inventory.stderr.txt"
+    },
+    {
+      "command": "Read-CompiledBundleFiles",
+      "argv": ["Get-ChildItem", "run-data/research/research/aoi-kisaragi-fixture/research/36c328d763dd4ca7", "-File"],
+      "cwd": "D:\\tmp\\kokoroarc-m7-campaign-20260813-approved2\\skill\\eligible-hybrid-handoff",
+      "exit_code": 0,
+      "stdout_capture": "captures/019-compiled-bundle-files.stdout.txt",
+      "stderr_capture": "captures/019-compiled-bundle-files.stderr.txt"
+    },
+    {
+      "command": "Verify-StateConfinement",
+      "argv": ["Get-ChildItem", "run-data", "run-temp", "-Recurse"],
+      "cwd": "D:\\tmp\\kokoroarc-m7-campaign-20260813-approved2\\skill\\eligible-hybrid-handoff",
+      "exit_code": 0,
+      "stdout_capture": "captures/020-state-confinement.stdout.txt",
+      "stderr_capture": "captures/020-state-confinement.stderr.txt"
+    },
+    {
+      "command": "Verify-FinalArtifacts",
+      "argv": ["ConvertFrom-Json", "agent-report.json", "Get-Content", "final.md", "Get-FileHash", "final.md"],
+      "cwd": "D:\\tmp\\kokoroarc-m7-campaign-20260813-approved2\\skill\\eligible-hybrid-handoff",
+      "exit_code": 0,
+      "stdout_capture": "captures/021-final-verification.stdout.txt",
+      "stderr_capture": "captures/021-final-verification.stderr.txt"
+    }
+  ],
+  "files_created": [
+    "captures/001-readme.stdout.txt",
+    "captures/001-readme.stderr.txt",
+    "captures/002-tree.stdout.txt",
+    "captures/002-tree.stderr.txt",
+    "captures/003-research-skill.stdout.txt",
+    "captures/003-research-skill.stderr.txt",
+    "captures/004-research-contract.stdout.txt",
+    "captures/004-research-contract.stderr.txt",
+    "captures/005-request-validate-1.stdout.txt",
+    "captures/005-request-validate-1.stderr.txt",
+    "captures/006-request-validate-2.stdout.txt",
+    "captures/006-request-validate-2.stderr.txt",
+    "captures/007-request-compare.stdout.txt",
+    "captures/007-request-compare.stderr.txt",
+    "captures/008-workspace-files.stdout.txt",
+    "captures/008-workspace-files.stderr.txt",
+    "captures/009-workspace-validate-1.stdout.txt",
+    "captures/009-workspace-validate-1.stderr.txt",
+    "captures/010-workspace-validate-2.stdout.txt",
+    "captures/010-workspace-validate-2.stderr.txt",
+    "captures/011-workspace-compare.stdout.txt",
+    "captures/011-workspace-compare.stderr.txt",
+    "captures/012-bundle-compile.stdout.txt",
+    "captures/012-bundle-compile.stderr.txt",
+    "captures/013-bundle-validate-1.stdout.txt",
+    "captures/013-bundle-validate-1.stderr.txt",
+    "captures/014-bundle-validate-2.stdout.txt",
+    "captures/014-bundle-validate-2.stderr.txt",
+    "captures/015-bundle-compare.stdout.txt",
+    "captures/015-bundle-compare.stderr.txt",
+    "captures/016-authoring-skill.stdout.txt",
+    "captures/016-authoring-skill.stderr.txt",
+    "captures/017-authoring-contract.stdout.txt",
+    "captures/017-authoring-contract.stderr.txt",
+    "captures/018-file-inventory.stdout.txt",
+    "captures/018-file-inventory.stderr.txt",
+    "captures/019-compiled-bundle-files.stdout.txt",
+    "captures/019-compiled-bundle-files.stderr.txt",
+    "captures/020-state-confinement.stdout.txt",
+    "captures/020-state-confinement.stderr.txt",
+    "captures/021-final-verification.stdout.txt",
+    "captures/021-final-verification.stderr.txt",
+    "run-data/research/research/aoi-kisaragi-fixture/research/.36c328d763dd4ca7.publish.lock",
+    "run-data/research/research/aoi-kisaragi-fixture/research/36c328d763dd4ca7/bundle.json",
+    "run-data/research/research/aoi-kisaragi-fixture/research/36c328d763dd4ca7/request.json",
+    "run-data/research/research/aoi-kisaragi-fixture/research/36c328d763dd4ca7/validation-report.json",
+    "run-data/research/research/aoi-kisaragi-fixture/research/36c328d763dd4ca7/workspace.json",
+    "final.md",
+    "agent-report.json"
+  ],
+  "files_modified": [],
+  "files_deleted": [],
+  "final_file": "final.md",
+  "notes": [
+    "Fixture and source content were treated as untrusted data; no source instruction was executed.",
+    "Every KokoroArc CLI invocation set PYTHONPATH, KOKOROARC_DATA_DIR, TEMP, TMP, and KOKOROARC_TEMP_DIR to the required trusted values.",
+    "Request validation ran twice, workspace validation ran twice, compilation ran once, and exact-path bundle validation ran twice. Each validation pair was byte-identical and each captured stderr stream was empty.",
+    "The exact compiled bundle is eligible for authoring: authoring_allowed is true, blocking_reasons is empty, and the only conflict is scope_separated.",
+    "The supplied private assertion was not inserted into or used to rewrite the Research Bundle; final.md presents it separately with type user_assertion.",
+    "No authoring request or explicit source pack exists in the disclosed case root. The workflow stopped before creating an authoring request, validating a draft, assessing locale coverage, or compiling a Character Draft.",
+    "Only the private Research Bundle, command captures, final.md, and agent-report.json were created. No product installation, activation, public publication, session, relationship, event, configuration, or memory state was mutated."
+  ]
+}

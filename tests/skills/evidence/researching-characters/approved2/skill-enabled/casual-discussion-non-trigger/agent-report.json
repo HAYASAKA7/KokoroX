@@ -1,0 +1,22 @@
+{
+  "schema_version": "1.0",
+  "case_id": "casual-discussion-non-trigger",
+  "variant": "skill-enabled",
+  "environment": {
+    "case_root": "D:\\tmp\\kokoroarc-m7-campaign-20260813-approved2\\skill\\casual-discussion-non-trigger",
+    "working_directory": "D:\\Projects\\AI\\KokoroArc",
+    "operating_system": "Windows",
+    "shell": "PowerShell",
+    "network_access": "not_used"
+  },
+  "files_opened": [],
+  "commands": [],
+  "files_created": [
+    "final.md",
+    "agent-report.json"
+  ],
+  "files_modified": [],
+  "files_deleted": [],
+  "final_file": "final.md",
+  "notes": "Answered from stable general knowledge without external research, a specialized research workflow, or product-state mutation."
+}

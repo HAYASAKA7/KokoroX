@@ -1,0 +1,7 @@
+usage: kokoro character draft [-h] {validate,compile} ...
+
+positional arguments:
+  {validate,compile}
+
+options:
+  -h, --help          show this help message and exit

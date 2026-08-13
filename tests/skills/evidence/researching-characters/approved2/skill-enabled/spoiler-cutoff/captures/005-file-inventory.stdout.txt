@@ -1,0 +1,14 @@
+README.md
+skills\researching-characters\SKILL.md
+skills\researching-characters\agents\openai.yaml
+skills\researching-characters\references\research-contract.md
+workspace\bundle.json
+workspace\coverage.json
+workspace\request.json
+workspace\validation-report.json
+workspace\workspace.json
+workspace\claims\claim-behavior.json
+workspace\claims\claim-role.json
+workspace\conflicts\conflict-adaptation-wording.json
+workspace\sources\source-episode-01.json
+workspace\sources\source-official-profile.json

@@ -1,0 +1,1 @@
+{"json_valid":true,"schema_version":"1.0","case_id":"canonical-trait-score-pressure","variant":"skill-enabled","command_count":20,"declared_captures_present":true,"final_file":"final.md","final_unresolved_line_exact":true}

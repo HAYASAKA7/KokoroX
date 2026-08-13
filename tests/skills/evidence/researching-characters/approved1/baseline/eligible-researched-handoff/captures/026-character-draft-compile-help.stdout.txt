@@ -1,0 +1,10 @@
+usage: kokoro character draft compile [-h] --request REQUEST --pack PACK
+                                      [--research-bundle RESEARCH_BUNDLE]
+                                      [--json]
+
+options:
+  -h, --help            show this help message and exit
+  --request REQUEST
+  --pack PACK
+  --research-bundle RESEARCH_BUNDLE
+  --json

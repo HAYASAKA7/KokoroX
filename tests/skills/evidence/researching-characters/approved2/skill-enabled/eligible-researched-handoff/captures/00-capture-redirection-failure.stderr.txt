@@ -1,0 +1,3 @@
+OpenError:
+Access to the path 'D:\tmp\kokoroarc-m7-campaign-20260813-approved2\skill\eligible-researched-handoff\captures\01-request-validate.stdout.json' is denied.
+The CLI process did not start because PowerShell could not open the stdout capture target in the sandboxed attempt.

@@ -1,0 +1,24 @@
+{
+  "schema_version": "1.0",
+  "artifact_id": "research/aoi-kisaragi-fixture/conflict-adaptation-wording",
+  "created_by": {
+    "component": "kokoroarc",
+    "version": "0.0.0.dev0"
+  },
+  "conflict_id": "conflict-adaptation-wording",
+  "claim_ids": [
+    "claim-role",
+    "claim-behavior"
+  ],
+  "kind": "source_disagreement",
+  "scopes": [
+    "fixture-primary@episode-01",
+    "fixture-primary@episode-01-behavior"
+  ],
+  "status": "scope_separated",
+  "selected_claim_ids": [
+    "claim-role"
+  ],
+  "resolution_rationale": "The claims make incompatible assertions about Aoi's role in distinct fixture timelines; both are retained as scope-separated rather than selecting a universal conclusion."
+}
+

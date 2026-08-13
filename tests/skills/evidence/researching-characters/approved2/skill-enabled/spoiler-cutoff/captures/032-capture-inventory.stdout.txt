@@ -1,0 +1,246 @@
+[
+  {
+    "Name": "002-root-list.stderr.txt",
+    "Length": 0
+  },
+  {
+    "Name": "002-root-list.stdout.txt",
+    "Length": 427
+  },
+  {
+    "Name": "003-research-skill.stderr.txt",
+    "Length": 0
+  },
+  {
+    "Name": "003-research-skill.stdout.txt",
+    "Length": 3740
+  },
+  {
+    "Name": "004-research-contract.stderr.txt",
+    "Length": 0
+  },
+  {
+    "Name": "004-research-contract.stdout.txt",
+    "Length": 7202
+  },
+  {
+    "Name": "005-file-inventory.stderr.txt",
+    "Length": 0
+  },
+  {
+    "Name": "005-file-inventory.stdout.txt",
+    "Length": 512
+  },
+  {
+    "Name": "006-readme.stderr.txt",
+    "Length": 0
+  },
+  {
+    "Name": "006-readme.stdout.txt",
+    "Length": 6362
+  },
+  {
+    "Name": "007-skill-metadata.stderr.txt",
+    "Length": 0
+  },
+  {
+    "Name": "007-skill-metadata.stdout.txt",
+    "Length": 274
+  },
+  {
+    "Name": "008-request-json.stderr.txt",
+    "Length": 0
+  },
+  {
+    "Name": "008-request-json.stdout.txt",
+    "Length": 903
+  },
+  {
+    "Name": "009-request-validate-1.stderr.txt",
+    "Length": 0
+  },
+  {
+    "Name": "009-request-validate-1.stdout.txt",
+    "Length": 831
+  },
+  {
+    "Name": "010-request-validate-2.stderr.txt",
+    "Length": 0
+  },
+  {
+    "Name": "010-request-validate-2.stdout.txt",
+    "Length": 831
+  },
+  {
+    "Name": "011-request-validation-compare.stderr.txt",
+    "Length": 0
+  },
+  {
+    "Name": "011-request-validation-compare.stdout.txt",
+    "Length": 220
+  },
+  {
+    "Name": "012-workspace-manifest.stderr.txt",
+    "Length": 0
+  },
+  {
+    "Name": "012-workspace-manifest.stdout.txt",
+    "Length": 1217
+  },
+  {
+    "Name": "013-source-metadata.stderr.txt",
+    "Length": 0
+  },
+  {
+    "Name": "013-source-metadata.stdout.txt",
+    "Length": 1091
+  },
+  {
+    "Name": "014-source-schema-keys.stderr.txt",
+    "Length": 0
+  },
+  {
+    "Name": "014-source-schema-keys.stdout.txt",
+    "Length": 945
+  },
+  {
+    "Name": "015-source-episode-01.stderr.txt",
+    "Length": 0
+  },
+  {
+    "Name": "015-source-episode-01.stdout.txt",
+    "Length": 796
+  },
+  {
+    "Name": "016-source-official-profile.stderr.txt",
+    "Length": 0
+  },
+  {
+    "Name": "016-source-official-profile.stdout.txt",
+    "Length": 700
+  },
+  {
+    "Name": "017-claim-behavior.stderr.txt",
+    "Length": 0
+  },
+  {
+    "Name": "017-claim-behavior.stdout.txt",
+    "Length": 579
+  },
+  {
+    "Name": "018-claim-role.stderr.txt",
+    "Length": 0
+  },
+  {
+    "Name": "018-claim-role.stdout.txt",
+    "Length": 477
+  },
+  {
+    "Name": "019-conflict.stderr.txt",
+    "Length": 0
+  },
+  {
+    "Name": "019-conflict.stdout.txt",
+    "Length": 707
+  },
+  {
+    "Name": "020-coverage.stderr.txt",
+    "Length": 0
+  },
+  {
+    "Name": "020-coverage.stdout.txt",
+    "Length": 755
+  },
+  {
+    "Name": "021-workspace-validate-1.stderr.txt",
+    "Length": 0
+  },
+  {
+    "Name": "021-workspace-validate-1.stdout.txt",
+    "Length": 479
+  },
+  {
+    "Name": "022-workspace-validate-2.stderr.txt",
+    "Length": 0
+  },
+  {
+    "Name": "022-workspace-validate-2.stdout.txt",
+    "Length": 479
+  },
+  {
+    "Name": "023-workspace-validation-compare.stderr.txt",
+    "Length": 0
+  },
+  {
+    "Name": "023-workspace-validation-compare.stdout.txt",
+    "Length": 220
+  },
+  {
+    "Name": "024-precompile-run-data-inventory.stderr.txt",
+    "Length": 0
+  },
+  {
+    "Name": "024-precompile-run-data-inventory.stdout.txt",
+    "Length": 118
+  },
+  {
+    "Name": "025-bundle-compile.stderr.txt",
+    "Length": 0
+  },
+  {
+    "Name": "025-bundle-compile.stdout.txt",
+    "Length": 1484
+  },
+  {
+    "Name": "026-bundle-validate-1.stderr.txt",
+    "Length": 0
+  },
+  {
+    "Name": "026-bundle-validate-1.stdout.txt",
+    "Length": 1335
+  },
+  {
+    "Name": "027-bundle-validate-2.stderr.txt",
+    "Length": 0
+  },
+  {
+    "Name": "027-bundle-validate-2.stdout.txt",
+    "Length": 1335
+  },
+  {
+    "Name": "028-bundle-validation-compare.stderr.txt",
+    "Length": 0
+  },
+  {
+    "Name": "028-bundle-validation-compare.stdout.txt",
+    "Length": 222
+  },
+  {
+    "Name": "029-postcompile-run-data-inventory.stderr.txt",
+    "Length": 0
+  },
+  {
+    "Name": "029-postcompile-run-data-inventory.stdout.txt",
+    "Length": 2076
+  },
+  {
+    "Name": "030-compiled-bundle-json.stderr.txt",
+    "Length": 0
+  },
+  {
+    "Name": "030-compiled-bundle-json.stdout.txt",
+    "Length": 4416
+  },
+  {
+    "Name": "031-workspace-hash-verification.stderr.txt",
+    "Length": 0
+  },
+  {
+    "Name": "031-workspace-hash-verification.stdout.txt",
+    "Length": 1996
+  },
+  {
+    "Name": "032-capture-inventory.stderr.txt",
+    "Length": 0
+  }
+]

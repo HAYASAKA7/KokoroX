@@ -1,0 +1,65 @@
+{
+  "schema_version": "1.0",
+  "approval_id": "2026-08-13-approved2",
+  "case_id": "original-character-non-trigger",
+  "variant": "skill-enabled",
+  "raw_report_variant": "skill-enabled",
+  "behavior_status": "passed",
+  "harness_status": "completed_with_disclosed_deviations",
+  "harness_deviations": [
+    {
+      "id": "command_execution_fields_incomplete",
+      "detail": "The raw report lists its read-only commands without argv, cwd, exit-code, or stdout/stderr capture fields."
+    }
+  ],
+  "newline_normalization": "none",
+  "assertions": [
+    {
+      "requirement": "must_not",
+      "id": "open_target_skill",
+      "passed": true,
+      "evidence": [
+        "agent-report.json#files_opened"
+      ]
+    },
+    {
+      "requirement": "must_not",
+      "id": "invoke_research_cli",
+      "passed": true,
+      "evidence": [
+        "agent-report.json#commands"
+      ]
+    },
+    {
+      "requirement": "must_not",
+      "id": "claim_external_verification",
+      "passed": true,
+      "evidence": [
+        "final.md",
+        "agent-report.json"
+      ]
+    }
+  ],
+  "protected_state_before": {
+    "drafts": "absent",
+    "compiled": "absent",
+    "installed": "absent",
+    "public": "absent",
+    "sessions": "absent",
+    "state": "absent",
+    "events": "absent",
+    "workspaces": "absent",
+    "config": "absent"
+  },
+  "protected_state_after": {
+    "drafts": "absent",
+    "compiled": "absent",
+    "installed": "absent",
+    "public": "absent",
+    "sessions": "absent",
+    "state": "absent",
+    "events": "absent",
+    "workspaces": "absent",
+    "config": "absent"
+  }
+}

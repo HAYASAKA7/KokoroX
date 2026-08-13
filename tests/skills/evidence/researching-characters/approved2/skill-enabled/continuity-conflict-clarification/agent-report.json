@@ -1,0 +1,62 @@
+{
+  "schema_version": "1.0",
+  "case_id": "continuity-conflict-clarification",
+  "variant": "skill-enabled",
+  "files_opened": [
+    "skills/researching-characters/SKILL.md",
+    "skills/researching-characters/references/research-contract.md",
+    "final.md",
+    "agent-report.json"
+  ],
+  "commands": [
+    {
+      "command": "& { Get-Content -LiteralPath 'skills\\researching-characters\\SKILL.md' } 2> 'captures\\cmd001.stderr.txt' | Tee-Object -FilePath 'captures\\cmd001.stdout.txt'",
+      "cwd": "D:\\tmp\\kokoroarc-m7-campaign-20260813-approved2\\skill\\continuity-conflict-clarification",
+      "exit_code": 1,
+      "stdout_capture": "captures/cmd001.stdout.txt",
+      "stderr_capture": "captures/cmd001.stderr.txt",
+      "tool_result_capture": "captures/cmd001.tool-result.txt"
+    },
+    {
+      "command": "$stdoutPath = 'captures\\cmd002.stdout.txt'; $stderrPath = 'captures\\cmd002.stderr.txt'; & { [System.IO.File]::WriteAllText((Join-Path (Get-Location) 'captures\\cmd001.stdout.txt'), ''); [System.IO.File]::WriteAllText((Join-Path (Get-Location) 'captures\\cmd001.stderr.txt'), \"Out-File: Access to the path 'D:\\tmp\\kokoroarc-m7-campaign-20260813-approved2\\skill\\continuity-conflict-clarification\\captures\\cmd001.stderr.txt' is denied.`r`n\"); Get-Content -LiteralPath 'skills\\researching-characters\\SKILL.md' } 2> $stderrPath | Tee-Object -FilePath $stdoutPath",
+      "cwd": "D:\\tmp\\kokoroarc-m7-campaign-20260813-approved2\\skill\\continuity-conflict-clarification",
+      "exit_code": 0,
+      "stdout_capture": "captures/cmd002.stdout.txt",
+      "stderr_capture": "captures/cmd002.stderr.txt"
+    },
+    {
+      "command": "& { Get-Content -LiteralPath 'skills\\researching-characters\\references\\research-contract.md' } 2> 'captures\\cmd003.stderr.txt' | Tee-Object -FilePath 'captures\\cmd003.stdout.txt'",
+      "cwd": "D:\\tmp\\kokoroarc-m7-campaign-20260813-approved2\\skill\\continuity-conflict-clarification",
+      "exit_code": 0,
+      "stdout_capture": "captures/cmd003.stdout.txt",
+      "stderr_capture": "captures/cmd003.stderr.txt"
+    },
+    {
+      "command": "& { $null = Get-Content -Raw -LiteralPath 'agent-report.json' | ConvertFrom-Json -ErrorAction Stop; Get-Item -LiteralPath 'final.md', 'agent-report.json' | Select-Object Name, Length } 2> 'captures\\cmd004.stderr.txt' | Tee-Object -FilePath 'captures\\cmd004.stdout.txt'",
+      "cwd": "D:\\tmp\\kokoroarc-m7-campaign-20260813-approved2\\skill\\continuity-conflict-clarification",
+      "exit_code": 0,
+      "stdout_capture": "captures/cmd004.stdout.txt",
+      "stderr_capture": "captures/cmd004.stderr.txt"
+    }
+  ],
+  "files_created": [
+    "captures/cmd001.stdout.txt",
+    "captures/cmd001.stderr.txt",
+    "captures/cmd001.tool-result.txt",
+    "captures/cmd002.stdout.txt",
+    "captures/cmd002.stderr.txt",
+    "captures/cmd003.stdout.txt",
+    "captures/cmd003.stderr.txt",
+    "captures/cmd004.stdout.txt",
+    "captures/cmd004.stderr.txt",
+    "final.md",
+    "agent-report.json"
+  ],
+  "final_file": "final.md",
+  "notes": [
+    "The first command failed because the sandbox denied writing its capture files; the complete visible tool failure was preserved separately and the failure was not hidden.",
+    "The research skill and its linked contract were the only task input files opened.",
+    "The unresolved manga/anime continuity required an early clarification stop.",
+    "No research CLI, evidence acquisition, Research Bundle compilation, authoring handoff, installation, activation, publication, or product-state mutation occurred."
+  ]
+}

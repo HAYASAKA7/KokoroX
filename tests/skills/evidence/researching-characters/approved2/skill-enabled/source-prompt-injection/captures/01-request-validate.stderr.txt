@@ -1,0 +1,1 @@
+OpenError: Access to the path 'D:\tmp\kokoroarc-m7-campaign-20260813-approved2\skill\source-prompt-injection\captures\01-request-validate.stdout.txt' is denied.

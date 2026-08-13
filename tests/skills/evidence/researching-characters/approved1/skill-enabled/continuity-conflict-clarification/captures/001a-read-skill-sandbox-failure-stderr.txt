@@ -1,0 +1,5 @@
+Out-File:
+Line |
+   2 |  Get-Content -Raw skills\researching-characters\SKILL.md 2> captures\0 …
+     |  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+     | Access to the path 'D:\tmp\kokoroarc-m7-campaign-20260813-approved1\skill\continuity-conflict-clarification\captures\001-read-skill-stderr.txt' is denied.

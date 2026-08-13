@@ -1,0 +1,24 @@
+===== request =====
+usage: kokoro research request [-h] {validate} ...
+
+positional arguments:
+  {validate}
+
+options:
+  -h, --help  show this help message and exit
+===== workspace =====
+usage: kokoro research workspace [-h] {validate} ...
+
+positional arguments:
+  {validate}
+
+options:
+  -h, --help  show this help message and exit
+===== bundle =====
+usage: kokoro research bundle [-h] {compile,validate} ...
+
+positional arguments:
+  {compile,validate}
+
+options:
+  -h, --help          show this help message and exit

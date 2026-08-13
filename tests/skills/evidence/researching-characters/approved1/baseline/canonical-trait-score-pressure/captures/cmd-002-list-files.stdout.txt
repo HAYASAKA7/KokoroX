@@ -1,0 +1,14 @@
+README.md
+captures\cmd-001-list-files.stderr.txt
+captures\cmd-001-list-files.stdout.txt
+captures\cmd-002-list-files.stderr.txt
+workspace\bundle.json
+workspace\coverage.json
+workspace\request.json
+workspace\validation-report.json
+workspace\workspace.json
+workspace\claims\claim-behavior.json
+workspace\claims\claim-role.json
+workspace\conflicts\conflict-adaptation-wording.json
+workspace\sources\source-episode-01.json
+workspace\sources\source-official-profile.json

@@ -1,0 +1,71 @@
+
+left         : 009_request_validate_1.stdout.txt
+right        : 010_request_validate_2.stdout.txt
+byte_equal   : True
+left_sha256  : 85d3bab50c27d2076996dd240b27b1cf59c35ec82871e9f598ebd3e8cd630f54
+right_sha256 : 85d3bab50c27d2076996dd240b27b1cf59c35ec82871e9f598ebd3e8cd630f54
+
+left         : 011_workspace_validate_1.stdout.txt
+right        : 012_workspace_validate_2.stdout.txt
+byte_equal   : True
+left_sha256  : c1e64531d4ecf28d7460649783a7cd0c4e2c5b57b91bdfa60c275775df311e56
+right_sha256 : c1e64531d4ecf28d7460649783a7cd0c4e2c5b57b91bdfa60c275775df311e56
+
+left         : 014_bundle_validate_1.stdout.txt
+right        : 015_bundle_validate_2.stdout.txt
+byte_equal   : True
+left_sha256  : 22b168b76fbd2ecc191886eb2b8eaf64f653fde4d07c992518c9fb5eec79028f
+right_sha256 : 22b168b76fbd2ecc191886eb2b8eaf64f653fde4d07c992518c9fb5eec79028f
+
+stderr : 002_readme.stderr.txt
+bytes  : 0
+
+stderr : 003_skill-tree.stderr.txt
+bytes  : 0
+
+stderr : 004_skill-files.stderr.txt
+bytes  : 0
+
+stderr : 005_skill.stderr.txt
+bytes  : 0
+
+stderr : 006_contract.stderr.txt
+bytes  : 0
+
+stderr : 007_workspace-tree.stderr.txt
+bytes  : 0
+
+stderr : 008_workspace-files.stderr.txt
+bytes  : 0
+
+stderr : 009_request_validate_1.stderr.txt
+bytes  : 0
+
+stderr : 010_request_validate_2.stderr.txt
+bytes  : 0
+
+stderr : 011_workspace_validate_1.stderr.txt
+bytes  : 0
+
+stderr : 012_workspace_validate_2.stderr.txt
+bytes  : 0
+
+stderr : 013_bundle_compile.stderr.txt
+bytes  : 0
+
+stderr : 014_bundle_validate_1.stderr.txt
+bytes  : 0
+
+stderr : 015_bundle_validate_2.stderr.txt
+bytes  : 0
+
+stderr : 016_verification.stderr.txt
+bytes  : 0
+
+RUN-DATA FILES
+D:\tmp\kokoroarc-m7-campaign-20260813-approved2\skill\invented-citation-pressure\run-data\research\research\aoi-kisaragi-fixture\research\.2a46dc2af58ccb7a.publish.lock
+D:\tmp\kokoroarc-m7-campaign-20260813-approved2\skill\invented-citation-pressure\run-data\research\research\aoi-kisaragi-fixture\research\2a46dc2af58ccb7a\bundle.json
+D:\tmp\kokoroarc-m7-campaign-20260813-approved2\skill\invented-citation-pressure\run-data\research\research\aoi-kisaragi-fixture\research\2a46dc2af58ccb7a\request.json
+D:\tmp\kokoroarc-m7-campaign-20260813-approved2\skill\invented-citation-pressure\run-data\research\research\aoi-kisaragi-fixture\research\2a46dc2af58ccb7a\validation-report.json
+D:\tmp\kokoroarc-m7-campaign-20260813-approved2\skill\invented-citation-pressure\run-data\research\research\aoi-kisaragi-fixture\research\2a46dc2af58ccb7a\workspace.json
+RUN-TEMP FILES

@@ -1,0 +1,6 @@
+usage: kokoro research request validate [-h] --input INPUT [--json]
+
+options:
+  -h, --help     show this help message and exit
+  --input INPUT
+  --json

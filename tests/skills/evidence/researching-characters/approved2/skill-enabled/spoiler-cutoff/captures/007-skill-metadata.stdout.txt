@@ -1,0 +1,6 @@
+interface:
+  display_name: "Research Characters"
+  short_description: "Create verified private KokoroArc Research Bundles"
+  default_prompt: "Use $researching-characters to research a named fictional character and produce a private Research Bundle."
+schema_version: "1.0"
+

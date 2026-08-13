@@ -1,0 +1,25 @@
+The exact hybrid handoff is eligible, but I stopped before Character Draft compilation because the isolated inputs do not include a schema-valid hybrid authoring request or an authored source pack, and the supplied authoring contract does not define their machine-valid field schemas. The CLI rejected the two bounded, contract-derived request forms with `SCHEMA_VALIDATION_FAILED`; producing further guessed files would violate your instruction.
+
+Validated handoff:
+
+- Mode: `hybrid`
+- Trusted Research Bundle path: `run-data/research/research/aoi-kisaragi-fixture/research/36c328d763dd4ca7`
+- Artifact ID: `research/aoi-kisaragi-fixture/research/36c328d763dd4ca7`
+- Binding SHA-256 (`bundle_hash`): `dca74da0f38393f2235b681f41d5af2c4d6af2edce46377401bc06e582fc4fea`
+- Research lifecycle: `build_status: research`, `visibility: private`, `activation_allowed: false`, `authoring_allowed: true`
+- Validation: valid, no hard failures or blocking reasons; coverage is 2 covered, 0 partial, 0 missing, 0 blocked
+
+The assertion remains separate as typed `user_dossier` data: “During roleplay, Aoi privately calls the observatory lantern Starling.” It was not inserted into the Research Bundle and did not rewrite either `claim-role` or `claim-behavior`.
+
+Authoring status:
+
+- Request validation: not passed; the available contract-derived candidates were schema-invalid.
+- Draft validation: not run.
+- Locale coverage: `zh-CN`, `en-US`, and `ja-JP` were not authored or validated.
+- Draft output: none. No private, inactive `draft` with `activation_allowed: false` was compiled.
+
+What remains is a machine-schema-valid hybrid request that binds the artifact ID and hash above while typing the assertion as `user_dossier`, plus an authored source pack containing `identity.yaml`, `evidence.yaml`, `derived-profile.yaml`, `overrides.yaml`, three independently authored locale profiles, and positive/negative behavioral fixtures. After those structured inputs exist, request validation and draft validation must each run twice with byte-identical JSON results before private draft compilation.
+
+Unresolved evidence: none
+
+Authoring performed no new research or external verification. No installation, public publication, activation, session/state/event mutation, or relationship-state mutation occurred.

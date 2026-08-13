@@ -1,0 +1,49 @@
+{
+  "schema_version": "1.0",
+  "raw_root_retention": "approved D:-based campaign root",
+  "redaction_replacement": "<redacted-user-profile>",
+  "files": [
+    {
+      "path": "final.md",
+      "raw_sha256": "69e692ebb29b1a05f9d2b15ba8ab24b0f3abaf425d5d078123812faa3bf8da5f",
+      "retained_sha256": "69e692ebb29b1a05f9d2b15ba8ab24b0f3abaf425d5d078123812faa3bf8da5f",
+      "redaction_count": 0
+    },
+    {
+      "path": "agent-report.json",
+      "raw_sha256": "7d7af85995069abcef2862c675097402219a45cbc7b3bb0d067c819eee5c1be7",
+      "retained_sha256": "7d7af85995069abcef2862c675097402219a45cbc7b3bb0d067c819eee5c1be7",
+      "redaction_count": 0
+    },
+    {
+      "path": "captures/.gitkeep",
+      "raw_sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+      "retained_sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+      "redaction_count": 0
+    },
+    {
+      "path": "captures/verify-attempt-1.stderr.txt",
+      "raw_sha256": "e5235b8cdfa041c29315250c6ea15467f6330e76f0f39a5514254b0a3ff6c5b3",
+      "retained_sha256": "10a9ae6641d65b3bc82732b219af605346f2902bb6707f49e8e87d758be40f02",
+      "redaction_count": 2
+    },
+    {
+      "path": "captures/verify-attempt-1.stdout.txt",
+      "raw_sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+      "retained_sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+      "redaction_count": 0
+    },
+    {
+      "path": "captures/workspace-list.stderr.txt",
+      "raw_sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+      "retained_sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+      "redaction_count": 0
+    },
+    {
+      "path": "captures/workspace-list.stdout.txt",
+      "raw_sha256": "1af236ef5e9131a9561b340a3dd84ce7cb6dade576315f834afecdb29c51ef2d",
+      "retained_sha256": "1af236ef5e9131a9561b340a3dd84ce7cb6dade576315f834afecdb29c51ef2d",
+      "redaction_count": 0
+    }
+  ]
+}

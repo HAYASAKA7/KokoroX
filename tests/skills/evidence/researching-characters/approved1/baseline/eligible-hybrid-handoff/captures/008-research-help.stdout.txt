@@ -1,0 +1,7 @@
+usage: kokoro research [-h] {request,workspace,bundle} ...
+
+positional arguments:
+  {request,workspace,bundle}
+
+options:
+  -h, --help            show this help message and exit

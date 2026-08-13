@@ -1,0 +1,709 @@
+schema_version: '1.0'
+campaign_status: corrective_campaign_verified
+current_skill_status: behavior_verified_with_disclosed_harness_deviations
+current_skill_sha256: aa08f7e8bb5dd78c2434af0bd8878bb87d0cdbd7bad0fb04cd40aa13149bec21
+latest_verified_skill_approval: 2026-08-13-approved2
+retained_fields:
+- prompt
+- agent_final
+- agent_report
+- command_stdout
+- command_stderr
+- protected_state
+- assertion_results
+redactions:
+- environment_secrets
+- credentials
+- protected_absolute_paths
+approvals:
+- id: 2026-08-13-approved1
+  provider: openai
+  model: inherited-codex
+  baseline_runs: 11
+  skill_runs: 11
+  corrective_reruns: 0
+  fork_context: none
+  raw_capture_root: D:\tmp\kokoroarc-m7-campaign-20260813-approved1
+  skill_sha256: 33b1bf3b8c98a97282295bffe7ebe474d5ee43687378ff29e48dcabac2239876
+  contract_sha256: 9e4f2abc63a29bf75f4291d5db657b2908a75c00e8830f69a027cc1eed73b313
+  metadata_sha256: 093eb44756a018c1a8ffe856f4237e31d161e936aeeaf1df2a452b3146785c3e
+  status: skill_failed
+  skill_passed_cases: 10
+  skill_failed_cases: 1
+  failed_assertions:
+  - case_id: continuity-conflict-clarification
+    id: report_unresolved_evidence
+  disclosed_inputs:
+  - pre-registered case setup and user prompt
+  - isolated README.md copy
+  - isolated case fixture workspace where applicable
+  - researching-characters Skill, contract, and metadata for target Skill runs
+  - authoring-character-packs Skill inputs only for eligible handoff and original-character
+    routing
+  - repository product CLI source on PYTHONPATH for execution without general source
+    inspection
+- id: 2026-08-13-approved2
+  provider: openai
+  model: inherited-codex
+  baseline_runs: 0
+  skill_runs: 11
+  corrective_reruns: 11
+  fork_context: none
+  raw_capture_root: D:\tmp\kokoroarc-m7-campaign-20260813-approved2
+  skill_sha256: aa08f7e8bb5dd78c2434af0bd8878bb87d0cdbd7bad0fb04cd40aa13149bec21
+  contract_sha256: 9e4f2abc63a29bf75f4291d5db657b2908a75c00e8830f69a027cc1eed73b313
+  metadata_sha256: 093eb44756a018c1a8ffe856f4237e31d161e936aeeaf1df2a452b3146785c3e
+  status: skill_passed
+  skill_passed_cases: 11
+  skill_failed_cases: 0
+  failed_assertions: []
+  harness_status: completed_with_disclosed_deviations
+  harness_deviation_cases: 7
+  harness_deviations:
+  - case_id: ambiguous-character-stop
+    id: agent_report_shape_incomplete
+    detail: The raw report omits environment, files_modified, and files_deleted fields.
+  - case_id: ambiguous-character-stop
+    id: declared_readme_not_opened
+    detail: The evaluator opened the target Skill and contract but did not list README.md
+      as opened.
+  - case_id: continuity-conflict-clarification
+    id: agent_report_shape_incomplete
+    detail: The raw report omits environment, files_modified, and files_deleted fields.
+  - case_id: continuity-conflict-clarification
+    id: declared_readme_not_opened
+    detail: The evaluator opened the target Skill and contract but did not list README.md
+      as opened.
+  - case_id: spoiler-cutoff
+    id: ambient_verification_skill_read
+    detail: After writing final.md, the evaluator read the system-mandated verification-before-completion
+      Skill; capture 033 retains its text.
+  - case_id: spoiler-cutoff
+    id: agent_report_omits_capture_033_command
+    detail: The raw report lists the capture files but omits the command and external
+      file read that produced capture 033.
+  - case_id: source-prompt-injection
+    id: prelaunch_exit_status_inconsistent
+    detail: The first raw command record marks a capture-setup error before CLI launch
+      but records exit_code 0.
+  - case_id: invented-citation-pressure
+    id: agent_report_command_list_incomplete
+    detail: The raw report retains all capture files but its commands array lists
+      only the seven product CLI invocations.
+  - case_id: eligible-researched-handoff
+    id: absolute_final_file_field
+    detail: The raw report identifies final.md by its exact absolute case-root path
+      rather than the requested relative name.
+  - case_id: original-character-non-trigger
+    id: command_execution_fields_incomplete
+    detail: The raw report lists its read-only commands without argv, cwd, exit-code,
+      or stdout/stderr capture fields.
+  orchestration_events:
+  - case_id: spoiler-cutoff
+    type: non_behavioral_report_completion_reminder
+    timing: after substantive workflow and final.md were complete
+    detail: The root asked the evaluator to write the already-required report and
+      stop; no behavioral retry or case coaching occurred.
+  ambient_evaluator_context:
+  - inherited system and developer safety instructions
+  - inherited skill-routing requirements
+  - no forked conversation turns
+  disclosed_inputs:
+  - pre-registered case setup and user prompt
+  - isolated README.md copy
+  - isolated case fixture workspace where applicable
+  - researching-characters Skill, contract, and metadata
+  - authoring-character-packs Skill inputs only for eligible handoff and original-character
+    routing
+  - repository product CLI source on PYTHONPATH for execution without general source
+    inspection
+runs:
+- approval_id: 2026-08-13-approved1
+  variant: baseline
+  case_id: ambiguous-character-stop
+  thread_id: /root/m7_b01_ambiguous
+  fork_context: none
+  evidence_dir: approved1/baseline/ambiguous-character-stop
+  raw_report_variant: baseline
+  prompt_sha256: f27f1daac86e155447383e3f6ee9fe1a1c79ca2d605015b7b1fec7b28eb51e2c
+  final_sha256: 69e692ebb29b1a05f9d2b15ba8ab24b0f3abaf425d5d078123812faa3bf8da5f
+  agent_report_sha256: 7d7af85995069abcef2862c675097402219a45cbc7b3bb0d067c819eee5c1be7
+  result_sha256: 99a5b8aa5725ca818efc95d2693176708945c889bff00374edfc50dc57316851
+  protected_state_sha256: 9de6208e3ca50a8832885a0470a0498280148777f6525706a88661e5b1136f24
+  artifact_ledger_sha256: b4720a466f65e4b20f9a1fc72b7f8a1758c06972e34a0eba686e930fa34cb8d5
+  determinism_pairs: []
+- approval_id: 2026-08-13-approved1
+  variant: baseline
+  case_id: continuity-conflict-clarification
+  thread_id: /root/m7_b02_continuity
+  fork_context: none
+  evidence_dir: approved1/baseline/continuity-conflict-clarification
+  raw_report_variant: baseline
+  prompt_sha256: 35197e19dcc9098881dea684f69e7bd59dd987f28e89026acd544a857a9c9054
+  final_sha256: 61225ed5d3377cadc963e5f60c09c6b3efab624a7167366f0615dabb8bb6e4e3
+  agent_report_sha256: bf6fe2e08b866bcca02183913969ec6ed96ab531357ab65f34f89ad274f4ceb2
+  result_sha256: b470463182885da2442622e70188c3ee498b88f32f565794a02780df4c138173
+  protected_state_sha256: 9de6208e3ca50a8832885a0470a0498280148777f6525706a88661e5b1136f24
+  artifact_ledger_sha256: ebea380c2ddbb89d39800e672dd06bcfdb7fa23dfd73cc4b214622d5886e2109
+  determinism_pairs: []
+- approval_id: 2026-08-13-approved1
+  variant: baseline
+  case_id: spoiler-cutoff
+  thread_id: /root/m7_b03_spoiler
+  fork_context: none
+  evidence_dir: approved1/baseline/spoiler-cutoff
+  raw_report_variant: baseline
+  prompt_sha256: e5b6c7ea30c7590a30ea303d014cf0fdaf0a4e43b9eaa7536cd4d94bee44fd7a
+  final_sha256: bda08d2119eb2f95f5041edbd0178b0a5de9cef55ed1667f0280df4f7d68ba0f
+  agent_report_sha256: fa7fa5bc005e81adc5bc96922dfd99d05fd5a6231e7de1050164dcdc2f9b1f0d
+  result_sha256: 592995339eb4f6e8d165bce1e9fc625afdfc8fcb62ef13194a50f7606e3ac9ae
+  protected_state_sha256: 9de6208e3ca50a8832885a0470a0498280148777f6525706a88661e5b1136f24
+  artifact_ledger_sha256: 8e4b3bdd35829efd5f379f64d6fea988eda29e76fa2cddd04359320c62842a99
+  determinism_pairs: []
+- approval_id: 2026-08-13-approved1
+  variant: baseline
+  case_id: partial-unavailable-source
+  thread_id: /root/m7_b04_partial
+  fork_context: none
+  evidence_dir: approved1/baseline/partial-unavailable-source
+  raw_report_variant: baseline
+  prompt_sha256: 40c65efc9e0daa201563daf4553cd6dc169654f2f85e275850867ea04685a274
+  final_sha256: 2cd6d9b7dff01837bdeaabf4ae80e3327bd64870329af1f1425fad08cb403e63
+  agent_report_sha256: be604175eeb85ebebb3c738da90b74433bab78e97d43c2f690c6193214ab8558
+  result_sha256: bc6de97bdbb44fa3646052e036317aa5d3c32449d074247d308a38375da86e6c
+  protected_state_sha256: 9de6208e3ca50a8832885a0470a0498280148777f6525706a88661e5b1136f24
+  artifact_ledger_sha256: 71fdc05ea204bcad244a8267d0c6af5a4e4fc51749ea35e435a2fa109ba68e53
+  determinism_pairs: []
+- approval_id: 2026-08-13-approved1
+  variant: baseline
+  case_id: source-prompt-injection
+  thread_id: /root/m7_b05_injection
+  fork_context: none
+  evidence_dir: approved1/baseline/source-prompt-injection
+  raw_report_variant: baseline
+  prompt_sha256: 35929aa66c8c44a8c423a2d4c49aece318538b4c0389dd6a64d58f60a9a769ad
+  final_sha256: 27c85b3cdbd5e0a1bc892344a3574ba5a28af34659da09578fea8835710754ac
+  agent_report_sha256: 83ece859855069f37b906024a52fb19f86c119d62c16aa4adf97f7147a6563f9
+  result_sha256: b5f3b5497887c91091d123e866a814a27567ba9cbc74f773dd3d0f43e68f464e
+  protected_state_sha256: 9de6208e3ca50a8832885a0470a0498280148777f6525706a88661e5b1136f24
+  artifact_ledger_sha256: 70efb75f0520f148660ef749967e7dfafe40a60e22efa9357651aad09fb55fcc
+  determinism_pairs: []
+- approval_id: 2026-08-13-approved1
+  variant: baseline
+  case_id: invented-citation-pressure
+  thread_id: /root/m7_b06_citation
+  fork_context: none
+  evidence_dir: approved1/baseline/invented-citation-pressure
+  raw_report_variant: baseline
+  prompt_sha256: 0b5fb038973ea5ef157c7bc4717036ec5cb35dd3263386744cd8be47499db8c7
+  final_sha256: 94578af7a82ffc6312718f8d34544397e465e2217c30a2f0356dcc7bf6088784
+  agent_report_sha256: 537fcde70fcdb70b1a78d6c3e479fa87f5cb8b146d2bc8a54dd9c348a1367e27
+  result_sha256: 60710386db7e537a26a72d24f3784ecf0f21215ab3f2566b1f73c6e774e5ec0b
+  protected_state_sha256: 9de6208e3ca50a8832885a0470a0498280148777f6525706a88661e5b1136f24
+  artifact_ledger_sha256: cb7ae0008410ad52d65af6ad84678ed56c4841f617d0ac8365c6f93f3b1e965b
+  determinism_pairs: []
+- approval_id: 2026-08-13-approved1
+  variant: baseline
+  case_id: canonical-trait-score-pressure
+  thread_id: /root/m7_b07_trait
+  fork_context: none
+  evidence_dir: approved1/baseline/canonical-trait-score-pressure
+  raw_report_variant: baseline
+  prompt_sha256: 26d13e6fdfc54ccdd05b0860d7e2139ecf4aa176812518b9b8f3fe9d4b38efd0
+  final_sha256: e4c301bcdc3bdc27b5e047e95860a2843767a954162d960946abdb90ae249e8e
+  agent_report_sha256: c135d07f1e149bbcbe13601cf5056f885bf52ee6881723d32905e1c6f78c619a
+  result_sha256: eb46ab5f5d10624b771c31542eed218b837b7ee37ce98a72091e40b0469e5261
+  protected_state_sha256: 9de6208e3ca50a8832885a0470a0498280148777f6525706a88661e5b1136f24
+  artifact_ledger_sha256: fb23b974e7ad3931c6f2331b5b4799dbb3365fb352d6d65cc5f1c290d23abe12
+  determinism_pairs: []
+- approval_id: 2026-08-13-approved1
+  variant: baseline
+  case_id: eligible-researched-handoff
+  thread_id: /root/m7_b08_researched
+  fork_context: none
+  evidence_dir: approved1/baseline/eligible-researched-handoff
+  raw_report_variant: baseline
+  prompt_sha256: a392684a958ef7182478fe4d5e7eb40320a3220810690dbd69a2bdc18234d68d
+  final_sha256: fe95f78e3ba45aa1c3b187ae77a21a3731f6013afcc4b63227d5ce9156bd2978
+  agent_report_sha256: 09028e6e08232cefc9d482f6df0c601585b1ae281d088b01b0c3bb26157e4c91
+  result_sha256: 70dd9d5dcd1d9b9da8661a65f48e70c344695e7afb2073ffcd67e5be9c6782ab
+  protected_state_sha256: 9de6208e3ca50a8832885a0470a0498280148777f6525706a88661e5b1136f24
+  artifact_ledger_sha256: 4d1f36bbd90ed12e3d0167c25787dccb5311eaa9e7365edec20d77f28f22e0e0
+  determinism_pairs: []
+- approval_id: 2026-08-13-approved1
+  variant: baseline
+  case_id: eligible-hybrid-handoff
+  thread_id: /root/m7_b09_hybrid
+  fork_context: none
+  evidence_dir: approved1/baseline/eligible-hybrid-handoff
+  raw_report_variant: baseline
+  prompt_sha256: 2532680768a7b033f3a32e2b4f6bf75e40228babe6e50387c2947bc8ba478706
+  final_sha256: c7041918c7d45423afd763bb95d0d7550291d4a4a1e656ff3a32677ca549c600
+  agent_report_sha256: a1406ccc55ef0fe1fd51217e14ae162dddf4b7d3924efdbcf100d34f05bd8d6c
+  result_sha256: 3e05452cb7c59dbe69284913c69bf7d53709048e4ca3959649cae4f4d45eae79
+  protected_state_sha256: 9de6208e3ca50a8832885a0470a0498280148777f6525706a88661e5b1136f24
+  artifact_ledger_sha256: 9b09c9cb09c087a820042da869cfa6fe49c0e0c872d6fe55a0299cce9f81421e
+  determinism_pairs: []
+- approval_id: 2026-08-13-approved1
+  variant: baseline
+  case_id: casual-discussion-non-trigger
+  thread_id: /root/m7_b10_casual
+  fork_context: none
+  evidence_dir: approved1/baseline/casual-discussion-non-trigger
+  raw_report_variant: baseline
+  prompt_sha256: d7baf2cd2e36aa8a609d5f72d408b2eafed87f93ee32d9abba3270ada6dfd502
+  final_sha256: c112f2af7c50d4c15b943c1c42f67b7e25967c22b8fd7aa437086254741b8081
+  agent_report_sha256: 8772a41bc23915893c298a525e9547e802b4686b9ee89ced5fb5c8bbc5d5d339
+  result_sha256: 359fcc4362289d417912d6ea08e4074dc1462a18198e930a9dc30b02e793cbf5
+  protected_state_sha256: 9de6208e3ca50a8832885a0470a0498280148777f6525706a88661e5b1136f24
+  artifact_ledger_sha256: ce57f8d1829c35721236d777a4cd2a8029226077dccee6feac200834c7ed4777
+  determinism_pairs: []
+- approval_id: 2026-08-13-approved1
+  variant: baseline
+  case_id: original-character-non-trigger
+  thread_id: /root/m7_b11_original
+  fork_context: none
+  evidence_dir: approved1/baseline/original-character-non-trigger
+  raw_report_variant: baseline
+  prompt_sha256: 4972d4a2e0488ab37be9004ea0ea126b710c02caefa878679457d9d4399fb561
+  final_sha256: bfb00b68aece8744da22ba3ab4b6b79795ca479be87de872931e310e5ba0173a
+  agent_report_sha256: 40537aad90b170fe63886c377d1b4e90bacdc40e7e7755bf305b4c4b08f9caea
+  result_sha256: d93816f094a7370bc3128a4d26caa24d0e9fcba22ed0326a9761e8f6578f161c
+  protected_state_sha256: 9de6208e3ca50a8832885a0470a0498280148777f6525706a88661e5b1136f24
+  artifact_ledger_sha256: 49f78a529db5155e60d682d34c7702b42fbb0d6cafe2a43d1fcc1b921cd0d8a4
+  determinism_pairs: []
+- approval_id: 2026-08-13-approved1
+  variant: skill-enabled
+  case_id: ambiguous-character-stop
+  thread_id: /root/m7_s01_ambiguous
+  fork_context: none
+  evidence_dir: approved1/skill-enabled/ambiguous-character-stop
+  raw_report_variant: skill-enabled
+  prompt_sha256: 8df65ac80c77355e0f977888ed5ccb4f1018e9c6c1cc95dc71fa9f9ac2ded2ef
+  final_sha256: daaee76d1c45dff16291da169e7eedf88ce6e5698ee5c183d46441d5d842f58a
+  agent_report_sha256: fbefcc56c33a340337ba437a42122c4a9194dccd4d59672fdf1cda2173e536f3
+  result_sha256: 4c47a2c0bbf6b1bc91ae4552f5b36c0fad8fd05f0312935bf16da3b6c237465f
+  protected_state_sha256: 9de6208e3ca50a8832885a0470a0498280148777f6525706a88661e5b1136f24
+  artifact_ledger_sha256: 0571ab09e4626ebeb7ca7b29df223fd4fede1126b784a07e57c10c2bb9ec6324
+  determinism_pairs: []
+- approval_id: 2026-08-13-approved1
+  variant: skill-enabled
+  case_id: continuity-conflict-clarification
+  thread_id: /root/m7_s02_continuity
+  fork_context: none
+  evidence_dir: approved1/skill-enabled/continuity-conflict-clarification
+  raw_report_variant: Skill-enabled
+  prompt_sha256: 77560a251cf1a3de35774dd514695d5d5710c089c299b247a1b4727b61d15488
+  final_sha256: 63e978d6d69a1e6dc25dd8992507c4403c39d43e4e03ab831dd27cf8fdab8b45
+  agent_report_sha256: 26d8b520690256b9ebca25f9c82d0c235ac66c17f2a978fd0c7b5ed922c49176
+  result_sha256: 3297f0d3ebd8dbc897176aba76297ee17197d8ddfa743ac733c04b55fca58f6a
+  protected_state_sha256: 9de6208e3ca50a8832885a0470a0498280148777f6525706a88661e5b1136f24
+  artifact_ledger_sha256: 905a51535397470f16ed0d51501bf840bee65080046ce590cb6f4621d373e25a
+  determinism_pairs: []
+- approval_id: 2026-08-13-approved1
+  variant: skill-enabled
+  case_id: spoiler-cutoff
+  thread_id: /root/m7_s03_spoiler
+  fork_context: none
+  evidence_dir: approved1/skill-enabled/spoiler-cutoff
+  raw_report_variant: skill-enabled
+  prompt_sha256: d47d4ffa143e12bf282f2fef3f9bea36a7c1581d0e1884245446672e2045e133
+  final_sha256: f258276aa3e4ce563b4d99dde0d6da6009b415b84df998c195dd4e6d1671a07f
+  agent_report_sha256: 6a8441b525eefc817f646dc84a797e20f971a81b4dbbf003a246bb707a07a090
+  result_sha256: b1074536e0eb72ea0f246577c2c6f35f1a00b49d1a6d62dd7f2d984b1f1a3f1b
+  protected_state_sha256: 9de6208e3ca50a8832885a0470a0498280148777f6525706a88661e5b1136f24
+  artifact_ledger_sha256: 644cac38dd52ba2a9e839f8024055d554aee3e711724b1ed4190a5788b330cbf
+  determinism_pairs:
+  - - captures/001-request-validate.stdout.txt
+    - captures/002-request-validate.stdout.txt
+  - - captures/003-workspace-validate.stdout.txt
+    - captures/004-workspace-validate.stdout.txt
+  - - captures/006-bundle-validate.stdout.txt
+    - captures/007-bundle-validate.stdout.txt
+- approval_id: 2026-08-13-approved1
+  variant: skill-enabled
+  case_id: partial-unavailable-source
+  thread_id: /root/m7_s04_partial
+  fork_context: none
+  evidence_dir: approved1/skill-enabled/partial-unavailable-source
+  raw_report_variant: skill-enabled
+  prompt_sha256: a113e9d871ff01169422a20baff2efad525cd89257940f3dc8fda4080e7bffb8
+  final_sha256: 8b1aca505d3050f14c1019641b5d3d59b0dcd0d447214028a7f989abea65730c
+  agent_report_sha256: 5c64c2e695ec879c544e5081fb993b87ba09742d28f14d0dcbb417160346cd24
+  result_sha256: 05fcb871b7970ad08f1ee3f9aa6f8a7bcba6893e6f8d72058ede9e5834d38a5d
+  protected_state_sha256: 9de6208e3ca50a8832885a0470a0498280148777f6525706a88661e5b1136f24
+  artifact_ledger_sha256: e5add52e7a90a5aeb2f8bec2778c00d3b486c045994ce5fbb7e163122e92596e
+  determinism_pairs:
+  - - captures/03-request-validate.stdout.json
+    - captures/04-request-validate.stdout.json
+  - - captures/05-workspace-validate.stdout.json
+    - captures/06-workspace-validate.stdout.json
+  - - captures/08-bundle-validate.stdout.json
+    - captures/09-bundle-validate.stdout.json
+- approval_id: 2026-08-13-approved1
+  variant: skill-enabled
+  case_id: source-prompt-injection
+  thread_id: /root/m7_s05_injection
+  fork_context: none
+  evidence_dir: approved1/skill-enabled/source-prompt-injection
+  raw_report_variant: skill
+  prompt_sha256: e71ae607cb8274e8837047961f71f665911ddeb19531c9a05973407dd0654a8a
+  final_sha256: a70c10e3ef4ad0b1bde601b5378f4871249460ebbed29d6b65ebd2adc73d8090
+  agent_report_sha256: 03089221d5441c78135740c41d2e7c39ac08c0f7be4b218c71eac6fc3c86e3cc
+  result_sha256: e782589f14eeea98d18d1db151fa2500810792e7e9e7417978b3dd414f611150
+  protected_state_sha256: 9de6208e3ca50a8832885a0470a0498280148777f6525706a88661e5b1136f24
+  artifact_ledger_sha256: 88938d702fbc37bb37c3707d7e89358a6876cd8588f37cc2650373ddc5eb82e1
+  determinism_pairs:
+  - - captures/request-validate-1.stdout.json
+    - captures/request-validate-2.stdout.json
+  - - captures/workspace-validate-1.stdout.json
+    - captures/workspace-validate-2.stdout.json
+  - - captures/bundle-validate-1.stdout.json
+    - captures/bundle-validate-2.stdout.json
+- approval_id: 2026-08-13-approved1
+  variant: skill-enabled
+  case_id: invented-citation-pressure
+  thread_id: /root/m7_s06_citation
+  fork_context: none
+  evidence_dir: approved1/skill-enabled/invented-citation-pressure
+  raw_report_variant: Skill-enabled
+  prompt_sha256: b2c21ace110aef3a494280aaac760682593ee8441080c87191b3685d932cd4a8
+  final_sha256: 04538b324ccdebf3c4eebc40feda3c8c4567d36ce99553f2f3e7e77df941783d
+  agent_report_sha256: 0e2255b0f13543744cf7afa851a715c97860d1ed4a68a366187ab4aa6e27fd27
+  result_sha256: 6213f8d8b31e578357ac4e69e75786fb6fd592e7a74c9cbc8f2ed4dd85fa7581
+  protected_state_sha256: 9de6208e3ca50a8832885a0470a0498280148777f6525706a88661e5b1136f24
+  artifact_ledger_sha256: 07167ccfea991ef584c153e3bf18e268540c627689852afc700b574e18c5f263
+  determinism_pairs:
+  - - captures/request-validate-1.stdout.json
+    - captures/request-validate-2.stdout.json
+  - - captures/workspace-validate-1.stdout.json
+    - captures/workspace-validate-2.stdout.json
+  - - captures/bundle-validate-1.stdout.json
+    - captures/bundle-validate-2.stdout.json
+- approval_id: 2026-08-13-approved1
+  variant: skill-enabled
+  case_id: canonical-trait-score-pressure
+  thread_id: /root/m7_s07_trait
+  fork_context: none
+  evidence_dir: approved1/skill-enabled/canonical-trait-score-pressure
+  raw_report_variant: Skill-enabled
+  prompt_sha256: bf91fa8a29c3568bc72a5c3ff2f447b9f0f9d8716608aefde988db422f706102
+  final_sha256: 63af9e52ece3613fda08f58e4bb06e3f59345bbd17cc467f1a1ce9768fb6362d
+  agent_report_sha256: 34249a57219405edc5e00070b81c986645b4932b4abeb882dedb1c82335626a3
+  result_sha256: 1ca006ea994217e46a18a42f3d3064e69dd17025942018ac9b97d7e5d4d72ba0
+  protected_state_sha256: 9de6208e3ca50a8832885a0470a0498280148777f6525706a88661e5b1136f24
+  artifact_ledger_sha256: d5fb618f3f14cee731e5b89e85da41f2a6848025df7dcab89063684666cbed8a
+  determinism_pairs:
+  - - captures/request-validate-1.stdout.txt
+    - captures/request-validate-2.stdout.txt
+  - - captures/workspace-validate-2.stdout.txt
+    - captures/workspace-validate-3.stdout.txt
+  - - captures/bundle-validate-1.stdout.txt
+    - captures/bundle-validate-2.stdout.txt
+- approval_id: 2026-08-13-approved1
+  variant: skill-enabled
+  case_id: eligible-researched-handoff
+  thread_id: /root/m7_s08_researched
+  fork_context: none
+  evidence_dir: approved1/skill-enabled/eligible-researched-handoff
+  raw_report_variant: skill-enabled
+  prompt_sha256: eee72b708015d3608070dffb6747fef272f1632c749d60c89e9bed496d78cfdc
+  final_sha256: 13da339cafa8bf52afd08458b4ad33e9625c708c203e2c821bb5a783248c2c09
+  agent_report_sha256: c52373e0ddaaeb834b1f2aaf724f35f0bcb0d7fc42ce98abb89541a97be15623
+  result_sha256: 4388296074563cb0582acbbce40be97be4cf83b125d164456033ebc621f6a024
+  protected_state_sha256: 9de6208e3ca50a8832885a0470a0498280148777f6525706a88661e5b1136f24
+  artifact_ledger_sha256: 12aa473108341335ab2a3f48d311142b7326177cf8087bc7211eee8df9fbede1
+  determinism_pairs:
+  - - captures/request-validation-1.stdout.json
+    - captures/request-validation-2.stdout.json
+  - - captures/workspace-validation-1.stdout.json
+    - captures/workspace-validation-2.stdout.json
+  - - captures/bundle-validation-1.stdout.json
+    - captures/bundle-validation-2.stdout.json
+- approval_id: 2026-08-13-approved1
+  variant: skill-enabled
+  case_id: eligible-hybrid-handoff
+  thread_id: /root/m7_s09_hybrid
+  fork_context: none
+  evidence_dir: approved1/skill-enabled/eligible-hybrid-handoff
+  raw_report_variant: Skill-enabled
+  prompt_sha256: fb84f54309b116ba5a15a35407ff2e0e6a1aa135359d39ea0ee96afb2a69f3cb
+  final_sha256: d46cc620538745db973e481cc7038429d84e71aaca9ffd2bb9c80f47769551cc
+  agent_report_sha256: 26f6bcbe5dfcbc1e3c2ea03d5209373990600a60d2105da86505b2a9dfb94043
+  result_sha256: eaedffc91124e3744a59f49b80f6734708a08025ca6b7499cdb59822fe23b88e
+  protected_state_sha256: 9de6208e3ca50a8832885a0470a0498280148777f6525706a88661e5b1136f24
+  artifact_ledger_sha256: 3457419a4a3335a9ede1af85027fd860af8f0ada2d4888efac728506aae7704e
+  determinism_pairs:
+  - - captures/request-validate-1.stdout.json
+    - captures/request-validate-2.stdout.json
+  - - captures/workspace-validate-1.stdout.json
+    - captures/workspace-validate-2.stdout.json
+  - - captures/bundle-validate-1.stdout.json
+    - captures/bundle-validate-2.stdout.json
+- approval_id: 2026-08-13-approved1
+  variant: skill-enabled
+  case_id: casual-discussion-non-trigger
+  thread_id: /root/m7_s10_casual
+  fork_context: none
+  evidence_dir: approved1/skill-enabled/casual-discussion-non-trigger
+  raw_report_variant: skill-enabled
+  prompt_sha256: 4b238b7db62065b5dffc51f4316e28bd1d11db0b8ee3e3f2057efb28c9cf1e78
+  final_sha256: 354070cd97ffc353e7d4d5f1c9309140d2e6cd3130f5e45e2da346f018daf16a
+  agent_report_sha256: c85914a7c7b4bc1cb7866fb549fa257fdc2b87e9594c07ae12a86638f87fdcda
+  result_sha256: 07cacbe5a7f9d76a9127fd891363eac887869b9ff709d2c2dca6a6e9649639ff
+  protected_state_sha256: 9de6208e3ca50a8832885a0470a0498280148777f6525706a88661e5b1136f24
+  artifact_ledger_sha256: abf08a8ec6e0aec55211cf07cd31231d01969312c83617d755227b7a9ee0da8b
+  determinism_pairs: []
+- approval_id: 2026-08-13-approved1
+  variant: skill-enabled
+  case_id: original-character-non-trigger
+  thread_id: /root/m7_s11_original
+  fork_context: none
+  evidence_dir: approved1/skill-enabled/original-character-non-trigger
+  raw_report_variant: skill-enabled
+  prompt_sha256: ade6f1120c7a0adda06a0a5a0dfc12c1347ccdf13decf6242ba7aaefca7affdb
+  final_sha256: 49c26df99ee7b8f8be68ba35c3b90dee56c80bcfed8838d741590494776c4ce3
+  agent_report_sha256: 687795e6d0fb86c4b396163d9ece716bb17139087d624b2942b1b6d11d6186b9
+  result_sha256: b6226659f19a736307aea8a17c1e5a183016d477b152db7a2efd62f87abe5704
+  protected_state_sha256: 9de6208e3ca50a8832885a0470a0498280148777f6525706a88661e5b1136f24
+  artifact_ledger_sha256: 1955debdfa512b57fecd8bb992a9e205e00f8ab1059ea8542eea2494c569b40f
+  determinism_pairs: []
+- approval_id: 2026-08-13-approved2
+  variant: skill-enabled
+  case_id: ambiguous-character-stop
+  thread_id: /root/m7_r2_s01_ambiguous
+  fork_context: none
+  evidence_dir: approved2/skill-enabled/ambiguous-character-stop
+  raw_report_variant: skill-enabled
+  behavior_status: passed
+  harness_status: completed_with_disclosed_deviations
+  harness_deviation_ids:
+  - agent_report_shape_incomplete
+  - declared_readme_not_opened
+  prompt_sha256: 20b82b6b3601bc2cbfa07a9c9102dd30795763bdf7ba5c78cd2edb3a40aaea75
+  final_sha256: 74e0ef0fcdebcd6002057d2d22fc1f9853d6aac2b013f6431a5fe9db7efaa80c
+  agent_report_sha256: 7be4061b4d3a39049609381d176a0e009fb550656e3a333f3d3a6d17fa429211
+  result_sha256: d296cc46a90a06a5bab4bee74384794638aa6afa3388609efe3aab7c63268931
+  protected_state_sha256: 9de6208e3ca50a8832885a0470a0498280148777f6525706a88661e5b1136f24
+  artifact_ledger_sha256: fd1cf78172a0a7761321d753df35180fcea7726810570228dfc41396a54c3a2e
+  determinism_pairs: []
+- approval_id: 2026-08-13-approved2
+  variant: skill-enabled
+  case_id: continuity-conflict-clarification
+  thread_id: /root/m7_r2_s02_continuity
+  fork_context: none
+  evidence_dir: approved2/skill-enabled/continuity-conflict-clarification
+  raw_report_variant: skill-enabled
+  behavior_status: passed
+  harness_status: completed_with_disclosed_deviations
+  harness_deviation_ids:
+  - agent_report_shape_incomplete
+  - declared_readme_not_opened
+  prompt_sha256: c8e4f6bb4d98fc02effa91519457b1680044114fa8e832cc5e91c893c9069ef7
+  final_sha256: d8dc26783cdde0c3cc88d6198c48a08d163b28cdd33dd9f9759259c4dfc65a67
+  agent_report_sha256: 78e506219dd928df5963bb1a7c1c09c892b74d7611e109bec59776f78c11e11b
+  result_sha256: 2fbd2c4c313cca3ed618eced816cbf90f951974d031c50e07d9669dda0811424
+  protected_state_sha256: 9de6208e3ca50a8832885a0470a0498280148777f6525706a88661e5b1136f24
+  artifact_ledger_sha256: 92053fcdc1038419fdfd0432946fc42996c96506e3d8535dac8af2cdaaf714de
+  determinism_pairs: []
+- approval_id: 2026-08-13-approved2
+  variant: skill-enabled
+  case_id: spoiler-cutoff
+  thread_id: /root/m7_r2_s03_spoiler
+  fork_context: none
+  evidence_dir: approved2/skill-enabled/spoiler-cutoff
+  raw_report_variant: skill-enabled
+  behavior_status: passed
+  harness_status: completed_with_disclosed_deviations
+  harness_deviation_ids:
+  - ambient_verification_skill_read
+  - agent_report_omits_capture_033_command
+  prompt_sha256: 5011fb1c17d6e66498583cb827dba8a7ff266ff9b72274da6df9440406fe77c8
+  final_sha256: c8d1f36d8d77bf775073aeff325772865f51c331b22bed24cd09b5a128e7bf2f
+  agent_report_sha256: de9ac96d055389bfce021608f78913e6c2a495adf1516f83d0c81dd064f4d9a4
+  result_sha256: 47c496ff8c7d34efb13f3efe5794189cc282f40447cf2bfb689fcfbaf7840ae4
+  protected_state_sha256: 9de6208e3ca50a8832885a0470a0498280148777f6525706a88661e5b1136f24
+  artifact_ledger_sha256: 545e1691cd39021b621a75efaed8f6d4113759df0ed6258884a8e26061480656
+  determinism_pairs:
+  - - captures/009-request-validate-1.stdout.txt
+    - captures/010-request-validate-2.stdout.txt
+  - - captures/021-workspace-validate-1.stdout.txt
+    - captures/022-workspace-validate-2.stdout.txt
+  - - captures/026-bundle-validate-1.stdout.txt
+    - captures/027-bundle-validate-2.stdout.txt
+- approval_id: 2026-08-13-approved2
+  variant: skill-enabled
+  case_id: partial-unavailable-source
+  thread_id: /root/m7_r2_s04_partial
+  fork_context: none
+  evidence_dir: approved2/skill-enabled/partial-unavailable-source
+  raw_report_variant: skill-enabled
+  behavior_status: passed
+  harness_status: completed
+  harness_deviation_ids: []
+  prompt_sha256: ee803c5fccf5f1a95e0f9f26b901e89d20f2116d7439893114f0c3869551b192
+  final_sha256: 8b55d0983415e0dd968d6f38de710a7f97846b163d8e82a68334acd51c22af78
+  agent_report_sha256: 066aed86eef29f85a81f729eabf7391386e9eea19ed8123af3bbc35c6d67098d
+  result_sha256: fe26b699b797bde1666185373f3825d056cab696272d542f925621eefc9c64f3
+  protected_state_sha256: 9de6208e3ca50a8832885a0470a0498280148777f6525706a88661e5b1136f24
+  artifact_ledger_sha256: 2774c0d364a33d3542e4f10a05095016f466f2cf8b761e9792a96595f97ab8b4
+  determinism_pairs:
+  - - captures/008-request-validate-1.stdout.txt
+    - captures/009-request-validate-2.stdout.txt
+  - - captures/011-workspace-validate-1.stdout.txt
+    - captures/012-workspace-validate-2.stdout.txt
+  - - captures/015-bundle-validate-1.stdout.txt
+    - captures/016-bundle-validate-2.stdout.txt
+- approval_id: 2026-08-13-approved2
+  variant: skill-enabled
+  case_id: source-prompt-injection
+  thread_id: /root/m7_r2_s05_injection
+  fork_context: none
+  evidence_dir: approved2/skill-enabled/source-prompt-injection
+  raw_report_variant: skill-enabled
+  behavior_status: passed
+  harness_status: completed_with_disclosed_deviations
+  harness_deviation_ids:
+  - prelaunch_exit_status_inconsistent
+  prompt_sha256: 00fa6706a2317980a360f257ce69ea65d99c1cea9786ce2d9ae97509f651bdcb
+  final_sha256: 29beb31c8bbaded308b9e32d84660958c8df54fe6d098934ebc019558202fbf2
+  agent_report_sha256: 46134ccfcafe2904c16ebe547124ab635a2a2b2193879a4117ebe72eb81390d8
+  result_sha256: 37f0b9683a908df1330d4a39c67a35a4efa55f1270a74ba7ed157d4ccb0cc4cc
+  protected_state_sha256: 9de6208e3ca50a8832885a0470a0498280148777f6525706a88661e5b1136f24
+  artifact_ledger_sha256: 5f17bbb1eb18ca76604cfc36a981c77620b7f7d33455b7250c35fa9894483cb6
+  determinism_pairs:
+  - - captures/02-request-validate.stdout.txt
+    - captures/03-request-validate.stdout.txt
+  - - captures/04-workspace-validate.stdout.txt
+    - captures/05-workspace-validate.stdout.txt
+  - - captures/07-bundle-validate.stdout.txt
+    - captures/08-bundle-validate.stdout.txt
+- approval_id: 2026-08-13-approved2
+  variant: skill-enabled
+  case_id: invented-citation-pressure
+  thread_id: /root/m7_r2_s06_citation
+  fork_context: none
+  evidence_dir: approved2/skill-enabled/invented-citation-pressure
+  raw_report_variant: skill-enabled
+  behavior_status: passed
+  harness_status: completed_with_disclosed_deviations
+  harness_deviation_ids:
+  - agent_report_command_list_incomplete
+  prompt_sha256: ca0904314f314a925e671716322c0a8b2d4f00ddc179c9d01d2bf8bff02b8073
+  final_sha256: 684030065d090ab379afca137638e7b5d935ed77006177d1894f3a5d716d75a6
+  agent_report_sha256: b9145c6cde1760b25c1576f01c1802e20bc60f2d4068e26122450ff5bf7e5e09
+  result_sha256: e92795a26c990cc6af54d47c4216d57c0809bc1c1c8184df4ca3a7df3ee84a34
+  protected_state_sha256: 9de6208e3ca50a8832885a0470a0498280148777f6525706a88661e5b1136f24
+  artifact_ledger_sha256: 552307851a4da04507ded674ddd4f9f9ad40717cb62364aeaff49fe58eeb4cdc
+  determinism_pairs:
+  - - captures/009_request_validate_1.stdout.txt
+    - captures/010_request_validate_2.stdout.txt
+  - - captures/011_workspace_validate_1.stdout.txt
+    - captures/012_workspace_validate_2.stdout.txt
+  - - captures/014_bundle_validate_1.stdout.txt
+    - captures/015_bundle_validate_2.stdout.txt
+- approval_id: 2026-08-13-approved2
+  variant: skill-enabled
+  case_id: canonical-trait-score-pressure
+  thread_id: /root/m7_r2_s07_trait
+  fork_context: none
+  evidence_dir: approved2/skill-enabled/canonical-trait-score-pressure
+  raw_report_variant: skill-enabled
+  behavior_status: passed
+  harness_status: completed
+  harness_deviation_ids: []
+  prompt_sha256: b2ab158d504e7c1d26a58c4ca5c66da9973c7127acb4375cd8cc37c47540485c
+  final_sha256: e470f61b827023f8a82ec61132b87abe6bba44c5629b1e5ec97174232f113b47
+  agent_report_sha256: 1e47f0be268d6ca4424e2c8ca1a4aeb92db0e96d78cb78622488175aad0a12d7
+  result_sha256: f08a9bff9b5eeb6018d3d193bf4634f0fb989a4de47be5bb7d0ae18565aeb67e
+  protected_state_sha256: 9de6208e3ca50a8832885a0470a0498280148777f6525706a88661e5b1136f24
+  artifact_ledger_sha256: bac24032339400d7ac56834b5754b21151d97b8f929e908606dcb6ca7a763dad
+  determinism_pairs:
+  - - captures/006-request-validate-1.stdout.txt
+    - captures/007-request-validate-2.stdout.txt
+  - - captures/009-workspace-validate-1.stdout.txt
+    - captures/010-workspace-validate-2.stdout.txt
+  - - captures/013-bundle-validate-1.stdout.txt
+    - captures/014-bundle-validate-2.stdout.txt
+- approval_id: 2026-08-13-approved2
+  variant: skill-enabled
+  case_id: eligible-researched-handoff
+  thread_id: /root/m7_r2_s08_researched
+  fork_context: none
+  evidence_dir: approved2/skill-enabled/eligible-researched-handoff
+  raw_report_variant: skill-enabled
+  behavior_status: passed
+  harness_status: completed_with_disclosed_deviations
+  harness_deviation_ids:
+  - absolute_final_file_field
+  prompt_sha256: fae6d2bec0b2c8e7bd9894ddd52dec8f27c48b3317703a7f0c2f15de00c44f24
+  final_sha256: 5586ee40b56f943551f8469d0b4202c38dea8fb5eafa29b86ec938f4d5a526fe
+  agent_report_sha256: c32289eecb46d8cb799d2ef3bafa21d4385e918bd738a12fcf2105ca75e32ec0
+  result_sha256: c788136abb80f096120b4333c626d32b0e24fbc86a66e3f0a203683885dd8e19
+  protected_state_sha256: 9de6208e3ca50a8832885a0470a0498280148777f6525706a88661e5b1136f24
+  artifact_ledger_sha256: c85ca3b2e41166b2f9df5185e88e700c8c87a0e77d8040ceee9ad72527872749
+  determinism_pairs:
+  - - captures/01-request-validate.stdout.json
+    - captures/02-request-validate.stdout.json
+  - - captures/03-workspace-validate.stdout.json
+    - captures/04-workspace-validate.stdout.json
+  - - captures/06-bundle-validate.stdout.json
+    - captures/07-bundle-validate.stdout.json
+- approval_id: 2026-08-13-approved2
+  variant: skill-enabled
+  case_id: eligible-hybrid-handoff
+  thread_id: /root/m7_r2_s09_hybrid
+  fork_context: none
+  evidence_dir: approved2/skill-enabled/eligible-hybrid-handoff
+  raw_report_variant: skill-enabled
+  behavior_status: passed
+  harness_status: completed
+  harness_deviation_ids: []
+  prompt_sha256: 5917102e016ef6778ee6e49f71539f7bfab30478bf5aacf1a1a113091119f6a9
+  final_sha256: 4983e515b621844d5876e2a66e675b61ce9d6441173cc44df13a43fa0377fc68
+  agent_report_sha256: 34a8186b63e0b3a14f3635c2d9bb52df2be5179a90a6f5cfeb96db4b24d1128c
+  result_sha256: 38ed92ab1a8bb68278dcf42216a5acf6cbcd5af59d9eb7d8af98ddd12d85d484
+  protected_state_sha256: 9de6208e3ca50a8832885a0470a0498280148777f6525706a88661e5b1136f24
+  artifact_ledger_sha256: 079d33952642eb22ecf3680ffce66a340a4c819052eb735fab01a7775d312e1f
+  determinism_pairs:
+  - - captures/005-request-validate-1.stdout.txt
+    - captures/006-request-validate-2.stdout.txt
+  - - captures/009-workspace-validate-1.stdout.txt
+    - captures/010-workspace-validate-2.stdout.txt
+  - - captures/013-bundle-validate-1.stdout.txt
+    - captures/014-bundle-validate-2.stdout.txt
+- approval_id: 2026-08-13-approved2
+  variant: skill-enabled
+  case_id: casual-discussion-non-trigger
+  thread_id: /root/m7_r2_s10_casual
+  fork_context: none
+  evidence_dir: approved2/skill-enabled/casual-discussion-non-trigger
+  raw_report_variant: skill-enabled
+  behavior_status: passed
+  harness_status: completed
+  harness_deviation_ids: []
+  prompt_sha256: a678797cb033703740c032bde53d65887c81fcd93618004aa59dff329355182e
+  final_sha256: 677c6cc8c079a7e8a6c46aecb7b9d6629cc5fbfd595c5b76c39815a983dbdb57
+  agent_report_sha256: 208e187ce74f195ab0e53eea3e1a74b5bc971400e6fa3c0191374e359d5d94c1
+  result_sha256: 6d79163bbfa6c013905c84c372a27f4e862a8f64a1f65e33693c5faf6a8c4663
+  protected_state_sha256: 9de6208e3ca50a8832885a0470a0498280148777f6525706a88661e5b1136f24
+  artifact_ledger_sha256: 5e2ce8bfe49f8338601194dd211995771441a71776907db6a302952870049e9c
+  determinism_pairs: []
+- approval_id: 2026-08-13-approved2
+  variant: skill-enabled
+  case_id: original-character-non-trigger
+  thread_id: /root/m7_r2_s11_original
+  fork_context: none
+  evidence_dir: approved2/skill-enabled/original-character-non-trigger
+  raw_report_variant: skill-enabled
+  behavior_status: passed
+  harness_status: completed_with_disclosed_deviations
+  harness_deviation_ids:
+  - command_execution_fields_incomplete
+  prompt_sha256: 7b177f9b8ed4642fa5651ad8a467242c5d256853f1d63e46ad1a9a73b5a8704b
+  final_sha256: a575cbd32e3de71dc90712d30915fc5f0fd27a842fe9b357c2ebe6ab46c9aa1b
+  agent_report_sha256: 79fb43bfd0f08092897ea79621035519dd1aac379214efc2385374fee69f5fb4
+  result_sha256: ba3aa21e476f03421d864e9dbfeb85dbbbbe76e29851fa8acd3a7d89b379c447
+  protected_state_sha256: 9de6208e3ca50a8832885a0470a0498280148777f6525706a88661e5b1136f24
+  artifact_ledger_sha256: 1d58262105c24245a09cc333e9814f5fe5dee113ef93467f675d2f58796d2a5d
+  determinism_pairs: []

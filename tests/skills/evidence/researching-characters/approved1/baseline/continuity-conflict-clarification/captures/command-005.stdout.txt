@@ -1,0 +1,1 @@
+{"schema_version":"1.0","case_id":"continuity-conflict-clarification","variant":"baseline","final_exists":true,"capture_count":8}

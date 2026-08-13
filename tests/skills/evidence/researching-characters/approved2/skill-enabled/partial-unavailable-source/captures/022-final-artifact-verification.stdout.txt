@@ -1,0 +1,1 @@
+{"report_json_valid":true,"schema_version":"1.0","case_id":"partial-unavailable-source","variant":"skill-enabled","final_file":"final.md","final_nonempty":true,"final_has_required_last_line":true,"runtime_file_count":4,"runtime_files_only_expected_bundle":true}

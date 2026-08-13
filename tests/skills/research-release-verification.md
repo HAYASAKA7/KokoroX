@@ -7,21 +7,29 @@ This record covers the inline product, CLI, Skill-structure, smoke, and distribu
 - Build base HEAD: `7ec68e553b478411d3b9f7e8207a70df2b382b19`
 - Build input: that HEAD plus the current `README.md` patch only among `README.md`, `pyproject.toml`, `src/`, and `schemas/`
 - Isolated root: `D:\tmp\kokoroarc-m7-release-20260813-inline1`
-- Behavioral campaign: PENDING
+- Behavioral campaign: CORRECTIVE PASS 11/11 (first batch remains Skill PASS 10/11, RED 1/11)
+- Corrective harness: COMPLETED WITH DISCLOSED DEVIATIONS
+- Exact-final verification: PASS
 - Independent specification review: PENDING
 - Independent quality review: PENDING
 
-Because the required 22 external evaluator runs and two independent closure reviews have not run, Task 11 and Milestone 7 remain open. No campaign PASS, canon-accuracy claim, or complete-suite approval is implied by the checks below.
+The approved 22-run first campaign remains immutable, including its one failed Skill assertion. The separately approved 11-run corrective Skill-only campaign passed all declared behavioral assertions against the current Skill. Ten harness/report deviations across seven cases are retained and disclosed; they do not reclassify any behavior or erase the failed first campaign. Exact-final verification has passed, but both independent closure reviews have not run, so Task 11 and Milestone 7 remain open. No canon-accuracy claim or complete-suite approval is implied by the checks below.
 
 ## Current Skill identity
 
 | Artifact | SHA-256 |
 | --- | --- |
-| `skills/researching-characters/SKILL.md` | `33B1BF3B8C98A97282295BFFE7EBE474D5EE43687378FF29E48DCABAC2239876` |
+| `skills/researching-characters/SKILL.md` | `AA08F7E8BB5DD78C2434AF0BD8878BB87D0CDBD7BAD0FB04CD40AA13149BEC21` |
 | `skills/researching-characters/references/research-contract.md` | `9E4F2ABC63A29BF75F4291D5DB657B2908A75C00E8830F69A027CC1EED73B313` |
 | `skills/researching-characters/agents/openai.yaml` | `093EB44756A018C1A8FFE856F4237E31D161E936AEEAF1DF2A452B3146785C3E` |
 
-Structural verification completed with `7 passed`; the standard Skill validator exited `0` and printed `Skill is valid!`.
+The focused structural suite completed with `8 passed`; the standard Skill validator exited `0` and printed `Skill is valid!` after the early-stop reporting correction.
+
+The first approved Skill batch used the previous Skill SHA-256, `33B1BF3B8C98A97282295BFFE7EBE474D5EE43687378FF29E48DCABAC2239876`. It passed 10 of 11 cases and failed only `continuity-conflict-clarification` → `report_unresolved_evidence`; that exact failed output remains retained.
+
+Approval `2026-08-13-approved2` then ran exactly 11 fresh Skill-only cases with the current hashes, unique evaluator threads, `fork_turns: none`, no baseline reruns, and no behavioral retries. Result: **PASS 11/11**. All seven operational cases retained 21 byte-identical JSON validation pairs with empty stderr and exactly one compilation per case. Protected product roots remained absent. The corrected continuity response now includes the required separate unresolved-evidence line.
+
+The corrective evidence reports `completed_with_disclosed_deviations` for seven cases. The retained deviations include incomplete report/control fields, one inconsistent pre-launch exit field, incomplete command arrays, one absolute final-file field, and one post-response read of the ambient system verification Skill whose producing command was omitted from the raw report. One non-behavioral reminder was sent only after the spoiler workflow and `final.md` were complete so the evaluator would write its already-required report. Repository evidence preserves every affected capture and raw hash.
 
 ## Copy/paste deterministic CLI smoke
 
@@ -130,7 +138,49 @@ The fresh wheel again contained 58 entries; the sdist contained 75 entries and e
 
 The standard Skill validator ran separately for `skills/using-kokoroarc`, `skills/authoring-character-packs`, and `skills/researching-characters`. All three validators exited `0` and printed `Skill is valid!`.
 
-This is a verified inline checkpoint, not Task 11 closure. Because campaign artifacts and independent reviews are absent, exact-final verification remains pending until those release inputs are settled.
+This is a verified inline checkpoint, not Task 11 closure. The current corrected Skill now has an approved 11/11 behavioral batch, but this checkpoint predates the final corrective-evidence import. Independent reviews are absent, and exact-final verification remains pending against the settled release inputs.
+
+## Exact-final candidate after corrective evidence
+
+Candidate root: `D:\tmp\kokoroarc-m7-release-20260813-final1`. Input identity: base HEAD `274c5a57051b8ee31d95deab11ae26d00707911a` plus the complete corrective campaign import, current Skill correction, executable evidence checks, and the corrective-status documentation that preceded this result block.
+
+The full repository suite ran with `PYTHONPATH=src`, pytest caching disabled, and `TEMP`, `TMP`, `KOKOROARC_TEMP_DIR`, and `--basetemp` confined beneath the candidate root. It exited `0`: **`1912 passed, 24 skipped` in 164.80 seconds**. All 24 skips were explicit Windows capability cases for symlinks, junctions, or FIFOs. There were no failures or errors. Captured pytest stdout was 6,995 bytes with SHA-256 `F60198B48BAA0203C5882CD62AECF76B24FB863E0A27AD1D2BFE0A1DFF6912C6`; stderr was empty with SHA-256 `E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855`.
+
+The clean build exited `0` and produced:
+
+| Artifact | Bytes | SHA-256 |
+| --- | ---: | --- |
+| `kokoroarc-0.0.0.dev0-py3-none-any.whl` | 111,414 | `A573C408B6B9492DA5A204AE31FA302A346FE7BFECD219D2A4724141D6F37AC5` |
+| `kokoroarc-0.0.0.dev0.tar.gz` | 86,038 | `8CED76118C774ABE209F8CB176F4AAB783B57C01A5162812C0ACF4DDB74B2668` |
+
+The wheel again contained 58 entries and the sdist 75. Both contained all six research modules and all eight research schemas; the sdist README SHA-256 remained `0F345F780A742B8552C34134641B8BA23C15B615D8A67F5E996F7303E9B5881D`.
+
+All three standard validators separately exited `0` and printed `Skill is valid!` for `skills/using-kokoroarc`, `skills/authoring-character-packs`, and `skills/researching-characters`. `git diff --check` exited `0`; its only output was the repository's LF-to-CRLF conversion warning. `git status --short` contained only the intended Task 11 Skill, plan, release-document, evidence-test, importer, and retained campaign-evidence paths.
+
+Two fixed-epoch calibration builds used `SOURCE_DATE_EPOCH=1786608259`, the base commit timestamp. Their wheel bytes were reproducible at SHA-256 `0F9D3B900E26B47E8F7C8A077931600351D051708881F473DBAF0C076E29ED6D`. Setuptools still assigned current mtimes to generated sdist entries, so raw sdist archives differed; after excluding only member mtimes, both produced the same 75-entry content-manifest SHA-256, `4E1ADA14555CCF663C9E87545AC476013E8726E43D3E894FF4CBF469E2C54776`. Per-run raw sdist hashes remain authoritative for each captured build.
+
+This candidate does not itself close Task 11: the result block and its executable assertions are post-run release-record changes. A final settled-input rerun and both independent reviews remain required.
+
+## Settled-input exact-final verification
+
+Final root: `D:\tmp\kokoroarc-m7-release-20260814-final2`. This rerun included the corrective campaign evidence, all disclosed harness deviations, the candidate release record, and its executable assertions. All temporary, pytest, build, and capture paths remained beneath the final D:-based root.
+
+The complete repository suite exited `0`: **`1913 passed, 24 skipped` in 160.54 seconds**. Every skip was again an explicit Windows capability limitation for symlinks, junctions, or FIFOs. There were no failures or errors. Captured stdout was 6,995 bytes with SHA-256 `8A7450B26067B2ED88EC14599FC66C892B3B75F08396051D675BA2C0C7F5E119`; stderr was empty with SHA-256 `E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855`.
+
+The final clean build used `SOURCE_DATE_EPOCH=1786608259`, exited `0`, and printed `Successfully built kokoroarc-0.0.0.dev0.tar.gz and kokoroarc-0.0.0.dev0-py3-none-any.whl`:
+
+| Artifact | Bytes | SHA-256 |
+| --- | ---: | --- |
+| `kokoroarc-0.0.0.dev0-py3-none-any.whl` | 111,414 | `0F9D3B900E26B47E8F7C8A077931600351D051708881F473DBAF0C076E29ED6D` |
+| `kokoroarc-0.0.0.dev0.tar.gz` | 86,031 | `2F22933EA8326B706DA77C7FE6EF0A36747246BE406F7A290DA59B071DA64FDF` |
+
+The wheel contained 58 entries and the sdist 75. Both retained all six research modules and all eight research schemas. The embedded README SHA-256 was `0F345F780A742B8552C34134641B8BA23C15B615D8A67F5E996F7303E9B5881D`; the normalized sdist content-manifest SHA-256 was `4E1ADA14555CCF663C9E87545AC476013E8726E43D3E894FF4CBF469E2C54776`. The wheel SHA-256 matched both fixed-epoch calibration builds byte-for-byte.
+
+The standard validator separately exited `0` and printed `Skill is valid!` for all three Skills. `git diff --check` exited `0`; only LF-to-CRLF conversion notices were printed. The intended-change audit contained only Task 11's current research Skill correction, plan/release documents, baseline/results records, evidence tests, two reproducible importers, and retained approved1/approved2 campaign evidence.
+
+The commit-preparation audit additionally treats `tests/skills/evidence/researching-characters/**` as byte-exact data via `.gitattributes` `-text`. This is required because the retained evaluator outputs include intentional trailing whitespace or terminal blank lines and their raw bytes are hash-bound. `git diff --cached --check` passes for every non-evidence path; the evidence subtree is deliberately excluded from whitespace normalization and its executable checks independently recompute every retained-file SHA-256.
+
+Because this section and its focused executable assertion are the only post-gate edits, the product code, schemas, Skills, retained evaluator artifacts, and broad test corpus exercised by the settled-input run are unchanged. The focused release-evidence tests are rerun after recording these values. Exact-final verification is therefore **PASS**; independent specification and quality reviews remain the two closure gates.
 
 ## Verified product gates before this record
 
@@ -140,14 +190,12 @@ This is a verified inline checkpoint, not Task 11 closure. Because campaign arti
 - Broad research plus authoring gate: `866 passed, 11 skipped`.
 - All skips were documented platform capability cases for Windows symlink/FIFO behavior.
 
-These results were obtained before the release-document changes. The current inline checkpoint above supplies a fresh full repository suite, three Skill validators, and distribution build. Exact-final reruns and diff/status checks still must run after all Task 11 evidence is settled.
+These results were obtained before the release-document changes. The settled-input exact-final section above supersedes the earlier inline checkpoint for Task 11 closure.
 
 ## Remaining closure gates
 
-1. Obtain exact approval and run the 22-case behavioral campaign with fresh isolated evaluator threads.
-2. Verify retained transcripts, hashes, assertion mappings, and product-state snapshots with executable tests.
-3. After the campaign evidence is settled, rerun the exact-final full repository suite and clean build.
-4. Obtain fresh independent specification and quality reviews on the exact final commit.
-5. Close Milestone 7 only after every gate reports PASS.
+1. Commit the exact Milestone 7 release evidence.
+2. Obtain fresh independent specification and quality reviews on that exact commit.
+3. Close Milestone 7 only after every remaining gate reports PASS.
 
-Until then, Behavioral campaign: PENDING. Independent specification review: PENDING. Independent quality review: PENDING.
+Current status: Behavioral campaign: CORRECTIVE PASS 11/11. Corrective harness: COMPLETED WITH DISCLOSED DEVIATIONS. Exact-final verification: PASS. Independent specification review: PENDING. Independent quality review: PENDING.

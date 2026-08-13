@@ -1,0 +1,34 @@
+{
+  "schema_version": "1.0",
+  "case_id": "original-character-non-trigger",
+  "variant": "skill-enabled",
+  "files_opened": [
+    "README.md",
+    "skills/authoring-character-packs/SKILL.md",
+    "skills/authoring-character-packs/references/authoring-contract.md"
+  ],
+  "commands": [
+    "Get-ChildItem -Force | Select-Object Name,Mode,Length",
+    "Get-Content -Raw skills\\authoring-character-packs\\SKILL.md",
+    "Get-Content -Raw skills\\authoring-character-packs\\references\\authoring-contract.md",
+    "Get-Content -Raw README.md",
+    "rg --files run-data",
+    "Get-ChildItem -Force run-data,run-temp,captures | Select-Object FullName,Mode,Length",
+    "python -m kokoroarc.cli character request validate --help",
+    "Get-Command kokoro -ErrorAction SilentlyContinue | Select-Object Name,Source,CommandType",
+    "kokoro character request validate --help",
+    "Get-Content -Raw final.md; Get-Content -Raw agent-report.json"
+  ],
+  "files_created": [
+    "final.md",
+    "agent-report.json"
+  ],
+  "final_file": "final.md",
+  "factual_notes": [
+    "The request is for a wholly original character, so the researching-characters skill was not opened or invoked.",
+    "No external research or claim verification was performed.",
+    "The brief specifies only a moon-rabbit mechanic; a single focused creative-direction clarification was requested before authoring identity and locale-specific voice.",
+    "No KokoroArc draft was created, compiled, installed, published, or activated in this turn.",
+    "The installed kokoro launcher and the python module entry point were unavailable because the kokoroarc Python module could not be imported; no repository implementation was opened or searched."
+  ]
+}

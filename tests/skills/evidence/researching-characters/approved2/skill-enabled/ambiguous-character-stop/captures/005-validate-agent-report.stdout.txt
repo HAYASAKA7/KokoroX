@@ -1,0 +1,8 @@
+{
+  "valid_json": true,
+  "schema_version": "1.0",
+  "case_id": "ambiguous-character-stop",
+  "variant": "skill-enabled",
+  "final_file": "final.md",
+  "final_file_exists": true
+}

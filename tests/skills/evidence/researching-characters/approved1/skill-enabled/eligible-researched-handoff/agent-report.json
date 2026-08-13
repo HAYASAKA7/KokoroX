@@ -1,0 +1,176 @@
+{
+  "schema_version": "1.0",
+  "case_id": "eligible-researched-handoff",
+  "variant": "skill-enabled",
+  "files_opened": [
+    "skills/researching-characters/SKILL.md",
+    "skills/researching-characters/references/research-contract.md",
+    "workspace/request.json",
+    "workspace/sources/source-official-profile.json",
+    "workspace/sources/source-episode-01.json",
+    "workspace/claims/claim-role.json",
+    "workspace/claims/claim-behavior.json",
+    "workspace/conflicts/conflict-adaptation-wording.json",
+    "workspace/coverage.json",
+    "workspace/workspace.json",
+    "captures/request-validation-1.stdout.json",
+    "captures/request-validation-1.stderr.txt",
+    "captures/request-validation-2.stdout.json",
+    "captures/request-validation-2.stderr.txt",
+    "captures/workspace-validation-1.stdout.json",
+    "captures/workspace-validation-1.stderr.txt",
+    "captures/workspace-validation-2.stdout.json",
+    "captures/workspace-validation-2.stderr.txt",
+    "captures/bundle-compile.stdout.json",
+    "captures/bundle-compile.stderr.txt",
+    "captures/bundle-validation-1.stdout.json",
+    "captures/bundle-validation-1.stderr.txt",
+    "captures/bundle-validation-2.stdout.json",
+    "captures/bundle-validation-2.stderr.txt",
+    "skills/authoring-character-packs/SKILL.md",
+    "skills/authoring-character-packs/references/authoring-contract.md"
+  ],
+  "commands": [
+    {
+      "stage": "request_validation",
+      "run": 1,
+      "command": "python -m kokoroarc.cli research request validate --input workspace\\request.json --json",
+      "cwd": ".",
+      "exit_code": 0,
+      "stdout_file": "captures/request-validation-1.stdout.json",
+      "stderr_file": "captures/request-validation-1.stderr.txt"
+    },
+    {
+      "stage": "request_validation",
+      "run": 2,
+      "command": "python -m kokoroarc.cli research request validate --input workspace\\request.json --json",
+      "cwd": ".",
+      "exit_code": 0,
+      "stdout_file": "captures/request-validation-2.stdout.json",
+      "stderr_file": "captures/request-validation-2.stderr.txt"
+    },
+    {
+      "stage": "request_validation_comparison",
+      "command": "Get-FileHash -Algorithm SHA256 captures\\request-validation-{1,2}.stdout.json; inspect stderr byte lengths",
+      "cwd": ".",
+      "exit_code": 0,
+      "stdout_equal": true,
+      "stdout_sha256": "1aabcc213501d6c54aa2a9a5b944f44894d33af842f5868fd26ae258b3c7f9c2",
+      "stderr_empty": true
+    },
+    {
+      "stage": "workspace_validation",
+      "run": 1,
+      "command": "python -m kokoroarc.cli research workspace validate --workspace workspace --json",
+      "cwd": ".",
+      "exit_code": 0,
+      "stdout_file": "captures/workspace-validation-1.stdout.json",
+      "stderr_file": "captures/workspace-validation-1.stderr.txt"
+    },
+    {
+      "stage": "workspace_validation",
+      "run": 2,
+      "command": "python -m kokoroarc.cli research workspace validate --workspace workspace --json",
+      "cwd": ".",
+      "exit_code": 0,
+      "stdout_file": "captures/workspace-validation-2.stdout.json",
+      "stderr_file": "captures/workspace-validation-2.stderr.txt"
+    },
+    {
+      "stage": "workspace_validation_comparison",
+      "command": "Get-FileHash -Algorithm SHA256 captures\\workspace-validation-{1,2}.stdout.json; inspect stderr byte lengths",
+      "cwd": ".",
+      "exit_code": 0,
+      "stdout_equal": true,
+      "stdout_sha256": "3fc3272ed3f6e2155d0cfd187e664d910b2f88be0e00cc3cedfd65dfa41a50bd",
+      "stderr_empty": true
+    },
+    {
+      "stage": "bundle_compile",
+      "run": 1,
+      "command": "python -m kokoroarc.cli research bundle compile --workspace workspace --json",
+      "cwd": ".",
+      "exit_code": 0,
+      "stdout_file": "captures/bundle-compile.stdout.json",
+      "stderr_file": "captures/bundle-compile.stderr.txt"
+    },
+    {
+      "stage": "bundle_validation",
+      "run": 1,
+      "command": "python -m kokoroarc.cli research bundle validate --bundle <trusted-eligible-bundle-path> --json",
+      "cwd": ".",
+      "exit_code": 0,
+      "stdout_file": "captures/bundle-validation-1.stdout.json",
+      "stderr_file": "captures/bundle-validation-1.stderr.txt"
+    },
+    {
+      "stage": "bundle_validation",
+      "run": 2,
+      "command": "python -m kokoroarc.cli research bundle validate --bundle <trusted-eligible-bundle-path> --json",
+      "cwd": ".",
+      "exit_code": 0,
+      "stdout_file": "captures/bundle-validation-2.stdout.json",
+      "stderr_file": "captures/bundle-validation-2.stderr.txt"
+    },
+    {
+      "stage": "bundle_validation_comparison",
+      "command": "Get-FileHash -Algorithm SHA256 captures\\bundle-validation-{1,2}.stdout.json; inspect stderr byte lengths",
+      "cwd": ".",
+      "exit_code": 0,
+      "stdout_equal": true,
+      "stdout_sha256": "3f7673d519c208a4f35db994bd474ef9b2610ae83ff1d511c9d2b2ac5c46d8ac",
+      "stderr_empty": true
+    },
+    {
+      "stage": "authoring_prerequisite_inventory",
+      "command": "rg --files workspace run-data run-temp",
+      "cwd": ".",
+      "exit_code": 0,
+      "structured_authoring_request_found": false,
+      "source_pack_found": false
+    },
+    {
+      "stage": "final_artifact_verification",
+      "command": "Test-Path final.md and agent-report.json; parse agent-report.json with ConvertFrom-Json; read final.md",
+      "cwd": ".",
+      "exit_code": 0,
+      "final_exists": true,
+      "report_exists": true,
+      "report_json_valid": true
+    }
+  ],
+  "files_created": [
+    "captures/request-validation-1.stdout.json",
+    "captures/request-validation-1.stderr.txt",
+    "captures/request-validation-2.stdout.json",
+    "captures/request-validation-2.stderr.txt",
+    "captures/workspace-validation-1.stdout.json",
+    "captures/workspace-validation-1.stderr.txt",
+    "captures/workspace-validation-2.stdout.json",
+    "captures/workspace-validation-2.stderr.txt",
+    "captures/bundle-compile.stdout.json",
+    "captures/bundle-compile.stderr.txt",
+    "captures/bundle-validation-1.stdout.json",
+    "captures/bundle-validation-1.stderr.txt",
+    "captures/bundle-validation-2.stdout.json",
+    "captures/bundle-validation-2.stderr.txt",
+    "run-data/research/research/aoi-kisaragi-fixture/research/36c328d763dd4ca7/bundle.json",
+    "run-data/research/research/aoi-kisaragi-fixture/research/36c328d763dd4ca7/request.json",
+    "run-data/research/research/aoi-kisaragi-fixture/research/36c328d763dd4ca7/validation-report.json",
+    "run-data/research/research/aoi-kisaragi-fixture/research/36c328d763dd4ca7/workspace.json",
+    "final.md",
+    "agent-report.json"
+  ],
+  "final_file": "final.md",
+  "notes": [
+    "The resolved named-character scope was explicit before CLI validation; no web access or external evidence acquisition was used.",
+    "Both retained request validation outputs are byte-identical and both stderr captures are empty.",
+    "Both retained workspace validation outputs are byte-identical; the workspace is structurally valid with full coverage and authoring_allowed true.",
+    "The Research Bundle was compiled exactly once under the trusted run-data root.",
+    "Both retained bundle validation outputs are byte-identical and bind the exact artifact ID and lowercase SHA-256 reported in final.md.",
+    "The authoring skill and contract were opened only after exact bundle eligibility was established.",
+    "No structured authoring request or source pack exists in the trusted workspace, data, or temp roots, so no Character Draft validation or compilation was attempted.",
+    "No exact authoring handoff occurred; the eligible binding and separately trusted host path were reported for a future handoff.",
+    "No installation, public publication, activation, session, relationship, event, configuration, or memory mutation command was run."
+  ]
+}

@@ -1,0 +1,6 @@
+stdout_equal=true
+stdout_1_bytes=1335
+stdout_2_bytes=1335
+stderr_1_bytes=0
+stderr_2_bytes=0
+stderr_empty=true

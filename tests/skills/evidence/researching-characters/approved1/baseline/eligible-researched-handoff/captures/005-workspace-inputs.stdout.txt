@@ -1,0 +1,398 @@
+===== D:\tmp\kokoroarc-m7-campaign-20260813-approved1\baseline\eligible-researched-handoff\workspace\bundle.json =====
+{
+  "schema_version": "1.0",
+  "artifact_id": "research/aoi-kisaragi-fixture/bundle",
+  "created_by": {
+    "component": "kokoroarc",
+    "version": "0.0.0.dev0"
+  },
+  "build_status": "research",
+  "visibility": "private",
+  "activation_allowed": false,
+  "authoring_allowed": true,
+  "namespace": "research",
+  "character_id": "aoi-kisaragi-fixture",
+  "display_name": "Aoi Kisaragi Fixture",
+  "continuity": "fixture-primary",
+  "timeline_cutoff": "episode-01",
+  "spoiler_scope": "episode-01 only",
+  "request_hash": "ce2816fe46ddd45950a939d6286d148ea4cab94218ec65df62daa361d4307fec",
+  "workspace_hash": "36c328d763dd4ca705f1619c8225cbc304ac09ccfe930c54375d2b9cf8c128a1",
+  "validation_report_hash": "78fc8a7e8db234f32aca04d6a1b1b690768f77e579d241bde8ffbb99eff0aa26",
+  "sources": [
+    {
+      "schema_version": "1.0",
+      "artifact_id": "research/aoi-kisaragi-fixture/source-episode-01",
+      "created_by": {
+        "component": "kokoroarc",
+        "version": "0.0.0.dev0"
+      },
+      "source_id": "source-episode-01",
+      "category": "episode",
+      "locator": "kokoro-evidence:fixture-arc/episode-01",
+      "title": "Fixture Arc Episode 01",
+      "publisher": "Fixture Arc Studio",
+      "accessed_at": "2026-08-04T00:00:00Z",
+      "availability": "available",
+      "content_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "excerpts": [
+        "In this fixture timeline, Aoi states that she is not an observatory apprentice."
+      ],
+      "continuity": "fixture-primary",
+      "spoiler_scope": "episode-01 only",
+      "limitations": [],
+      "trust_notes": [
+        "Fictional episode fixture record."
+      ]
+    },
+    {
+      "schema_version": "1.0",
+      "artifact_id": "research/aoi-kisaragi-fixture/source-official-profile",
+      "created_by": {
+        "component": "kokoroarc",
+        "version": "0.0.0.dev0"
+      },
+      "source_id": "source-official-profile",
+      "category": "official_profile",
+      "locator": "https://evidence.fixture-arc.example/aoi-profile",
+      "title": "Aoi Kisaragi Fixture Profile",
+      "publisher": "Fixture Arc Studio",
+      "accessed_at": "2026-08-04T00:00:00Z",
+      "availability": "available",
+      "content_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "excerpts": [
+        "Aoi serves as the observatory apprentice."
+      ],
+      "continuity": "fixture-primary",
+      "spoiler_scope": "episode-01 only",
+      "limitations": [],
+      "trust_notes": [
+        "Fictional official fixture record."
+      ]
+    }
+  ],
+  "claims": [
+    {
+      "schema_version": "1.0",
+      "artifact_id": "research/aoi-kisaragi-fixture/claim-behavior",
+      "created_by": {
+        "component": "kokoroarc",
+        "version": "0.0.0.dev0"
+      },
+      "claim_id": "claim-behavior",
+      "subject_id": "aoi-kisaragi-fixture",
+      "statement": "Aoi is not an observatory apprentice.",
+      "classification": "direct_observation",
+      "support": "direct",
+      "source_ids": [
+        "source-episode-01"
+      ],
+      "supporting_claim_ids": [],
+      "continuity": "fixture-primary",
+      "timeline": "episode-01-behavior",
+      "spoiler_scope": "episode-01 only",
+      "limitations": []
+    },
+    {
+      "schema_version": "1.0",
+      "artifact_id": "research/aoi-kisaragi-fixture/claim-role",
+      "created_by": {
+        "component": "kokoroarc",
+        "version": "0.0.0.dev0"
+      },
+      "claim_id": "claim-role",
+      "subject_id": "aoi-kisaragi-fixture",
+      "statement": "Aoi is an observatory apprentice.",
+      "classification": "direct_fact",
+      "support": "direct",
+      "source_ids": [
+        "source-official-profile"
+      ],
+      "supporting_claim_ids": [],
+      "continuity": "fixture-primary",
+      "timeline": "episode-01",
+      "spoiler_scope": "episode-01 only",
+      "limitations": []
+    }
+  ],
+  "conflicts": [
+    {
+      "schema_version": "1.0",
+      "artifact_id": "research/aoi-kisaragi-fixture/conflict-adaptation-wording",
+      "created_by": {
+        "component": "kokoroarc",
+        "version": "0.0.0.dev0"
+      },
+      "conflict_id": "conflict-adaptation-wording",
+      "claim_ids": [
+        "claim-role",
+        "claim-behavior"
+      ],
+      "kind": "source_disagreement",
+      "scopes": [
+        "fixture-primary@episode-01",
+        "fixture-primary@episode-01-behavior"
+      ],
+      "status": "scope_separated",
+      "selected_claim_ids": [
+        "claim-role"
+      ],
+      "resolution_rationale": "The claims make incompatible assertions about Aoi's role in distinct fixture timelines; both are retained as scope-separated rather than selecting a universal conclusion."
+    }
+  ],
+  "coverage": {
+    "schema_version": "1.0",
+    "artifact_id": "research/aoi-kisaragi-fixture/coverage",
+    "created_by": {
+      "component": "kokoroarc",
+      "version": "0.0.0.dev0"
+    },
+    "topics": [
+      {
+        "topic_id": "role-primary",
+        "status": "covered",
+        "supporting_claim_ids": [
+          "claim-role"
+        ],
+        "missing_evidence": [],
+        "unavailable_sources": [],
+        "spoiler_restrictions": [],
+        "blocks_authoring": false
+      },
+      {
+        "topic_id": "role-alternate",
+        "status": "covered",
+        "supporting_claim_ids": [
+          "claim-behavior"
+        ],
+        "missing_evidence": [],
+        "unavailable_sources": [],
+        "spoiler_restrictions": [],
+        "blocks_authoring": false
+      }
+    ],
+    "blocks_authoring": false
+  },
+  "limitations": [],
+  "blocking_reasons": [],
+  "bundle_hash": "5612d291bed5170721c684d9ba33f86ab41dd7001487efa109d803755a1dc117"
+}
+
+===== D:\tmp\kokoroarc-m7-campaign-20260813-approved1\baseline\eligible-researched-handoff\workspace\claims\claim-behavior.json =====
+{
+  "schema_version": "1.0",
+  "artifact_id": "research/aoi-kisaragi-fixture/claim-behavior",
+  "created_by": {
+    "component": "kokoroarc",
+    "version": "0.0.0.dev0"
+  },
+  "claim_id": "claim-behavior",
+  "subject_id": "aoi-kisaragi-fixture",
+  "statement": "Aoi is not an observatory apprentice.",
+  "classification": "direct_observation",
+  "support": "direct",
+  "source_ids": [
+    "source-episode-01"
+  ],
+  "supporting_claim_ids": [],
+  "continuity": "fixture-primary",
+  "timeline": "episode-01-behavior",
+  "spoiler_scope": "episode-01 only",
+  "limitations": []
+}
+
+===== D:\tmp\kokoroarc-m7-campaign-20260813-approved1\baseline\eligible-researched-handoff\workspace\claims\claim-role.json =====
+{"schema_version":"1.0","artifact_id":"research/aoi-kisaragi-fixture/claim-role","created_by":{"component":"kokoroarc","version":"0.0.0.dev0"},"claim_id":"claim-role","subject_id":"aoi-kisaragi-fixture","statement":"Aoi is an observatory apprentice.","classification":"direct_fact","support":"direct","source_ids":["source-official-profile"],"supporting_claim_ids":[],"continuity":"fixture-primary","timeline":"episode-01","spoiler_scope":"episode-01 only","limitations":[]}
+
+===== D:\tmp\kokoroarc-m7-campaign-20260813-approved1\baseline\eligible-researched-handoff\workspace\conflicts\conflict-adaptation-wording.json =====
+{
+  "schema_version": "1.0",
+  "artifact_id": "research/aoi-kisaragi-fixture/conflict-adaptation-wording",
+  "created_by": {
+    "component": "kokoroarc",
+    "version": "0.0.0.dev0"
+  },
+  "conflict_id": "conflict-adaptation-wording",
+  "claim_ids": [
+    "claim-role",
+    "claim-behavior"
+  ],
+  "kind": "source_disagreement",
+  "scopes": [
+    "fixture-primary@episode-01",
+    "fixture-primary@episode-01-behavior"
+  ],
+  "status": "scope_separated",
+  "selected_claim_ids": [
+    "claim-role"
+  ],
+  "resolution_rationale": "The claims make incompatible assertions about Aoi's role in distinct fixture timelines; both are retained as scope-separated rather than selecting a universal conclusion."
+}
+
+===== D:\tmp\kokoroarc-m7-campaign-20260813-approved1\baseline\eligible-researched-handoff\workspace\coverage.json =====
+{
+  "schema_version": "1.0",
+  "artifact_id": "research/aoi-kisaragi-fixture/coverage",
+  "created_by": {
+    "component": "kokoroarc",
+    "version": "0.0.0.dev0"
+  },
+  "topics": [
+    {
+      "topic_id": "role-primary",
+      "status": "covered",
+      "supporting_claim_ids": [
+        "claim-role"
+      ],
+      "missing_evidence": [],
+      "unavailable_sources": [],
+      "spoiler_restrictions": [],
+      "blocks_authoring": false
+    },
+    {
+      "topic_id": "role-alternate",
+      "status": "covered",
+      "supporting_claim_ids": [
+        "claim-behavior"
+      ],
+      "missing_evidence": [],
+      "unavailable_sources": [],
+      "spoiler_restrictions": [],
+      "blocks_authoring": false
+    }
+  ],
+  "blocks_authoring": false
+}
+
+===== D:\tmp\kokoroarc-m7-campaign-20260813-approved1\baseline\eligible-researched-handoff\workspace\request.json =====
+{
+  "schema_version": "1.0",
+  "artifact_id": "research/aoi-kisaragi-fixture/request",
+  "created_by": {
+    "component": "kokoroarc",
+    "version": "0.0.0.dev0"
+  },
+  "user_assertions": [],
+  "requested_visibility": "private",
+  "namespace": "research",
+  "character_id": "aoi-kisaragi-fixture",
+  "display_name": "Aoi Kisaragi Fixture",
+  "franchise": "fixture-arc",
+  "aliases": [
+    "Aoi",
+    "Kisaragi"
+  ],
+  "medium": "animated serial",
+  "work": "Fixture Arc",
+  "adaptation": "fixture-primary",
+  "continuity": "fixture-primary",
+  "timeline_cutoff": "episode-01",
+  "spoiler_scope": "episode-01 only",
+  "research_questions": [
+    "What role does Aoi hold?",
+    "How is Aoi's role described in the alternate fixture timeline?"
+  ],
+  "required_coverage_topics": [
+    "role-primary",
+    "role-alternate"
+  ],
+  "constraints": [
+    "Keep the research bundle private and inert."
+  ]
+}
+
+===== D:\tmp\kokoroarc-m7-campaign-20260813-approved1\baseline\eligible-researched-handoff\workspace\sources\source-episode-01.json =====
+{
+  "schema_version": "1.0",
+  "artifact_id": "research/aoi-kisaragi-fixture/source-episode-01",
+  "created_by": {
+    "component": "kokoroarc",
+    "version": "0.0.0.dev0"
+  },
+  "source_id": "source-episode-01",
+  "category": "episode",
+  "locator": "kokoro-evidence:fixture-arc/episode-01",
+  "title": "Fixture Arc Episode 01",
+  "publisher": "Fixture Arc Studio",
+  "accessed_at": "2026-08-04T00:00:00Z",
+  "availability": "available",
+  "content_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+  "excerpts": [
+    "In this fixture timeline, Aoi states that she is not an observatory apprentice."
+  ],
+  "continuity": "fixture-primary",
+  "spoiler_scope": "episode-01 only",
+  "limitations": [],
+  "trust_notes": [
+    "Fictional episode fixture record."
+  ]
+}
+
+===== D:\tmp\kokoroarc-m7-campaign-20260813-approved1\baseline\eligible-researched-handoff\workspace\sources\source-official-profile.json =====
+{"schema_version":"1.0","artifact_id":"research/aoi-kisaragi-fixture/source-official-profile","created_by":{"component":"kokoroarc","version":"0.0.0.dev0"},"source_id":"source-official-profile","category":"official_profile","locator":"https://evidence.fixture-arc.example/aoi-profile","title":"Aoi Kisaragi Fixture Profile","publisher":"Fixture Arc Studio","accessed_at":"2026-08-04T00:00:00Z","availability":"available","content_sha256":"1111111111111111111111111111111111111111111111111111111111111111","excerpts":["Aoi serves as the observatory apprentice."],"continuity":"fixture-primary","spoiler_scope":"episode-01 only","limitations":[],"trust_notes":["Fictional official fixture record."]}
+
+===== D:\tmp\kokoroarc-m7-campaign-20260813-approved1\baseline\eligible-researched-handoff\workspace\validation-report.json =====
+{
+  "schema_version": "1.0",
+  "artifact_id": "research/aoi-kisaragi-fixture/validation",
+  "created_by": {
+    "component": "kokoroarc",
+    "version": "0.0.0.dev0"
+  },
+  "advisory_findings": [],
+  "coverage_summary": {
+    "covered": 2,
+    "partial": 0,
+    "missing": 0,
+    "blocked": 0
+  },
+  "blocking_reasons": [],
+  "valid": true,
+  "authoring_allowed": true,
+  "hard_failures": []
+}
+
+===== D:\tmp\kokoroarc-m7-campaign-20260813-approved1\baseline\eligible-researched-handoff\workspace\workspace.json =====
+{
+  "schema_version": "1.0",
+  "artifact_id": "research/aoi-kisaragi-fixture/workspace",
+  "created_by": {
+    "component": "kokoroarc",
+    "version": "0.0.0.dev0"
+  },
+  "request": {
+    "path": "request.json",
+    "sha256": "1568eb96e6892e6518e186ab43db9380219e876f448c04e830b84e11fd5dfc6d"
+  },
+  "sources": [
+    {
+      "path": "sources/source-episode-01.json",
+      "sha256": "d44dea0c930e82b8af5952cf448d0a3f8a09aed6054be8aaa07070be66694407"
+    },
+    {
+      "path": "sources/source-official-profile.json",
+      "sha256": "0112f1fc85c669a1deaeb7e7842225b0b52e758d353186ee1841c092e58dabc4"
+    }
+  ],
+  "claims": [
+    {
+      "path": "claims/claim-behavior.json",
+      "sha256": "de8f1c581d64182bc8a9a668a762d43885f6364b784812023b1d4c7cf68720c2"
+    },
+    {
+      "path": "claims/claim-role.json",
+      "sha256": "5f86148980c761e2a1b9404bdc64c910ce327eeed1d82431a793cd088816f4c7"
+    }
+  ],
+  "conflicts": [
+    {
+      "path": "conflicts/conflict-adaptation-wording.json",
+      "sha256": "f99d693b908bf4cc337a8f60accdb067677ee7c3c90c91d125571ff8ce4add5c"
+    }
+  ],
+  "coverage": {
+    "path": "coverage.json",
+    "sha256": "66d19afa19de0b5860fb59d1221593c4bee9b35b6a90941d1b9b12054c969d80"
+  }
+}
+

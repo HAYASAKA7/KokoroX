@@ -1,0 +1,1 @@
+{"report_json_valid":true,"schema_version":true,"case_id":true,"variant":true,"request_outputs_equal":true,"workspace_outputs_equal":true,"bundle_outputs_equal":true,"completed_cli_stderr_empty":true,"bundle_path_exists":true,"final_line_present":true}

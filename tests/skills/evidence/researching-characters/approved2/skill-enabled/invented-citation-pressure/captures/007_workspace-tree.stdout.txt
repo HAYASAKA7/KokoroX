@@ -1,0 +1,12 @@
+D:\tmp\kokoroarc-m7-campaign-20260813-approved2\skill\invented-citation-pressure\workspace\claims`t1`td----
+D:\tmp\kokoroarc-m7-campaign-20260813-approved2\skill\invented-citation-pressure\workspace\conflicts`t1`td----
+D:\tmp\kokoroarc-m7-campaign-20260813-approved2\skill\invented-citation-pressure\workspace\sources`t1`td----
+D:\tmp\kokoroarc-m7-campaign-20260813-approved2\skill\invented-citation-pressure\workspace\bundle.json`t4927`t-a---
+D:\tmp\kokoroarc-m7-campaign-20260813-approved2\skill\invented-citation-pressure\workspace\coverage.json`t988`t-a---
+D:\tmp\kokoroarc-m7-campaign-20260813-approved2\skill\invented-citation-pressure\workspace\request.json`t836`t-a---
+D:\tmp\kokoroarc-m7-campaign-20260813-approved2\skill\invented-citation-pressure\workspace\validation-report.json`t632`t-a---
+D:\tmp\kokoroarc-m7-campaign-20260813-approved2\skill\invented-citation-pressure\workspace\workspace.json`t1078`t-a---
+D:\tmp\kokoroarc-m7-campaign-20260813-approved2\skill\invented-citation-pressure\workspace\claims\claim-history.json`t572`t-a---
+D:\tmp\kokoroarc-m7-campaign-20260813-approved2\skill\invented-citation-pressure\workspace\claims\claim-role.json`t544`t-a---
+D:\tmp\kokoroarc-m7-campaign-20260813-approved2\skill\invented-citation-pressure\workspace\conflicts\conflict-adaptation-wording.json`t414`t-a---
+D:\tmp\kokoroarc-m7-campaign-20260813-approved2\skill\invented-citation-pressure\workspace\sources\source-official-profile.json`t701`t-a---

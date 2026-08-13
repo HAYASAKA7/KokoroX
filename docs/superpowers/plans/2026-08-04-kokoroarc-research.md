@@ -1077,21 +1077,21 @@ git commit -m "feat: add character research skill"
 - Modify: `README.md`
 - Modify: `docs/superpowers/plans/2026-08-04-kokoroarc-research.md`
 
-**Inline checkpoint (2026-08-13):** Steps 5-6 have recorded deterministic CLI smoke and distribution evidence. A current full repository run reported `1903 passed, 24 skipped`, all three Skills passed the standard validator, and the historical Milestone 6 evidence verifier was corrected to reconstruct its recorded commit. Steps 1-4 and 10 remain pending because the required fresh evaluator threads and independent reviews conflict with the user's current inline-only/no-subagent instruction. Task 11 remains open, exact-final verification must be repeated after those inputs are settled, and Milestone 8 is not authorized to begin.
+**Campaign checkpoint (2026-08-14):** The exactly approved first campaign ran 11 baseline and 11 Skill-enabled cases in fresh isolated threads. Its immutable result remains baseline RED `9/11` and Skill PASS `10/11`, RED `1/11`; the only Skill failure is the missing separate `Unresolved evidence:` line on the early continuity-clarification stop. A focused RED regression drove the corrected Skill body. Approval `2026-08-13-approved2` then ran exactly 11 fresh corrected Skill-only cases, with no baseline reruns or behavioral retries, and passed all declared assertions `11/11`. Repository evidence binds raw/sanitized streams, prompts, finals, reports, command outputs, state records, assertions, current hashes, and ten disclosed harness/report deviations across seven cases. Deterministic CLI smoke, distribution evidence, and exact-final verification are recorded; Steps 9 and 10 remain open. Task 11 remains open and Milestone 8 is not authorized to begin.
 
-- [ ] **Step 1: Obtain campaign approval**
+- [x] **Step 1: Obtain campaign approval**
 
 Before any external evaluator execution, state the exact number of baseline/Skill runs, model/provider if applicable, disclosed repository files, retained transcript fields, redactions, and `D:\tmp` roots. Wait for explicit user approval. Any rerun batch needs a new exact approval.
 
-- [ ] **Step 2: Run fresh Skill-enabled cases**
+- [x] **Step 2: Run fresh Skill-enabled cases**
 
 Use unique threads and isolated directories. Positive cases must open the current Skill and reference, use the exact current hashes, and retain complete validation outputs. Bind raw/sanitized streams, prompts, final responses, state snapshots, assertion outcomes, and current Skill/reference/metadata hashes. Reject and rerun only harness failures; retain and report product/Skill failures.
 
-- [ ] **Step 3: Write executable evidence verification**
+- [x] **Step 3: Write executable evidence verification**
 
 The test must parse evidence rather than check global substring presence. It independently computes every retained file hash, verifies thread uniqueness and approval counts, binds final text to the final agent message with only declared newline normalization, checks complete JSON output pairs byte-for-byte, scans parsed strings recursively for forbidden paths/secrets, verifies state hashes, and maps each result row to exact case assertions.
 
-- [ ] **Step 4: Run campaign GREEN or fix with RED regressions**
+- [x] **Step 4: Run campaign GREEN or fix with RED regressions**
 
 Run:
 
@@ -1102,15 +1102,15 @@ python $skillCreatorValidator skills/researching-characters
 
 Expected: every declared baseline result is honest, every Skill-enabled case passes, and the Skill validates. Fix failures with new focused tests and fresh approved reruns; never edit retained model output to force a pass.
 
-- [ ] **Step 5: Run a copy/paste CLI release smoke**
+- [x] **Step 5: Run a copy/paste CLI release smoke**
 
 Under one new unique `D:\tmp` root, explicitly create test/temp/build/smoke/data directories. Capture stdout and stderr separately for two request validations, two workspace validations, one bundle compilation, and two bundle validations. Assert byte equality of paired outputs, empty stderr, exact lifecycle, coverage/conflicts, confinement, protected-root absence, and canonical transcript hash.
 
-- [ ] **Step 6: Build and inspect distributions from an exact input identity**
+- [x] **Step 6: Build and inspect distributions from an exact input identity**
 
 Record exact HEAD or exact base-plus-patch identity; never call a dirty build clean. Build wheel and sdist into the unique root. Record names, sizes, SHA-256, entry counts, all research module/schema entries, README identity, and any excluded non-package evidence changes. Provide copy/paste reconstruction commands and parameterize external validator paths.
 
-- [ ] **Step 7: Run exact-final verification**
+- [x] **Step 7: Run exact-final verification**
 
 Run separately and record exact outputs:
 
@@ -1126,7 +1126,7 @@ git status --short
 
 Expected: zero failures/errors, only documented platform capability skips, all three Skills valid, wheel and sdist built, no bad whitespace, and only intended release-evidence changes before commit.
 
-- [ ] **Step 8: Document the exact boundary**
+- [x] **Step 8: Document the exact boundary**
 
 README must explain repository-local research Skill invocation, continuity/spoiler clarification, private Research Bundle output, exact eligible handoff to authoring, and that testing/promotion/global installation/default bindings/memory/publication remain unavailable until Milestones 8-9.
 

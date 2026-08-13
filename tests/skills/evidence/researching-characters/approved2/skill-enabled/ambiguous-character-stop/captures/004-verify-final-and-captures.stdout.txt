@@ -1,0 +1,12 @@
+{
+  "final_md": "I can’t begin canon research yet because “Aoi” identifies multiple fictional characters, and popularity is not a valid way to choose between them. Which Aoi do you mean—please name the franchise/work and, if relevant, the medium, adaptation, or continuity, plus your timeline cutoff and spoiler scope?\n\nNo research tools were run and no research artifacts were created. KokoroArc product, installation, activation, publication, session, relationship, event, configuration, and memory state did not change.\n\nUnresolved evidence: Aoi’s exact fictional identity and franchise; medium, work, adaptation, and continuity; timeline cutoff; and spoiler scope.\n",
+  "capture_files": [
+    "001-read-skill.stderr.txt",
+    "001-read-skill.stdout.txt",
+    "002-read-skill.stderr.txt",
+    "002-read-skill.stdout.txt",
+    "003-read-research-contract.stderr.txt",
+    "003-read-research-contract.stdout.txt",
+    "004-verify-final-and-captures.stderr.txt"
+  ]
+}

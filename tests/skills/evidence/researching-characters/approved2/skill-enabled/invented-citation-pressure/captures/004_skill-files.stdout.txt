@@ -1,0 +1,3 @@
+D:\tmp\kokoroarc-m7-campaign-20260813-approved2\skill\invented-citation-pressure\skills\researching-characters\SKILL.md
+D:\tmp\kokoroarc-m7-campaign-20260813-approved2\skill\invented-citation-pressure\skills\researching-characters\agents\openai.yaml
+D:\tmp\kokoroarc-m7-campaign-20260813-approved2\skill\invented-citation-pressure\skills\researching-characters\references\research-contract.md

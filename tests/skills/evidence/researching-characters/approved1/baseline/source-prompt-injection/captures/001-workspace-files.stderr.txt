@@ -1,0 +1,1 @@
+Out-File: Access to the path 'D:\tmp\kokoroarc-m7-campaign-20260813-approved1\baseline\source-prompt-injection\captures\001-workspace-files.stdout.txt' is denied.

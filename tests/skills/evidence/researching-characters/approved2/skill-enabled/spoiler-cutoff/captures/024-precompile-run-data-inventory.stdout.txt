@@ -1,0 +1,4 @@
+{
+  "root": "D:\\tmp\\kokoroarc-m7-campaign-20260813-approved2\\skill\\spoiler-cutoff\\run-data",
+  "items": []
+}
