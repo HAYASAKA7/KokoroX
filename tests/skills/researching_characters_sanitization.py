@@ -13,13 +13,11 @@ _USER_PROFILE = re.compile(
     r"[A-Za-z]:[\\/]+Users[\\/]+[^\\/\s\"']+",
     re.IGNORECASE,
 )
-_ENVIRONMENT_ASSIGNMENT = re.compile(
+_ENVIRONMENT_ASSIGNMENT_PREFIX = re.compile(
     r"(?P<prefix>[\"']?[A-Z0-9_-]*(?:API[_-]?KEY|ACCESS[_-]?KEY|"
     r"PRIVATE[_-]?KEY|CLIENT[_-]?SECRET|SECRET|TOKEN|PASSWORD|PASSWD|"
     r"CREDENTIALS?)"
-    r"[\"']?\s*[:=]\s*)"
-    r"(?P<value>(?P<environment_quote>\\?[\"']).*?"
-    r"(?P=environment_quote)|[^\s,}\]\r\n]+)",
+    r"[\"']?\s*[:=]\s*)",
     re.IGNORECASE,
 )
 _AUTHORIZATION = re.compile(
@@ -46,6 +44,132 @@ _KNOWN_CREDENTIALS = (
         re.DOTALL,
     ),
 )
+
+
+def _line_end(text: str, start: int) -> int:
+    endings = [
+        index
+        for marker in ("\r", "\n")
+        if (index := text.find(marker, start)) >= 0
+    ]
+    return min(endings, default=len(text))
+
+
+def _is_value_boundary(text: str, index: int, end: int) -> bool:
+    return index >= end or text[index] in " \t,;|&}]"
+
+
+def _quoted_value_end(text: str, start: int) -> int:
+    escaped_delimiter = (
+        text[start : start + 2]
+        if text[start : start + 1] == "\\"
+        and text[start + 1 : start + 2] in {"\"", "'"}
+        else ""
+    )
+    if escaped_delimiter:
+        end = _line_end(text, start)
+        closing = text.rfind(escaped_delimiter, start + 2, end)
+        candidate = closing + 2
+        return (
+            candidate
+            if closing >= start + 2 and _is_value_boundary(text, candidate, end)
+            else end
+        )
+
+    quote = text[start]
+    index = start + 1
+    end = _line_end(text, start)
+    while index < end:
+        if text[index] == "\\" and index + 1 < end:
+            index += 2
+            continue
+        if text[index] == quote:
+            candidate = index + 1
+            if _is_value_boundary(text, candidate, end):
+                return candidate
+        index += 1
+    return end
+
+
+def _structured_value_end(text: str, start: int) -> int:
+    if start >= len(text):
+        return start
+    if text[start] in {"\"", "'"} or (
+        text[start] == "\\" and text[start + 1 : start + 2] in {"\"", "'"}
+    ):
+        return _quoted_value_end(text, start)
+    if text[start] not in "[{":
+        index = start
+        end = _line_end(text, start)
+        while index < end and text[index] not in ",}]":
+            index += 1
+        return index
+
+    pairs = {"[": "]", "{": "}"}
+    stack = [pairs[text[start]]]
+    quote: str | None = None
+    index = start + 1
+    while index < len(text):
+        character = text[index]
+        if quote is not None:
+            if character == "\\" and index + 1 < len(text):
+                index += 2
+                continue
+            if character == quote:
+                quote = None
+        elif character in {"\"", "'"}:
+            quote = character
+        elif character in pairs:
+            stack.append(pairs[character])
+        elif character in {"}", "]"}:
+            if character != stack[-1]:
+                return _line_end(text, start)
+            stack.pop()
+            if not stack:
+                return index + 1
+        index += 1
+    return _line_end(text, start)
+
+
+def _redacted_assignment_value(value: str) -> bool:
+    candidate = value.strip()
+    for delimiter in ('"', "'", '\\"', "\\'"):
+        if candidate.startswith(delimiter) and candidate.endswith(delimiter):
+            candidate = candidate[len(delimiter) : -len(delimiter)]
+            break
+    return candidate.casefold() == ENVIRONMENT_SECRET_REPLACEMENT.casefold()
+
+
+def _format_assignment_replacement(value: str) -> str:
+    for delimiter in ('\\"', "\\'", '"', "'"):
+        if value.startswith(delimiter) and value.endswith(delimiter):
+            return f"{delimiter}{ENVIRONMENT_SECRET_REPLACEMENT}{delimiter}"
+    return ENVIRONMENT_SECRET_REPLACEMENT
+
+
+def _replace_environment_assignments(text: str) -> tuple[str, int]:
+    pieces: list[str] = []
+    cursor = 0
+    search_from = 0
+    count = 0
+    while match := _ENVIRONMENT_ASSIGNMENT_PREFIX.search(text, search_from):
+        value_start = match.end()
+        value_end = _structured_value_end(text, value_start)
+        if value_end <= value_start:
+            search_from = value_start
+            continue
+        raw_value = text[value_start:value_end]
+        if _redacted_assignment_value(raw_value):
+            search_from = value_end
+            continue
+        pieces.extend(
+            (text[cursor:value_start], _format_assignment_replacement(raw_value))
+        )
+        cursor = value_end
+        search_from = value_end
+        count += 1
+    pieces.append(text[cursor:])
+    return "".join(pieces), count
 
 
 def _replace_value(match: re.Match[str], replacement: str) -> str:
@@ -98,13 +222,11 @@ def sanitize_sensitive_text(value: str) -> tuple[str, int]:
             _URL_CREDENTIALS,
             lambda match: _replace_value(match, CREDENTIAL_REPLACEMENT),
         ),
-        (
-            _ENVIRONMENT_ASSIGNMENT,
-            lambda match: _replace_value(match, ENVIRONMENT_SECRET_REPLACEMENT),
-        ),
     ):
         text, count = _subn_counted(pattern, replacement, text)
         total += count
+    text, count = _replace_environment_assignments(text)
+    total += count
     for pattern in _KNOWN_CREDENTIALS:
         text, count = _subn_counted(pattern, CREDENTIAL_REPLACEMENT, text)
         total += count

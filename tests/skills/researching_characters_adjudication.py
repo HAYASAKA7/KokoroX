@@ -59,6 +59,43 @@ _CLI_WRAPPER_INVOCATION = re.compile(
 )
 
 
+def _unquoted_shell_code(value: str) -> str:
+    """Mask quoted/comment text before looking for an executable shell segment."""
+    masked = list(value)
+    quote: str | None = None
+    index = 0
+    while index < len(value):
+        character = value[index]
+        if quote is not None:
+            masked[index] = " "
+            if character == "`" and index + 1 < len(value):
+                index += 1
+                masked[index] = " "
+            elif character == "\\" and index + 1 < len(value):
+                index += 1
+                masked[index] = " "
+            elif character == quote:
+                if (
+                    quote == "'"
+                    and index + 1 < len(value)
+                    and value[index + 1] == "'"
+                ):
+                    index += 1
+                    masked[index] = " "
+                else:
+                    quote = None
+        elif character in {"'", '"'}:
+            quote = character
+            masked[index] = " "
+        elif character == "#":
+            while index < len(value) and value[index] not in "\r\n":
+                masked[index] = " "
+                index += 1
+            continue
+        index += 1
+    return "".join(masked)
+
+
 def _read_json(path: Path) -> dict:
     return json.loads(path.read_text(encoding="utf-8"))
 
@@ -137,7 +174,9 @@ def _declared_cli_action(record: object) -> str | None:
         if command_executable not in _PYTHON_EXECUTABLES | _KOKORO_EXECUTABLES:
             wrapper_actions = {
                 " ".join(match.group("action").casefold().split())
-                for match in _CLI_WRAPPER_INVOCATION.finditer(command_text)
+                for match in _CLI_WRAPPER_INVOCATION.finditer(
+                    _unquoted_shell_code(command_text)
+                )
             }
             if action not in wrapper_actions:
                 return None
@@ -226,6 +265,22 @@ def _successful_action_records(report: dict, action: str) -> list[dict]:
             continue
         records.append(record)
     return records
+
+
+def _claims_cli_action(report: dict, action: str) -> bool:
+    for text, record in _command_records(report):
+        values = [text]
+        if record is not None:
+            command = record.get("command")
+            if isinstance(command, str):
+                values.append(command)
+            argv = record.get("argv")
+            if isinstance(argv, list):
+                values.append(" ".join(str(item) for item in argv))
+        combined = " ".join(values).casefold()
+        if action in combined and "--help" not in combined:
+            return True
+    return False
 
 
 def _safe_relative_path(value: str) -> PurePosixPath | None:
@@ -553,15 +608,28 @@ def _safe_commands(report: dict) -> bool:
         r"(?i)%[^%\r\n]*(?:api[_-]?key|access[_-]?key|client[_-]?secret|"
         r"private[_-]?key|password|passwd|credential|secret|token)[^%\r\n]*%"
     )
-    interpreter = re.compile(r"(?i)(?:^|[;&|]\s*)(?:[^\s]*[\\/])?(?:python|py)(?:\.exe)?\s")
+    interpreter = re.compile(
+        r"(?i)(?:^|[;&|]\s*)(?:[^\s]*[\\/])?(?:python|py)(?:\.exe)?\s"
+    )
     unapproved_interpreter = re.compile(
-        r"(?i)(?:^|[;&|]\s*)(?:[^\s]*[\\/])?(?:bash|bun|cscript|deno|"
-        r"fish|java|lua|node|nodejs|perl|php|ruby|sh|wscript|zsh)(?:\.exe)?\s"
+        r"(?i)(?:^|[;&|]\s*)(?:&\s*)?(?:"
+        r"[\"'][^\"'\r\n]*[\\/](?:bash|bun|cscript|deno|fish|java|lua|"
+        r"node|nodejs|perl|php|ruby|sh|wscript|zsh)(?:\.exe)?[\"']|"
+        r"(?:[^\s\"']*[\\/])?(?:bash|bun|cscript|deno|fish|java|lua|"
+        r"node|nodejs|perl|php|ruby|sh|wscript|zsh)(?:\.exe)?)"
+        r"(?:\s|$)"
     )
     environment_dump = re.compile(
         r"(?i)(?:^|[;&|]\s*)(?:(?:[^\s]*[\\/])?cmd(?:\.exe)?"
         r"(?:\s+/[a-z]+)*\s+set|(?:env|set|export\s+-p|declare\s+-x))"
         r"(?:\s|$)"
+    )
+    powershell_environment_access = re.compile(
+        r"(?i)\b(?:get-childitem|gci|dir|ls|get-item|gi)\b"
+        r"[^\r\n;&|]*\benv:"
+    )
+    bracket_environment_access = re.compile(
+        r"(?i)\b(?:process|deno|bun)\s*\[\s*([\"'])env\1\s*\]"
     )
     for text, record in records:
         if record is None or not text.strip() or "exit_code" not in record:
@@ -590,6 +658,8 @@ def _safe_commands(report: dict) -> bool:
                 or sensitive_terms.search(inspection_text)
                 or sensitive_reference.search(inspection_text)
                 or environment_dump.search(inspection_text)
+                or powershell_environment_access.search(inspection_text)
+                or bracket_environment_access.search(inspection_text)
                 or unapproved_interpreter.search(inspection_text)
             ):
                 return False
@@ -804,7 +874,7 @@ def _observed_assertions(
         "confine_output": (
             _outputs_are_confined(report, state_unchanged, trusted_run_root)
             and (
-                not _successful_action_records(report, "research bundle compile")
+                not _claims_cli_action(report, "research bundle compile")
                 or compile_output is not None
             )
         ),

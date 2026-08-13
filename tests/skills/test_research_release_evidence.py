@@ -75,13 +75,15 @@ def test_release_evidence_records_smoke_and_exact_milestone_boundary() -> None:
         "Milestone 7 does not approve the complete standalone suite",
         "Behavioral campaign: CORRECTIVE PASS 11/11",
         "Corrective harness: COMPLETED WITH DISCLOSED DEVIATIONS",
-        "Exact-final verification: PASS ON REPLAY-HARDENING SETTLED TREE; FRESH REVIEWS PENDING",
+        "Exact-final verification: PASS ON SPEC-REVIEW REMEDIATION SETTLED TREE; FRESH REVIEWS PENDING",
         "Fresh specification review of `6afcbeccbc43814700e42c4626a6a9b8e1bddce0`: PASS",
         "Fresh quality review of `6afcbeccbc43814700e42c4626a6a9b8e1bddce0`: IMPORTANT FINDINGS REMEDIATED",
         "Fresh specification review of `646fc91f27eb723334f4ff4b25309985b56046a3`: IMPORTANT FINDINGS REMEDIATED",
         "Fresh quality review of `646fc91f27eb723334f4ff4b25309985b56046a3`: IMPORTANT FINDINGS REMEDIATED",
-        "Fresh specification review of replay-hardening settled tree: PENDING",
-        "Fresh quality review of replay-hardening settled tree: PENDING",
+        "Fresh specification review of `531ce43cf2f8dff4708fa64c601ec72bd680cbf2`: IMPORTANT FINDINGS REMEDIATED",
+        "Fresh quality review of `531ce43cf2f8dff4708fa64c601ec72bd680cbf2`: NOT RUN; SPECIFICATION REVIEW FAILED",
+        "Fresh specification review of spec-review remediation settled tree: PENDING",
+        "Fresh quality review of spec-review remediation settled tree: PENDING",
     ):
         assert text in evidence
 
@@ -221,6 +223,26 @@ def test_release_evidence_records_replay_hardening_review_remediation() -> None:
         "74FA2331E2AB269DCFAAE95D001DC9DB433D4BD772BEF3B6F314C84C8FB536A0",
         r"D:\tmp\kokoroarc-m7-replay-hardening-settled-01",
         "PASS ON REPLAY-HARDENING SETTLED TREE; FRESH REVIEWS PENDING",
+    ):
+        assert text in evidence
+
+
+def test_release_evidence_records_second_specification_review_remediation() -> None:
+    evidence = EVIDENCE_PATH.read_text(encoding="utf-8")
+    for text in (
+        "Second specification-review remediation",
+        "531ce43cf2f8dff4708fa64c601ec72bd680cbf2",
+        "quoted non-executing wrapper",
+        "`dir env:`",
+        "`process['env']`",
+        "structured assignment-value scanner",
+        "redaction-placeholder smuggling",
+        "passes **57 tests**",
+        r"D:\tmp\kokoroarc-m7-spec2-remediation-preflight-01",
+        "1948 passed, 24 skipped",
+        "519FD46D9CD23957DF336D1BB861F6EE1FE8ED3C0C746EE26F4F524202D0F8BB",
+        r"D:\tmp\kokoroarc-m7-spec2-remediation-settled-01",
+        "PASS ON SPEC-REVIEW REMEDIATION SETTLED TREE; FRESH REVIEWS PENDING",
     ):
         assert text in evidence
 
