@@ -82,6 +82,46 @@
     },
     {
       "if": {
+        "properties": {"mode": {"enum": ["researched", "hybrid"]}},
+        "required": ["mode"]
+      },
+      "then": {
+        "required": ["continuity", "timeline", "spoiler_scope"],
+        "properties": {
+          "inputs": {
+            "contains": {
+              "type": "object",
+              "properties": {"type": {"const": "research_bundle"}},
+              "required": ["type"]
+            },
+            "minContains": 1,
+            "maxContains": 1
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {"mode": {"const": "hybrid"}},
+        "required": ["mode"]
+      },
+      "then": {
+        "properties": {
+          "inputs": {
+            "contains": {
+              "type": "object",
+              "properties": {
+                "type": {"enum": ["user_dossier", "user_override"]}
+              },
+              "required": ["type"]
+            },
+            "minContains": 1
+          }
+        }
+      }
+    },
+    {
+      "if": {
         "properties": {
           "mode": {"enum": ["dossier", "researched", "hybrid"]}
         },
@@ -150,19 +190,33 @@
       ]
     },
     "input_record": {
+      "oneOf": [
+        {"$ref": "#/$defs/content_input_record"},
+        {"$ref": "#/$defs/research_bundle_input_record"}
+      ]
+    },
+    "content_input_record": {
       "type": "object",
       "additionalProperties": false,
       "required": ["type", "content"],
       "properties": {
         "type": {
-          "enum": [
-            "creative_brief",
-            "user_dossier",
-            "research_bundle",
-            "user_override"
-          ]
+          "enum": ["creative_brief", "user_dossier", "user_override"]
         },
         "content": {"type": "string", "minLength": 1, "maxLength": 262144}
+      }
+    },
+    "research_bundle_input_record": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "artifact_id", "sha256"],
+      "properties": {
+        "type": {"const": "research_bundle"},
+        "artifact_id": {"$ref": "#/$defs/artifact_id"},
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}(?![\\s\\S])"
+        }
       }
     }
   }

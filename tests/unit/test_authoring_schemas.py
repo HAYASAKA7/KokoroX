@@ -27,6 +27,14 @@ def _metadata(artifact_id: str) -> dict:
     }
 
 
+def _research_bundle_input() -> dict[str, str]:
+    return {
+        "type": "research_bundle",
+        "artifact_id": "research/aoi-kisaragi-fixture/research/0123456789abcdef",
+        "sha256": "a" * 64,
+    }
+
+
 @pytest.fixture
 def valid_request() -> dict:
     return {
@@ -201,14 +209,114 @@ def test_build_request_accepts_each_construction_mode(
     if mode == "dossier":
         request["inputs"] = [{"type": "user_dossier", "content": "User dossier."}]
     elif mode == "researched":
-        request["inputs"] = [
-            {"type": "research_bundle", "content": "Research bundle."}
-        ]
+        request["inputs"] = [_research_bundle_input()]
     elif mode == "hybrid":
-        request["inputs"].append(
+        request["inputs"] = [
+            _research_bundle_input(),
             {"type": "user_override", "content": "Prefer a quieter delivery."}
-        )
+        ]
     SCHEMAS.validate("character-build-request", request)
+
+
+@pytest.mark.parametrize("mode", ["researched", "hybrid"])
+def test_researched_modes_require_typed_bundle_binding(
+    mode: str, valid_request: dict
+) -> None:
+    request = deepcopy(valid_request)
+    request["mode"] = mode
+    request["inputs"] = [_research_bundle_input()]
+    if mode == "hybrid":
+        request["inputs"].append(
+            {"type": "user_dossier", "content": "Private user assertion."}
+        )
+
+    SCHEMAS.validate("character-build-request", request)
+
+    for field, value in (
+        ("path", "D:/untrusted/bundle"),
+        ("content", "untrusted embedded bundle"),
+    ):
+        invalid = deepcopy(request)
+        invalid["inputs"][0][field] = value
+        _assert_invalid("character-build-request", invalid)
+
+
+@pytest.mark.parametrize("mode", ["researched", "hybrid"])
+def test_researched_modes_require_research_bundle_input(
+    mode: str, valid_request: dict
+) -> None:
+    invalid = deepcopy(valid_request)
+    invalid["mode"] = mode
+    invalid["inputs"] = [
+        {"type": "user_override", "content": "No bundle binding."}
+    ]
+
+    _assert_invalid("character-build-request", invalid)
+
+
+def test_hybrid_requires_separate_user_input(valid_request: dict) -> None:
+    invalid = deepcopy(valid_request)
+    invalid["mode"] = "hybrid"
+    invalid["inputs"] = [_research_bundle_input()]
+
+    _assert_invalid("character-build-request", invalid)
+
+    for input_type in ("user_dossier", "user_override"):
+        valid = deepcopy(invalid)
+        valid["inputs"].append(
+            {"type": input_type, "content": "Separate user provenance."}
+        )
+        SCHEMAS.validate("character-build-request", valid)
+
+
+@pytest.mark.parametrize("field", ["artifact_id", "sha256"])
+def test_research_bundle_binding_requires_exact_identity_fields(
+    field: str, valid_request: dict
+) -> None:
+    invalid = deepcopy(valid_request)
+    invalid["mode"] = "researched"
+    binding = _research_bundle_input()
+    binding.pop(field)
+    invalid["inputs"] = [binding]
+
+    _assert_invalid("character-build-request", invalid)
+
+
+def test_research_bundle_hash_requires_lowercase_sha256(valid_request: dict) -> None:
+    invalid = deepcopy(valid_request)
+    invalid["mode"] = "researched"
+    binding = _research_bundle_input()
+    binding["sha256"] = "A" * 64
+    invalid["inputs"] = [binding]
+
+    _assert_invalid("character-build-request", invalid)
+
+
+@pytest.mark.parametrize("field", ["continuity", "timeline", "spoiler_scope"])
+@pytest.mark.parametrize("mode", ["researched", "hybrid"])
+def test_researched_modes_require_explicit_scope(
+    field: str, mode: str, valid_request: dict
+) -> None:
+    invalid = deepcopy(valid_request)
+    invalid["mode"] = mode
+    invalid["inputs"] = [_research_bundle_input()]
+    if mode == "hybrid":
+        invalid["inputs"].append(
+            {"type": "user_override", "content": "Separate user provenance."}
+        )
+    invalid.pop(field)
+
+    _assert_invalid("character-build-request", invalid)
+
+
+def test_researched_modes_require_exactly_one_bundle_binding(
+    valid_request: dict,
+) -> None:
+    invalid = deepcopy(valid_request)
+    invalid["mode"] = "researched"
+    invalid["inputs"] = [_research_bundle_input(), _research_bundle_input()]
+
+    _assert_invalid("character-build-request", invalid)
 
 
 @pytest.mark.parametrize(

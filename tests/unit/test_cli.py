@@ -213,6 +213,7 @@ def test_nested_character_help_remains_a_successful_stdout_exit() -> None:
                 "draft_command": "validate",
                 "request": "request.json",
                 "pack": "pack",
+                "research_bundle": None,
                 "json": True,
             },
         ),
@@ -233,6 +234,7 @@ def test_nested_character_help_remains_a_successful_stdout_exit() -> None:
                 "draft_command": "compile",
                 "request": "request.json",
                 "pack": "pack",
+                "research_bundle": None,
                 "json": True,
             },
         ),
@@ -242,6 +244,25 @@ def test_character_authoring_parser_leaves(
     arguments: list[str], expected: dict[str, object]
 ) -> None:
     assert vars(build_parser().parse_args(arguments)) == expected
+
+
+def test_character_draft_parser_accepts_trusted_research_bundle_path() -> None:
+    parsed = build_parser().parse_args(
+        [
+            "character",
+            "draft",
+            "validate",
+            "--request",
+            "request.json",
+            "--pack",
+            "pack",
+            "--research-bundle",
+            "private-bundle",
+            "--json",
+        ]
+    )
+
+    assert parsed.research_bundle == "private-bundle"
 
 
 @pytest.mark.parametrize(

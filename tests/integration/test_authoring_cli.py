@@ -117,7 +117,13 @@ def test_character_request_validate_returns_normalized_request_without_data_dir(
 
 
 @pytest.mark.parametrize(
-    "fixture_name", ["original-request.json", "dossier-request.json"]
+    "fixture_name",
+    [
+        "original-request.json",
+        "dossier-request.json",
+        "researched-request.json",
+        "hybrid-request.json",
+    ],
 )
 def test_authoring_representative_requests_normalize_deterministically(
     fixture_name: str,
@@ -324,7 +330,7 @@ def test_character_request_validate_sanitizes_schema_failure(
     assert secret not in completed.stdout
 
 
-def test_character_request_validate_reports_unsupported_mode_without_payload(
+def test_character_request_validate_sanitizes_invalid_research_binding(
     tmp_path: Path, original_request: dict[str, Any]
 ) -> None:
     secret = "PRIVATE-RESEARCH-PAYLOAD"
@@ -338,8 +344,8 @@ def test_character_request_validate_reports_unsupported_mode_without_payload(
 
     _assert_error(
         completed,
-        "AUTHORING_MODE_UNSUPPORTED",
-        "Construction mode is not available in this milestone.",
+        "SCHEMA_VALIDATION_FAILED",
+        "Input did not match the required schema.",
     )
     assert secret not in completed.stdout
 

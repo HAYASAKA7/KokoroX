@@ -9,6 +9,8 @@ from collections.abc import Mapping
 from typing import Any
 
 from kokoroarc import __version__
+from kokoroarc.errors import KokoroError
+from kokoroarc.packs.compiler import canonical_bytes
 from kokoroarc.schemas import SchemaRegistry
 
 
@@ -24,6 +26,8 @@ def validate_authoring_pack(
     request: dict[str, Any],
     source: dict[str, Any],
     schemas: SchemaRegistry,
+    *,
+    research_bundle: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Return a deterministic cross-artifact authoring validation report."""
     hard_failures: list[dict[str, Any]] = []
@@ -75,6 +79,15 @@ def validate_authoring_pack(
     elif mode == "dossier":
         _validate_dossier_provenance(
             request, source, evidence_map, claims, hard_failures
+        )
+    elif mode in {"researched", "hybrid"}:
+        _validate_research_provenance(
+            request,
+            evidence_map,
+            claims,
+            research_bundle,
+            schemas,
+            hard_failures,
         )
     else:
         hard_failures.append(
@@ -146,6 +159,218 @@ def validate_authoring_pack(
     }
     schemas.validate("build-validation-report", report)
     return report
+
+
+def _validate_research_provenance(
+    request: Mapping[str, Any],
+    evidence: Mapping[str, Any],
+    claims: list[Any],
+    bundle: dict[str, Any] | None,
+    schemas: SchemaRegistry,
+    findings: list[dict[str, Any]],
+) -> None:
+    if bundle is None:
+        findings.append(
+            _finding(
+                "RESEARCH_BUNDLE_REQUIRED",
+                ["inputs"],
+                "An eligible Research Bundle is required for this authoring mode.",
+            )
+        )
+        return
+    try:
+        schemas.validate("research-bundle", bundle)
+    except KokoroError:
+        findings.append(
+            _finding(
+                "RESEARCH_BUNDLE_INVALID",
+                ["inputs"],
+                "The Research Bundle is invalid.",
+            )
+        )
+        return
+    unhashed = dict(bundle)
+    bundle_hash = unhashed.pop("bundle_hash")
+    if hashlib.sha256(canonical_bytes(unhashed)).hexdigest() != bundle_hash:
+        findings.append(
+            _finding(
+                "RESEARCH_BUNDLE_INVALID",
+                ["inputs", "research_bundle", "sha256"],
+                "The Research Bundle hash is invalid.",
+            )
+        )
+        return
+
+    bindings = [
+        item
+        for item in _mapping_items(request.get("inputs"))
+        if item.get("type") == "research_bundle"
+    ]
+    if len(bindings) != 1:
+        findings.append(
+            _finding(
+                "RESEARCH_BUNDLE_REQUIRED",
+                ["inputs"],
+                "Exactly one Research Bundle binding is required.",
+            )
+        )
+    else:
+        binding = bindings[0]
+        if binding.get("artifact_id") != bundle.get("artifact_id"):
+            findings.append(
+                _finding(
+                    "RESEARCH_BUNDLE_IDENTITY_MISMATCH",
+                    ["inputs", "research_bundle", "artifact_id"],
+                    "Research Bundle identity does not match the request binding.",
+                )
+            )
+        if binding.get("sha256") != bundle.get("bundle_hash"):
+            findings.append(
+                _finding(
+                    "RESEARCH_BUNDLE_HASH_MISMATCH",
+                    ["inputs", "research_bundle", "sha256"],
+                    "Research Bundle hash does not match the request binding.",
+                )
+            )
+
+    for request_field, bundle_field in (
+        ("namespace", "namespace"),
+        ("character_id", "character_id"),
+        ("display_name", "display_name"),
+    ):
+        if request.get(request_field) != bundle.get(bundle_field):
+            findings.append(
+                _finding(
+                    "RESEARCH_BUNDLE_IDENTITY_MISMATCH",
+                    [request_field],
+                    "Research Bundle character identity does not match the request.",
+                )
+            )
+    for request_field, bundle_field, code, message in (
+        (
+            "continuity",
+            "continuity",
+            "RESEARCH_BUNDLE_CONTINUITY_MISMATCH",
+            "Research Bundle continuity does not match the request.",
+        ),
+        (
+            "timeline",
+            "timeline_cutoff",
+            "RESEARCH_BUNDLE_TIMELINE_MISMATCH",
+            "Research Bundle timeline does not match the request.",
+        ),
+        (
+            "spoiler_scope",
+            "spoiler_scope",
+            "RESEARCH_BUNDLE_SPOILER_MISMATCH",
+            "Research Bundle spoiler scope does not match the request.",
+        ),
+    ):
+        if request.get(request_field) != bundle.get(bundle_field):
+            findings.append(_finding(code, [request_field], message))
+
+    coverage = bundle.get("coverage")
+    coverage_blocks = (
+        isinstance(coverage, Mapping) and coverage.get("blocks_authoring") is True
+    )
+    if (
+        bundle.get("build_status") != "research"
+        or bundle.get("visibility") != "private"
+        or bundle.get("activation_allowed") is not False
+        or bundle.get("authoring_allowed") is not True
+        or bool(bundle.get("blocking_reasons"))
+        or coverage_blocks
+    ):
+        findings.append(
+            _finding(
+                "RESEARCH_BUNDLE_INELIGIBLE",
+                ["inputs", "research_bundle"],
+                "Research Bundle is not eligible for character authoring.",
+            )
+        )
+    conflicts = _mapping_items(bundle.get("conflicts"))
+    if any(conflict.get("status") == "unresolved" for conflict in conflicts):
+        findings.append(
+            _finding(
+                "RESEARCH_BUNDLE_CONFLICT_UNRESOLVED",
+                ["inputs", "research_bundle", "conflicts"],
+                "Research Bundle contains an unresolved conflict.",
+            )
+        )
+
+    supported_claim_ids = {
+        claim.get("claim_id")
+        for claim in _mapping_items(bundle.get("claims"))
+        if claim.get("support") != "unsupported"
+        and isinstance(claim.get("claim_id"), str)
+    }
+    request_input_types = {
+        item.get("type") for item in _mapping_items(request.get("inputs"))
+    }
+    research_reference_count = 0
+    for index, claim in enumerate(claims):
+        if not isinstance(claim, Mapping):
+            findings.append(
+                _finding(
+                    "AUTHORING_RESEARCH_CLAIM_UNBOUND",
+                    ["evidence", "claims", index],
+                    "Research evidence must reference a supported bundle claim.",
+                )
+            )
+            continue
+        source_label = _normalize_source_label(claim.get("source"))
+        claim_id = claim.get("claim_id")
+        if source_label == "research_bundle":
+            research_reference_count += 1
+            if (
+                claim_id not in supported_claim_ids
+                or set(claim) != {"claim_id", "source"}
+            ):
+                findings.append(
+                    _finding(
+                        "AUTHORING_RESEARCH_CLAIM_UNBOUND",
+                        ["evidence", "claims", index],
+                        "Research evidence must be an exact supported-claim reference.",
+                    )
+                )
+            continue
+        allowed_user_source = (
+            request.get("mode") == "hybrid"
+            and source_label in {"user_dossier", "user_override"}
+            and source_label in request_input_types
+        )
+        if not allowed_user_source:
+            findings.append(
+                _finding(
+                    "AUTHORING_RESEARCH_PROVENANCE_INVALID",
+                    ["evidence", "claims", index, "source"],
+                    "Research-backed evidence provenance is invalid.",
+                )
+            )
+        elif claim_id in supported_claim_ids:
+            findings.append(
+                _finding(
+                    "AUTHORING_RESEARCH_FACT_OVERRIDE",
+                    ["evidence", "claims", index, "claim_id"],
+                    "User assertions cannot rewrite a Research Bundle fact.",
+                )
+            )
+    if research_reference_count == 0:
+        findings.append(
+            _finding(
+                "AUTHORING_RESEARCH_EVIDENCE_REQUIRED",
+                ["evidence", "claims"],
+                "A supported Research Bundle claim reference is required.",
+            )
+        )
+    if evidence.get("authored_original") is True:
+        findings.append(
+            _finding(
+                "AUTHORING_RESEARCH_ORIGINAL_PROVENANCE_PROHIBITED",
+                ["evidence", "authored_original"],
+                "Research-backed evidence cannot be marked as authored original.",
+            )
+        )
 
 
 def _validate_original_provenance(
@@ -297,6 +522,12 @@ def _string_items(value: Any) -> list[str]:
     if not isinstance(value, list):
         return []
     return [item for item in value if isinstance(item, str)]
+
+
+def _mapping_items(value: Any) -> list[Mapping[str, Any]]:
+    if not isinstance(value, list):
+        return []
+    return [item for item in value if isinstance(item, Mapping)]
 
 
 def _mapping_count(value: Any, member: str) -> int:

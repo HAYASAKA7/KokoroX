@@ -10,6 +10,7 @@ import pytest
 from kokoroarc.authoring.requests import normalize_build_request
 from kokoroarc.authoring.validation import validate_authoring_pack
 from kokoroarc.errors import KokoroError
+from kokoroarc.research.bundles import canonical_hash
 from kokoroarc.schemas import SchemaRegistry
 
 
@@ -50,23 +51,107 @@ def source() -> dict[str, Any]:
     )
 
 
+@pytest.fixture
+def complete_research_bundle() -> dict[str, Any]:
+    return json.loads(
+        Path("tests/fixtures/research/complete/bundle.json").read_text(
+            encoding="utf-8"
+        )
+    )
+
+
+def _research_authoring_case(
+    original_request: dict[str, Any],
+    source: dict[str, Any],
+    bundle: dict[str, Any],
+    mode: str = "researched",
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    request = deepcopy(original_request)
+    request.update(
+        {
+            "artifact_id": "research/aoi-kisaragi-fixture/build-request",
+            "mode": mode,
+            "namespace": bundle["namespace"],
+            "character_id": bundle["character_id"],
+            "display_name": bundle["display_name"],
+            "continuity": bundle["continuity"],
+            "timeline": bundle["timeline_cutoff"],
+            "spoiler_scope": bundle["spoiler_scope"],
+            "inputs": [
+                {
+                    "type": "research_bundle",
+                    "artifact_id": bundle["artifact_id"],
+                    "sha256": bundle["bundle_hash"],
+                }
+            ],
+        }
+    )
+    researched_source = deepcopy(source)
+    researched_source.update(
+        {
+            "artifact_id": "research/aoi-kisaragi-fixture/source",
+            "namespace": bundle["namespace"],
+            "character_id": bundle["character_id"],
+        }
+    )
+    researched_source["identity"]["display_name"] = bundle["display_name"]
+    researched_source["evidence"] = {
+        "authored_original": False,
+        "claims": [
+            {"claim_id": "claim-role", "source": "research_bundle"}
+        ],
+    }
+    if mode == "hybrid":
+        request["inputs"].append(
+            {"type": "user_override", "content": "Prefer quieter delivery."}
+        )
+        researched_source["evidence"]["claims"].append(
+            {
+                "statement": "Prefer quieter delivery.",
+                "source": "user_override",
+            }
+        )
+    return request, researched_source
+
+
 def _request_for_mode(
     original_request: dict[str, Any], mode: str
 ) -> dict[str, Any]:
     request = deepcopy(original_request)
     request["mode"] = mode
+    if mode in {"researched", "hybrid"}:
+        request.update(
+            {
+                "continuity": "fixture-primary",
+                "timeline": "episode-01",
+                "spoiler_scope": "episode-01 only",
+            }
+        )
     if mode == "dossier":
         request["inputs"] = [
             {"type": "user_dossier", "content": "A private user dossier."}
         ]
     elif mode == "researched":
         request["inputs"] = [
-            {"type": "research_bundle", "content": "A research bundle."}
+            {
+                "type": "research_bundle",
+                "artifact_id": (
+                    "research/aoi-kisaragi-fixture/research/0123456789abcdef"
+                ),
+                "sha256": "a" * 64,
+            }
         ]
     elif mode == "hybrid":
-        request["inputs"].append(
+        request["inputs"] = [
+            {
+                "type": "research_bundle",
+                "artifact_id": (
+                    "research/aoi-kisaragi-fixture/research/0123456789abcdef"
+                ),
+                "sha256": "a" * 64,
+            },
             {"type": "user_override", "content": "Prefer quieter delivery."}
-        )
+        ]
     return request
 
 
@@ -113,17 +198,17 @@ def test_normalize_accepts_dossier_request(
 
 
 @pytest.mark.parametrize("mode", ["researched", "hybrid"])
-def test_normalize_rejects_modes_not_supported_in_this_milestone(
+def test_normalize_accepts_research_backed_modes(
     mode: str,
     registry: SchemaRegistry,
     original_request: dict[str, Any],
 ) -> None:
     request = _request_for_mode(original_request, mode)
 
-    with pytest.raises(KokoroError) as caught:
-        normalize_build_request(request, registry)
+    normalized = normalize_build_request(request, registry)
 
-    assert caught.value.code == "AUTHORING_MODE_UNSUPPORTED"
+    assert normalized["mode"] == mode
+    assert normalized["requested_visibility"] == "private"
 
 
 @pytest.mark.parametrize("mode", ["dossier", "researched", "hybrid"])
@@ -797,20 +882,287 @@ def test_validate_authoring_pack_does_not_mutate_inputs(
 
 
 @pytest.mark.parametrize("mode", ["researched", "hybrid"])
-def test_validate_authoring_pack_reports_unsupported_direct_call_mode(
+def test_validate_authoring_pack_accepts_exact_eligible_research_bundle(
     mode: str,
     registry: SchemaRegistry,
     original_request: dict[str, Any],
     source: dict[str, Any],
+    complete_research_bundle: dict[str, Any],
 ) -> None:
-    request = _request_for_mode(original_request, mode)
+    request, researched_source = _research_authoring_case(
+        original_request,
+        source,
+        complete_research_bundle,
+        mode,
+    )
     registry.validate("character-build-request", request)
+    registry.validate("character-source", researched_source)
 
-    report = validate_authoring_pack(request, source, registry)
+    report = validate_authoring_pack(
+        request,
+        researched_source,
+        registry,
+        research_bundle=complete_research_bundle,
+    )
+
+    assert report["valid"] is True
+    assert report["hard_failures"] == []
+    registry.validate("build-validation-report", report)
+
+
+@pytest.mark.parametrize(
+    "field,value,expected_code",
+    [
+        (
+            "artifact_id",
+            "research/aoi-kisaragi-fixture/research/other",
+            "RESEARCH_BUNDLE_IDENTITY_MISMATCH",
+        ),
+        ("sha256", "0" * 64, "RESEARCH_BUNDLE_HASH_MISMATCH"),
+    ],
+)
+def test_validate_authoring_pack_rejects_inexact_bundle_binding(
+    field: str,
+    value: str,
+    expected_code: str,
+    registry: SchemaRegistry,
+    original_request: dict[str, Any],
+    source: dict[str, Any],
+    complete_research_bundle: dict[str, Any],
+) -> None:
+    request, researched_source = _research_authoring_case(
+        original_request, source, complete_research_bundle
+    )
+    request["inputs"][0][field] = value
+
+    report = validate_authoring_pack(
+        request,
+        researched_source,
+        registry,
+        research_bundle=complete_research_bundle,
+    )
 
     assert report["valid"] is False
-    assert [item["code"] for item in report["hard_failures"]] == [
-        "AUTHORING_MODE_UNSUPPORTED"
-    ]
-    assert report["hard_failures"][0]["path"] == ["mode"]
-    registry.validate("build-validation-report", report)
+    assert expected_code in {
+        finding["code"] for finding in report["hard_failures"]
+    }
+
+
+@pytest.mark.parametrize(
+    "request_field,bundle_field,expected_code",
+    [
+        ("namespace", "namespace", "RESEARCH_BUNDLE_IDENTITY_MISMATCH"),
+        ("character_id", "character_id", "RESEARCH_BUNDLE_IDENTITY_MISMATCH"),
+        ("display_name", "display_name", "RESEARCH_BUNDLE_IDENTITY_MISMATCH"),
+        ("continuity", "continuity", "RESEARCH_BUNDLE_CONTINUITY_MISMATCH"),
+        ("timeline", "timeline_cutoff", "RESEARCH_BUNDLE_TIMELINE_MISMATCH"),
+        ("spoiler_scope", "spoiler_scope", "RESEARCH_BUNDLE_SPOILER_MISMATCH"),
+    ],
+)
+def test_validate_authoring_pack_rejects_bundle_scope_mismatch(
+    request_field: str,
+    bundle_field: str,
+    expected_code: str,
+    registry: SchemaRegistry,
+    original_request: dict[str, Any],
+    source: dict[str, Any],
+    complete_research_bundle: dict[str, Any],
+) -> None:
+    request, researched_source = _research_authoring_case(
+        original_request, source, complete_research_bundle
+    )
+    request[request_field] = f"different-{complete_research_bundle[bundle_field]}"
+
+    report = validate_authoring_pack(
+        request,
+        researched_source,
+        registry,
+        research_bundle=complete_research_bundle,
+    )
+
+    assert expected_code in {
+        finding["code"] for finding in report["hard_failures"]
+    }
+
+
+def test_validate_authoring_pack_rejects_partial_research_bundle(
+    registry: SchemaRegistry,
+    original_request: dict[str, Any],
+    source: dict[str, Any],
+) -> None:
+    partial = json.loads(
+        Path("tests/fixtures/research/partial/bundle.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    request, researched_source = _research_authoring_case(
+        original_request, source, partial
+    )
+
+    report = validate_authoring_pack(
+        request,
+        researched_source,
+        registry,
+        research_bundle=partial,
+    )
+
+    assert "RESEARCH_BUNDLE_INELIGIBLE" in {
+        finding["code"] for finding in report["hard_failures"]
+    }
+
+
+def test_validate_authoring_pack_rejects_unbound_research_claim(
+    registry: SchemaRegistry,
+    original_request: dict[str, Any],
+    source: dict[str, Any],
+    complete_research_bundle: dict[str, Any],
+) -> None:
+    request, researched_source = _research_authoring_case(
+        original_request, source, complete_research_bundle
+    )
+    researched_source["evidence"]["claims"][0]["claim_id"] = "invented-claim"
+
+    report = validate_authoring_pack(
+        request,
+        researched_source,
+        registry,
+        research_bundle=complete_research_bundle,
+    )
+
+    assert "AUTHORING_RESEARCH_CLAIM_UNBOUND" in {
+        finding["code"] for finding in report["hard_failures"]
+    }
+
+
+def test_validate_authoring_pack_rejects_embellished_research_reference(
+    registry: SchemaRegistry,
+    original_request: dict[str, Any],
+    source: dict[str, Any],
+    complete_research_bundle: dict[str, Any],
+) -> None:
+    request, researched_source = _research_authoring_case(
+        original_request, source, complete_research_bundle
+    )
+    researched_source["evidence"]["claims"][0]["notes"] = (
+        "This must not ride along with a reference."
+    )
+
+    report = validate_authoring_pack(
+        request,
+        researched_source,
+        registry,
+        research_bundle=complete_research_bundle,
+    )
+
+    assert "AUTHORING_RESEARCH_CLAIM_UNBOUND" in {
+        finding["code"] for finding in report["hard_failures"]
+    }
+
+
+def test_validate_authoring_pack_rejects_unresolved_bundle_conflict(
+    registry: SchemaRegistry,
+    original_request: dict[str, Any],
+    source: dict[str, Any],
+    complete_research_bundle: dict[str, Any],
+) -> None:
+    unresolved = deepcopy(complete_research_bundle)
+    unresolved["conflicts"][0]["status"] = "unresolved"
+    unresolved["conflicts"][0]["selected_claim_ids"] = []
+    unresolved["conflicts"][0].pop("resolution_rationale")
+    unhashed = dict(unresolved)
+    unhashed.pop("bundle_hash")
+    unresolved["bundle_hash"] = canonical_hash(unhashed)
+    request, researched_source = _research_authoring_case(
+        original_request, source, unresolved
+    )
+
+    report = validate_authoring_pack(
+        request,
+        researched_source,
+        registry,
+        research_bundle=unresolved,
+    )
+
+    assert "RESEARCH_BUNDLE_CONFLICT_UNRESOLVED" in {
+        finding["code"] for finding in report["hard_failures"]
+    }
+
+
+@pytest.mark.parametrize(
+    "field,value",
+    [("visibility", "public"), ("activation_allowed", True)],
+)
+def test_validate_authoring_pack_rejects_invalid_bundle_lifecycle(
+    field: str,
+    value: object,
+    registry: SchemaRegistry,
+    original_request: dict[str, Any],
+    source: dict[str, Any],
+    complete_research_bundle: dict[str, Any],
+) -> None:
+    invalid = deepcopy(complete_research_bundle)
+    invalid[field] = value
+    request, researched_source = _research_authoring_case(
+        original_request, source, invalid
+    )
+
+    report = validate_authoring_pack(
+        request,
+        researched_source,
+        registry,
+        research_bundle=invalid,
+    )
+
+    assert "RESEARCH_BUNDLE_INVALID" in {
+        finding["code"] for finding in report["hard_failures"]
+    }
+
+
+def test_validate_authoring_pack_rejects_stale_internal_bundle_hash(
+    registry: SchemaRegistry,
+    original_request: dict[str, Any],
+    source: dict[str, Any],
+    complete_research_bundle: dict[str, Any],
+) -> None:
+    changed = deepcopy(complete_research_bundle)
+    changed["limitations"] = ["Changed after hashing."]
+    request, researched_source = _research_authoring_case(
+        original_request, source, changed
+    )
+
+    report = validate_authoring_pack(
+        request,
+        researched_source,
+        registry,
+        research_bundle=changed,
+    )
+
+    assert "RESEARCH_BUNDLE_INVALID" in {
+        finding["code"] for finding in report["hard_failures"]
+    }
+
+
+def test_hybrid_user_override_cannot_rewrite_bundle_claim_id(
+    registry: SchemaRegistry,
+    original_request: dict[str, Any],
+    source: dict[str, Any],
+    complete_research_bundle: dict[str, Any],
+) -> None:
+    request, researched_source = _research_authoring_case(
+        original_request,
+        source,
+        complete_research_bundle,
+        "hybrid",
+    )
+    researched_source["evidence"]["claims"][1]["claim_id"] = "claim-role"
+
+    report = validate_authoring_pack(
+        request,
+        researched_source,
+        registry,
+        research_bundle=complete_research_bundle,
+    )
+
+    assert "AUTHORING_RESEARCH_FACT_OVERRIDE" in {
+        finding["code"] for finding in report["hard_failures"]
+    }

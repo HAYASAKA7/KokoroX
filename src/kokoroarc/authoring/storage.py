@@ -160,6 +160,7 @@ def publish_draft_bundle(
     request: dict[str, Any],
     draft: dict[str, Any],
     report: dict[str, Any],
+    research_bundle: dict[str, Any] | None = None,
 ) -> Path:
     """Publish one complete draft beneath ``data_root/drafts``.
 
@@ -179,7 +180,14 @@ def publish_draft_bundle(
     final = root / "drafts" / Path(*draft["artifact_id"].split("/"))
     _validate_existing_chain(root)
     if _destination_lstat(final.parent) is None:
-        _preflight_validate_source(source_root, request, draft, report, schemas)
+        _preflight_validate_source(
+            source_root,
+            request,
+            draft,
+            report,
+            schemas,
+            research_bundle,
+        )
         _validate_existing_chain(root)
     created_directories = _create_secure_directories(final.parent)
     with _acquire_publication_lock(final) as publication_lock:
@@ -197,6 +205,7 @@ def publish_draft_bundle(
             schemas,
             final,
             publication_lock,
+            research_bundle,
         )
 
 
@@ -206,6 +215,7 @@ def _preflight_validate_source(
     draft: dict[str, Any],
     report: dict[str, Any],
     schemas: SchemaRegistry,
+    research_bundle: dict[str, Any] | None = None,
 ) -> None:
     scanned_files = scan_pack(source_root, PackLimits())
     resolved_source = _resolved_source_root(source_root)
@@ -223,7 +233,13 @@ def _preflight_validate_source(
     }
     assembled_source = load_source_pack(source_root, schemas)
     _require_source_hash(assembled_source, draft["source_pack_hash"])
-    _require_validation_report(request, assembled_source, report, schemas)
+    _require_validation_report(
+        request,
+        assembled_source,
+        report,
+        schemas,
+        research_bundle,
+    )
     _revalidate_sources(
         source_root,
         resolved_source,
@@ -241,6 +257,7 @@ def _publish_draft_bundle_locked(
     schemas: SchemaRegistry,
     final: Path,
     publication_lock: _PublicationLock,
+    research_bundle: dict[str, Any] | None = None,
 ) -> Path:
     scanned_files = scan_pack(source_root, PackLimits())
     resolved_source = _resolved_source_root(source_root)
@@ -258,7 +275,13 @@ def _publish_draft_bundle_locked(
     }
     assembled_source = load_source_pack(source_root, schemas)
     _require_source_hash(assembled_source, draft["source_pack_hash"])
-    _require_validation_report(request, assembled_source, report, schemas)
+    _require_validation_report(
+        request,
+        assembled_source,
+        report,
+        schemas,
+        research_bundle,
+    )
     _revalidate_sources(
         source_root,
         resolved_source,
@@ -315,7 +338,13 @@ def _publish_draft_bundle_locked(
             raise _source_changed(Path("."), error.code) from error
         if _canonical_hash(post_copy_source) != draft["source_pack_hash"]:
             raise _source_changed(Path("."), "assembled_source")
-        _require_validation_report(request, post_copy_source, report, schemas)
+        _require_validation_report(
+            request,
+            post_copy_source,
+            report,
+            schemas,
+            research_bundle,
+        )
         _revalidate_sources(
             source_root,
             resolved_source,
@@ -1253,8 +1282,18 @@ def _require_validation_report(
     source: dict[str, Any],
     report: dict[str, Any],
     schemas: SchemaRegistry,
+    research_bundle: dict[str, Any] | None = None,
 ) -> None:
-    recomputed = validate_authoring_pack(request, source, schemas)
+    recomputed = (
+        validate_authoring_pack(request, source, schemas)
+        if research_bundle is None
+        else validate_authoring_pack(
+            request,
+            source,
+            schemas,
+            research_bundle=research_bundle,
+        )
+    )
     if recomputed["hard_failures"] or canonical_bytes(recomputed) != canonical_bytes(
         report
     ):

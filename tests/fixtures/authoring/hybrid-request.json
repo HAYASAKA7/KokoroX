@@ -1,0 +1,40 @@
+{
+  "schema_version": "1.0",
+  "artifact_id": "research/aoi-kisaragi-fixture/hybrid-build-request",
+  "created_by": {
+    "component": "kokoroarc",
+    "version": "0.0.0.dev0"
+  },
+  "mode": "hybrid",
+  "namespace": "research",
+  "character_id": "aoi-kisaragi-fixture",
+  "display_name": "Aoi Kisaragi Fixture",
+  "character_version": "1.0.0",
+  "requested_locales": [
+    "zh-CN",
+    "en-US",
+    "ja-JP"
+  ],
+  "intended_use_cases": [
+    "private evidence-grounded character authoring with user direction"
+  ],
+  "user_constraints": [
+    "Keep Research Bundle facts separate from user preferences.",
+    "Keep the resulting draft private and inactive."
+  ],
+  "continuity": "fixture-primary",
+  "timeline": "episode-01",
+  "spoiler_scope": "episode-01 only",
+  "inputs": [
+    {
+      "type": "research_bundle",
+      "artifact_id": "research/aoi-kisaragi-fixture/research/36c328d763dd4ca7",
+      "sha256": "dca74da0f38393f2235b681f41d5af2c4d6af2edce46377401bc06e582fc4fea"
+    },
+    {
+      "type": "user_override",
+      "content": "Prefer a quieter delivery without changing researched facts."
+    }
+  ],
+  "requested_visibility": "private"
+}

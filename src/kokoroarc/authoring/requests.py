@@ -10,7 +10,7 @@ from kokoroarc.packs.compiler import canonical_bytes
 from kokoroarc.schemas import SchemaRegistry
 
 
-_SUPPORTED_MODES = frozenset({"original", "dossier"})
+_SUPPORTED_MODES = frozenset({"original", "dossier", "researched", "hybrid"})
 
 
 def normalize_build_request(

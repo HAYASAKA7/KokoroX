@@ -66,6 +66,12 @@ _PUBLIC_MESSAGES = {
     "RESEARCH_BUNDLE_MISMATCH": (
         "Research Bundle metadata did not match validated inputs."
     ),
+    "RESEARCH_BUNDLE_REQUIRED": (
+        "An eligible Research Bundle is required for this authoring mode."
+    ),
+    "RESEARCH_BUNDLE_UNEXPECTED": (
+        "This authoring mode does not accept a Research Bundle."
+    ),
     "RESEARCH_CONTINUITY_UNRESOLVED": (
         "Research identity and continuity must be resolved."
     ),
@@ -143,6 +149,7 @@ def build_parser() -> argparse.ArgumentParser:
         draft_command = draft_commands.add_parser(name)
         draft_command.add_argument("--request", required=True)
         draft_command.add_argument("--pack", required=True)
+        draft_command.add_argument("--research-bundle")
         _leaf_json(draft_command)
 
     research = commands.add_parser("research")
@@ -603,11 +610,36 @@ def _handle_research_bundle_validate(
 
 def _authoring_inputs(
     args: argparse.Namespace, schemas: SchemaRegistry
-) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
+) -> tuple[
+    dict[str, Any],
+    dict[str, Any],
+    dict[str, Any],
+    dict[str, Any] | None,
+]:
     request = normalize_build_request(_read_json(Path(args.request)), schemas)
+    research_bundle = None
+    if request["mode"] in {"researched", "hybrid"}:
+        if not args.research_bundle:
+            raise KokoroError(
+                "RESEARCH_BUNDLE_REQUIRED",
+                "An eligible Research Bundle is required for this authoring mode.",
+            )
+        research_bundle = load_published_research_bundle(
+            Path(args.research_bundle), schemas
+        )
+    elif args.research_bundle:
+        raise KokoroError(
+            "RESEARCH_BUNDLE_UNEXPECTED",
+            "This authoring mode does not accept a Research Bundle.",
+        )
     source = load_source_pack(Path(args.pack), schemas)
-    report = validate_authoring_pack(request, source, schemas)
-    return request, source, report
+    report = validate_authoring_pack(
+        request,
+        source,
+        schemas,
+        research_bundle=research_bundle,
+    )
+    return request, source, report, research_bundle
 
 
 def _handle_character_draft_validate(
@@ -616,7 +648,7 @@ def _handle_character_draft_validate(
     schemas: SchemaRegistry,
 ) -> dict[str, Any]:
     del settings
-    _request, _source, report = _authoring_inputs(args, schemas)
+    _request, _source, report, _research_bundle = _authoring_inputs(args, schemas)
     return {
         "ok": True,
         "valid": report["valid"],
@@ -627,19 +659,24 @@ def _handle_character_draft_validate(
 def _handle_character_draft_compile(
     args: argparse.Namespace, settings: Settings, schemas: SchemaRegistry
 ) -> dict[str, Any]:
-    request, source, report = _authoring_inputs(args, schemas)
+    request, source, report, research_bundle = _authoring_inputs(args, schemas)
     if not report["valid"]:
         raise KokoroError(
             "AUTHORING_VALIDATION_FAILED",
             "Character authoring validation failed.",
         )
     draft = build_character_draft(request, source, report)
-    target = publish_draft_bundle(
+    publication_inputs = (
         settings.data_dir,
         Path(args.pack),
         request,
         draft,
         report,
+    )
+    target = (
+        publish_draft_bundle(*publication_inputs)
+        if research_bundle is None
+        else publish_draft_bundle(*publication_inputs, research_bundle)
     )
     return {
         "ok": True,
