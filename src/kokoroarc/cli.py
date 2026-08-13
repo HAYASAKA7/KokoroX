@@ -21,6 +21,14 @@ from kokoroarc.json_compat import find_json_incompatibility
 from kokoroarc.packs.compiler import compile_pack, write_compiled_pack
 from kokoroarc.packs.loader import load_source_pack
 from kokoroarc.policy.compiler import normalize_policy
+from kokoroarc.research.bundles import build_research_bundle
+from kokoroarc.research.requests import normalize_research_request
+from kokoroarc.research.storage import (
+    load_published_research_bundle,
+    publish_research_bundle,
+)
+from kokoroarc.research.validation import validate_research_workspace
+from kokoroarc.research.workspace import load_research_workspace
 from kokoroarc.runtime.context import build_runtime_context
 from kokoroarc.runtime.planning import build_render_plan
 from kokoroarc.runtime.validation import validate_rendered_output
@@ -52,9 +60,49 @@ _PUBLIC_MESSAGES = {
     "INPUT_INVALID_JSON": "Input file contains invalid JSON.",
     "INVALID_PACK_DATA": "Character pack data is invalid.",
     "PACK_NOT_FOUND": "Character pack was not found.",
+    "RESEARCH_BUNDLE_INVALID": (
+        "Published Research Bundle validation failed."
+    ),
+    "RESEARCH_BUNDLE_MISMATCH": (
+        "Research Bundle metadata did not match validated inputs."
+    ),
+    "RESEARCH_CONTINUITY_UNRESOLVED": (
+        "Research identity and continuity must be resolved."
+    ),
+    "RESEARCH_DURABILITY_FAILED": (
+        "Research bundle publication could not be made durable."
+    ),
+    "RESEARCH_PUBLISH_BUSY": (
+        "Research bundle publication is already in progress."
+    ),
+    "RESEARCH_PUBLISH_FAILED": "Research bundle publication failed.",
+    "RESEARCH_RECOVERY_REQUIRED": (
+        "Research publication retained a recoverable previous bundle."
+    ),
+    "RESEARCH_REPORT_MISMATCH": (
+        "Research validation report did not match the workspace."
+    ),
+    "RESEARCH_STAGING_INVALID": "Staged Research Bundle validation failed.",
+    "RESEARCH_VALIDATION_FAILED": "Research validation failed.",
+    "RESEARCH_WORKSPACE_CHANGED": (
+        "Research workspace changed during validation."
+    ),
+    "RESEARCH_WORKSPACE_DIGEST_MISMATCH": (
+        "Research workspace digest did not match."
+    ),
+    "RESEARCH_WORKSPACE_INVALID": "Research workspace is invalid.",
+    "RESEARCH_WORKSPACE_LIMIT_EXCEEDED": (
+        "Research workspace filesystem limit was exceeded."
+    ),
+    "RESEARCH_WORKSPACE_LIMIT_INVALID": (
+        "Research workspace limits are invalid."
+    ),
+    "RESEARCH_WORKSPACE_NOT_FOUND": "Research workspace was not found.",
+    "RESEARCH_WORKSPACE_UNSAFE": "Research workspace path is unsafe.",
     "SCHEMA_VALIDATION_FAILED": "Input did not match the required schema.",
     "STATE_REVISION_CONFLICT": "Relationship state revision conflicted.",
     "UNSAFE_PACK_PATH": "Character pack path is unsafe.",
+    "UNSAFE_RESEARCH_PATH": "Research publication path is unsafe.",
 }
 
 
@@ -96,6 +144,35 @@ def build_parser() -> argparse.ArgumentParser:
         draft_command.add_argument("--request", required=True)
         draft_command.add_argument("--pack", required=True)
         _leaf_json(draft_command)
+
+    research = commands.add_parser("research")
+    research_groups = research.add_subparsers(
+        dest="research_group", required=True
+    )
+    research_request = research_groups.add_parser("request")
+    research_request_commands = research_request.add_subparsers(
+        dest="research_request_command", required=True
+    )
+    research_request_validate = research_request_commands.add_parser("validate")
+    research_request_validate.add_argument("--input", required=True)
+    _leaf_json(research_request_validate)
+    research_workspace = research_groups.add_parser("workspace")
+    research_workspace_commands = research_workspace.add_subparsers(
+        dest="research_workspace_command", required=True
+    )
+    research_workspace_validate = research_workspace_commands.add_parser("validate")
+    research_workspace_validate.add_argument("--workspace", required=True)
+    _leaf_json(research_workspace_validate)
+    research_bundle = research_groups.add_parser("bundle")
+    research_bundle_commands = research_bundle.add_subparsers(
+        dest="research_bundle_command", required=True
+    )
+    research_bundle_compile = research_bundle_commands.add_parser("compile")
+    research_bundle_compile.add_argument("--workspace", required=True)
+    _leaf_json(research_bundle_compile)
+    research_bundle_validate = research_bundle_commands.add_parser("validate")
+    research_bundle_validate.add_argument("--bundle", required=True)
+    _leaf_json(research_bundle_validate)
 
     session = commands.add_parser("session")
     session_commands = session.add_subparsers(dest="session_command", required=True)
@@ -420,6 +497,110 @@ def _handle_character_request_validate(
     return {"ok": True, "request": request}
 
 
+def _handle_research_request_validate(
+    args: argparse.Namespace,
+    settings: Settings | None,
+    schemas: SchemaRegistry,
+) -> dict[str, Any]:
+    del settings
+    request = normalize_research_request(_read_json(Path(args.input)), schemas)
+    return {"ok": True, "request": request}
+
+
+def _handle_research_workspace_validate(
+    args: argparse.Namespace,
+    settings: Settings | None,
+    schemas: SchemaRegistry,
+) -> dict[str, Any]:
+    del settings
+    workspace = load_research_workspace(Path(args.workspace), schemas)
+    report = validate_research_workspace(workspace, schemas)
+    return {
+        "ok": True,
+        "valid": report["valid"],
+        "workspace_hash": workspace.workspace_hash,
+        "validation_report": report,
+    }
+
+
+def _public_research_bundle_summary(
+    bundle: dict[str, Any],
+    coverage_summary: dict[str, Any],
+) -> dict[str, Any]:
+    return {
+        "artifact_id": bundle["artifact_id"],
+        "request_hash": bundle["request_hash"],
+        "workspace_hash": bundle["workspace_hash"],
+        "validation_report_hash": bundle["validation_report_hash"],
+        "bundle_hash": bundle["bundle_hash"],
+        "build_status": bundle["build_status"],
+        "visibility": bundle["visibility"],
+        "activation_allowed": bundle["activation_allowed"],
+        "authoring_allowed": bundle["authoring_allowed"],
+        "coverage_summary": coverage_summary,
+        "conflicts": bundle["conflicts"],
+        "limitations": bundle["limitations"],
+        "blocking_reasons": bundle["blocking_reasons"],
+    }
+
+
+def _research_coverage_summary(bundle: dict[str, Any]) -> dict[str, int]:
+    summary = {
+        "covered": 0,
+        "partial": 0,
+        "missing": 0,
+        "blocked": 0,
+    }
+    for topic in bundle["coverage"]["topics"]:
+        summary[topic["status"]] += 1
+    return summary
+
+
+def _handle_research_bundle_compile(
+    args: argparse.Namespace,
+    settings: Settings,
+    schemas: SchemaRegistry,
+) -> dict[str, Any]:
+    workspace_path = Path(args.workspace)
+    workspace = load_research_workspace(workspace_path, schemas)
+    report = validate_research_workspace(workspace, schemas)
+    if not report["valid"]:
+        raise KokoroError(
+            "RESEARCH_VALIDATION_FAILED",
+            "Research validation failed.",
+        )
+    bundle = build_research_bundle(workspace, report)
+    target = publish_research_bundle(
+        settings.data_dir,
+        workspace_path,
+        workspace,
+        report,
+        bundle,
+    )
+    return {
+        "ok": True,
+        "path": str(target),
+        **_public_research_bundle_summary(bundle, report["coverage_summary"]),
+    }
+
+
+def _handle_research_bundle_validate(
+    args: argparse.Namespace,
+    settings: Settings | None,
+    schemas: SchemaRegistry,
+) -> dict[str, Any]:
+    del settings
+    bundle = load_published_research_bundle(Path(args.bundle), schemas)
+    return {
+        "ok": True,
+        "valid": True,
+        **_public_research_bundle_summary(
+            bundle,
+            _research_coverage_summary(bundle),
+        ),
+    }
+
+
 def _authoring_inputs(
     args: argparse.Namespace, schemas: SchemaRegistry
 ) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
@@ -697,6 +878,15 @@ _CHARACTER_HANDLERS: dict[
     ("draft", "compile"): _handle_character_draft_compile,
 }
 
+_RESEARCH_HANDLERS: dict[
+    tuple[str, str], Callable[..., dict[str, Any]]
+] = {
+    ("request", "validate"): _handle_research_request_validate,
+    ("workspace", "validate"): _handle_research_workspace_validate,
+    ("bundle", "compile"): _handle_research_bundle_compile,
+    ("bundle", "validate"): _handle_research_bundle_validate,
+}
+
 
 def main(argv: list[str] | None = None) -> int:
     try:
@@ -730,6 +920,20 @@ def main(argv: list[str] | None = None) -> int:
                 settings.schema_dir if settings is not None else resolve_schema_dir()
             )
             result = _CHARACTER_HANDLERS[(group, subcommand)](
+                args, settings, schemas
+            )
+        elif args.command == "research":
+            group = args.research_group
+            subcommand = getattr(args, f"research_{group}_command")
+            settings = (
+                Settings.from_env(os.environ)
+                if (group, subcommand) == ("bundle", "compile")
+                else None
+            )
+            schemas = SchemaRegistry(
+                settings.schema_dir if settings is not None else resolve_schema_dir()
+            )
+            result = _RESEARCH_HANDLERS[(group, subcommand)](
                 args, settings, schemas
             )
         else:

@@ -245,6 +245,78 @@ def test_character_authoring_parser_leaves(
 
 
 @pytest.mark.parametrize(
+    ("arguments", "expected"),
+    [
+        (
+            ["research", "request", "validate", "--input", "request.json", "--json"],
+            {
+                "command": "research",
+                "research_group": "request",
+                "research_request_command": "validate",
+                "input": "request.json",
+                "json": True,
+            },
+        ),
+        (
+            [
+                "research",
+                "workspace",
+                "validate",
+                "--workspace",
+                "workspace",
+                "--json",
+            ],
+            {
+                "command": "research",
+                "research_group": "workspace",
+                "research_workspace_command": "validate",
+                "workspace": "workspace",
+                "json": True,
+            },
+        ),
+        (
+            [
+                "research",
+                "bundle",
+                "compile",
+                "--workspace",
+                "workspace",
+                "--json",
+            ],
+            {
+                "command": "research",
+                "research_group": "bundle",
+                "research_bundle_command": "compile",
+                "workspace": "workspace",
+                "json": True,
+            },
+        ),
+        (
+            [
+                "research",
+                "bundle",
+                "validate",
+                "--bundle",
+                "bundle",
+                "--json",
+            ],
+            {
+                "command": "research",
+                "research_group": "bundle",
+                "research_bundle_command": "validate",
+                "bundle": "bundle",
+                "json": True,
+            },
+        ),
+    ],
+)
+def test_research_parser_leaves(
+    arguments: list[str], expected: dict[str, object]
+) -> None:
+    assert vars(build_parser().parse_args(arguments)) == expected
+
+
+@pytest.mark.parametrize(
     "forbidden",
     [
         ["--output", "elsewhere"],
