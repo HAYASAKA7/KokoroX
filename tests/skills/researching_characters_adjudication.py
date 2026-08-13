@@ -54,7 +54,7 @@ _POWERSHELL_CLI_WRAPPER = re.compile(
     r"""
     \A\s*
     \$ErrorActionPreference\s*=\s*'Stop'\s*;\s*
-    \$env:PYTHONPATH\s*=\s*'[^'\r\n]+'\s*;\s*
+    \$env:PYTHONPATH\s*=\s*'(?P<pythonpath>[^'\r\n]+)'\s*;\s*
     \$env:KOKOROARC_DATA_DIR\s*=\s*
         \(\s*Resolve-Path\s+-LiteralPath\s+'run-data'\s*\)\.Path\s*;\s*
     \$env:TEMP\s*=\s*
@@ -160,22 +160,14 @@ def _executable_name(value: str) -> str:
     return value.strip().strip("\"'").replace("\\", "/").rsplit("/", 1)[-1].casefold()
 
 
-def _same_cli_token(left: str, right: str, index: int) -> bool:
-    if index == 0:
-        left_name = _executable_name(left)
-        right_name = _executable_name(right)
-        if left_name in _PYTHON_EXECUTABLES:
-            return right_name in _PYTHON_EXECUTABLES
-        if left_name in _KOKORO_EXECUTABLES:
-            return right_name in _KOKORO_EXECUTABLES
-        return False
+def _same_cli_token(left: str, right: str) -> bool:
     return left.replace("\\", "/").casefold() == right.replace("\\", "/").casefold()
 
 
 def _cli_tokens_match(left: list[str], right: list[str]) -> bool:
     return len(left) == len(right) and all(
-        _same_cli_token(left_token, right_token, index)
-        for index, (left_token, right_token) in enumerate(zip(left, right))
+        _same_cli_token(left_token, right_token)
+        for left_token, right_token in zip(left, right)
     )
 
 
@@ -185,7 +177,7 @@ def _direct_summary_binds_declared_tokens(
     if not summary_tokens or not declared_tokens:
         return False
     if len(summary_tokens) == 1:
-        return _same_cli_token(summary_tokens[0], declared_tokens[0], 0)
+        return _same_cli_token(summary_tokens[0], declared_tokens[0])
     if _cli_tokens_match(summary_tokens, declared_tokens):
         return True
     executable = _executable_name(declared_tokens[0])
@@ -196,19 +188,62 @@ def _direct_summary_binds_declared_tokens(
 
 
 def _record_capture_value(record: dict, stream: str) -> str | None:
+    values: list[str] = []
     for key in (f"{stream}_file", f"{stream}_capture"):
         if key in record:
             value = record[key]
             if not isinstance(value, str) or not value.strip():
                 return None
-            return _normalized_path(value.strip())
-    return None
+            values.append(value.strip())
+    if not values or len({_normalized_path(value) for value in values}) != 1:
+        return None
+    return values[0]
+
+
+def _record_cwd_is_trusted(
+    record: dict,
+    trusted_run_root: str | Path | None,
+) -> bool:
+    if "cwd" not in record:
+        return True
+    value = record["cwd"]
+    if not isinstance(value, str) or not value.strip():
+        return False
+    normalized = value.strip().replace("\\", "/").rstrip("/").casefold()
+    if normalized in {".", ""}:
+        return trusted_run_root is not None
+    if trusted_run_root is None:
+        return False
+    trusted = str(trusted_run_root).replace("\\", "/").rstrip("/").casefold()
+    return normalized == trusted
+
+
+def _record_cli_context_is_bound(
+    record: dict,
+    trusted_run_root: str | Path | None,
+) -> bool:
+    if not _record_cwd_is_trusted(record, trusted_run_root):
+        return False
+    if "login" in record and record["login"] is not False:
+        return False
+    status = record.get("execution_status")
+    if status not in (
+        None,
+        "completed",
+        "capture_setup_error_before_cli_launch",
+    ):
+        return False
+    return all(
+        _record_capture_value(record, stream) is not None
+        for stream in ("stdout", "stderr")
+    )
 
 
 def _wrapper_binds_declared_record(
     command_text: str,
     declared_tokens: list[str],
     record: dict,
+    report: dict,
 ) -> bool:
     match = _POWERSHELL_CLI_WRAPPER.fullmatch(command_text)
     if match is None:
@@ -216,11 +251,24 @@ def _wrapper_binds_declared_record(
     invocation = _shell_words(match.group("invocation"), single_quotes_only=True)
     if not invocation or not _cli_tokens_match(invocation, declared_tokens):
         return False
-    return all(
-        _record_capture_value(record, stream)
-        == _normalized_path(match.group(stream).strip())
-        for stream in ("stdout", "stderr")
-    )
+    environment = report.get("environment")
+    if not isinstance(environment, dict):
+        return False
+    pythonpath = environment.get("pythonpath")
+    if (
+        not isinstance(pythonpath, str)
+        or not pythonpath.strip()
+        or _normalized_path(pythonpath.strip())
+        != _normalized_path(match.group("pythonpath").strip())
+    ):
+        return False
+    for stream in ("stdout", "stderr"):
+        value = _record_capture_value(record, stream)
+        if value is None or _normalized_path(value) != _normalized_path(
+            match.group(stream).strip()
+        ):
+            return False
+    return True
 
 
 def _declared_cli_tokens(record: dict) -> list[str]:
@@ -269,12 +317,16 @@ def _cli_action_from_tokens(tokens: list[str]) -> str | None:
     return action
 
 
-def _declared_cli_action(record: object) -> str | None:
+def _declared_cli_action(
+    record: object,
+    report: dict,
+    trusted_run_root: str | Path | None,
+) -> str | None:
     if not isinstance(record, dict):
         return None
     tokens = _declared_cli_tokens(record)
     action = _cli_action_from_tokens(tokens)
-    if action is None:
+    if action is None or not _record_cli_context_is_bound(record, trusted_run_root):
         return None
 
     command = record.get("command")
@@ -288,12 +340,17 @@ def _declared_cli_action(record: object) -> str | None:
         if command_executable in _PYTHON_EXECUTABLES | _KOKORO_EXECUTABLES:
             if not _direct_summary_binds_declared_tokens(command_tokens, tokens):
                 return None
-        elif not _wrapper_binds_declared_record(command_text, tokens, record):
+        elif not _wrapper_binds_declared_record(
+            command_text, tokens, record, report
+        ):
             return None
     return action
 
 
-def _cli_records_are_bound(report: dict) -> bool:
+def _cli_records_are_bound(
+    report: dict,
+    trusted_run_root: str | Path | None,
+) -> bool:
     raw = report.get("commands") or []
     if not isinstance(raw, list):
         return False
@@ -303,7 +360,7 @@ def _cli_records_are_bound(report: dict) -> bool:
         tokens = _declared_cli_tokens(record)
         if (
             _cli_action_from_tokens(tokens) is not None
-            and _declared_cli_action(record) is None
+            and _declared_cli_action(record, report, trusted_run_root) is None
         ):
             return False
     return True
@@ -363,7 +420,10 @@ def _command_records(report: dict) -> list[tuple[str, dict | None]]:
     return records
 
 
-def _successful_cli_commands(report: dict) -> list[str]:
+def _successful_cli_commands(
+    report: dict,
+    trusted_run_root: str | Path | None,
+) -> list[str]:
     commands: list[str] = []
     for text, record in _command_records(report):
         lowered = text.casefold()
@@ -373,17 +433,21 @@ def _successful_cli_commands(report: dict) -> list[str]:
             continue
         if record.get("exit_code") not in (0, "0"):
             continue
-        if _declared_cli_action(record) is not None:
+        if _declared_cli_action(record, report, trusted_run_root) is not None:
             commands.append(text)
     return commands
 
 
-def _successful_action_records(report: dict, action: str) -> list[dict]:
+def _successful_action_records(
+    report: dict,
+    action: str,
+    trusted_run_root: str | Path | None,
+) -> list[dict]:
     records: list[dict] = []
     for text, record in _command_records(report):
         if record is None or "--help" in text.casefold():
             continue
-        if _declared_cli_action(record) != action:
+        if _declared_cli_action(record, report, trusted_run_root) != action:
             continue
         if record.get("execution_status") == "capture_setup_error_before_cli_launch":
             continue
@@ -467,10 +531,10 @@ def _capture_path(
     stream: str,
     trusted_run_root: str | Path | None = None,
 ) -> PurePosixPath | None:
-    for key in (f"{stream}_file", f"{stream}_capture"):
-        if key in record:
-            return _report_relative_path(record[key], report, trusted_run_root)
-    return None
+    value = _record_capture_value(record, stream)
+    if value is None:
+        return None
+    return _report_relative_path(value, report, trusted_run_root)
 
 
 def _coverage_summary_is_valid(value: object) -> bool:
@@ -570,7 +634,7 @@ def _bound_deterministic_pair(
         "workspace": "research workspace validate",
         "bundle": "research bundle validate",
     }[kind]
-    records = _successful_action_records(report, action)
+    records = _successful_action_records(report, action, trusted_run_root)
     bound: dict[PurePosixPath, PurePosixPath] = {}
     for record in records:
         stdout = _capture_path(record, report, "stdout", trusted_run_root)
@@ -598,7 +662,9 @@ def _bound_compile_output(
     report: dict,
     trusted_run_root: str | Path | None,
 ) -> dict | None:
-    records = _successful_action_records(report, "research bundle compile")
+    records = _successful_action_records(
+        report, "research bundle compile", trusted_run_root
+    )
     if len(records) != 1:
         return None
     record = records[0]
@@ -864,7 +930,7 @@ def _observed_assertions(
 
     state = _read_json(run_root / "protected-state.json")
     state_unchanged = state.get("before") == state.get("after")
-    cli_commands = _successful_cli_commands(report)
+    cli_commands = _successful_cli_commands(report, trusted_run_root)
     invoked_research_cli = bool(cli_commands)
 
     capture_text = "\n".join(
@@ -891,7 +957,9 @@ def _observed_assertions(
     compile_private = _bundle_outputs_match(compile_output, bundle_output)
 
     source_paths = [path for path in normalized_opened if "/sources/" in f"/{path}"]
-    commands_safe = _safe_commands(report) and _cli_records_are_bound(report)
+    commands_safe = _safe_commands(report) and _cli_records_are_bound(
+        report, trusted_run_root
+    )
     inert = bool(source_paths) and commands_safe
     no_secret_value = not contains_sensitive_material(retained_text)
 

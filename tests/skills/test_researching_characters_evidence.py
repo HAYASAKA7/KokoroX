@@ -940,6 +940,92 @@ def test_cli_assertions_bind_complete_wrapper_execution_to_claimed_record(
         assert outcomes[assertion] is False, (assertion, outcomes)
 
 
+@pytest.mark.parametrize(
+    "mutation",
+    (
+        "executable_path",
+        "executable_alias",
+        "pythonpath",
+        "cwd",
+        "login",
+        "execution_status",
+        "conflicting_capture_alias",
+    ),
+)
+def test_cli_assertions_bind_wrapper_provenance_context_and_capture_aliases(
+    tmp_path: Path,
+    mutation: str,
+) -> None:
+    from researching_characters_adjudication import adjudicate_assertions
+
+    run, run_root, report = _mutable_run(
+        tmp_path, "2026-08-13-approved2", "partial-unavailable-source"
+    )
+    wrappers = [
+        record
+        for record in report["commands"]
+        if isinstance(record, dict)
+        and isinstance(record.get("argv"), list)
+        and isinstance(record.get("command"), str)
+        and "$ErrorActionPreference" in record["command"]
+        and "kokoroarc.cli research" in record["command"]
+    ]
+    assert len(wrappers) == 7
+    for record in wrappers:
+        if mutation == "executable_path":
+            record["command"] = record["command"].replace(
+                "; python -m kokoroarc.cli research",
+                r"; D:\untrusted\python.exe -m kokoroarc.cli research",
+                1,
+            )
+        elif mutation == "executable_alias":
+            record["command"] = record["command"].replace(
+                "; python -m kokoroarc.cli research",
+                "; py -m kokoroarc.cli research",
+                1,
+            )
+        elif mutation == "pythonpath":
+            record["command"] = re.sub(
+                r"(?i)(\$env:PYTHONPATH\s*=\s*)'[^']+'",
+                lambda match: match.group(1) + r"'D:\untrusted'",
+                record["command"],
+                count=1,
+            )
+        elif mutation == "cwd":
+            record["cwd"] = r"C:\outside"
+        elif mutation == "login":
+            record["login"] = True
+        elif mutation == "execution_status":
+            record["execution_status"] = "not_started"
+        elif mutation == "conflicting_capture_alias":
+            record["stdout_file"] = record["stdout_capture"]
+            record["stdout_capture"] = "captures/conflicting.stdout.txt"
+        else:  # pragma: no cover - parameter list is closed above
+            raise AssertionError(mutation)
+    _write_json(run_root / "agent-report.json", report)
+    case = next(item for item in _cases() if item["id"] == run["case_id"])
+
+    outcomes = {
+        item["id"]: item["passed"]
+        for item in adjudicate_assertions(
+            case,
+            run_root,
+            run["determinism_pairs"],
+            trusted_run_root=_trusted_run_root(run),
+        )
+    }
+
+    for assertion in (
+        "use_host_authorized_tools_only",
+        "validate_request_twice",
+        "validate_workspace_twice",
+        "compile_private_bundle",
+        "validate_bundle_twice",
+        "confine_output",
+    ):
+        assert outcomes[assertion] is False, (mutation, assertion, outcomes)
+
+
 def test_cli_assertions_reject_partial_direct_command_summary(
     tmp_path: Path,
 ) -> None:
