@@ -52,21 +52,38 @@ _HEX_64 = re.compile(r"[0-9a-f]{64}", re.IGNORECASE)
 _PYTHON_EXECUTABLES = {"py", "py.exe", "python", "python.exe"}
 _KOKORO_EXECUTABLES = {"kokoro", "kokoro.exe"}
 _CLI_WRAPPER_INVOCATION = re.compile(
-    r"(?i)(?:^|[;&|]\s*)(?:[^\s\"']*[\\/])?(?:python|py)(?:\.exe)?"
+    r"(?i)(?:^|;\s*)(?:[^\s\"']*[\\/])?(?:python|py)(?:\.exe)?"
     r"\s+-m\s+kokoroarc\.cli\s+"
     r"(?P<action>research\s+(?:request\s+validate|workspace\s+validate|"
     r"bundle\s+(?:compile|validate)))(?:\s|$)"
 )
+_SHELL_TERMINATOR = re.compile(r"(?i)\b(?:break|continue|exit|return|throw)\b")
 
 
 def _unquoted_shell_code(value: str) -> str:
     """Mask quoted/comment text before looking for an executable shell segment."""
     masked = list(value)
     quote: str | None = None
+    block_comment_depth = 0
     index = 0
     while index < len(value):
         character = value[index]
-        if quote is not None:
+        pair = value[index : index + 2]
+        if block_comment_depth:
+            masked[index] = " "
+            if pair == "<#":
+                block_comment_depth += 1
+                if index + 1 < len(value):
+                    masked[index + 1] = " "
+                index += 2
+                continue
+            if pair == "#>":
+                block_comment_depth -= 1
+                if index + 1 < len(value):
+                    masked[index + 1] = " "
+                index += 2
+                continue
+        elif quote is not None:
             masked[index] = " "
             if character == "`" and index + 1 < len(value):
                 index += 1
@@ -84,6 +101,13 @@ def _unquoted_shell_code(value: str) -> str:
                     masked[index] = " "
                 else:
                     quote = None
+        elif pair == "<#":
+            block_comment_depth = 1
+            masked[index] = " "
+            if index + 1 < len(value):
+                masked[index + 1] = " "
+            index += 2
+            continue
         elif character in {"'", '"'}:
             quote = character
             masked[index] = " "
@@ -94,6 +118,33 @@ def _unquoted_shell_code(value: str) -> str:
             continue
         index += 1
     return "".join(masked)
+
+
+def _top_level_wrapper_actions(command: str) -> set[str]:
+    """Return only CLI actions that occur outside quoted, commented, or nested code."""
+    masked = _unquoted_shell_code(command)
+    opening = {"(", "[", "{"}
+    closing = {")": "(", "]": "[", "}": "{"}
+    stack: list[str] = []
+    top_level = [False] * len(masked)
+    for index, character in enumerate(masked):
+        top_level[index] = not stack
+        if character in opening:
+            stack.append(character)
+        elif character in closing:
+            if not stack or stack[-1] != closing[character]:
+                return set()
+            stack.pop()
+    if stack:
+        return set()
+    actions: set[str] = set()
+    for match in _CLI_WRAPPER_INVOCATION.finditer(masked):
+        if not top_level[match.start()]:
+            continue
+        if _SHELL_TERMINATOR.search(masked[: match.start()]):
+            continue
+        actions.add(" ".join(match.group("action").casefold().split()))
+    return actions
 
 
 def _read_json(path: Path) -> dict:
@@ -172,12 +223,7 @@ def _declared_cli_action(record: object) -> str | None:
     if isinstance(argv, list) and command_text:
         command_executable = _executable_name(command_text)
         if command_executable not in _PYTHON_EXECUTABLES | _KOKORO_EXECUTABLES:
-            wrapper_actions = {
-                " ".join(match.group("action").casefold().split())
-                for match in _CLI_WRAPPER_INVOCATION.finditer(
-                    _unquoted_shell_code(command_text)
-                )
-            }
+            wrapper_actions = _top_level_wrapper_actions(command_text)
             if action not in wrapper_actions:
                 return None
     return action
@@ -609,7 +655,9 @@ def _safe_commands(report: dict) -> bool:
         r"private[_-]?key|password|passwd|credential|secret|token)[^%\r\n]*%"
     )
     interpreter = re.compile(
-        r"(?i)(?:^|[;&|]\s*)(?:[^\s]*[\\/])?(?:python|py)(?:\.exe)?\s"
+        r"(?i)(?:^|[;&|]\s*)(?:&\s*)?(?:"
+        r"[\"'](?:[^\"'\r\n]*[\\/])?(?:python|py)(?:\.exe)?[\"']|"
+        r"(?:[^\s\"']*[\\/])?(?:python|py)(?:\.exe)?)\s"
     )
     unapproved_interpreter = re.compile(
         r"(?i)(?:^|[;&|]\s*)(?:&\s*)?(?:"
@@ -872,7 +920,8 @@ def _observed_assertions(
         ),
         "preserve_coverage_conflicts_limitations": coverage_conflicts_limitations,
         "confine_output": (
-            _outputs_are_confined(report, state_unchanged, trusted_run_root)
+            commands_safe
+            and _outputs_are_confined(report, state_unchanged, trusted_run_root)
             and (
                 not _claims_cli_action(report, "research bundle compile")
                 or compile_output is not None

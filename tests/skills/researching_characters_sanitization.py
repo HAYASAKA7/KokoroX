@@ -20,11 +20,8 @@ _ENVIRONMENT_ASSIGNMENT_PREFIX = re.compile(
     r"[\"']?\s*[:=]\s*)",
     re.IGNORECASE,
 )
-_AUTHORIZATION = re.compile(
-    r"(?P<prefix>(?:\\?[\"'])?Authorization(?:\\?[\"'])?\s*[:=]\s*)"
-    r"(?P<value>(?P<authorization_quote>\\?[\"'])"
-    r"(?:Bearer|Basic|Token)\s+.*?(?P=authorization_quote)|"
-    r"(?:Bearer|Basic|Token)\s+[^\s,}\]\r\n]+)",
+_AUTHORIZATION_PREFIX = re.compile(
+    r"(?P<prefix>(?:\\?[\"'])?Authorization(?:\\?[\"'])?\s*[:=]\s*)",
     re.IGNORECASE,
 )
 _URL_CREDENTIALS = re.compile(
@@ -131,45 +128,68 @@ def _structured_value_end(text: str, start: int) -> int:
     return _line_end(text, start)
 
 
-def _redacted_assignment_value(value: str) -> bool:
+def _redacted_structured_value(value: str, replacement: str) -> bool:
     candidate = value.strip()
     for delimiter in ('"', "'", '\\"', "\\'"):
         if candidate.startswith(delimiter) and candidate.endswith(delimiter):
             candidate = candidate[len(delimiter) : -len(delimiter)]
             break
-    return candidate.casefold() == ENVIRONMENT_SECRET_REPLACEMENT.casefold()
+    return candidate.casefold() == replacement.casefold()
 
 
-def _format_assignment_replacement(value: str) -> str:
+def _format_structured_replacement(value: str, replacement: str) -> str:
     for delimiter in ('\\"', "\\'", '"', "'"):
         if value.startswith(delimiter) and value.endswith(delimiter):
-            return f"{delimiter}{ENVIRONMENT_SECRET_REPLACEMENT}{delimiter}"
-    return ENVIRONMENT_SECRET_REPLACEMENT
+            return f"{delimiter}{replacement}{delimiter}"
+    return replacement
 
 
-def _replace_environment_assignments(text: str) -> tuple[str, int]:
+def _replace_prefixed_values(
+    text: str,
+    prefix_pattern: re.Pattern[str],
+    replacement: str,
+) -> tuple[str, int]:
     pieces: list[str] = []
     cursor = 0
     search_from = 0
     count = 0
-    while match := _ENVIRONMENT_ASSIGNMENT_PREFIX.search(text, search_from):
+    while match := prefix_pattern.search(text, search_from):
         value_start = match.end()
         value_end = _structured_value_end(text, value_start)
         if value_end <= value_start:
             search_from = value_start
             continue
         raw_value = text[value_start:value_end]
-        if _redacted_assignment_value(raw_value):
+        if _redacted_structured_value(raw_value, replacement):
             search_from = value_end
             continue
         pieces.extend(
-            (text[cursor:value_start], _format_assignment_replacement(raw_value))
+            (
+                text[cursor:value_start],
+                _format_structured_replacement(raw_value, replacement),
+            )
         )
         cursor = value_end
         search_from = value_end
         count += 1
     pieces.append(text[cursor:])
     return "".join(pieces), count
+
+
+def _replace_environment_assignments(text: str) -> tuple[str, int]:
+    return _replace_prefixed_values(
+        text,
+        _ENVIRONMENT_ASSIGNMENT_PREFIX,
+        ENVIRONMENT_SECRET_REPLACEMENT,
+    )
+
+
+def _replace_authorization_values(text: str) -> tuple[str, int]:
+    return _replace_prefixed_values(
+        text,
+        _AUTHORIZATION_PREFIX,
+        CREDENTIAL_REPLACEMENT,
+    )
 
 
 def _replace_value(match: re.Match[str], replacement: str) -> str:
@@ -186,7 +206,7 @@ def _replace_value(match: re.Match[str], replacement: str) -> str:
         if delimiter and value.endswith(delimiter)
         else value
     )
-    if unquoted.casefold().startswith("<redacted-"):
+    if unquoted.casefold() == replacement.casefold():
         return match.group(0)
     redacted = f"{delimiter}{replacement}{delimiter}" if delimiter else replacement
     return f"{match.group('prefix')}{redacted}"
@@ -212,12 +232,10 @@ def _subn_counted(
 def sanitize_sensitive_text(value: str) -> tuple[str, int]:
     text = value
     total = 0
+    text, count = _replace_authorization_values(text)
+    total += count
     for pattern, replacement in (
         (_USER_PROFILE, USER_PROFILE_REPLACEMENT),
-        (
-            _AUTHORIZATION,
-            lambda match: _replace_value(match, CREDENTIAL_REPLACEMENT),
-        ),
         (
             _URL_CREDENTIALS,
             lambda match: _replace_value(match, CREDENTIAL_REPLACEMENT),
