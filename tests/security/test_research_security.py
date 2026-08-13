@@ -15,6 +15,14 @@ import pytest
 
 import kokoroarc.research.workspace as research_workspace
 from kokoroarc.errors import KokoroError
+from kokoroarc.packs.compiler import canonical_bytes
+from kokoroarc.research import (
+    build_research_bundle,
+    load_published_research_bundle,
+    publish_research_bundle,
+    storage,
+)
+from kokoroarc.research.validation import validate_research_workspace
 from kokoroarc.research.workspace import ResearchLimits, load_research_workspace
 from kokoroarc.schemas import SchemaRegistry
 
@@ -50,6 +58,16 @@ def assert_safe_error(error: KokoroError, secret: str) -> None:
     assert secret not in rendered
     assert not Path(secret).is_absolute() or str(Path(secret)) not in rendered
     assert error.__cause__ is None
+
+
+def published_bundle(tmp_path: Path) -> Path:
+    source_root = copied_workspace(tmp_path)
+    workspace = load_research_workspace(source_root, registry())
+    report = validate_research_workspace(workspace, registry())
+    bundle = build_research_bundle(workspace, report)
+    return publish_research_bundle(
+        tmp_path / "data", source_root, workspace, report, bundle
+    )
 
 
 def test_manifest_is_validated_before_following_missing_reference(tmp_path: Path) -> None:
@@ -755,3 +773,46 @@ def test_rejects_short_read_even_when_stat_size_matches(
     with pytest.raises(KokoroError) as raised:
         load_research_workspace(root, registry())
     assert raised.value.code == "RESEARCH_WORKSPACE_CHANGED"
+
+
+def test_published_bundle_schema_failure_does_not_leak_source_text(
+    tmp_path: Path,
+) -> None:
+    published = published_bundle(tmp_path)
+    secret = "SENSITIVE_PUBLISHED_SOURCE_FIELD_7D91"
+    bundle_path = published / "bundle.json"
+    document = json.loads(bundle_path.read_bytes())
+    document[secret] = "SENSITIVE_PUBLISHED_SOURCE_VALUE"
+    bundle_path.write_bytes(canonical_bytes(document) + b"\n")
+
+    with pytest.raises(KokoroError) as raised:
+        load_published_research_bundle(published, registry())
+
+    assert raised.value.code == "RESEARCH_BUNDLE_INVALID"
+    assert_safe_error(raised.value, secret)
+    assert_safe_error(raised.value, "SENSITIVE_PUBLISHED_SOURCE_VALUE")
+
+
+def test_published_bundle_rejects_oversized_file_before_open(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    published = published_bundle(tmp_path)
+    bundle_path = published / "bundle.json"
+    bundle_path.write_bytes(b" " * (4 * 1024 * 1024 + 1))
+    real_open = storage.os.open
+    opened_oversized = False
+
+    def recording_open(path: object, flags: int, *args: object) -> int:
+        nonlocal opened_oversized
+        if Path(path) == bundle_path:
+            opened_oversized = True
+        return real_open(path, flags, *args)
+
+    monkeypatch.setattr(storage.os, "open", recording_open)
+
+    with pytest.raises(KokoroError) as raised:
+        load_published_research_bundle(published, registry())
+
+    assert raised.value.code == "RESEARCH_BUNDLE_INVALID"
+    assert opened_oversized is False

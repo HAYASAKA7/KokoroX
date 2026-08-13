@@ -116,6 +116,29 @@ def test_load_published_research_bundle_rejects_hash_bound_tampering(
     assert caught.value.code == "RESEARCH_BUNDLE_INVALID"
 
 
+@pytest.mark.parametrize(
+    "contents",
+    [
+        b'{"value":NaN}\n',
+        b'{"value":1,"value":2}\n',
+        b'{"value":"\x00"}\n',
+        b'{"value":"\xed\xa0\x80"}\n',
+        b"\xff",
+    ],
+)
+def test_load_published_research_bundle_rejects_non_strict_json(
+    tmp_path: Path,
+    contents: bytes,
+) -> None:
+    published, _bundle = published_bundle(tmp_path)
+    (published / "bundle.json").write_bytes(contents)
+
+    with pytest.raises(KokoroError) as caught:
+        load_published_research_bundle(published, SCHEMAS)
+
+    assert caught.value.code == "RESEARCH_BUNDLE_INVALID"
+
+
 def test_publish_fsyncs_same_parent_staging_before_cutover(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

@@ -29,6 +29,7 @@ _PUBLISHED_FILES = {
     "request.json": "research-request",
     "validation-report.json": "research-validation-report",
 }
+_MAX_PUBLISHED_FILE_BYTES = 4 * 1024 * 1024
 _LOCK_CONTENTION_ERRNOS = frozenset(
     value
     for value in (
@@ -151,7 +152,7 @@ def load_published_research_bundle(
     except KokoroError as error:
         if error.code == "RESEARCH_BUNDLE_INVALID":
             raise
-        raise _bundle_invalid("validation") from error
+        raise _bundle_invalid("validation") from None
     except (OSError, ValueError):
         raise _bundle_invalid("path") from None
 
@@ -208,6 +209,7 @@ def _published_layout_snapshot(
             _is_redirect(path, path_stat)
             or not stat.S_ISREG(path_stat.st_mode)
             or path_stat.st_nlink != 1
+            or path_stat.st_size > _MAX_PUBLISHED_FILE_BYTES
         ):
             raise _bundle_invalid("unsafe_file")
         snapshot[name] = _file_identity(path_stat)

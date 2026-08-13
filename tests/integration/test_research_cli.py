@@ -1,15 +1,50 @@
 from __future__ import annotations
 
 import json
+from hashlib import sha256
 import os
 from pathlib import Path
 import shutil
 import subprocess
 import sys
+import tarfile
+import zipfile
 
 
 REPOSITORY_ROOT = Path.cwd().resolve()
 RESEARCH_FIXTURES = REPOSITORY_ROOT / "tests" / "fixtures" / "research"
+REQUIRED_RESEARCH_MODULES = {
+    "kokoroarc/research/__init__.py",
+    "kokoroarc/research/bundles.py",
+    "kokoroarc/research/requests.py",
+    "kokoroarc/research/storage.py",
+    "kokoroarc/research/validation.py",
+    "kokoroarc/research/workspace.py",
+}
+REQUIRED_RESEARCH_SCHEMAS = {
+    f"{name}.schema.json"
+    for name in (
+        "research-bundle",
+        "research-claim",
+        "research-conflict",
+        "research-coverage",
+        "research-request",
+        "research-source-record",
+        "research-validation-report",
+        "research-workspace",
+    )
+}
+PROTECTED_STATE_ROOTS = (
+    "drafts",
+    "compiled",
+    "installed",
+    "public",
+    "sessions",
+    "state",
+    "events",
+    "workspaces",
+    "config",
+)
 
 
 def _cli(
@@ -51,6 +86,18 @@ def _assert_error(
         "ok": False,
     }
     assert completed.stderr == ""
+
+
+def _protected_state_snapshot(data_dir: Path) -> dict[str, bytes]:
+    snapshot: dict[str, bytes] = {}
+    for root_name in PROTECTED_STATE_ROOTS:
+        root = data_dir / root_name
+        for path in sorted(root.rglob("*")):
+            relative = path.relative_to(data_dir).as_posix()
+            snapshot[relative + ("/" if path.is_dir() else "")] = (
+                b"" if path.is_dir() else path.read_bytes()
+            )
+    return snapshot
 
 
 def test_research_request_validate_is_stateless_and_deterministic() -> None:
@@ -357,3 +404,208 @@ def test_research_request_validate_resolves_wheel_install_schema_layout(
     assert completed.returncode == 0
     assert json.loads(completed.stdout)["request"]["requested_visibility"] == "private"
     assert completed.stderr == ""
+
+
+def test_built_archives_and_installed_research_cli_are_complete(
+    tmp_path: Path,
+) -> None:
+    dist = tmp_path / "dist"
+    built = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "build",
+            "--no-isolation",
+            "--outdir",
+            str(dist),
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+        cwd=REPOSITORY_ROOT,
+    )
+    assert built.returncode == 0, built.stdout + built.stderr
+    wheel = next(dist.glob("*.whl"))
+    sdist = next(dist.glob("*.tar.gz"))
+
+    with zipfile.ZipFile(wheel) as archive:
+        wheel_entries = set(archive.namelist())
+    with tarfile.open(sdist, "r:gz") as archive:
+        sdist_entries = {member.name for member in archive.getmembers()}
+
+    for module in REQUIRED_RESEARCH_MODULES:
+        assert module in wheel_entries
+        assert any(entry.endswith(f"/src/{module}") for entry in sdist_entries)
+    for schema in REQUIRED_RESEARCH_SCHEMAS:
+        wheel_suffix = f"/share/kokoroarc/schemas/v1/{schema}"
+        assert any(entry.endswith(wheel_suffix) for entry in wheel_entries)
+        assert any(entry.endswith(f"/schemas/v1/{schema}") for entry in sdist_entries)
+
+    installed = tmp_path / "installed"
+    installed_result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "pip",
+            "install",
+            "--disable-pip-version-check",
+            "--no-compile",
+            "--no-deps",
+            "--target",
+            str(installed),
+            str(wheel),
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+        cwd=tmp_path,
+    )
+    assert installed_result.returncode == 0, (
+        installed_result.stdout + installed_result.stderr
+    )
+    outside_repository = tmp_path / "working"
+    outside_repository.mkdir()
+
+    request = _cli(
+        [
+            "research",
+            "request",
+            "validate",
+            "--input",
+            str(RESEARCH_FIXTURES / "complete" / "request.json"),
+            "--json",
+        ],
+        python_path=installed,
+        working_directory=outside_repository,
+    )
+    workspace = _cli(
+        [
+            "research",
+            "workspace",
+            "validate",
+            "--workspace",
+            str(RESEARCH_FIXTURES / "complete"),
+            "--json",
+        ],
+        python_path=installed,
+        working_directory=outside_repository,
+    )
+    compiled = _cli(
+        [
+            "research",
+            "bundle",
+            "compile",
+            "--workspace",
+            str(RESEARCH_FIXTURES / "complete"),
+            "--json",
+        ],
+        data_dir=tmp_path / "data",
+        python_path=installed,
+        working_directory=outside_repository,
+    )
+    assert compiled.returncode == 0, compiled.stdout + compiled.stderr
+    bundle_path = json.loads(compiled.stdout)["path"]
+    bundle = _cli(
+        [
+            "research",
+            "bundle",
+            "validate",
+            "--bundle",
+            bundle_path,
+            "--json",
+        ],
+        python_path=installed,
+        working_directory=outside_repository,
+    )
+
+    for completed in (request, workspace, compiled, bundle):
+        assert completed.returncode == 0, completed.stdout + completed.stderr
+        assert json.loads(completed.stdout)["ok"] is True
+        assert completed.stderr == ""
+
+
+def test_research_validation_and_failed_compile_do_not_mutate_product_state(
+    tmp_path: Path,
+) -> None:
+    data_dir = tmp_path / "data"
+    compiled = _cli(
+        [
+            "research",
+            "bundle",
+            "compile",
+            "--workspace",
+            str(RESEARCH_FIXTURES / "complete"),
+            "--json",
+        ],
+        data_dir=data_dir,
+    )
+    assert compiled.returncode == 0
+    bundle_path = json.loads(compiled.stdout)["path"]
+    for root_name in PROTECTED_STATE_ROOTS:
+        root = data_dir / root_name
+        root.mkdir(parents=True)
+        (root / "sentinel.bin").write_bytes(root_name.encode("ascii"))
+    before = _protected_state_snapshot(data_dir)
+    invalid_workspace = tmp_path / "invalid-workspace"
+    shutil.copytree(RESEARCH_FIXTURES / "complete", invalid_workspace)
+    claim_path = invalid_workspace / "claims" / "claim-role.json"
+    claim = json.loads(claim_path.read_bytes())
+    claim["source_ids"] = ["missing-source"]
+    claim_bytes = json.dumps(
+        claim, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+    ).encode("utf-8")
+    claim_path.write_bytes(claim_bytes)
+    manifest_path = invalid_workspace / "workspace.json"
+    manifest = json.loads(manifest_path.read_bytes())
+    manifest["claims"][1]["sha256"] = sha256(claim_bytes).hexdigest()
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+    request = _cli(
+        [
+            "research",
+            "request",
+            "validate",
+            "--input",
+            str(RESEARCH_FIXTURES / "complete" / "request.json"),
+            "--json",
+        ]
+    )
+    workspace = _cli(
+        [
+            "research",
+            "workspace",
+            "validate",
+            "--workspace",
+            str(RESEARCH_FIXTURES / "complete"),
+            "--json",
+        ]
+    )
+    bundle = _cli(
+        [
+            "research",
+            "bundle",
+            "validate",
+            "--bundle",
+            bundle_path,
+            "--json",
+        ]
+    )
+    failed_compile = _cli(
+        [
+            "research",
+            "bundle",
+            "compile",
+            "--workspace",
+            str(invalid_workspace),
+            "--json",
+        ],
+        data_dir=data_dir,
+    )
+
+    assert request.returncode == workspace.returncode == bundle.returncode == 0
+    _assert_error(
+        failed_compile,
+        "RESEARCH_VALIDATION_FAILED",
+        "Research validation failed.",
+    )
+    assert _protected_state_snapshot(data_dir) == before
