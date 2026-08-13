@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import re
+import subprocess
 from pathlib import Path
 
 
@@ -10,6 +11,7 @@ README = (ROOT / "README.md").read_text(encoding="utf-8")
 RESULTS_PATH = ROOT / "tests" / "skills" / "researching-characters-results.md"
 EVIDENCE_PATH = ROOT / "tests" / "skills" / "research-release-verification.md"
 GIT_ATTRIBUTES_PATH = ROOT / ".gitattributes"
+TASK_11_BASE = "274c5a57051b8ee31d95deab11ae26d00707911a"
 
 
 def _section(document: str, heading: str) -> str:
@@ -56,6 +58,8 @@ def test_results_document_records_corrective_pass_without_claiming_closure() -> 
     assert "exactly 11 fresh Skill-only corrective runs" in results
     assert "Corrective Skill result: **PASS 11/11**" in results
     assert "ten deviations across seven cases" in results
+    assert "Exact raw Codex `final_answer`" in results
+    assert "independently recomputes every assertion outcome" in results
     assert "Task 11 and Milestone 7 remain open" in results
 
 
@@ -71,9 +75,9 @@ def test_release_evidence_records_smoke_and_exact_milestone_boundary() -> None:
         "Milestone 7 does not approve the complete standalone suite",
         "Behavioral campaign: CORRECTIVE PASS 11/11",
         "Corrective harness: COMPLETED WITH DISCLOSED DEVIATIONS",
-        "Exact-final verification: PASS",
-        "Independent specification review: PENDING",
-        "Independent quality review: PENDING",
+        "Exact-final verification: REOPENED AFTER IMPORTANT REVIEW FINDINGS",
+        "Fresh exact-commit specification review: PENDING",
+        "Fresh exact-commit quality review: PENDING",
     ):
         assert text in evidence
 
@@ -107,7 +111,7 @@ def test_release_evidence_records_corrective_exact_final_candidate() -> None:
         assert text in evidence
 
 
-def test_release_evidence_records_settled_exact_final_pass() -> None:
+def test_release_evidence_retains_superseded_settled_exact_final_result() -> None:
     evidence = EVIDENCE_PATH.read_text(encoding="utf-8")
     for text in (
         r"D:\tmp\kokoroarc-m7-release-20260814-final2",
@@ -116,15 +120,52 @@ def test_release_evidence_records_settled_exact_final_pass() -> None:
         "0F9D3B900E26B47E8F7C8A077931600351D051708881F473DBAF0C076E29ED6D",
         "2F22933EA8326B706DA77C7FE6EF0A36747246BE406F7A290DA59B071DA64FDF",
         "4E1ADA14555CCF663C9E87545AC476013E8726E43D3E894FF4CBF469E2C54776",
-        "Exact-final verification is therefore **PASS**",
-        "independent specification and quality reviews remain the two closure gates",
+        "historical candidate reported **PASS**",
+        "invalidated it for Task 11 closure",
     ):
         assert text in evidence
 
 
-def test_retained_research_evidence_is_checkout_byte_stable() -> None:
+def test_release_evidence_records_important_review_remediation() -> None:
+    evidence = EVIDENCE_PATH.read_text(encoding="utf-8")
+    for text in (
+        "Closure-review remediation after `b073381`",
+        "b07338101b37c66080f9b7f82de7a84919d9b56c",
+        "pins `skills/**` to LF",
+        "cr-at-eol,-blank-at-eol,-blank-at-eof",
+        "All 33 original evaluator threads",
+        "`task_complete.last_agent_message`",
+        "`lf_and_strip_terminal_lf`",
+        "without `BASELINE_PASSES`",
+        "28 tests",
+        r"D:\tmp\kokoroarc-m7-remediation-preflight-20260814-02",
+        "1919 passed, 24 skipped",
+        "6C73C2A057A36110C9D467CEF0374D38E5BDCBF79D07343DB1225DA0BF79B0C1",
+        "not the fresh exact-commit closure run",
+    ):
+        assert text in evidence
+
+
+def test_research_skill_and_evidence_are_checkout_byte_stable() -> None:
     attributes = GIT_ATTRIBUTES_PATH.read_text(encoding="utf-8").splitlines()
-    assert "tests/skills/evidence/researching-characters/** -text" in attributes
+    assert "skills/** text eol=lf" in attributes
+    assert (
+        "tests/skills/evidence/researching-characters/** -text "
+        "whitespace=cr-at-eol,-blank-at-eol,-blank-at-eof"
+    ) in attributes
+
+
+def test_exact_task_11_range_has_no_undeclared_whitespace_errors() -> None:
+    checked = subprocess.run(
+        ["git", "diff", "--check", TASK_11_BASE, "HEAD"],
+        cwd=ROOT,
+        check=False,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        encoding="utf-8",
+    )
+    assert checked.returncode == 0, checked.stdout + checked.stderr
 
 
 def test_release_evidence_binds_current_skill_files() -> None:

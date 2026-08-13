@@ -5,12 +5,13 @@ tests/skills/transcripts/** -text
 README.md text eol=lf
 
 # Skill hashes and packaged instructions must be stable across host line-ending policy.
-skills/using-kokoroarc/** text eol=lf
+skills/** text eol=lf
 # Evaluator prompts are byte-exact captures; a terminal blank line can be evidence.
 tests/skills/transcripts/authoring-character-packs/skill/*/prompt.txt whitespace=-blank-at-eof
 
 # Research workspace manifests hash their fixture artifact bytes.
 tests/fixtures/research/** text eol=lf
 
-# Retained research campaign files are byte-exact evaluator evidence.
-tests/skills/evidence/researching-characters/** -text
+# Retained research campaign files are byte-exact evaluator evidence. Their raw
+# Windows CRLF is valid evidence, not trailing whitespace.
+tests/skills/evidence/researching-characters/** -text whitespace=cr-at-eol,-blank-at-eol,-blank-at-eof

@@ -9,11 +9,12 @@ This record covers the inline product, CLI, Skill-structure, smoke, and distribu
 - Isolated root: `D:\tmp\kokoroarc-m7-release-20260813-inline1`
 - Behavioral campaign: CORRECTIVE PASS 11/11 (first batch remains Skill PASS 10/11, RED 1/11)
 - Corrective harness: COMPLETED WITH DISCLOSED DEVIATIONS
-- Exact-final verification: PASS
-- Independent specification review: PENDING
-- Independent quality review: PENDING
+- Exact-final verification: REOPENED AFTER IMPORTANT REVIEW FINDINGS
+- Review of commit `b07338101b37c66080f9b7f82de7a84919d9b56c`: IMPORTANT FINDINGS REMEDIATED
+- Fresh exact-commit specification review: PENDING
+- Fresh exact-commit quality review: PENDING
 
-The approved 22-run first campaign remains immutable, including its one failed Skill assertion. The separately approved 11-run corrective Skill-only campaign passed all declared behavioral assertions against the current Skill. Ten harness/report deviations across seven cases are retained and disclosed; they do not reclassify any behavior or erase the failed first campaign. Exact-final verification has passed, but both independent closure reviews have not run, so Task 11 and Milestone 7 remain open. No canon-accuracy claim or complete-suite approval is implied by the checks below.
+The approved 22-run first campaign remains behaviorally immutable, including its one failed Skill assertion. The separately approved 11-run corrective Skill-only campaign passed all declared behavioral assertions against the current Skill. Ten harness/report deviations across seven cases are retained and disclosed; they do not reclassify any behavior or erase the failed first campaign. Review of the first release-evidence commit found Important checkout, whitespace-gate, assertion-adjudication, and final-message-binding gaps. Those gaps are now remediated, but the prior exact-final result cannot close Task 11; a fresh settled-commit verification and two fresh independent reviews remain required. No canon-accuracy claim or complete-suite approval is implied by the checks below.
 
 ## Current Skill identity
 
@@ -180,7 +181,24 @@ The standard validator separately exited `0` and printed `Skill is valid!` for a
 
 The commit-preparation audit additionally treats `tests/skills/evidence/researching-characters/**` as byte-exact data via `.gitattributes` `-text`. This is required because the retained evaluator outputs include intentional trailing whitespace or terminal blank lines and their raw bytes are hash-bound. `git diff --cached --check` passes for every non-evidence path; the evidence subtree is deliberately excluded from whitespace normalization and its executable checks independently recompute every retained-file SHA-256.
 
-Because this section and its focused executable assertion are the only post-gate edits, the product code, schemas, Skills, retained evaluator artifacts, and broad test corpus exercised by the settled-input run are unchanged. The focused release-evidence tests are rerun after recording these values. Exact-final verification is therefore **PASS**; independent specification and quality reviews remain the two closure gates.
+Because this section and its focused executable assertion were the only post-gate edits at that time, the product code, schemas, Skills, retained evaluator artifacts, and broad test corpus exercised by the settled-input run were unchanged. The focused release-evidence tests were rerun after recording these values. That historical candidate reported **PASS**, but later independent review invalidated it for Task 11 closure because the exact committed range and fresh-checkout evidence did not satisfy all declared gates.
+
+## Closure-review remediation after `b073381`
+
+Review of exact commit `b07338101b37c66080f9b7f82de7a84919d9b56c` found four Important closure gaps:
+
+1. only `skills/using-kokoroarc/**` was pinned to LF, so a fresh Windows checkout with `core.autocrlf=true` changed the current research Skill bytes and broke its retained SHA-256 binding;
+2. `git diff --check 274c5a57051b8ee31d95deab11ae26d00707911a b073381` reported CR-at-EOL and intentional raw-capture whitespace across the byte-exact evidence subtree, contradicting the recorded exact-range gate;
+3. both campaign importers assigned assertion truth from constants instead of deriving it from retained evidence; and
+4. `final.md` was only named by the evaluator report, not independently compared with the platform's final agent message.
+
+The remediation pins `skills/**` to LF and gives the raw campaign subtree a scoped Git whitespace policy: `cr-at-eol,-blank-at-eol,-blank-at-eof`. Raw evaluator files remain `-text` and byte-exact. The exact Task 11 range is now an executable `git diff --check` regression, while fresh-checkout coverage verifies the Skill and evidence hashes under Windows autocrlf behavior.
+
+All 33 original evaluator threads were located through their non-sensitive `agent_path` in the local Codex session records. Each run now retains the exact raw JSONL records for the platform `final_answer` event, matching assistant response item, and `task_complete.last_agent_message`, plus a session identity/hash record. The verifier proves all three message fields are identical and compares them with `final.md` using only `lf_and_strip_terminal_lf`. No evaluator rerun was needed, and no raw evaluator final, report, or command capture was edited.
+
+Every declared assertion is now independently recomputed from retained finals, reports, captures, deterministic validation pairs, and protected-state evidence. The baseline RED and both Skill campaign outcomes reproduce exactly without `BASELINE_PASSES`, unconditional `passed=True`, or a literal corrective behavior PASS. The focused research/release verifier passes **28 tests**.
+
+A D:-confined full-suite remediation preflight at `D:\tmp\kokoroarc-m7-remediation-preflight-20260814-02` exited `0`: **`1919 passed, 24 skipped` in 160.54 seconds**. Captured stdout was 7,155 bytes with SHA-256 `6C73C2A057A36110C9D467CEF0374D38E5BDCBF79D07343DB1225DA0BF79B0C1`; stderr was empty with SHA-256 `E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855`. This preflight is evidence for the remediation, not the fresh exact-commit closure run.
 
 ## Verified product gates before this record
 
@@ -198,4 +216,4 @@ These results were obtained before the release-document changes. The settled-inp
 2. Obtain fresh independent specification and quality reviews on that exact commit.
 3. Close Milestone 7 only after every remaining gate reports PASS.
 
-Current status: Behavioral campaign: CORRECTIVE PASS 11/11. Corrective harness: COMPLETED WITH DISCLOSED DEVIATIONS. Exact-final verification: PASS. Independent specification review: PENDING. Independent quality review: PENDING.
+Current status: Behavioral campaign: CORRECTIVE PASS 11/11. Corrective harness: COMPLETED WITH DISCLOSED DEVIATIONS. Exact-final verification: REOPENED AFTER IMPORTANT REVIEW FINDINGS. Fresh exact-commit specification review: PENDING. Fresh exact-commit quality review: PENDING.

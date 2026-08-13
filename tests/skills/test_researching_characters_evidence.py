@@ -125,6 +125,10 @@ def _final_file_names_final_md(value: object) -> bool:
     return str(value).replace("\\", "/").rsplit("/", 1)[-1] == "final.md"
 
 
+def _normalized_agent_final(value: str) -> str:
+    return value.replace("\r\n", "\n").replace("\r", "\n").rstrip("\n")
+
+
 def _all_decoded_strings(value: object) -> list[str]:
     strings: list[str] = []
     if isinstance(value, str):
@@ -520,7 +524,7 @@ def test_campaign_evidence_hashes_outputs_and_maps_every_assertion() -> None:
             assert [item["id"] for item in result["harness_deviations"]] == run[
                 "harness_deviation_ids"
             ]
-        assert result["newline_normalization"] == "none"
+        assert result["newline_normalization"] == "lf_and_strip_terminal_lf"
         assert final.read_text(encoding="utf-8").strip()
 
         case = cases[run["case_id"]]
@@ -556,6 +560,90 @@ def test_campaign_evidence_hashes_outputs_and_maps_every_assertion() -> None:
     assert skill_failures == [
         ("continuity-conflict-clarification", "report_unresolved_evidence")
     ]
+
+
+def test_campaign_assertion_truth_is_recomputed_from_retained_evidence() -> None:
+    from researching_characters_adjudication import adjudicate_assertions
+
+    cases = {case["id"]: case for case in _cases()}
+    for run in _campaign()["runs"]:
+        run_root = CAMPAIGN_ROOT / _safe_relative(run["evidence_dir"])
+        retained = _strict_json(run_root / "result.json")["assertions"]
+        recomputed = adjudicate_assertions(
+            cases[run["case_id"]], run_root, run["determinism_pairs"]
+        )
+        assert recomputed == retained, (run["approval_id"], run["case_id"])
+
+
+def test_final_file_is_bound_to_retained_final_agent_session_events() -> None:
+    for run in _campaign()["runs"]:
+        run_root = CAMPAIGN_ROOT / _safe_relative(run["evidence_dir"])
+        events_path = run_root / "agent-final-events.jsonl"
+        session_path = run_root / "agent-final-session.json"
+        assert _sha256(events_path) == run["agent_final_events_sha256"]
+        assert _sha256(session_path) == run["agent_final_session_sha256"]
+
+        lines = events_path.read_text(encoding="utf-8").splitlines()
+        assert len(lines) == 3
+        events = [json.loads(line) for line in lines]
+        agent_event, response_event, complete_event = events
+        assert agent_event["type"] == "event_msg"
+        assert agent_event["payload"]["type"] == "agent_message"
+        assert agent_event["payload"]["phase"] == "final_answer"
+        assert response_event["type"] == "response_item"
+        assert response_event["payload"]["type"] == "message"
+        assert response_event["payload"]["role"] == "assistant"
+        assert response_event["payload"]["phase"] == "final_answer"
+        assert complete_event["type"] == "event_msg"
+        assert complete_event["payload"]["type"] == "task_complete"
+
+        response_texts = [
+            item["text"]
+            for item in response_event["payload"]["content"]
+            if item["type"] == "output_text"
+        ]
+        assert len(response_texts) == 1
+        messages = [
+            agent_event["payload"]["message"],
+            response_texts[0],
+            complete_event["payload"]["last_agent_message"],
+        ]
+        assert len(set(messages)) == 1
+        final = (run_root / "final.md").read_text(encoding="utf-8")
+        assert _normalized_agent_final(final) == _normalized_agent_final(messages[0])
+
+        turn_id = response_event["payload"][
+            "internal_chat_message_metadata_passthrough"
+        ]["turn_id"]
+        assert complete_event["payload"]["turn_id"] == turn_id
+        session = _strict_json(session_path)
+        assert session["schema_version"] == "1.0"
+        assert session["source"] == "codex_session_log"
+        assert session["agent_path"] == run["thread_id"]
+        assert re.fullmatch(r"[0-9a-f-]+", session["session_id"])
+        assert session["selected_final_answer_is_last"] is True
+        assert session["source_line_numbers"] == sorted(session["source_line_numbers"])
+        assert len(session["source_line_numbers"]) == 3
+        assert session["event_line_sha256"] == [
+            hashlib.sha256((line + "\n").encode("utf-8")).hexdigest()
+            for line in lines
+        ]
+        assert re.fullmatch(r"[0-9a-f]{64}", session["session_log_sha256"])
+        assert re.fullmatch(r"[0-9a-f]{64}", session["session_meta_line_sha256"])
+        result = _strict_json(run_root / "result.json")
+        assert result["newline_normalization"] == "lf_and_strip_terminal_lf"
+
+
+def test_campaign_importers_derive_assertion_truth_from_evidence() -> None:
+    for name in (
+        "import_researching_characters_campaign.py",
+        "import_researching_characters_corrective_campaign.py",
+    ):
+        source = (ROOT / name).read_text(encoding="utf-8")
+        assert "adjudicate_assertions" in source, name
+        assert "BASELINE_PASSES" not in source, name
+        assert '"passed": True' not in source, name
+        assert '"behavior_status": "passed"' not in source, name
 
 
 def test_campaign_artifact_ledgers_bind_raw_and_sanitized_streams() -> None:

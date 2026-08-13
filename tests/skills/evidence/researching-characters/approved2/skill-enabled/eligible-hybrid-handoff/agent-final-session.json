@@ -1,0 +1,26 @@
+{
+  "schema_version": "1.0",
+  "source": "codex_session_log",
+  "session_id": "019ffbc0-b46c-7553-89f8-c74af50b8861",
+  "agent_path": "/root/m7_r2_s09_hybrid",
+  "selected_final_answer_is_last": true,
+  "newline_normalization": "lf_and_strip_terminal_lf",
+  "source_line_numbers": [
+    137,
+    138,
+    140
+  ],
+  "event_line_sha256": [
+    "cfe531cbd724d871ae75795a0a6eaeeb3db349a9bc2c907e0bccc3dfd7e9b491",
+    "8611cfbdec2cd1fbfe3e55962f00ee9b5dd298185d9691c36a2377d68804b8b1",
+    "ded9bcf304e5888d411ada6359c9f7ca9f4dacddaf07279bffa6e651b1349c5a"
+  ],
+  "session_log_sha256": "8d5747f241c3c863b85bbd4db533b6ddf7633e32ede5bd4a1e158da0f5a7e83a",
+  "session_meta_line_sha256": "1537a3fc5f08e9b78363bf437e487e60a30abd1e892a57b5ded176b2e799cd49",
+  "final_answer_event_count": 1,
+  "selected_event_timestamps": [
+    "2026-08-13T15:43:07.130Z",
+    "2026-08-13T15:43:07.143Z",
+    "2026-08-13T15:43:07.603Z"
+  ]
+}

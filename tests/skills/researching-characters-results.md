@@ -6,7 +6,9 @@ Status: **CORRECTIVE BEHAVIORAL CAMPAIGN PASS; MILESTONE 7 CLOSURE PENDING**.
 
 Approval `2026-08-13-approved1` covered exactly 22 fresh evaluator runs: 11 baseline and 11 Skill-enabled. All used inherited OpenAI/Codex evaluators, unique threads, `fork_turns: none`, and isolated D:-based roots. No failed behavioral case was silently retried.
 
-Raw artifacts remain beneath `D:\tmp\kokoroarc-m7-campaign-20260813-approved1`. Repository evidence at `tests/skills/evidence/researching-characters/approved1` retains the declared prompt, exact final response, evaluator report, every command stdout/stderr capture, protected-state record, and per-assertion result. User-profile paths are redacted only in retained report/capture copies; each ledger records both the original raw SHA-256 and retained SHA-256. Final responses required no redaction and use `newline_normalization: none`.
+Raw artifacts remain beneath `D:\tmp\kokoroarc-m7-campaign-20260813-approved1`. Repository evidence at `tests/skills/evidence/researching-characters/approved1` retains the declared prompt, exact final response, evaluator report, every command stdout/stderr capture, protected-state record, and per-assertion result. User-profile paths are redacted only in retained report/capture copies; each ledger records both the original raw SHA-256 and retained SHA-256. Final responses required no redaction. Exact raw Codex `final_answer`, assistant-response, and `task_complete.last_agent_message` events are retained separately and bind every `final.md` under the declared `lf_and_strip_terminal_lf` normalization.
+
+The campaign verifier independently recomputes every assertion outcome from the retained final, report, captures, deterministic pairs, and protected-state record. The importers no longer assign assertion truth from case-name constants. A reproducible session-binding importer extracts only the three exact final-message events plus non-sensitive session identity and hashes; no retained evaluator final, report, or command capture was rewritten to obtain a pass.
 
 The first Skill runs bind these exact artifacts:
 

@@ -6,10 +6,11 @@ from pathlib import Path
 
 import yaml
 
+from researching_characters_adjudication import adjudicate_assertions
+
 from import_researching_characters_campaign import (
     CASES_FILE,
     DESTINATION,
-    EVIDENCE_PATHS,
     PROTECTED_ROOTS,
     SKILL_DIR,
     normalized_variant,
@@ -133,25 +134,6 @@ HARNESS_DEVIATIONS = {
 }
 
 
-def assertion_outcomes(case: dict) -> list[dict]:
-    outcomes = []
-    for requirement in ("must", "must_not"):
-        for assertion in case.get(requirement, []):
-            outcomes.append(
-                {
-                    "requirement": requirement,
-                    "id": assertion,
-                    "passed": True,
-                    "evidence": list(
-                        EVIDENCE_PATHS.get(
-                            assertion, ("final.md", "agent-report.json")
-                        )
-                    ),
-                }
-            )
-    return outcomes
-
-
 def final_file_names_final_md(value: object) -> bool:
     return str(value).replace("\\", "/").rsplit("/", 1)[-1] == "final.md"
 
@@ -241,17 +223,22 @@ def import_run(source_root: Path, approval_root: Path, case: dict) -> dict:
 
     deviations = list(HARNESS_DEVIATIONS.get(case_id, ()))
     harness_status = "completed_with_disclosed_deviations" if deviations else "completed"
+    pairs = verify_determinism(source, case_id)
+    outcomes = adjudicate_assertions(case, destination, pairs)
+    behavior_status = (
+        "passed" if all(item["passed"] for item in outcomes) else "failed"
+    )
     result = {
         "schema_version": "1.0",
         "approval_id": APPROVAL_ID,
         "case_id": case_id,
         "variant": "skill-enabled",
         "raw_report_variant": report["variant"],
-        "behavior_status": "passed",
+        "behavior_status": behavior_status,
         "harness_status": harness_status,
         "harness_deviations": deviations,
-        "newline_normalization": "none",
-        "assertions": assertion_outcomes(case),
+        "newline_normalization": "lf_and_strip_terminal_lf",
+        "assertions": outcomes,
         "protected_state_before": before,
         "protected_state_after": after,
     }
@@ -266,7 +253,6 @@ def import_run(source_root: Path, approval_root: Path, case: dict) -> dict:
         },
     )
 
-    pairs = verify_determinism(source, case_id)
     relative = destination.relative_to(DESTINATION).as_posix()
     return {
         "approval_id": APPROVAL_ID,
@@ -276,7 +262,7 @@ def import_run(source_root: Path, approval_root: Path, case: dict) -> dict:
         "fork_context": "none",
         "evidence_dir": relative,
         "raw_report_variant": report["variant"],
-        "behavior_status": "passed",
+        "behavior_status": behavior_status,
         "harness_status": harness_status,
         "harness_deviation_ids": [item["id"] for item in deviations],
         "prompt_sha256": sha256_file(destination / "prompt.md"),
@@ -319,33 +305,60 @@ def main() -> None:
     if approval_root.exists():
         raise SystemExit(f"refusing to overwrite evidence: {approval_root}")
     runs = [import_run(source_root, approval_root, case) for case in cases]
+    failed_assertions = []
+    skill_passed_cases = 0
+    for run in runs:
+        result = json.loads(
+            (DESTINATION / run["evidence_dir"] / "result.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        failures = [item["id"] for item in result["assertions"] if not item["passed"]]
+        if failures:
+            failed_assertions.extend(
+                {"case_id": run["case_id"], "id": assertion}
+                for assertion in failures
+            )
+        else:
+            skill_passed_cases += 1
+    skill_failed_cases = len(runs) - skill_passed_cases
+    approval_status = "skill_failed" if failed_assertions else "skill_passed"
 
     flattened_deviations = [
         {"case_id": case_id, **deviation}
         for case_id, deviations in HARNESS_DEVIATIONS.items()
         for deviation in deviations
     ]
-    campaign["campaign_status"] = "corrective_campaign_verified"
-    campaign["current_skill_status"] = "behavior_verified_with_disclosed_harness_deviations"
+    campaign["campaign_status"] = (
+        "corrective_campaign_failed"
+        if failed_assertions
+        else "corrective_campaign_verified"
+    )
+    campaign["current_skill_status"] = (
+        "behavior_failed"
+        if failed_assertions
+        else "behavior_verified_with_disclosed_harness_deviations"
+    )
     campaign["current_skill_sha256"] = SKILL_SHA256
-    campaign["latest_verified_skill_approval"] = APPROVAL_ID
+    if not failed_assertions:
+        campaign["latest_verified_skill_approval"] = APPROVAL_ID
     campaign["approvals"].append(
         {
             "id": APPROVAL_ID,
             "provider": "openai",
             "model": "inherited-codex",
             "baseline_runs": 0,
-            "skill_runs": 11,
-            "corrective_reruns": 11,
+            "skill_runs": len(runs),
+            "corrective_reruns": len(runs),
             "fork_context": "none",
             "raw_capture_root": str(source_root),
             "skill_sha256": SKILL_SHA256,
             "contract_sha256": CONTRACT_SHA256,
             "metadata_sha256": METADATA_SHA256,
-            "status": "skill_passed",
-            "skill_passed_cases": 11,
-            "skill_failed_cases": 0,
-            "failed_assertions": [],
+            "status": approval_status,
+            "skill_passed_cases": skill_passed_cases,
+            "skill_failed_cases": skill_failed_cases,
+            "failed_assertions": failed_assertions,
             "harness_status": "completed_with_disclosed_deviations",
             "harness_deviation_cases": len(HARNESS_DEVIATIONS),
             "harness_deviations": flattened_deviations,

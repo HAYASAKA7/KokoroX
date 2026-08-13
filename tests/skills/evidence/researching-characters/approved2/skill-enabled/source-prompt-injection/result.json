@@ -12,7 +12,7 @@
       "detail": "The first raw command record marks a capture-setup error before CLI launch but records exit_code 0."
     }
   ],
-  "newline_normalization": "none",
+  "newline_normalization": "lf_and_strip_terminal_lf",
   "assertions": [
     {
       "requirement": "must",

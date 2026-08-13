@@ -1077,7 +1077,7 @@ git commit -m "feat: add character research skill"
 - Modify: `README.md`
 - Modify: `docs/superpowers/plans/2026-08-04-kokoroarc-research.md`
 
-**Campaign checkpoint (2026-08-14):** The exactly approved first campaign ran 11 baseline and 11 Skill-enabled cases in fresh isolated threads. Its immutable result remains baseline RED `9/11` and Skill PASS `10/11`, RED `1/11`; the only Skill failure is the missing separate `Unresolved evidence:` line on the early continuity-clarification stop. A focused RED regression drove the corrected Skill body. Approval `2026-08-13-approved2` then ran exactly 11 fresh corrected Skill-only cases, with no baseline reruns or behavioral retries, and passed all declared assertions `11/11`. Repository evidence binds raw/sanitized streams, prompts, finals, reports, command outputs, state records, assertions, current hashes, and ten disclosed harness/report deviations across seven cases. Deterministic CLI smoke, distribution evidence, and exact-final verification are recorded; Steps 9 and 10 remain open. Task 11 remains open and Milestone 8 is not authorized to begin.
+**Campaign checkpoint (2026-08-14):** The exactly approved first campaign ran 11 baseline and 11 Skill-enabled cases in fresh isolated threads. Its immutable behavioral result remains baseline RED `9/11` and Skill PASS `10/11`, RED `1/11`; the only Skill failure is the missing separate `Unresolved evidence:` line on the early continuity-clarification stop. A focused RED regression drove the corrected Skill body. Approval `2026-08-13-approved2` then ran exactly 11 fresh corrected Skill-only cases, with no baseline reruns or behavioral retries, and passed all declared assertions `11/11`. Exact raw platform final-message events have now been recovered from all 33 original Codex session logs, and evidence-derived adjudication reproduces every result without truth-table constants. Review of commit `b07338101b37c66080f9b7f82de7a84919d9b56c` found Important checkout and exact-range whitespace gaps; scoped Git attributes and regressions now remediate them. A fresh exact-commit verification and both fresh reviews remain open. Task 11 remains open and Milestone 8 is not authorized to begin.
 
 - [x] **Step 1: Obtain campaign approval**
 
@@ -1110,7 +1110,7 @@ Under one new unique `D:\tmp` root, explicitly create test/temp/build/smoke/data
 
 Record exact HEAD or exact base-plus-patch identity; never call a dirty build clean. Build wheel and sdist into the unique root. Record names, sizes, SHA-256, entry counts, all research module/schema entries, README identity, and any excluded non-package evidence changes. Provide copy/paste reconstruction commands and parameterize external validator paths.
 
-- [x] **Step 7: Run exact-final verification**
+- [ ] **Step 7: Run exact-final verification**
 
 Run separately and record exact outputs:
 
@@ -1125,6 +1125,8 @@ git status --short
 ```
 
 Expected: zero failures/errors, only documented platform capability skips, all three Skills valid, wheel and sdist built, no bad whitespace, and only intended release-evidence changes before commit.
+
+The earlier `final2` run is retained as historical evidence but was reopened after Important exact-commit review findings. The remediation preflight passes `1919 passed, 24 skipped`; Step 7 remains unchecked until the remediated exact commit passes the complete suite, build, all validators, fresh-checkout hash checks, and exact-range whitespace audit.
 
 - [x] **Step 8: Document the exact boundary**
 

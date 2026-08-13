@@ -1,0 +1,26 @@
+{
+  "schema_version": "1.0",
+  "source": "codex_session_log",
+  "session_id": "019ffa4b-3ded-7cc1-8736-022dddc7396f",
+  "agent_path": "/root/m7_b03_spoiler",
+  "selected_final_answer_is_last": true,
+  "newline_normalization": "lf_and_strip_terminal_lf",
+  "source_line_numbers": [
+    95,
+    96,
+    98
+  ],
+  "event_line_sha256": [
+    "f4307015f4dbb898cb76b73c8ca74ec0a271cae1dd3f7380e83d4e08c30ee59e",
+    "214f94f1d26b95fd053fcb4d1a821fde29b07e34898c353ecc26195ce8de35b1",
+    "2505e1389827a4f039b655cd3eb98e1ea744b5fb2b1cac3df46b3ee737849a39"
+  ],
+  "session_log_sha256": "7c65e41fc2aff8b34043d48b3abcbe167a52c583284444567a9808efceda3500",
+  "session_meta_line_sha256": "7e20564de6a93ed7b2de398f2bd1cae19bb6051d49737cc00afac8769ea34400",
+  "final_answer_event_count": 1,
+  "selected_event_timestamps": [
+    "2026-08-13T08:51:58.330Z",
+    "2026-08-13T08:51:58.355Z",
+    "2026-08-13T08:51:59.196Z"
+  ]
+}
