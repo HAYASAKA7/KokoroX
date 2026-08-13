@@ -98,7 +98,7 @@
     {
       "requirement": "must",
       "id": "compile_private_bundle",
-      "passed": true,
+      "passed": false,
       "evidence": [
         "agent-report.json#commands",
         "final.md"
@@ -143,7 +143,7 @@
     {
       "requirement": "must",
       "id": "report_lifecycle",
-      "passed": true,
+      "passed": false,
       "evidence": [
         "final.md",
         "agent-report.json"
@@ -161,7 +161,7 @@
     {
       "requirement": "must",
       "id": "handoff_exact_eligible_bundle",
-      "passed": true,
+      "passed": false,
       "evidence": [
         "final.md",
         "agent-report.json"

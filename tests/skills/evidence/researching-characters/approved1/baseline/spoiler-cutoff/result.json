@@ -98,7 +98,7 @@
     {
       "requirement": "must",
       "id": "compile_private_bundle",
-      "passed": true,
+      "passed": false,
       "evidence": [
         "agent-report.json#commands",
         "final.md"

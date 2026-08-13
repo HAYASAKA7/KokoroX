@@ -75,9 +75,9 @@ def test_release_evidence_records_smoke_and_exact_milestone_boundary() -> None:
         "Milestone 7 does not approve the complete standalone suite",
         "Behavioral campaign: CORRECTIVE PASS 11/11",
         "Corrective harness: COMPLETED WITH DISCLOSED DEVIATIONS",
-        "Exact-final verification: PASS ON SETTLED REMEDIATION COMMIT",
-        "Fresh exact-commit specification review: PENDING",
-        "Fresh exact-commit quality review: PENDING",
+        "Exact-final verification: INVALIDATED BY FRESH QUALITY REVIEW; RERUN PENDING",
+        "Fresh specification review of `6afcbeccbc43814700e42c4626a6a9b8e1bddce0`: PASS",
+        "Fresh quality review of `6afcbeccbc43814700e42c4626a6a9b8e1bddce0`: IMPORTANT FINDINGS UNDER REMEDIATION",
     ):
         assert text in evidence
 
@@ -160,7 +160,28 @@ def test_release_evidence_records_remediated_exact_commit_gates() -> None:
         "1921 passed, 24 skipped",
         "PASS ON SETTLED REMEDIATION COMMIT",
         "archive-inventory.json",
-        "Task 11 now awaits only the two fresh independent reviews",
+        "later fresh quality review invalidated it for Task 11 closure",
+    ):
+        assert text in evidence
+
+
+def test_release_evidence_records_post_settlement_quality_remediation() -> None:
+    evidence = EVIDENCE_PATH.read_text(encoding="utf-8")
+    for text in (
+        "Post-settlement quality-review remediation",
+        "all 917 reproducible importer outputs matched",
+        "all 785 raw-ledger files matched",
+        "all 33 retained final messages rebound",
+        "semantically empty but byte-identical JSON",
+        "fabricated artifact and hash",
+        "A shared sanitizer now covers",
+        "credential-bearing URLs",
+        "eight legacy baseline assertion booleans across four runs",
+        "aggregate baseline remains RED in 9/11 cases",
+        "passes **40 tests**",
+        r"D:\tmp\kokoroarc-m7-quality-remediation-preflight-01",
+        "1931 passed, 24 skipped",
+        "not Task 11 closure",
     ):
         assert text in evidence
 

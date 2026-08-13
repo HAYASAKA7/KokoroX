@@ -3,12 +3,17 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
-import re
 from pathlib import Path
 
 import yaml
 
 from researching_characters_adjudication import adjudicate_assertions
+from researching_characters_sanitization import (
+    CREDENTIAL_REPLACEMENT,
+    ENVIRONMENT_SECRET_REPLACEMENT,
+    USER_PROFILE_REPLACEMENT as REDACTION_REPLACEMENT,
+    sanitize_sensitive_bytes,
+)
 
 
 HERE = Path(__file__).resolve().parent
@@ -92,14 +97,14 @@ DETERMINISM_PAIRS = {
         ("bundle-validate-1.stdout.json", "bundle-validate-2.stdout.json"),
     ),
 }
-REDACTION_PATTERNS = (
-    re.compile(r"[A-Za-z]:\\\\Users\\\\[^\\\s\"']+", re.IGNORECASE),
-    re.compile(r"[A-Za-z]:\\Users\\[^\\\s\"']+", re.IGNORECASE),
-)
-REDACTION_REPLACEMENT = "<redacted-user-profile>"
 APPROVED_SKILL_SHA256 = "33b1bf3b8c98a97282295bffe7ebe474d5ee43687378ff29e48dcabac2239876"
 APPROVED_CONTRACT_SHA256 = "9e4f2abc63a29bf75f4291d5db657b2908a75c00e8830f69a027cc1eed73b313"
 APPROVED_METADATA_SHA256 = "093eb44756a018c1a8ffe856f4237e31d161e936aeeaf1df2a452b3146785c3e"
+REDACTION_REPLACEMENTS = {
+    "environment_secrets": ENVIRONMENT_SECRET_REPLACEMENT,
+    "credentials": CREDENTIAL_REPLACEMENT,
+    "protected_absolute_paths": REDACTION_REPLACEMENT,
+}
 
 
 def sha256_bytes(value: bytes) -> str:
@@ -117,12 +122,7 @@ def write_json(path: Path, value: object) -> None:
 
 
 def sanitize(raw: bytes) -> tuple[bytes, int]:
-    text = raw.decode("utf-8")
-    count = 0
-    for pattern in REDACTION_PATTERNS:
-        text, replacements = pattern.subn(REDACTION_REPLACEMENT, text)
-        count += replacements
-    return text.encode("utf-8"), count
+    return sanitize_sensitive_bytes(raw)
 
 
 def retained_copy(source: Path, destination: Path, allow_redaction: bool) -> dict:
@@ -243,7 +243,7 @@ def import_run(
         {
             "schema_version": "1.0",
             "raw_root_retention": "approved D:-based campaign root",
-            "redaction_replacement": REDACTION_REPLACEMENT,
+            "redaction_replacements": REDACTION_REPLACEMENTS,
             "files": ledger,
         },
     )

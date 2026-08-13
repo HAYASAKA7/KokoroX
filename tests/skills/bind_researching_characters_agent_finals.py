@@ -3,20 +3,16 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
-import re
 from pathlib import Path
 
 import yaml
+
+from researching_characters_sanitization import contains_sensitive_material
 
 
 HERE = Path(__file__).resolve().parent
 DEFAULT_EVIDENCE_ROOT = HERE / "evidence" / "researching-characters"
 NORMALIZATION = "lf_and_strip_terminal_lf"
-FORBIDDEN = (
-    re.compile(r"[A-Za-z]:\\+Users\\+[^\\\s'\"]+", re.IGNORECASE),
-    re.compile(r"OPENAI_API_KEY\s*[:=]", re.IGNORECASE),
-    re.compile(r"Authorization\s*[:=]\s*Bearer\s+\S+", re.IGNORECASE),
-)
 
 
 def sha256_bytes(value: bytes) -> str:
@@ -167,7 +163,7 @@ def bind_run(
     selected_lines = [raw_lines[index] for index in selected_indexes]
     retained = b"".join(selected_lines)
     retained_text = retained.decode("utf-8")
-    if any(pattern.search(retained_text) for pattern in FORBIDDEN):
+    if contains_sensitive_material(retained_text):
         raise RuntimeError(f"final event contains forbidden sensitive material: {session_path}")
 
     events_path = run_root / "agent-final-events.jsonl"

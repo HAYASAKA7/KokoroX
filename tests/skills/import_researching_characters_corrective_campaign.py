@@ -12,6 +12,7 @@ from import_researching_characters_campaign import (
     CASES_FILE,
     DESTINATION,
     PROTECTED_ROOTS,
+    REDACTION_REPLACEMENTS,
     SKILL_DIR,
     normalized_variant,
     prompt_text,
@@ -248,7 +249,7 @@ def import_run(source_root: Path, approval_root: Path, case: dict) -> dict:
         {
             "schema_version": "1.0",
             "raw_root_retention": "approved D:-based corrective campaign root",
-            "redaction_replacement": "<redacted-user-profile>",
+            "redaction_replacements": REDACTION_REPLACEMENTS,
             "files": ledger,
         },
     )
