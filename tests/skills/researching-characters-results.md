@@ -63,4 +63,4 @@ The spoiler evaluator also read the ambient system-mandated `verification-before
 
 ## Remaining Milestone 7 gates
 
-The focused campaign verifier passes, and the current Skill passes the standard validator. Task 11 and Milestone 7 remain open until exact-final full-suite/build/validator verification is recorded, the exact release-evidence commit is created, and fresh independent specification and quality reviews both pass. This behavioral result does not approve Milestones 8-9 or the complete standalone suite.
+The focused campaign verifier passes, the current Skill passes the standard validator, and the exact-final full-suite/build/validator gate is recorded on the settled release-evidence commit. Task 11 and Milestone 7 remain open until fresh independent specification and quality reviews both pass. This behavioral result does not approve Milestones 8-9 or the complete standalone suite.

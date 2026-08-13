@@ -75,7 +75,7 @@ def test_release_evidence_records_smoke_and_exact_milestone_boundary() -> None:
         "Milestone 7 does not approve the complete standalone suite",
         "Behavioral campaign: CORRECTIVE PASS 11/11",
         "Corrective harness: COMPLETED WITH DISCLOSED DEVIATIONS",
-        "Exact-final verification: REOPENED AFTER IMPORTANT REVIEW FINDINGS",
+        "Exact-final verification: PASS ON SETTLED REMEDIATION COMMIT",
         "Fresh exact-commit specification review: PENDING",
         "Fresh exact-commit quality review: PENDING",
     ):
@@ -137,11 +137,30 @@ def test_release_evidence_records_important_review_remediation() -> None:
         "`task_complete.last_agent_message`",
         "`lf_and_strip_terminal_lf`",
         "without `BASELINE_PASSES`",
-        "28 tests",
+        "30 tests",
         r"D:\tmp\kokoroarc-m7-remediation-preflight-20260814-02",
         "1919 passed, 24 skipped",
         "6C73C2A057A36110C9D467CEF0374D38E5BDCBF79D07343DB1225DA0BF79B0C1",
         "not the fresh exact-commit closure run",
+    ):
+        assert text in evidence
+
+
+def test_release_evidence_records_remediated_exact_commit_gates() -> None:
+    evidence = EVIDENCE_PATH.read_text(encoding="utf-8")
+    for text in (
+        "Remediated exact-commit verification",
+        "c8095c105f4866f3728debfa1ca2568f28fff2be",
+        r"D:\tmp\kokoroarc-m7-remediation-final3-c8095c1-01",
+        "1920 passed, 24 skipped",
+        "4B8A46FAFB0ACAC1C71EB9A56E0BC8E97BDBF50C627FBB6B442AF988896E2D40",
+        "73174C633EC2A77AA7B403BA9F901A2F834C21FA1FFD6A0E151EDAB1CFA041FF",
+        "Settled remediation release gate",
+        r"D:\tmp\kokoroarc-m7-remediation-final4-settled-01",
+        "1921 passed, 24 skipped",
+        "PASS ON SETTLED REMEDIATION COMMIT",
+        "archive-inventory.json",
+        "Task 11 now awaits only the two fresh independent reviews",
     ):
         assert text in evidence
 

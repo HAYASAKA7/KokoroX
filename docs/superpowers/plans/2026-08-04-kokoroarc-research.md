@@ -1077,7 +1077,7 @@ git commit -m "feat: add character research skill"
 - Modify: `README.md`
 - Modify: `docs/superpowers/plans/2026-08-04-kokoroarc-research.md`
 
-**Campaign checkpoint (2026-08-14):** The exactly approved first campaign ran 11 baseline and 11 Skill-enabled cases in fresh isolated threads. Its immutable behavioral result remains baseline RED `9/11` and Skill PASS `10/11`, RED `1/11`; the only Skill failure is the missing separate `Unresolved evidence:` line on the early continuity-clarification stop. A focused RED regression drove the corrected Skill body. Approval `2026-08-13-approved2` then ran exactly 11 fresh corrected Skill-only cases, with no baseline reruns or behavioral retries, and passed all declared assertions `11/11`. Exact raw platform final-message events have now been recovered from all 33 original Codex session logs, and evidence-derived adjudication reproduces every result without truth-table constants. Review of commit `b07338101b37c66080f9b7f82de7a84919d9b56c` found Important checkout and exact-range whitespace gaps; scoped Git attributes and regressions now remediate them. A fresh exact-commit verification and both fresh reviews remain open. Task 11 remains open and Milestone 8 is not authorized to begin.
+**Campaign checkpoint (2026-08-14):** The exactly approved first campaign ran 11 baseline and 11 Skill-enabled cases in fresh isolated threads. Its immutable behavioral result remains baseline RED `9/11` and Skill PASS `10/11`, RED `1/11`; the only Skill failure is the missing separate `Unresolved evidence:` line on the early continuity-clarification stop. A focused RED regression drove the corrected Skill body. Approval `2026-08-13-approved2` then ran exactly 11 fresh corrected Skill-only cases, with no baseline reruns or behavioral retries, and passed all declared assertions `11/11`. Exact raw platform final-message events have now been recovered from all 33 original Codex session logs, and evidence-derived adjudication reproduces every result without truth-table constants. Review of commit `b07338101b37c66080f9b7f82de7a84919d9b56c` found Important checkout and exact-range whitespace gaps; scoped Git attributes and regressions remediate them. The committed remediation candidate and settled release-record commit pass exact-final verification. Both fresh independent reviews remain open, so Task 11 remains open and Milestone 8 is not authorized to begin.
 
 - [x] **Step 1: Obtain campaign approval**
 
@@ -1110,7 +1110,7 @@ Under one new unique `D:\tmp` root, explicitly create test/temp/build/smoke/data
 
 Record exact HEAD or exact base-plus-patch identity; never call a dirty build clean. Build wheel and sdist into the unique root. Record names, sizes, SHA-256, entry counts, all research module/schema entries, README identity, and any excluded non-package evidence changes. Provide copy/paste reconstruction commands and parameterize external validator paths.
 
-- [ ] **Step 7: Run exact-final verification**
+- [x] **Step 7: Run exact-final verification**
 
 Run separately and record exact outputs:
 
@@ -1126,7 +1126,7 @@ git status --short
 
 Expected: zero failures/errors, only documented platform capability skips, all three Skills valid, wheel and sdist built, no bad whitespace, and only intended release-evidence changes before commit.
 
-The earlier `final2` run is retained as historical evidence but was reopened after Important exact-commit review findings. The remediation preflight passes `1919 passed, 24 skipped`; Step 7 remains unchecked until the remediated exact commit passes the complete suite, build, all validators, fresh-checkout hash checks, and exact-range whitespace audit.
+The earlier `final2` run is retained as historical evidence but was reopened after Important exact-commit review findings. Commit `c8095c105f4866f3728debfa1ca2568f28fff2be` then passed `1920 passed, 24 skipped`, the fixed-epoch build and archive inventory, all three validators, a detached `core.autocrlf=true` checkout, evidence byte reproduction, and the exact-range whitespace audit. The settled release-record commit repeats those gates under `D:\tmp\kokoroarc-m7-remediation-final4-settled-01`.
 
 - [x] **Step 8: Document the exact boundary**
 
@@ -1134,7 +1134,7 @@ README must explain repository-local research Skill invocation, continuity/spoil
 
 `research-release-verification.md` must state that Milestone 7 does not approve the complete standalone suite.
 
-- [ ] **Step 9: Commit release evidence**
+- [x] **Step 9: Commit release evidence**
 
 ```powershell
 git add README.md tests/skills/researching-characters-results.md tests/skills/test_researching_characters_evidence.py tests/skills/research-release-verification.md tests/skills/test_research_release_evidence.py docs/superpowers/plans/2026-08-04-kokoroarc-research.md
