@@ -13,6 +13,7 @@ PLAN_PATH = ROOT / "docs" / "superpowers" / "plans" / "2026-08-03-kokoroarc-auth
 README = README_PATH.read_text(encoding="utf-8")
 EVIDENCE = EVIDENCE_PATH.read_text(encoding="utf-8")
 PLAN = PLAN_PATH.read_text(encoding="utf-8")
+AUTHORING_RELEASE_COMMIT = "d944c8277183fb111de233b7ff3fe5398c5e398f"
 
 
 def _section(document: str, heading: str) -> str:
@@ -43,6 +44,10 @@ def _git_stdout(*args: str) -> bytes:
     return subprocess.run(
         ["git", *args], cwd=ROOT, check=True, stdout=subprocess.PIPE
     ).stdout
+
+
+def _historical_file(path: str) -> bytes:
+    return _git_stdout("show", f"{AUTHORING_RELEASE_COMMIT}:{path}")
 
 
 def test_readme_routes_actual_authoring_through_repository_local_skill() -> None:
@@ -77,28 +82,45 @@ def test_documented_build_identity_matches_computed_readme_patch() -> None:
     documented_patch = _identity("README normalized patch SHA-256")
 
     assert re.fullmatch(r"[0-9a-f]{40}", base)
-    assert hashlib.sha256(README_PATH.read_bytes()).hexdigest().upper() == documented_sha256
-    assert _git_stdout("hash-object", "--", "README.md").decode().strip() == documented_blob
+    historical_readme = _historical_file("README.md")
+    assert hashlib.sha256(historical_readme).hexdigest().upper() == documented_sha256
+    assert (
+        _git_stdout("rev-parse", f"{AUTHORING_RELEASE_COMMIT}:README.md")
+        .decode()
+        .strip()
+        == documented_blob
+    )
 
-    raw_patch = _git_stdout("diff", "--binary", base, "--", "README.md")
+    raw_patch = _git_stdout(
+        "diff", "--binary", base, AUTHORING_RELEASE_COMMIT, "--", "README.md"
+    )
     normalized_patch = raw_patch.replace(b"\r\n", b"\n")
     assert hashlib.sha256(normalized_patch).hexdigest().upper() == documented_patch
     assert "CRLF byte pair with LF; no other normalization" in build
 
 
 def test_readme_checkout_policy_is_lf_and_matches_documented_patch() -> None:
-    attributes = _git_stdout("check-attr", "text", "eol", "--", "README.md").decode()
-    assert attributes.splitlines() == [
-        "README.md: text: set",
-        "README.md: eol: lf",
-    ]
+    historical_attributes = _historical_file(".gitattributes").decode("utf-8")
+    assert "README.md text eol=lf" in historical_attributes.splitlines()
 
     base = _identity("Base HEAD")
     documented_blob = _identity(".gitattributes Git blob (`git hash-object`)")
     documented_patch = _identity(".gitattributes normalized patch SHA-256")
-    assert _git_stdout("hash-object", "--", ".gitattributes").decode().strip() == documented_blob
+    assert (
+        _git_stdout("rev-parse", f"{AUTHORING_RELEASE_COMMIT}:.gitattributes")
+        .decode()
+        .strip()
+        == documented_blob
+    )
 
-    raw_patch = _git_stdout("diff", "--binary", base, "--", ".gitattributes")
+    raw_patch = _git_stdout(
+        "diff",
+        "--binary",
+        base,
+        AUTHORING_RELEASE_COMMIT,
+        "--",
+        ".gitattributes",
+    )
     normalized_patch = raw_patch.replace(b"\r\n", b"\n")
     assert hashlib.sha256(normalized_patch).hexdigest().upper() == documented_patch
 
@@ -110,7 +132,14 @@ def test_readme_checkout_policy_is_lf_and_matches_documented_patch() -> None:
 def test_only_readme_changed_among_explicit_distribution_inputs() -> None:
     base = _identity("Base HEAD")
     changed = _git_stdout(
-        "diff", "--name-only", base, "--", "pyproject.toml", "src", "schemas"
+        "diff",
+        "--name-only",
+        base,
+        AUTHORING_RELEASE_COMMIT,
+        "--",
+        "pyproject.toml",
+        "src",
+        "schemas",
     )
     assert changed == b""
 

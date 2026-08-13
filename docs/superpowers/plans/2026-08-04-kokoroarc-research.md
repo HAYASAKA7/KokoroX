@@ -1077,6 +1077,8 @@ git commit -m "feat: add character research skill"
 - Modify: `README.md`
 - Modify: `docs/superpowers/plans/2026-08-04-kokoroarc-research.md`
 
+**Inline checkpoint (2026-08-13):** Steps 5-6 have recorded deterministic CLI smoke and distribution evidence. A current full repository run reported `1903 passed, 24 skipped`, all three Skills passed the standard validator, and the historical Milestone 6 evidence verifier was corrected to reconstruct its recorded commit. Steps 1-4 and 10 remain pending because the required fresh evaluator threads and independent reviews conflict with the user's current inline-only/no-subagent instruction. Task 11 remains open, exact-final verification must be repeated after those inputs are settled, and Milestone 8 is not authorized to begin.
+
 - [ ] **Step 1: Obtain campaign approval**
 
 Before any external evaluator execution, state the exact number of baseline/Skill runs, model/provider if applicable, disclosed repository files, retained transcript fields, redactions, and `D:\tmp` roots. Wait for explicit user approval. Any rerun batch needs a new exact approval.

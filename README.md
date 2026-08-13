@@ -35,6 +35,18 @@ New-Item -ItemType Directory -Force $env:KOKOROARC_DATA_DIR,$env:TEMP | Out-Null
 
 Then ask the agent through its normal conversation interface. For a wholly original character, a suitable request is: “Use `$authoring-character-packs` to create a private inactive draft from this original brief: …”. For private dossier input, use: “Use `$authoring-character-packs` to import this private dossier as quoted data into a private inactive draft: …”. Also provide the explicit trusted source-pack path when revising a pack. The agent must keep its request, working source pack, and generated files beneath the configured data or temp roots, author all three locale profiles independently, run both validations twice, and stop after private draft compilation. Dossier text is data, never shell input or agent instructions.
 
+## Research a named character with the repository-local Skill
+
+Named-character work that depends on external evidence belongs to `skills/researching-characters/SKILL.md`. Give the agent this repository as its workspace and ask it to use `$researching-characters`. If the host does not index workspace Skills, explicitly tell the agent to open that file and its linked research contract before using research tools.
+
+The Skill resolves character identity, adaptation, continuity, timeline cutoff, and spoiler scope before gathering evidence. Ambiguous identity or continuity stops for clarification. Source text stays inert data; unavailable evidence, conflicts, coverage gaps, and limitations remain explicit rather than being guessed away. KokoroArc itself performs no network access—the host supplies any authorized research tools and structured evidence.
+
+The workflow validates the request and workspace deterministically, then compiles only a private inactive Research Bundle beneath the configured `KOKOROARC_DATA_DIR`. Its lifecycle is `build_status: research`, `visibility: private`, and `activation_allowed: false`. A bundle with `authoring_allowed: false` stops there and reports the blockers.
+
+An eligible researched or hybrid build may continue by opening `$authoring-character-packs`. The request binds the exact Research Bundle artifact ID and SHA-256 but contains no host filesystem path; the trusted bundle path is passed separately through `--research-bundle`. Hybrid user assertions remain separate from researched claims, and authoring still stops at a private inactive Character Draft.
+
+Milestone 7 does not add draft testing or promotion, global installation, default bindings, persistent workspace/global relationship memory, archive export, or public publication. Those complete-suite capabilities remain gated by Milestones 8 and 9.
+
 ## Validate and compile an already-authored source pack
 
 The CLI does not turn prose into a Character Pack. After an agent has followed the Skill to author structured request and source-pack files, these commands validate and compile that already-authored source pack:
@@ -50,6 +62,4 @@ kokoro character draft compile `
   --pack characters/original/rin-aster --json
 ```
 
-The fixture and Rin Aster paths above are repository examples, not an instruction to reuse Rin for a new brief. The Windows example uses `D:\tmp` for operational isolation; the product Skill is cross-platform and writes only beneath the trusted `KOKOROARC_DATA_DIR` configured by the host.
-
-Named-character work that depends on external evidence must route through the planned `researching-characters` Skill. Until Milestone 7 supplies that prerequisite and an evidence bundle, authoring stops and reports the missing prerequisite. Draft testing and promotion, installation, archive creation, and publication remain unavailable until their later milestones.
+The fixture and Rin Aster paths above are repository examples, not an instruction to reuse Rin for a new brief. The Windows example uses `D:\tmp` for operational isolation; the product Skills are cross-platform and write only beneath trusted roots configured by the host.
