@@ -75,9 +75,11 @@ def test_release_evidence_records_smoke_and_exact_milestone_boundary() -> None:
         "Milestone 7 does not approve the complete standalone suite",
         "Behavioral campaign: CORRECTIVE PASS 11/11",
         "Corrective harness: COMPLETED WITH DISCLOSED DEVIATIONS",
-        "Exact-final verification: INVALIDATED BY FRESH QUALITY REVIEW; RERUN PENDING",
+        "Exact-final verification: PASS ON POST-SETTLEMENT REMEDIATION TREE; FRESH REVIEWS PENDING",
         "Fresh specification review of `6afcbeccbc43814700e42c4626a6a9b8e1bddce0`: PASS",
         "Fresh quality review of `6afcbeccbc43814700e42c4626a6a9b8e1bddce0`: IMPORTANT FINDINGS UNDER REMEDIATION",
+        "Fresh specification review of post-settlement remediation: PENDING",
+        "Fresh quality review of post-settlement remediation: PENDING",
     ):
         assert text in evidence
 
@@ -182,6 +184,16 @@ def test_release_evidence_records_post_settlement_quality_remediation() -> None:
         r"D:\tmp\kokoroarc-m7-quality-remediation-preflight-01",
         "1931 passed, 24 skipped",
         "not Task 11 closure",
+        "Post-settlement remediation exact gates",
+        "ee5d2073b76d2760bbcf8838da8a2f7e80df6aa7",
+        r"D:\tmp\kokoroarc-m7-quality-remediation-exact-ee5d207-01",
+        "9019A197C95479E416D385FA3CB630191A79EBB4C9C0A3B414B897ED4377B31F",
+        "EAC007AF8B70CD87354E5DC1C1B1B7CA8E743709F0F3F0D0A953AD2618381DA3",
+        r"D:\tmp\kokoroarc-m7-fresh-checkout-ee5d207-01",
+        "29BFB709927BFD3B65280102AB93BEE792891390333BE287756013FFD8E46C82",
+        "all 984 retained evidence blobs byte-for-byte",
+        r"D:\tmp\kokoroarc-m7-quality-remediation-settled-01",
+        "PASS ON POST-SETTLEMENT REMEDIATION TREE; FRESH REVIEWS PENDING",
     ):
         assert text in evidence
 

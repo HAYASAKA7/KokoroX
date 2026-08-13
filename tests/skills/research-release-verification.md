@@ -9,10 +9,12 @@ This record covers the inline product, CLI, Skill-structure, smoke, and distribu
 - Isolated root: `D:\tmp\kokoroarc-m7-release-20260813-inline1`
 - Behavioral campaign: CORRECTIVE PASS 11/11 (first batch remains Skill PASS 10/11, RED 1/11)
 - Corrective harness: COMPLETED WITH DISCLOSED DEVIATIONS
-- Exact-final verification: INVALIDATED BY FRESH QUALITY REVIEW; RERUN PENDING
+- Exact-final verification: PASS ON POST-SETTLEMENT REMEDIATION TREE; FRESH REVIEWS PENDING
 - Review of commit `b07338101b37c66080f9b7f82de7a84919d9b56c`: IMPORTANT FINDINGS REMEDIATED
 - Fresh specification review of `6afcbeccbc43814700e42c4626a6a9b8e1bddce0`: PASS
 - Fresh quality review of `6afcbeccbc43814700e42c4626a6a9b8e1bddce0`: IMPORTANT FINDINGS UNDER REMEDIATION
+- Fresh specification review of post-settlement remediation: PENDING
+- Fresh quality review of post-settlement remediation: PENDING
 
 The approved 22-run first campaign remains behaviorally immutable, including its one failed Skill case. The separately approved 11-run corrective Skill-only campaign passed all declared behavioral assertions against the current Skill. Ten harness/report deviations across seven cases are retained and disclosed; they do not reclassify behavior or erase the failed first campaign. Review of the first release-evidence commit found Important checkout, whitespace-gate, assertion-adjudication, and final-message-binding gaps. The first remediation fixed those gaps, but fresh quality review of the settled commit then found additional fail-open adjudication and incomplete sanitizer coverage. Those findings are being remediated. Task 11 requires a new exact-commit gate and two new independent reviews. No canon-accuracy claim or complete-suite approval is implied by the checks below.
 
@@ -238,6 +240,27 @@ Recomputation also corrected eight legacy baseline assertion booleans across fou
 
 The expanded focused research and release-evidence gate now passes **40 tests**. A D:-confined full-suite preflight at `D:\tmp\kokoroarc-m7-quality-remediation-preflight-01` passed with **1931 passed, 24 skipped** in 164.66 seconds; every skip was the same explicit Windows symlink, junction, or FIFO capability case. This is remediation preflight evidence, not Task 11 closure. A committed exact-input full-suite/build/validator/fresh-checkout gate and two fresh independent reviews are still required.
 
+## Post-settlement remediation exact gates
+
+Implementation commit `ee5d2073b76d2760bbcf8838da8a2f7e80df6aa7` was verified from `D:\tmp\kokoroarc-m7-quality-remediation-exact-ee5d207-01`. The complete repository suite exited `0` with **1931 passed, 24 skipped** in 168.82 seconds. There were no failures or errors; every skip was an explicit Windows capability case. Captured stdout was 7,284 bytes with SHA-256 `9019A197C95479E416D385FA3CB630191A79EBB4C9C0A3B414B897ED4377B31F`; stderr was empty with SHA-256 `E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855`.
+
+The fixed-epoch build used `SOURCE_DATE_EPOCH=1786608259`, exited `0`, and printed the expected successful two-archive message. Its inventory was:
+
+| Artifact | Bytes | SHA-256 |
+| --- | ---: | --- |
+| `kokoroarc-0.0.0.dev0-py3-none-any.whl` | 111,414 | `0F9D3B900E26B47E8F7C8A077931600351D051708881F473DBAF0C076E29ED6D` |
+| `kokoroarc-0.0.0.dev0.tar.gz` | 86,055 | `EAC007AF8B70CD87354E5DC1C1B1B7CA8E743709F0F3F0D0A953AD2618381DA3` |
+
+The wheel contained 58 entries and the sdist 75. Both retained all six research modules and all eight research schemas. The embedded README SHA-256 remained `0F345F780A742B8552C34134641B8BA23C15B615D8A67F5E996F7303E9B5881D`, and the normalized sdist content-manifest SHA-256 remained `4E1ADA14555CCF663C9E87545AC476013E8726E43D3E894FF4CBF469E2C54776`.
+
+All three standard Skill validators exited `0`, printed `Skill is valid!`, and retained empty stderr. `git diff --check 274c5a57051b8ee31d95deab11ae26d00707911a ee5d2073b76d2760bbcf8838da8a2f7e80df6aa7` exited `0` with empty output, and the implementation-commit worktree was clean.
+
+A detached clone at `D:\tmp\kokoroarc-m7-fresh-checkout-ee5d207-01` configured with `core.autocrlf=true` passed the 40-test focused verifier. Its stdout SHA-256 was `29BFB709927BFD3B65280102AB93BEE792891390333BE287756013FFD8E46C82`; stderr was empty. The audit reproduced all 984 retained evidence blobs byte-for-byte, retained the three declared Skill hashes with zero CRLF pairs, passed the exact-range whitespace check, and remained clean.
+
+The release-record tree, including this result block and its unchanged executable assertions, is assigned the settled rerun root `D:\tmp\kokoroarc-m7-quality-remediation-settled-01`. The settled gate requires the same 1931/24 full-suite outcome, fixed-epoch wheel and normalized-sdist identities, three validator passes, exact-range diff check, and clean detached-checkout result before this record is committed. Raw per-run archive and command hashes remain captured under that root where generated sdist mtimes or path-bearing test output are expected to vary.
+
+The post-settlement remediation exact status is **PASS ON POST-SETTLEMENT REMEDIATION TREE; FRESH REVIEWS PENDING**. Task 11 and Milestone 7 remain open until fresh specification and quality reviews of the settled commit both report no Critical or Important findings.
+
 ## Verified product gates before this record
 
 - Task 8 exact research-to-authoring gate: `380 passed, 7 skipped`.
@@ -250,9 +273,8 @@ These results were obtained before the release-document changes. The settled-inp
 
 ## Remaining closure gates
 
-1. Commit the post-settlement verifier and sanitizer remediation.
-2. Run the full-suite, fixed-epoch build, Skill-validator, exact-range, clean-status, and detached `core.autocrlf=true` gates on the exact committed input.
-3. Obtain fresh independent specification and quality reviews on that exact commit.
-4. Close Milestone 7 only after both reviews report PASS with no Critical or Important findings.
+1. Commit the settled post-settlement remediation release record after its exact-tree rerun.
+2. Obtain fresh independent specification and quality reviews on that exact commit.
+3. Close Milestone 7 only after both reviews report PASS with no Critical or Important findings.
 
-Current status: Behavioral campaign: CORRECTIVE PASS 11/11. Corrective harness: COMPLETED WITH DISCLOSED DEVIATIONS. Exact-final verification: INVALIDATED BY FRESH QUALITY REVIEW; RERUN PENDING. Fresh specification review of `6afcbeccbc43814700e42c4626a6a9b8e1bddce0`: PASS. Fresh quality review of that commit: IMPORTANT FINDINGS UNDER REMEDIATION.
+Current status: Behavioral campaign: CORRECTIVE PASS 11/11. Corrective harness: COMPLETED WITH DISCLOSED DEVIATIONS. Exact-final verification: PASS ON POST-SETTLEMENT REMEDIATION TREE; FRESH REVIEWS PENDING. Fresh specification review of post-settlement remediation: PENDING. Fresh quality review of post-settlement remediation: PENDING.
