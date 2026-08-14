@@ -96,6 +96,24 @@
       }
     }
   ],
+  "allOf": [
+    {
+      "if": {
+        "properties": {"ready_for_private_export": {"const": true}},
+        "required": ["ready_for_private_export"]
+      },
+      "then": {
+        "properties": {
+          "checks": {"$ref": "#/$defs/private_export_checks_pass"}
+        }
+      },
+      "else": {
+        "properties": {
+          "checks": {"$ref": "#/$defs/private_export_check_failure"}
+        }
+      }
+    }
+  ],
   "$defs": {
     "artifact_id": {
       "type": "string",
@@ -267,6 +285,36 @@
         "source_references": {"properties": {"passed": {"const": true}}},
         "age_routes": {"properties": {"passed": {"const": true}}}
       }
+    },
+    "private_export_checks_pass": {
+      "type": "object",
+      "properties": {
+        "verified_promotion": {"properties": {"passed": {"const": true}}},
+        "visibility_policy": {"properties": {"passed": {"const": true}}},
+        "provenance": {"properties": {"passed": {"const": true}}},
+        "private_material_absent": {"properties": {"passed": {"const": true}}},
+        "executable_content_absent": {"properties": {"passed": {"const": true}}},
+        "secrets_absent": {"properties": {"passed": {"const": true}}},
+        "absolute_paths_absent": {"properties": {"passed": {"const": true}}},
+        "continuity": {"properties": {"passed": {"const": true}}},
+        "source_references": {"properties": {"passed": {"const": true}}},
+        "age_routes": {"properties": {"passed": {"const": true}}}
+      }
+    },
+    "private_export_check_failure": {
+      "type": "object",
+      "anyOf": [
+        {"properties": {"verified_promotion": {"properties": {"passed": {"const": false}}}}},
+        {"properties": {"visibility_policy": {"properties": {"passed": {"const": false}}}}},
+        {"properties": {"provenance": {"properties": {"passed": {"const": false}}}}},
+        {"properties": {"private_material_absent": {"properties": {"passed": {"const": false}}}}},
+        {"properties": {"executable_content_absent": {"properties": {"passed": {"const": false}}}}},
+        {"properties": {"secrets_absent": {"properties": {"passed": {"const": false}}}}},
+        {"properties": {"absolute_paths_absent": {"properties": {"passed": {"const": false}}}}},
+        {"properties": {"continuity": {"properties": {"passed": {"const": false}}}}},
+        {"properties": {"source_references": {"properties": {"passed": {"const": false}}}}},
+        {"properties": {"age_routes": {"properties": {"passed": {"const": false}}}}}
+      ]
     },
     "artifact_reference": {
       "type": "object",

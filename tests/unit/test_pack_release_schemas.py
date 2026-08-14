@@ -354,6 +354,47 @@ def test_blocked_public_candidate_requires_a_blocker() -> None:
     _assert_invalid("pack-publication-readiness-report", invalid)
 
 
+@pytest.mark.parametrize(
+    "check_name",
+    [
+        "verified_promotion",
+        "visibility_policy",
+        "provenance",
+        "private_material_absent",
+        "executable_content_absent",
+        "secrets_absent",
+        "absolute_paths_absent",
+        "continuity",
+        "source_references",
+        "age_routes",
+    ],
+)
+def test_private_export_readiness_requires_every_baseline_export_gate(
+    check_name: str,
+) -> None:
+    invalid = deepcopy(_bundle("research-full.json")["publication_report"])
+    invalid["checks"][check_name] = {
+        "passed": False,
+        "findings": [
+            {
+                "severity": "error",
+                "code": "PRIVATE_EXPORT_GATE_FAILED",
+                "path": ["checks", check_name],
+                "message": "The baseline private-export gate failed.",
+            }
+        ],
+    }
+
+    _assert_invalid("pack-publication-readiness-report", invalid)
+
+
+def test_blocked_private_export_requires_a_failed_baseline_export_gate() -> None:
+    invalid = deepcopy(_bundle("research-full.json")["publication_report"])
+    invalid["ready_for_private_export"] = False
+
+    _assert_invalid("pack-publication-readiness-report", invalid)
+
+
 def test_private_readiness_cannot_claim_publication_readiness() -> None:
     invalid = deepcopy(_bundle("original-minimal.json")["publication_report"])
     invalid["ready_for_publication"] = True
