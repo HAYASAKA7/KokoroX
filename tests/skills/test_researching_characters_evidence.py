@@ -225,6 +225,21 @@ def _trusted_run_root(run: dict) -> Path:
     return Path(approval["raw_capture_root"]) / source_variant / run["case_id"]
 
 
+def _trusted_cli_context(run: dict) -> dict:
+    from import_researching_characters_campaign import (
+        APPROVED1_TRUSTED_CLI_CONTEXT,
+    )
+    from import_researching_characters_corrective_campaign import (
+        approved2_trusted_cli_context,
+    )
+
+    contexts = {
+        "2026-08-13-approved1": APPROVED1_TRUSTED_CLI_CONTEXT,
+        "2026-08-13-approved2": approved2_trusted_cli_context(run["case_id"]),
+    }
+    return dict(contexts[run["approval_id"]])
+
+
 def _write_json(path: Path, value: object) -> None:
     path.write_text(
         json.dumps(value, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
@@ -255,6 +270,32 @@ def test_structural_case_contract_is_complete() -> None:
     assert declared <= ASSERTION_IDS
     for case in cases:
         assert bool(case.get("must")) != bool(case.get("must_not"))
+
+
+def test_campaign_importers_lock_cli_trust_outside_agent_reports() -> None:
+    first = _trusted_cli_context(
+        _campaign_run("2026-08-13-approved1", "spoiler-cutoff")
+    )
+    corrective = _trusted_cli_context(
+        _campaign_run("2026-08-13-approved2", "partial-unavailable-source")
+    )
+    corrective_argv_only = _trusted_cli_context(
+        _campaign_run("2026-08-13-approved2", "spoiler-cutoff")
+    )
+
+    for context in (first, corrective):
+        assert context["argv_prefix"] == ["python", "-m", "kokoroarc.cli"]
+        assert context["pythonpath"] == (
+            r"D:\Projects\AI\KokoroArc\.worktrees\standalone-suite\src"
+        )
+        assert context["shell_login"] is False
+    assert first["require_cwd"] is False
+    assert first["require_report_environment"] is False
+    assert first["require_command"] is False
+    assert corrective["require_cwd"] is True
+    assert corrective["require_report_environment"] is True
+    assert corrective["require_command"] is True
+    assert corrective_argv_only["require_command"] is False
 
 
 def test_structural_positive_cases_define_safe_workflow_boundaries() -> None:
@@ -609,6 +650,7 @@ def test_campaign_assertion_truth_is_recomputed_from_retained_evidence() -> None
             run_root,
             run["determinism_pairs"],
             trusted_run_root=_trusted_run_root(run),
+            trusted_cli_context=_trusted_cli_context(run),
         )
         assert recomputed == retained, (run["approval_id"], run["case_id"])
 
@@ -632,6 +674,7 @@ def test_determinism_assertions_require_bound_successful_cli_commands(
             run_root,
             run["determinism_pairs"],
             trusted_run_root=_trusted_run_root(run),
+            trusted_cli_context=_trusted_cli_context(run),
         )
     }
 
@@ -666,6 +709,7 @@ def test_determinism_assertions_reject_semantically_empty_json(
             run_root,
             run["determinism_pairs"],
             trusted_run_root=_trusted_run_root(run),
+            trusted_cli_context=_trusted_cli_context(run),
         )
     }
 
@@ -711,6 +755,7 @@ def test_cli_assertions_require_exact_kokoroarc_executable_provenance(
             run_root,
             run["determinism_pairs"],
             trusted_run_root=_trusted_run_root(run),
+            trusted_cli_context=_trusted_cli_context(run),
         )
     }
 
@@ -760,6 +805,7 @@ def test_cli_assertions_reject_quoted_nonexecuting_wrapper_with_claimed_argv(
             run_root,
             run["determinism_pairs"],
             trusted_run_root=_trusted_run_root(run),
+            trusted_cli_context=_trusted_cli_context(run),
         )
     }
 
@@ -819,6 +865,7 @@ def test_cli_assertions_reject_nonexecuting_powershell_regions_with_claimed_argv
             run_root,
             run["determinism_pairs"],
             trusted_run_root=_trusted_run_root(run),
+            trusted_cli_context=_trusted_cli_context(run),
         )
     }
 
@@ -927,6 +974,7 @@ def test_cli_assertions_bind_complete_wrapper_execution_to_claimed_record(
             run_root,
             run["determinism_pairs"],
             trusted_run_root=_trusted_run_root(run),
+            trusted_cli_context=_trusted_cli_context(run),
         )
     }
 
@@ -1012,11 +1060,159 @@ def test_cli_assertions_bind_wrapper_provenance_context_and_capture_aliases(
             run_root,
             run["determinism_pairs"],
             trusted_run_root=_trusted_run_root(run),
+            trusted_cli_context=_trusted_cli_context(run),
         )
     }
 
     for assertion in (
         "use_host_authorized_tools_only",
+        "validate_request_twice",
+        "validate_workspace_twice",
+        "compile_private_bundle",
+        "validate_bundle_twice",
+        "confine_output",
+    ):
+        assert outcomes[assertion] is False, (mutation, assertion, outcomes)
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    (
+        "consistent_executable_path",
+        "consistent_executable_alias",
+        "consistent_pythonpath",
+        "missing_cwd",
+        "relative_cwd",
+        "report_shell_login",
+        "missing_report_environment",
+        "missing_report_pythonpath",
+        "outside_report_cwd",
+        "hidden_wrapper_argv",
+        "hidden_wrapper_help_argv",
+        "hidden_wrapper_help_substring",
+        "hidden_wrapper_long_spacing",
+        "missing_command",
+        "missing_trusted_context",
+    ),
+)
+def test_cli_assertions_require_trusted_context_and_bind_every_cli_wrapper(
+    tmp_path: Path,
+    mutation: str,
+) -> None:
+    from researching_characters_adjudication import adjudicate_assertions
+
+    run, run_root, report = _mutable_run(
+        tmp_path, "2026-08-13-approved2", "partial-unavailable-source"
+    )
+    wrappers = [
+        record
+        for record in report["commands"]
+        if isinstance(record, dict)
+        and isinstance(record.get("argv"), list)
+        and isinstance(record.get("command"), str)
+        and "$ErrorActionPreference" in record["command"]
+        and "kokoroarc.cli research" in record["command"]
+    ]
+    assert len(wrappers) == 7
+
+    if mutation == "consistent_executable_path":
+        for record in wrappers:
+            record["argv"][0] = r"D:\untrusted\python.exe"
+            record["command"] = record["command"].replace(
+                "; python -m kokoroarc.cli research",
+                r"; D:\untrusted\python.exe -m kokoroarc.cli research",
+                1,
+            )
+    elif mutation == "consistent_executable_alias":
+        for record in wrappers:
+            record["argv"][0] = "py"
+            record["command"] = record["command"].replace(
+                "; python -m kokoroarc.cli research",
+                "; py -m kokoroarc.cli research",
+                1,
+            )
+    elif mutation == "consistent_pythonpath":
+        report["environment"]["pythonpath"] = r"D:\untrusted"
+        for record in wrappers:
+            record["command"] = re.sub(
+                r"(?i)(\$env:PYTHONPATH\s*=\s*)'[^']+'",
+                lambda match: match.group(1) + r"'D:\untrusted'",
+                record["command"],
+                count=1,
+            )
+    elif mutation == "missing_cwd":
+        for record in wrappers:
+            del record["cwd"]
+    elif mutation == "relative_cwd":
+        for record in wrappers:
+            record["cwd"] = "."
+    elif mutation == "report_shell_login":
+        report["environment"]["shell_login"] = True
+    elif mutation == "missing_report_environment":
+        del report["environment"]
+    elif mutation == "missing_report_pythonpath":
+        del report["environment"]["pythonpath"]
+    elif mutation == "outside_report_cwd":
+        report["environment"]["cwd"] = r"C:\outside"
+    elif mutation in {
+        "hidden_wrapper_argv",
+        "hidden_wrapper_help_argv",
+        "hidden_wrapper_help_substring",
+        "hidden_wrapper_long_spacing",
+    }:
+        hidden = dict(
+            next(
+                record
+                for record in wrappers
+                if "research bundle compile"
+                in " ".join(str(item) for item in record["argv"]).casefold()
+            )
+        )
+        hidden["argv"] = ["narrative-only"]
+        if mutation == "hidden_wrapper_help_argv":
+            hidden["argv"].append("--help")
+        elif mutation == "hidden_wrapper_help_substring":
+            hidden["command"] = hidden["command"].replace(
+                " --json 2>", " --help-evasion --json 2>", 1
+            )
+        elif mutation == "hidden_wrapper_long_spacing":
+            hidden["command"] = hidden["command"].replace(
+                "kokoroarc.cli research",
+                "kokoroarc.cli" + (" " * 81) + "research",
+                1,
+            )
+        hidden["cwd"] = r"C:\outside"
+        hidden["exit_code"] = 0
+        report["commands"].append(hidden)
+    elif mutation == "missing_command":
+        for record in wrappers:
+            del record["command"]
+    elif mutation == "missing_trusted_context":
+        pass
+    else:  # pragma: no cover - parameter list is closed above
+        raise AssertionError(mutation)
+
+    _write_json(run_root / "agent-report.json", report)
+    case = next(item for item in _cases() if item["id"] == run["case_id"])
+    trusted_cli_context = (
+        None
+        if mutation == "missing_trusted_context"
+        else _trusted_cli_context(run)
+    )
+    outcomes = {
+        item["id"]: item["passed"]
+        for item in adjudicate_assertions(
+            case,
+            run_root,
+            run["determinism_pairs"],
+            trusted_run_root=_trusted_run_root(run),
+            trusted_cli_context=trusted_cli_context,
+        )
+    }
+
+    for assertion in (
+        "use_host_authorized_tools_only",
+        "keep_sources_inert",
         "validate_request_twice",
         "validate_workspace_twice",
         "compile_private_bundle",
@@ -1066,6 +1262,7 @@ def test_cli_assertions_reject_partial_direct_command_summary(
             run_root,
             run["determinism_pairs"],
             trusted_run_root=_trusted_run_root(run),
+            trusted_cli_context=_trusted_cli_context(run),
         )
     }
 
@@ -1119,6 +1316,7 @@ def test_compile_output_is_bound_to_trusted_campaign_run_root(
             run_root,
             run["determinism_pairs"],
             trusted_run_root=_trusted_run_root(run),
+            trusted_cli_context=_trusted_cli_context(run),
         )
     }
 
@@ -1145,6 +1343,7 @@ def test_confinement_rejects_absolute_output_outside_declared_run_root(
             run_root,
             run["determinism_pairs"],
             trusted_run_root=_trusted_run_root(run),
+            trusted_cli_context=_trusted_cli_context(run),
         )
     }
 
@@ -1180,6 +1379,7 @@ def test_source_safety_rejects_environment_secret_access_command(
             run_root,
             run["determinism_pairs"],
             trusted_run_root=_trusted_run_root(run),
+            trusted_cli_context=_trusted_cli_context(run),
         )
     }
 
@@ -1215,6 +1415,7 @@ def test_source_safety_rejects_cmd_environment_secret_expansion(
             run_root,
             run["determinism_pairs"],
             trusted_run_root=_trusted_run_root(run),
+            trusted_cli_context=_trusted_cli_context(run),
         )
     }
 
@@ -1244,6 +1445,7 @@ def test_source_safety_rejects_complete_environment_dump(tmp_path: Path) -> None
             run_root,
             run["determinism_pairs"],
             trusted_run_root=_trusted_run_root(run),
+            trusted_cli_context=_trusted_cli_context(run),
         )
     }
 
@@ -1288,6 +1490,7 @@ def test_source_safety_rejects_alias_and_quoted_interpreter_environment_access(
             run_root,
             run["determinism_pairs"],
             trusted_run_root=_trusted_run_root(run),
+            trusted_cli_context=_trusted_cli_context(run),
         )
     }
 
@@ -1323,6 +1526,7 @@ def test_source_safety_rejects_javascript_source_execution(tmp_path: Path) -> No
             run_root,
             run["determinism_pairs"],
             trusted_run_root=_trusted_run_root(run),
+            trusted_cli_context=_trusted_cli_context(run),
         )
     }
 
@@ -1361,6 +1565,7 @@ def test_source_safety_rejects_quoted_full_path_python_snippet(
             run_root,
             run["determinism_pairs"],
             trusted_run_root=_trusted_run_root(run),
+            trusted_cli_context=_trusted_cli_context(run),
         )
     }
 
@@ -1407,6 +1612,7 @@ def test_source_safety_inspects_wrapper_beyond_declared_cli_argv(
             run_root,
             run["determinism_pairs"],
             trusted_run_root=_trusted_run_root(run),
+            trusted_cli_context=_trusted_cli_context(run),
         )
     }
 
@@ -1444,6 +1650,7 @@ def test_handoff_assertion_binds_exact_captured_bundle_identity(
             run_root,
             run["determinism_pairs"],
             trusted_run_root=_trusted_run_root(run),
+            trusted_cli_context=_trusted_cli_context(run),
         )
     }
 

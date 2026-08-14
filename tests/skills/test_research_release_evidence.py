@@ -75,7 +75,7 @@ def test_release_evidence_records_smoke_and_exact_milestone_boundary() -> None:
         "Milestone 7 does not approve the complete standalone suite",
         "Behavioral campaign: CORRECTIVE PASS 11/11",
         "Corrective harness: COMPLETED WITH DISCLOSED DEVIATIONS",
-        "Exact-final verification: FIFTH SPEC-REVIEW REMEDIATION PREFLIGHT PASS; EXACT-TREE GATES AND FRESH REVIEWS PENDING",
+        "Exact-final verification: SIXTH SPEC-REVIEW REMEDIATION PREFLIGHT PASS; EXACT-TREE GATES AND FRESH REVIEWS PENDING",
         "Fresh specification review of `6afcbeccbc43814700e42c4626a6a9b8e1bddce0`: PASS",
         "Fresh quality review of `6afcbeccbc43814700e42c4626a6a9b8e1bddce0`: IMPORTANT FINDINGS REMEDIATED",
         "Fresh specification review of `646fc91f27eb723334f4ff4b25309985b56046a3`: IMPORTANT FINDINGS REMEDIATED",
@@ -88,8 +88,10 @@ def test_release_evidence_records_smoke_and_exact_milestone_boundary() -> None:
         "Fresh quality review of `bea1fce58cbbf0c00a49da2fa662e0dc30c2d7b1`: NOT RUN; SPECIFICATION REVIEW FAILED",
         "Fresh specification review of `670e44bf126daa2198c77889ad3bf142b60d0b72`: IMPORTANT FINDINGS REMEDIATED",
         "Fresh quality review of `670e44bf126daa2198c77889ad3bf142b60d0b72`: NOT RUN; SPECIFICATION REVIEW FAILED",
-        "Fresh specification review of fifth spec-review remediation settled tree: PENDING",
-        "Fresh quality review of fifth spec-review remediation settled tree: PENDING",
+        "Fresh specification review of `bc183a8f92452a82b733459118764e9304d4878a`: IMPORTANT FINDINGS REMEDIATED",
+        "Fresh quality review of `bc183a8f92452a82b733459118764e9304d4878a`: NOT RUN; SPECIFICATION REVIEW FAILED",
+        "Fresh specification review of sixth spec-review remediation settled tree: PENDING",
+        "Fresh quality review of sixth spec-review remediation settled tree: PENDING",
     ):
         assert text in evidence
 
@@ -309,6 +311,39 @@ def test_release_evidence_records_fifth_specification_review_remediation() -> No
         "95022C1B29E414D28554A40C7E8E5FBC5D3ED2088CF7AEF41B619B40EC552EB1",
         r"D:\tmp\kokoroarc-m7-spec5-remediation-settled-01",
         "PASS ON FIFTH SPEC-REVIEW REMEDIATION SETTLED TREE; FRESH REVIEWS PENDING",
+    ):
+        assert text in evidence
+
+
+def test_release_evidence_records_sixth_specification_review_remediation() -> None:
+    evidence = EVIDENCE_PATH.read_text(encoding="utf-8")
+    for text in (
+        "Sixth specification-review remediation",
+        "bc183a8f92452a82b733459118764e9304d4878a",
+        "aa94d127c51dd8f5879d6ee3fdfd38f83d0893db",
+        "approval-controlled trust anchor",
+        "approval-locked importer constants",
+        "immutable approved1 evidence",
+        "current approved2 campaign",
+        "single approval-locked `spoiler-cutoff` argv-only exception",
+        "explicit absolute per-command `cwd`",
+        "Every independently recognized research CLI occurrence",
+        "Fifteen focused mutations",
+        "missing raw command",
+        "misleading help metadata",
+        "arbitrarily long spacing",
+        "100 tests",
+        r"D:\tmp\kokoroarc-m7-spec6-remediation-preflight-01",
+        "1988 passed, 24 skipped",
+        "superseded after the two adjacent raw-command/help-token RED regressions",
+        r"D:\tmp\kokoroarc-m7-spec6-remediation-preflight-02",
+        "1990 passed, 24 skipped",
+        "overlong-spacing RED regression removed the scanner's arbitrary gap cap",
+        r"D:\tmp\kokoroarc-m7-spec6-remediation-preflight-03",
+        "1991 passed, 24 skipped",
+        "BA96DC9DE317B700D7A39A1B7DDB22FFCF4CE9478E26E03B98E32E5D1BE6E77A",
+        r"D:\tmp\kokoroarc-m7-spec6-remediation-settled-01",
+        "PASS ON SIXTH SPEC-REVIEW REMEDIATION SETTLED TREE; FRESH REVIEWS PENDING",
     ):
         assert text in evidence
 

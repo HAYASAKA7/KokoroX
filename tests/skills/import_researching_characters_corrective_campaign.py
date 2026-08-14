@@ -14,6 +14,7 @@ from import_researching_characters_campaign import (
     PROTECTED_ROOTS,
     REDACTION_REPLACEMENTS,
     SKILL_DIR,
+    APPROVED1_TRUSTED_CLI_CONTEXT,
     normalized_variant,
     prompt_text,
     retained_copy,
@@ -23,6 +24,22 @@ from import_researching_characters_campaign import (
 
 
 APPROVAL_ID = "2026-08-13-approved2"
+APPROVED2_TRUSTED_CLI_CONTEXT = {
+    **APPROVED1_TRUSTED_CLI_CONTEXT,
+    "require_cwd": True,
+    "require_report_environment": True,
+    "require_command": True,
+}
+APPROVED2_ARGV_ONLY_CASE_IDS = frozenset({"spoiler-cutoff"})
+
+
+def approved2_trusted_cli_context(case_id: str) -> dict:
+    return {
+        **APPROVED2_TRUSTED_CLI_CONTEXT,
+        "require_command": case_id not in APPROVED2_ARGV_ONLY_CASE_IDS,
+    }
+
+
 METADATA_FILE = SKILL_DIR / "agents" / "openai.yaml"
 SKILL_SHA256 = "aa08f7e8bb5dd78c2434af0bd8878bb87d0cdbd7bad0fb04cd40aa13149bec21"
 CONTRACT_SHA256 = "9e4f2abc63a29bf75f4291d5db657b2908a75c00e8830f69a027cc1eed73b313"
@@ -226,7 +243,11 @@ def import_run(source_root: Path, approval_root: Path, case: dict) -> dict:
     harness_status = "completed_with_disclosed_deviations" if deviations else "completed"
     pairs = verify_determinism(source, case_id)
     outcomes = adjudicate_assertions(
-        case, destination, pairs, trusted_run_root=source
+        case,
+        destination,
+        pairs,
+        trusted_run_root=source,
+        trusted_cli_context=approved2_trusted_cli_context(case["id"]),
     )
     behavior_status = (
         "passed" if all(item["passed"] for item in outcomes) else "failed"

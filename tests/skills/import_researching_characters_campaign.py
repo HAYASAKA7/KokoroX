@@ -21,6 +21,15 @@ ROOT = HERE.parents[1]
 CASES_FILE = HERE / "researching-characters-cases.yaml"
 SKILL_DIR = ROOT / "skills" / "researching-characters"
 DESTINATION = HERE / "evidence" / "researching-characters"
+# Approval-locked harness input; never derive this trust anchor from agent output.
+APPROVED1_TRUSTED_CLI_CONTEXT = {
+    "argv_prefix": ["python", "-m", "kokoroarc.cli"],
+    "pythonpath": r"D:\Projects\AI\KokoroArc\.worktrees\standalone-suite\src",
+    "shell_login": False,
+    "require_cwd": False,
+    "require_report_environment": False,
+    "require_command": False,
+}
 PROTECTED_ROOTS = (
     "drafts",
     "compiled",
@@ -224,7 +233,11 @@ def import_run(
             for left, right in DETERMINISM_PAIRS[case["id"]]
         ]
     outcomes = adjudicate_assertions(
-        case, destination, pairs, trusted_run_root=source
+        case,
+        destination,
+        pairs,
+        trusted_run_root=source,
+        trusted_cli_context=APPROVED1_TRUSTED_CLI_CONTEXT,
     )
 
     result = {

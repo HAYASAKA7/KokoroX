@@ -9,7 +9,7 @@ This record covers the inline product, CLI, Skill-structure, smoke, and distribu
 - Isolated root: `D:\tmp\kokoroarc-m7-release-20260813-inline1`
 - Behavioral campaign: CORRECTIVE PASS 11/11 (first batch remains Skill PASS 10/11, RED 1/11)
 - Corrective harness: COMPLETED WITH DISCLOSED DEVIATIONS
-- Exact-final verification: FIFTH SPEC-REVIEW REMEDIATION PREFLIGHT PASS; EXACT-TREE GATES AND FRESH REVIEWS PENDING
+- Exact-final verification: SIXTH SPEC-REVIEW REMEDIATION PREFLIGHT PASS; EXACT-TREE GATES AND FRESH REVIEWS PENDING
 - Review of commit `b07338101b37c66080f9b7f82de7a84919d9b56c`: IMPORTANT FINDINGS REMEDIATED
 - Fresh specification review of `6afcbeccbc43814700e42c4626a6a9b8e1bddce0`: PASS
 - Fresh quality review of `6afcbeccbc43814700e42c4626a6a9b8e1bddce0`: IMPORTANT FINDINGS REMEDIATED
@@ -23,8 +23,10 @@ This record covers the inline product, CLI, Skill-structure, smoke, and distribu
 - Fresh quality review of `bea1fce58cbbf0c00a49da2fa662e0dc30c2d7b1`: NOT RUN; SPECIFICATION REVIEW FAILED
 - Fresh specification review of `670e44bf126daa2198c77889ad3bf142b60d0b72`: IMPORTANT FINDINGS REMEDIATED
 - Fresh quality review of `670e44bf126daa2198c77889ad3bf142b60d0b72`: NOT RUN; SPECIFICATION REVIEW FAILED
-- Fresh specification review of fifth spec-review remediation settled tree: PENDING
-- Fresh quality review of fifth spec-review remediation settled tree: PENDING
+- Fresh specification review of `bc183a8f92452a82b733459118764e9304d4878a`: IMPORTANT FINDINGS REMEDIATED
+- Fresh quality review of `bc183a8f92452a82b733459118764e9304d4878a`: NOT RUN; SPECIFICATION REVIEW FAILED
+- Fresh specification review of sixth spec-review remediation settled tree: PENDING
+- Fresh quality review of sixth spec-review remediation settled tree: PENDING
 
 The approved 22-run first campaign remains behaviorally immutable, including its one failed Skill case. The separately approved 11-run corrective Skill-only campaign passed all declared behavioral assertions against the current Skill. Ten harness/report deviations across seven cases are retained and disclosed; they do not reclassify behavior or erase the failed first campaign. Review of the first release-evidence commit found Important checkout, whitespace-gate, assertion-adjudication, and final-message-binding gaps. Later reviews found additional fail-open adjudication, command-provenance, confinement, inert-source, sanitizer, raw-replay, quoted-wrapper, shell-reachability, environment-access, and structured-secret gaps. Each accepted finding has a focused RED regression and fail-closed remediation. Task 11 still requires both independent reviews to pass on the newest settled release-record tree. No canon-accuracy claim or complete-suite approval is implied by the checks below.
 
@@ -355,6 +357,18 @@ The focused research/release evidence gate passes **83 tests**. The D:-confined 
 
 The release-record tree containing this section and its executable assertion is assigned `D:\tmp\kokoroarc-m7-spec5-remediation-settled-01`. After commit, that exact tree must pass the complete suite, fixed-epoch build and archive inventory, all three validators, raw replay, final-message binding, exact base-to-HEAD whitespace and clean-status checks, and a fresh detached `core.autocrlf=true` checkout. Its status may be recorded as **PASS ON FIFTH SPEC-REVIEW REMEDIATION SETTLED TREE; FRESH REVIEWS PENDING** only while those exact artifacts exist and match; both independent reviews remain required.
 
+## Sixth specification-review remediation
+
+Exact fifth-remediation commit `bc183a8f92452a82b733459118764e9304d4878a`, tree `aa94d127c51dd8f5879d6ee3fdfd38f83d0893db`, and parent `670e44bf126daa2198c77889ad3bf142b60d0b72` passed the assigned `D:\tmp\kokoroarc-m7-spec5-remediation-settled-01` gate: `1974 passed, 24 skipped`, the fixed-base-epoch build and archive inventory, all three Skill validators, 785-file raw replay, 33 final-message bindings, exact-range whitespace and clean-status checks, and a fresh detached `core.autocrlf=true` checkout with all 984 evidence files byte-identical and 83 focused tests.
+
+Fresh specification review still returned FAIL with three Important evidence-integrity findings, so quality review was not run. CLI executable and import-root evidence was only self-consistent rather than bound to an approval-controlled trust anchor; consistently substituting both wrapper and argv or both wrapper and reported `PYTHONPATH` preserved all 19 assertions. Missing or contradictory execution context, including absent `cwd` and `shell_login: true`, also passed. Finally, a new executable CLI wrapper could be hidden behind narrative-only structured argv, allowing an outside working directory to escape the per-record binding audit while all assertions stayed green.
+
+The regression-first remediation moves executable prefix, import root, login mode, and required-context policy into approval-locked importer constants that are never derived from agent output. The current approved2 campaign requires its retained report environment and an explicit absolute per-command `cwd` equal to the trusted raw run root. It also requires the retained raw command wherever that approved transcript contains one, with a single approval-locked `spoiler-cutoff` argv-only exception; the immutable approved1 evidence keeps narrowly declared historical allowances for its absent context fields rather than rewriting old evidence. Every independently recognized research CLI occurrence in command text or argv is now audited even when the other field hides it, and all CLI-derived behavioral, tool-safety, and confinement assertions fail closed when the external trust context is absent or any record is unbound. Fifteen focused mutations cover consistent executable path and alias substitution, consistent import-root substitution, missing and relative command working directories, contradictory report login mode, absent report environment or `PYTHONPATH`, outside report context, hidden-wrapper forms with narrative, misleading help metadata, or arbitrarily long spacing, a missing raw command, and absent trusted context.
+
+The focused research/release evidence gate passes **100 tests**. An initial D:-confined full-suite dirty-tree preflight at `D:\tmp\kokoroarc-m7-spec6-remediation-preflight-01` exited `0` with `1988 passed, 24 skipped`, but it was superseded after the two adjacent raw-command/help-token RED regressions were added. Replacement `D:\tmp\kokoroarc-m7-spec6-remediation-preflight-02` then exited `0` with `1990 passed, 24 skipped` but was superseded when exact help-token handling was unified and the overlong-spacing RED regression removed the scanner's arbitrary gap cap. The final frozen-tree preflight at `D:\tmp\kokoroarc-m7-spec6-remediation-preflight-03` exited `0`: **`1991 passed, 24 skipped` in 300.55 seconds**. Every skip was an explicit Windows symlink, junction, or FIFO capability case. Captured stdout was 7,268 bytes with SHA-256 `BA96DC9DE317B700D7A39A1B7DDB22FFCF4CE9478E26E03B98E32E5D1BE6E77A`; stderr was empty with SHA-256 `E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855`. The final harness elapsed time was 302.75 seconds. This is dirty-tree remediation preflight evidence, not Task 11 closure; the release-record edits that retain it are verified by the focused gate and must be rerun on the exact committed tree.
+
+The release-record tree containing this section and its executable assertion is assigned `D:\tmp\kokoroarc-m7-spec6-remediation-settled-01`. After commit, that exact tree must pass the complete suite, fixed-base-epoch build and archive inventory, all three validators, raw replay, final-message binding, exact base-to-HEAD whitespace and clean-status checks, and a fresh detached `core.autocrlf=true` checkout. Its status may be recorded as **PASS ON SIXTH SPEC-REVIEW REMEDIATION SETTLED TREE; FRESH REVIEWS PENDING** only while those exact artifacts exist and match; both independent reviews remain required.
+
 ## Verified product gates before this record
 
 - Task 8 exact research-to-authoring gate: `380 passed, 7 skipped`.
@@ -367,8 +381,8 @@ These results were obtained before the release-document changes. The settled-inp
 
 ## Remaining closure gates
 
-1. Complete the fifth specification-review remediation preflight, commit it, and complete its exact-tree rerun under the assigned D:-based root.
+1. Complete the sixth specification-review remediation full preflight, commit it, and complete its exact-tree rerun under the assigned D:-based root.
 2. Obtain fresh independent specification and quality reviews on that exact commit.
 3. Close Milestone 7 only after both reviews report PASS with no Critical or Important findings.
 
-Current status: Behavioral campaign: CORRECTIVE PASS 11/11. Corrective harness: COMPLETED WITH DISCLOSED DEVIATIONS. Exact-final verification: FIFTH SPEC-REVIEW REMEDIATION PREFLIGHT PASS; EXACT-TREE GATES AND FRESH REVIEWS PENDING. Fresh specification review of fifth spec-review remediation settled tree: PENDING. Fresh quality review of fifth spec-review remediation settled tree: PENDING.
+Current status: Behavioral campaign: CORRECTIVE PASS 11/11. Corrective harness: COMPLETED WITH DISCLOSED DEVIATIONS. Exact-final verification: SIXTH SPEC-REVIEW REMEDIATION PREFLIGHT PASS; EXACT-TREE GATES AND FRESH REVIEWS PENDING. Fresh specification review of sixth spec-review remediation settled tree: PENDING. Fresh quality review of sixth spec-review remediation settled tree: PENDING.
