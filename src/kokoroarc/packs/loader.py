@@ -115,16 +115,28 @@ def _is_unsafe_windows_component(component: str) -> bool:
 
 def load_yaml(path: Path) -> dict[str, Any]:
     try:
-        contents = path.read_text(encoding="utf-8")
-    except (OSError, UnicodeError) as error:
+        contents = path.read_bytes()
+    except OSError as error:
+        raise _invalid_pack_data(
+            "YAML file could not be read.", "read_failed"
+        ) from error
+
+    return parse_yaml_bytes(contents)
+
+
+def parse_yaml_bytes(contents: bytes) -> dict[str, Any]:
+    """Parse UTF-8 YAML bytes with the pack loader's data-only rules."""
+    try:
+        text = contents.decode("utf-8")
+    except UnicodeError as error:
         raise _invalid_pack_data(
             "YAML file could not be read.", "read_failed"
         ) from error
 
     loader: _UniqueKeySafeLoader | None = None
     try:
-        _reject_alias_events(contents)
-        loader = _UniqueKeySafeLoader(contents)
+        _reject_alias_events(text)
+        loader = _UniqueKeySafeLoader(text)
         document = loader.get_single_data()
     except (RecursionError, yaml.YAMLError) as error:
         raise _invalid_pack_data("YAML document is invalid.", "invalid_yaml") from error
