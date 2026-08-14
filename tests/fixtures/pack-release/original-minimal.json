@@ -1,0 +1,243 @@
+{
+  "hard_report": {
+    "schema_version": "1.0",
+    "artifact_id": "original/rin-aster/release/hard-validation",
+    "created_by": {"component": "kokoroarc", "version": "0.0.0.dev0"},
+    "namespace": "original",
+    "character_id": "rin-aster",
+    "character_version": "1.0.0",
+    "mode": "original",
+    "visibility": "private",
+    "source_artifact_id": "original/rin-aster/source",
+    "source_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "compiled_artifact_id": "original/rin-aster/compiled",
+    "compiled_hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "corpus_hash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "checks": {
+      "source_schema": {"passed": true, "findings": []},
+      "pack_layout": {"passed": true, "findings": []},
+      "provenance": {"passed": true, "findings": []},
+      "security": {"passed": true, "findings": []},
+      "compile": {"passed": true, "findings": []},
+      "fixture_structure": {"passed": true, "findings": []},
+      "locale_coverage": {"passed": true, "findings": []},
+      "protected_content": {"passed": true, "findings": []},
+      "state_replay": {"passed": true, "findings": []}
+    },
+    "source_snapshot_stable": true,
+    "deterministic": true,
+    "passed": true
+  },
+  "soft_input": {
+    "schema_version": "1.0",
+    "artifact_id": "original/rin-aster/release/soft-input",
+    "created_by": {"component": "kokoroarc", "version": "0.0.0.dev0"},
+    "namespace": "original",
+    "character_id": "rin-aster",
+    "character_version": "1.0.0",
+    "mode": "original",
+    "visibility": "private",
+    "source_artifact_id": "original/rin-aster/source",
+    "source_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "compiled_artifact_id": "original/rin-aster/compiled",
+    "compiled_hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "evaluator": {"id": "local-evaluator", "version": "1.0.0"},
+    "rubric_version": "1.0.0",
+    "fixture_version": "1.0.0",
+    "samples": {
+      "semantic_equivalence": {
+        "semantic-zh-01": {
+          "locale": "zh-CN",
+          "scenario_id": "debugging",
+          "case_id": "semantic-positive",
+          "score": 0.95,
+          "confidence": 0.9,
+          "finding_codes": []
+        }
+      },
+      "character_consistency": {
+        "character-en-01": {
+          "locale": "en-US",
+          "scenario_id": "debugging",
+          "case_id": "character-positive",
+          "score": 0.94,
+          "confidence": 0.9,
+          "finding_codes": []
+        }
+      },
+      "locale_naturalness": {
+        "locale-ja-01": {
+          "locale": "ja-JP",
+          "scenario_id": "debugging",
+          "case_id": "locale-positive",
+          "score": 0.93,
+          "confidence": 0.9,
+          "finding_codes": []
+        }
+      },
+      "cross_language_persona_equivalence": {
+        "cross-language-01": {
+          "locale": "zh-CN",
+          "scenario_id": "debugging",
+          "case_id": "cross-language-positive",
+          "score": 0.92,
+          "confidence": 0.9,
+          "finding_codes": []
+        }
+      },
+      "repetition_catchphrase_quality": {
+        "repetition-en-01": {
+          "locale": "en-US",
+          "scenario_id": "debugging",
+          "case_id": "repetition-positive",
+          "score": 0.91,
+          "confidence": 0.9,
+          "finding_codes": []
+        }
+      },
+      "safety_policy_retention": {
+        "safety-en-01": {
+          "locale": "en-US",
+          "scenario_id": "debugging",
+          "case_id": "safety-positive",
+          "score": 0.96,
+          "confidence": 0.95,
+          "finding_codes": []
+        }
+      }
+    }
+  },
+  "soft_report": {
+    "schema_version": "1.0",
+    "artifact_id": "original/rin-aster/release/soft-evaluation",
+    "created_by": {"component": "kokoroarc", "version": "0.0.0.dev0"},
+    "namespace": "original",
+    "character_id": "rin-aster",
+    "character_version": "1.0.0",
+    "mode": "original",
+    "visibility": "private",
+    "source_artifact_id": "original/rin-aster/source",
+    "source_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "compiled_artifact_id": "original/rin-aster/compiled",
+    "compiled_hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "evaluation_input": {
+      "artifact_id": "original/rin-aster/release/soft-input",
+      "sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+    },
+    "evaluator": {"id": "local-evaluator", "version": "1.0.0"},
+    "rubric_version": "1.0.0",
+    "fixture_version": "1.0.0",
+    "threshold_profile": {
+      "profile_id": "default-release",
+      "version": "1.0.0",
+      "aggregation": "lower_confidence_bound",
+      "dimensions": {
+        "semantic_equivalence": {"min_samples": 1, "min_confidence": 0.8, "threshold": 0.8},
+        "character_consistency": {"min_samples": 1, "min_confidence": 0.8, "threshold": 0.8},
+        "locale_naturalness": {"min_samples": 1, "min_confidence": 0.8, "threshold": 0.8},
+        "cross_language_persona_equivalence": {"min_samples": 1, "min_confidence": 0.8, "threshold": 0.8},
+        "repetition_catchphrase_quality": {"min_samples": 1, "min_confidence": 0.8, "threshold": 0.8},
+        "safety_policy_retention": {"min_samples": 1, "min_confidence": 0.8, "threshold": 0.8}
+      }
+    },
+    "results": {
+      "semantic_equivalence": {"sample_count": 1, "score": 0.95, "confidence": 0.9, "lower_bound": 0.85, "passed": true, "finding_codes": []},
+      "character_consistency": {"sample_count": 1, "score": 0.94, "confidence": 0.9, "lower_bound": 0.84, "passed": true, "finding_codes": []},
+      "locale_naturalness": {"sample_count": 1, "score": 0.93, "confidence": 0.9, "lower_bound": 0.83, "passed": true, "finding_codes": []},
+      "cross_language_persona_equivalence": {"sample_count": 1, "score": 0.92, "confidence": 0.9, "lower_bound": 0.82, "passed": true, "finding_codes": []},
+      "repetition_catchphrase_quality": {"sample_count": 1, "score": 0.91, "confidence": 0.9, "lower_bound": 0.81, "passed": true, "finding_codes": []},
+      "safety_policy_retention": {"sample_count": 1, "score": 0.96, "confidence": 0.95, "lower_bound": 0.86, "passed": true, "finding_codes": []}
+    },
+    "passed": true
+  },
+  "review_attestation": {
+    "schema_version": "1.0",
+    "artifact_id": "original/rin-aster/release/review",
+    "created_by": {"component": "kokoroarc", "version": "0.0.0.dev0"},
+    "review_id": "rin-review-01",
+    "namespace": "original",
+    "character_id": "rin-aster",
+    "character_version": "1.0.0",
+    "mode": "original",
+    "source_artifact_id": "original/rin-aster/source",
+    "source_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "hard_report": {
+      "artifact_id": "original/rin-aster/release/hard-validation",
+      "sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+    },
+    "decision": "accept",
+    "reviewer": {"id": "local-user", "type": "user"},
+    "reviewed": {
+      "identity": true,
+      "continuity": true,
+      "provenance": true,
+      "overrides": true,
+      "privacy": true
+    },
+    "corrections": {},
+    "visibility_acknowledged": "private"
+  },
+  "promotion_record": {
+    "schema_version": "1.0",
+    "artifact_id": "original/rin-aster/release/promotion-reviewed",
+    "created_by": {"component": "kokoroarc", "version": "0.0.0.dev0"},
+    "promotion_id": "rin-promotion-reviewed-01",
+    "namespace": "original",
+    "character_id": "rin-aster",
+    "character_version": "1.0.0",
+    "mode": "original",
+    "visibility": "private",
+    "source_artifact_id": "original/rin-aster/source",
+    "source_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "compiled_artifact_id": "original/rin-aster/compiled",
+    "compiled_hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "from_status": "draft",
+    "to_status": "reviewed",
+    "activation_allowed": false,
+    "hard_report": {
+      "artifact_id": "original/rin-aster/release/hard-validation",
+      "sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+    },
+    "review_attestation": {
+      "artifact_id": "original/rin-aster/release/review",
+      "sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+    },
+    "previous_promotion": null,
+    "soft_evaluation_report": null
+  },
+  "publication_report": {
+    "schema_version": "1.0",
+    "artifact_id": "original/rin-aster/release/publication-readiness",
+    "created_by": {"component": "kokoroarc", "version": "0.0.0.dev0"},
+    "namespace": "original",
+    "character_id": "rin-aster",
+    "character_version": "1.0.0",
+    "mode": "original",
+    "requested_visibility": "private",
+    "source_artifact_id": "original/rin-aster/source",
+    "source_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "compiled_artifact_id": "original/rin-aster/compiled",
+    "compiled_hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "promotion": {
+      "artifact_id": "original/rin-aster/release/promotion-verified",
+      "sha256": "2222222222222222222222222222222222222222222222222222222222222222"
+    },
+    "checks": {
+      "verified_promotion": {"passed": true, "findings": []},
+      "visibility_policy": {"passed": true, "findings": []},
+      "provenance": {"passed": true, "findings": []},
+      "private_material_absent": {"passed": true, "findings": []},
+      "executable_content_absent": {"passed": true, "findings": []},
+      "secrets_absent": {"passed": true, "findings": []},
+      "absolute_paths_absent": {"passed": true, "findings": []},
+      "compliance": {"passed": true, "findings": []},
+      "continuity": {"passed": true, "findings": []},
+      "source_references": {"passed": true, "findings": []},
+      "age_routes": {"passed": true, "findings": []}
+    },
+    "blockers": [],
+    "compliance_attestation": null,
+    "ready_for_private_export": true,
+    "ready_for_publication": false
+  }
+}

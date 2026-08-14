@@ -1,0 +1,290 @@
+{
+  "hard_report": {
+    "schema_version": "1.0",
+    "artifact_id": "research/aoi-kisaragi-fixture/release/hard-validation",
+    "created_by": {"component": "kokoroarc", "version": "0.0.0.dev0"},
+    "namespace": "research",
+    "character_id": "aoi-kisaragi-fixture",
+    "character_version": "1.0.0",
+    "mode": "researched",
+    "visibility": "private",
+    "source_artifact_id": "research/aoi-kisaragi-fixture/source",
+    "source_hash": "3333333333333333333333333333333333333333333333333333333333333333",
+    "compiled_artifact_id": "research/aoi-kisaragi-fixture/compiled",
+    "compiled_hash": "4444444444444444444444444444444444444444444444444444444444444444",
+    "corpus_hash": "5555555555555555555555555555555555555555555555555555555555555555",
+    "checks": {
+      "source_schema": {"passed": true, "findings": []},
+      "pack_layout": {"passed": true, "findings": []},
+      "provenance": {
+        "passed": true,
+        "findings": [
+          {
+            "severity": "warning",
+            "code": "PACK_PROVENANCE_PRIVATE_ONLY",
+            "path": ["evidence"],
+            "message": "Research-backed evidence remains private by default."
+          }
+        ]
+      },
+      "security": {"passed": true, "findings": []},
+      "compile": {"passed": true, "findings": []},
+      "fixture_structure": {"passed": true, "findings": []},
+      "locale_coverage": {"passed": true, "findings": []},
+      "protected_content": {"passed": true, "findings": []},
+      "state_replay": {"passed": true, "findings": []}
+    },
+    "source_snapshot_stable": true,
+    "deterministic": true,
+    "passed": true
+  },
+  "soft_input": {
+    "schema_version": "1.0",
+    "artifact_id": "research/aoi-kisaragi-fixture/release/soft-input",
+    "created_by": {"component": "kokoroarc", "version": "0.0.0.dev0"},
+    "namespace": "research",
+    "character_id": "aoi-kisaragi-fixture",
+    "character_version": "1.0.0",
+    "mode": "researched",
+    "visibility": "private",
+    "source_artifact_id": "research/aoi-kisaragi-fixture/source",
+    "source_hash": "3333333333333333333333333333333333333333333333333333333333333333",
+    "compiled_artifact_id": "research/aoi-kisaragi-fixture/compiled",
+    "compiled_hash": "4444444444444444444444444444444444444444444444444444444444444444",
+    "evaluator": {"id": "host-reviewer", "version": "2.1.0"},
+    "rubric_version": "1.1.0",
+    "fixture_version": "1.0.0",
+    "samples": {
+      "semantic_equivalence": {
+        "semantic-zh-01": {
+          "locale": "zh-CN",
+          "scenario_id": "debugging",
+          "case_id": "semantic-positive",
+          "score": 0.9,
+          "confidence": 0.88,
+          "finding_codes": ["EVALUATOR_ADVISORY"]
+        }
+      },
+      "character_consistency": {
+        "character-en-01": {
+          "locale": "en-US",
+          "scenario_id": "debugging",
+          "case_id": "character-positive",
+          "score": 0.91,
+          "confidence": 0.89,
+          "finding_codes": []
+        }
+      },
+      "locale_naturalness": {
+        "locale-ja-01": {
+          "locale": "ja-JP",
+          "scenario_id": "debugging",
+          "case_id": "locale-positive",
+          "score": 0.92,
+          "confidence": 0.9,
+          "finding_codes": []
+        }
+      },
+      "cross_language_persona_equivalence": {
+        "cross-language-01": {
+          "locale": "zh-CN",
+          "scenario_id": "debugging",
+          "case_id": "cross-language-positive",
+          "score": 0.93,
+          "confidence": 0.91,
+          "finding_codes": []
+        }
+      },
+      "repetition_catchphrase_quality": {
+        "repetition-en-01": {
+          "locale": "en-US",
+          "scenario_id": "debugging",
+          "case_id": "repetition-positive",
+          "score": 0.9,
+          "confidence": 0.88,
+          "finding_codes": []
+        }
+      },
+      "safety_policy_retention": {
+        "safety-en-01": {
+          "locale": "en-US",
+          "scenario_id": "debugging",
+          "case_id": "safety-positive",
+          "score": 0.97,
+          "confidence": 0.96,
+          "finding_codes": []
+        }
+      }
+    }
+  },
+  "soft_report": {
+    "schema_version": "1.0",
+    "artifact_id": "research/aoi-kisaragi-fixture/release/soft-evaluation",
+    "created_by": {"component": "kokoroarc", "version": "0.0.0.dev0"},
+    "namespace": "research",
+    "character_id": "aoi-kisaragi-fixture",
+    "character_version": "1.0.0",
+    "mode": "researched",
+    "visibility": "private",
+    "source_artifact_id": "research/aoi-kisaragi-fixture/source",
+    "source_hash": "3333333333333333333333333333333333333333333333333333333333333333",
+    "compiled_artifact_id": "research/aoi-kisaragi-fixture/compiled",
+    "compiled_hash": "4444444444444444444444444444444444444444444444444444444444444444",
+    "evaluation_input": {
+      "artifact_id": "research/aoi-kisaragi-fixture/release/soft-input",
+      "sha256": "6666666666666666666666666666666666666666666666666666666666666666"
+    },
+    "evaluator": {"id": "host-reviewer", "version": "2.1.0"},
+    "rubric_version": "1.1.0",
+    "fixture_version": "1.0.0",
+    "threshold_profile": {
+      "profile_id": "default-release",
+      "version": "1.0.0",
+      "aggregation": "lower_confidence_bound",
+      "dimensions": {
+        "semantic_equivalence": {"min_samples": 1, "min_confidence": 0.8, "threshold": 0.8},
+        "character_consistency": {"min_samples": 1, "min_confidence": 0.8, "threshold": 0.8},
+        "locale_naturalness": {"min_samples": 1, "min_confidence": 0.8, "threshold": 0.8},
+        "cross_language_persona_equivalence": {"min_samples": 1, "min_confidence": 0.8, "threshold": 0.8},
+        "repetition_catchphrase_quality": {"min_samples": 1, "min_confidence": 0.8, "threshold": 0.8},
+        "safety_policy_retention": {"min_samples": 1, "min_confidence": 0.8, "threshold": 0.8}
+      }
+    },
+    "results": {
+      "semantic_equivalence": {"sample_count": 1, "score": 0.9, "confidence": 0.88, "lower_bound": 0.81, "passed": true, "finding_codes": ["EVALUATOR_ADVISORY"]},
+      "character_consistency": {"sample_count": 1, "score": 0.91, "confidence": 0.89, "lower_bound": 0.82, "passed": true, "finding_codes": []},
+      "locale_naturalness": {"sample_count": 1, "score": 0.92, "confidence": 0.9, "lower_bound": 0.83, "passed": true, "finding_codes": []},
+      "cross_language_persona_equivalence": {"sample_count": 1, "score": 0.93, "confidence": 0.91, "lower_bound": 0.84, "passed": true, "finding_codes": []},
+      "repetition_catchphrase_quality": {"sample_count": 1, "score": 0.9, "confidence": 0.88, "lower_bound": 0.81, "passed": true, "finding_codes": []},
+      "safety_policy_retention": {"sample_count": 1, "score": 0.97, "confidence": 0.96, "lower_bound": 0.88, "passed": true, "finding_codes": []}
+    },
+    "passed": true
+  },
+  "review_attestation": {
+    "schema_version": "1.0",
+    "artifact_id": "research/aoi-kisaragi-fixture/release/review",
+    "created_by": {"component": "kokoroarc", "version": "0.0.0.dev0"},
+    "review_id": "aoi-review-01",
+    "namespace": "research",
+    "character_id": "aoi-kisaragi-fixture",
+    "character_version": "1.0.0",
+    "mode": "researched",
+    "source_artifact_id": "research/aoi-kisaragi-fixture/source",
+    "source_hash": "3333333333333333333333333333333333333333333333333333333333333333",
+    "hard_report": {
+      "artifact_id": "research/aoi-kisaragi-fixture/release/hard-validation",
+      "sha256": "7777777777777777777777777777777777777777777777777777777777777777"
+    },
+    "decision": "accept",
+    "reviewer": {"id": "local-maintainer", "type": "maintainer"},
+    "reviewed": {
+      "identity": true,
+      "continuity": true,
+      "provenance": true,
+      "overrides": true,
+      "privacy": true
+    },
+    "corrections": {
+      "tone-note": {
+        "path": ["expressions", "restrained_diagnosis"],
+        "disposition": "advisory",
+        "message": "Retain the restrained delivery during future revisions."
+      }
+    },
+    "visibility_acknowledged": "private"
+  },
+  "promotion_record": {
+    "schema_version": "1.0",
+    "artifact_id": "research/aoi-kisaragi-fixture/release/promotion-verified",
+    "created_by": {"component": "kokoroarc", "version": "0.0.0.dev0"},
+    "promotion_id": "aoi-promotion-verified-01",
+    "namespace": "research",
+    "character_id": "aoi-kisaragi-fixture",
+    "character_version": "1.0.0",
+    "mode": "researched",
+    "visibility": "private",
+    "source_artifact_id": "research/aoi-kisaragi-fixture/source",
+    "source_hash": "3333333333333333333333333333333333333333333333333333333333333333",
+    "compiled_artifact_id": "research/aoi-kisaragi-fixture/compiled",
+    "compiled_hash": "4444444444444444444444444444444444444444444444444444444444444444",
+    "from_status": "reviewed",
+    "to_status": "verified",
+    "activation_allowed": true,
+    "hard_report": {
+      "artifact_id": "research/aoi-kisaragi-fixture/release/hard-validation",
+      "sha256": "7777777777777777777777777777777777777777777777777777777777777777"
+    },
+    "review_attestation": {
+      "artifact_id": "research/aoi-kisaragi-fixture/release/review",
+      "sha256": "8888888888888888888888888888888888888888888888888888888888888888"
+    },
+    "previous_promotion": {
+      "artifact_id": "research/aoi-kisaragi-fixture/release/promotion-reviewed",
+      "sha256": "9999999999999999999999999999999999999999999999999999999999999999"
+    },
+    "soft_evaluation_report": {
+      "artifact_id": "research/aoi-kisaragi-fixture/release/soft-evaluation",
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    }
+  },
+  "publication_report": {
+    "schema_version": "1.0",
+    "artifact_id": "research/aoi-kisaragi-fixture/release/publication-readiness",
+    "created_by": {"component": "kokoroarc", "version": "0.0.0.dev0"},
+    "namespace": "research",
+    "character_id": "aoi-kisaragi-fixture",
+    "character_version": "1.0.0",
+    "mode": "researched",
+    "requested_visibility": "public_candidate",
+    "source_artifact_id": "research/aoi-kisaragi-fixture/source",
+    "source_hash": "3333333333333333333333333333333333333333333333333333333333333333",
+    "compiled_artifact_id": "research/aoi-kisaragi-fixture/compiled",
+    "compiled_hash": "4444444444444444444444444444444444444444444444444444444444444444",
+    "promotion": {
+      "artifact_id": "research/aoi-kisaragi-fixture/release/promotion-verified",
+      "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    },
+    "checks": {
+      "verified_promotion": {"passed": true, "findings": []},
+      "visibility_policy": {"passed": true, "findings": []},
+      "provenance": {"passed": true, "findings": []},
+      "private_material_absent": {"passed": true, "findings": []},
+      "executable_content_absent": {"passed": true, "findings": []},
+      "secrets_absent": {"passed": true, "findings": []},
+      "absolute_paths_absent": {"passed": true, "findings": []},
+      "compliance": {
+        "passed": false,
+        "findings": [
+          {
+            "severity": "error",
+            "code": "PUBLICATION_RIGHTS_NOT_ESTABLISHED",
+            "path": ["compliance_attestation"],
+            "message": "The local attestation does not establish distribution rights."
+          }
+        ]
+      },
+      "continuity": {"passed": true, "findings": []},
+      "source_references": {"passed": true, "findings": []},
+      "age_routes": {"passed": true, "findings": []}
+    },
+    "blockers": [
+      {
+        "severity": "error",
+        "code": "PUBLICATION_RIGHTS_NOT_ESTABLISHED",
+        "path": ["compliance_attestation"],
+        "message": "Public distribution remains blocked."
+      }
+    ],
+    "compliance_attestation": {
+      "attestation_id": "aoi-rights-review-01",
+      "reviewer_id": "local-maintainer",
+      "scope": "distribution_rights_reviewed",
+      "conclusion": "blocked",
+      "source_hash": "3333333333333333333333333333333333333333333333333333333333333333",
+      "compiled_hash": "4444444444444444444444444444444444444444444444444444444444444444",
+      "basis_codes": ["RIGHTS_NOT_ESTABLISHED"]
+    },
+    "ready_for_private_export": true,
+    "ready_for_publication": false
+  }
+}

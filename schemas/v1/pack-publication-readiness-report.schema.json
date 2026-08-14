@@ -1,0 +1,313 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kokoroarc.local/schemas/v1/pack-publication-readiness-report.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "artifact_id",
+    "created_by",
+    "namespace",
+    "character_id",
+    "character_version",
+    "mode",
+    "requested_visibility",
+    "source_artifact_id",
+    "source_hash",
+    "compiled_artifact_id",
+    "compiled_hash",
+    "promotion",
+    "checks",
+    "blockers",
+    "compliance_attestation",
+    "ready_for_private_export",
+    "ready_for_publication"
+  ],
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "artifact_id": {"$ref": "#/$defs/artifact_id"},
+    "created_by": {"$ref": "#/$defs/created_by"},
+    "namespace": {"$ref": "#/$defs/slug_id"},
+    "character_id": {"$ref": "#/$defs/slug_id"},
+    "character_version": {"$ref": "#/$defs/semantic_version"},
+    "mode": {"$ref": "#/$defs/construction_mode"},
+    "requested_visibility": {"enum": ["private", "public_candidate"]},
+    "source_artifact_id": {"$ref": "#/$defs/artifact_id"},
+    "source_hash": {"$ref": "#/$defs/sha256"},
+    "compiled_artifact_id": {"$ref": "#/$defs/artifact_id"},
+    "compiled_hash": {"$ref": "#/$defs/sha256"},
+    "promotion": {"$ref": "#/$defs/artifact_reference"},
+    "checks": {"$ref": "#/$defs/publication_checks"},
+    "blockers": {
+      "type": "array",
+      "maxItems": 256,
+      "uniqueItems": true,
+      "items": {"$ref": "#/$defs/blocker"}
+    },
+    "compliance_attestation": {
+      "oneOf": [
+        {"type": "null"},
+        {"$ref": "#/$defs/compliance_attestation"}
+      ]
+    },
+    "ready_for_private_export": {"type": "boolean"},
+    "ready_for_publication": {"type": "boolean"}
+  },
+  "oneOf": [
+    {
+      "properties": {
+        "requested_visibility": {"const": "private"},
+        "ready_for_private_export": {"const": true},
+        "ready_for_publication": {"const": false},
+        "compliance_attestation": {"type": "null"},
+        "blockers": {"maxItems": 0},
+        "checks": {"$ref": "#/$defs/all_checks_pass"}
+      }
+    },
+    {
+      "properties": {
+        "requested_visibility": {"const": "private"},
+        "ready_for_private_export": {"const": false},
+        "ready_for_publication": {"const": false},
+        "compliance_attestation": {"type": "null"},
+        "blockers": {"minItems": 1}
+      }
+    },
+    {
+      "properties": {
+        "requested_visibility": {"const": "public_candidate"},
+        "ready_for_private_export": {"const": true},
+        "ready_for_publication": {"const": true},
+        "compliance_attestation": {
+          "allOf": [
+            {"$ref": "#/$defs/compliance_attestation"},
+            {"properties": {"conclusion": {"const": "approved"}}}
+          ]
+        },
+        "blockers": {"maxItems": 0},
+        "checks": {"$ref": "#/$defs/all_checks_pass"}
+      }
+    },
+    {
+      "properties": {
+        "requested_visibility": {"const": "public_candidate"},
+        "ready_for_publication": {"const": false},
+        "blockers": {"minItems": 1}
+      }
+    }
+  ],
+  "$defs": {
+    "artifact_id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9._/-]{0,191}(?![\\s\\S])"
+    },
+    "created_by": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["component", "version"],
+      "properties": {
+        "component": {"const": "kokoroarc"},
+        "version": {"type": "string", "minLength": 1, "maxLength": 64}
+      }
+    },
+    "slug_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*(?![\\s\\S])",
+      "not": {
+        "enum": [
+          "con", "prn", "aux", "nul",
+          "com1", "com2", "com3", "com4", "com5", "com6", "com7", "com8", "com9",
+          "lpt1", "lpt2", "lpt3", "lpt4", "lpt5", "lpt6", "lpt7", "lpt8", "lpt9"
+        ]
+      }
+    },
+    "stable_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*(?![\\s\\S])"
+    },
+    "semantic_version": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(?:-(?:0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*)(?:\\.(?:0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*))*)?(?:\\+[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)?(?![\\s\\S])"
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}(?![\\s\\S])"
+    },
+    "construction_mode": {
+      "enum": ["original", "dossier", "researched", "hybrid"]
+    },
+    "finding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["severity", "code", "path", "message"],
+      "properties": {
+        "severity": {"enum": ["error", "warning"]},
+        "code": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)*(?![\\s\\S])"
+        },
+        "path": {
+          "type": "array",
+          "maxItems": 32,
+          "items": {
+            "oneOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128,
+                "pattern": "^[A-Za-z0-9._-]+(?![\\s\\S])"
+              },
+              {"type": "integer", "minimum": 0, "maximum": 1000000}
+            ]
+          }
+        },
+        "message": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1000,
+          "pattern": "^[^\\u0000-\\u001f\\u007f]+(?![\\s\\S])"
+        }
+      }
+    },
+    "blocker": {
+      "allOf": [
+        {"$ref": "#/$defs/finding"},
+        {"properties": {"severity": {"const": "error"}}}
+      ]
+    },
+    "check_result": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["passed", "findings"],
+      "properties": {
+        "passed": {"type": "boolean"},
+        "findings": {
+          "type": "array",
+          "maxItems": 256,
+          "uniqueItems": true,
+          "items": {"$ref": "#/$defs/finding"}
+        }
+      },
+      "if": {
+        "properties": {"passed": {"const": true}},
+        "required": ["passed"]
+      },
+      "then": {
+        "properties": {
+          "findings": {
+            "not": {
+              "contains": {
+                "properties": {"severity": {"const": "error"}},
+                "required": ["severity"]
+              }
+            }
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "findings": {
+            "contains": {
+              "properties": {"severity": {"const": "error"}},
+              "required": ["severity"]
+            }
+          }
+        }
+      }
+    },
+    "publication_checks": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "verified_promotion",
+        "visibility_policy",
+        "provenance",
+        "private_material_absent",
+        "executable_content_absent",
+        "secrets_absent",
+        "absolute_paths_absent",
+        "compliance",
+        "continuity",
+        "source_references",
+        "age_routes"
+      ],
+      "properties": {
+        "verified_promotion": {"$ref": "#/$defs/check_result"},
+        "visibility_policy": {"$ref": "#/$defs/check_result"},
+        "provenance": {"$ref": "#/$defs/check_result"},
+        "private_material_absent": {"$ref": "#/$defs/check_result"},
+        "executable_content_absent": {"$ref": "#/$defs/check_result"},
+        "secrets_absent": {"$ref": "#/$defs/check_result"},
+        "absolute_paths_absent": {"$ref": "#/$defs/check_result"},
+        "compliance": {"$ref": "#/$defs/check_result"},
+        "continuity": {"$ref": "#/$defs/check_result"},
+        "source_references": {"$ref": "#/$defs/check_result"},
+        "age_routes": {"$ref": "#/$defs/check_result"}
+      }
+    },
+    "all_checks_pass": {
+      "type": "object",
+      "properties": {
+        "verified_promotion": {"properties": {"passed": {"const": true}}},
+        "visibility_policy": {"properties": {"passed": {"const": true}}},
+        "provenance": {"properties": {"passed": {"const": true}}},
+        "private_material_absent": {"properties": {"passed": {"const": true}}},
+        "executable_content_absent": {"properties": {"passed": {"const": true}}},
+        "secrets_absent": {"properties": {"passed": {"const": true}}},
+        "absolute_paths_absent": {"properties": {"passed": {"const": true}}},
+        "compliance": {"properties": {"passed": {"const": true}}},
+        "continuity": {"properties": {"passed": {"const": true}}},
+        "source_references": {"properties": {"passed": {"const": true}}},
+        "age_routes": {"properties": {"passed": {"const": true}}}
+      }
+    },
+    "artifact_reference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["artifact_id", "sha256"],
+      "properties": {
+        "artifact_id": {"$ref": "#/$defs/artifact_id"},
+        "sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "compliance_attestation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "attestation_id",
+        "reviewer_id",
+        "scope",
+        "conclusion",
+        "source_hash",
+        "compiled_hash",
+        "basis_codes"
+      ],
+      "properties": {
+        "attestation_id": {"$ref": "#/$defs/stable_id"},
+        "reviewer_id": {"$ref": "#/$defs/stable_id"},
+        "scope": {"const": "distribution_rights_reviewed"},
+        "conclusion": {"enum": ["approved", "blocked"]},
+        "source_hash": {"$ref": "#/$defs/sha256"},
+        "compiled_hash": {"$ref": "#/$defs/sha256"},
+        "basis_codes": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 64,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "maxLength": 128,
+            "pattern": "^[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)*(?![\\s\\S])"
+          }
+        }
+      }
+    }
+  }
+}

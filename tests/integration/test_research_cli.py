@@ -34,6 +34,17 @@ REQUIRED_RESEARCH_SCHEMAS = {
         "research-workspace",
     )
 }
+REQUIRED_PACK_RELEASE_SCHEMAS = {
+    f"{name}.schema.json"
+    for name in (
+        "pack-hard-validation-report",
+        "pack-soft-evaluation-input",
+        "pack-soft-evaluation-report",
+        "pack-review-attestation",
+        "pack-promotion-record",
+        "pack-publication-readiness-report",
+    )
+}
 PROTECTED_STATE_ROOTS = (
     "drafts",
     "compiled",
@@ -436,7 +447,7 @@ def test_built_archives_and_installed_research_cli_are_complete(
     for module in REQUIRED_RESEARCH_MODULES:
         assert module in wheel_entries
         assert any(entry.endswith(f"/src/{module}") for entry in sdist_entries)
-    for schema in REQUIRED_RESEARCH_SCHEMAS:
+    for schema in REQUIRED_RESEARCH_SCHEMAS | REQUIRED_PACK_RELEASE_SCHEMAS:
         wheel_suffix = f"/share/kokoroarc/schemas/v1/{schema}"
         assert any(entry.endswith(wheel_suffix) for entry in wheel_entries)
         assert any(entry.endswith(f"/schemas/v1/{schema}") for entry in sdist_entries)

@@ -1,0 +1,151 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kokoroarc.local/schemas/v1/pack-promotion-record.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "artifact_id",
+    "created_by",
+    "promotion_id",
+    "namespace",
+    "character_id",
+    "character_version",
+    "mode",
+    "visibility",
+    "source_artifact_id",
+    "source_hash",
+    "compiled_artifact_id",
+    "compiled_hash",
+    "from_status",
+    "to_status",
+    "activation_allowed",
+    "hard_report",
+    "review_attestation",
+    "previous_promotion",
+    "soft_evaluation_report"
+  ],
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "artifact_id": {"$ref": "#/$defs/artifact_id"},
+    "created_by": {"$ref": "#/$defs/created_by"},
+    "promotion_id": {"$ref": "#/$defs/stable_id"},
+    "namespace": {"$ref": "#/$defs/slug_id"},
+    "character_id": {"$ref": "#/$defs/slug_id"},
+    "character_version": {"$ref": "#/$defs/semantic_version"},
+    "mode": {"$ref": "#/$defs/construction_mode"},
+    "visibility": {"$ref": "#/$defs/visibility"},
+    "source_artifact_id": {"$ref": "#/$defs/artifact_id"},
+    "source_hash": {"$ref": "#/$defs/sha256"},
+    "compiled_artifact_id": {"$ref": "#/$defs/artifact_id"},
+    "compiled_hash": {"$ref": "#/$defs/sha256"},
+    "from_status": {"enum": ["draft", "reviewed"]},
+    "to_status": {"enum": ["reviewed", "verified"]},
+    "activation_allowed": {"type": "boolean"},
+    "hard_report": {"$ref": "#/$defs/artifact_reference"},
+    "review_attestation": {"$ref": "#/$defs/artifact_reference"},
+    "previous_promotion": {
+      "oneOf": [
+        {"type": "null"},
+        {"$ref": "#/$defs/artifact_reference"}
+      ]
+    },
+    "soft_evaluation_report": {
+      "oneOf": [
+        {"type": "null"},
+        {"$ref": "#/$defs/artifact_reference"}
+      ]
+    }
+  },
+  "allOf": [
+    {
+      "oneOf": [
+        {
+          "properties": {
+            "from_status": {"const": "draft"},
+            "to_status": {"const": "reviewed"},
+            "visibility": {"const": "private"},
+            "activation_allowed": {"const": false},
+            "previous_promotion": {"type": "null"},
+            "soft_evaluation_report": {"type": "null"}
+          }
+        },
+        {
+          "properties": {
+            "from_status": {"const": "reviewed"},
+            "to_status": {"const": "verified"},
+            "activation_allowed": {"const": true},
+            "previous_promotion": {"$ref": "#/$defs/artifact_reference"},
+            "soft_evaluation_report": {"$ref": "#/$defs/artifact_reference"}
+          }
+        }
+      ]
+    },
+    {
+      "if": {
+        "properties": {
+          "mode": {"enum": ["dossier", "researched", "hybrid"]}
+        },
+        "required": ["mode"]
+      },
+      "then": {"properties": {"visibility": {"const": "private"}}}
+    }
+  ],
+  "$defs": {
+    "artifact_id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9._/-]{0,191}(?![\\s\\S])"
+    },
+    "created_by": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["component", "version"],
+      "properties": {
+        "component": {"const": "kokoroarc"},
+        "version": {"type": "string", "minLength": 1, "maxLength": 64}
+      }
+    },
+    "slug_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*(?![\\s\\S])",
+      "not": {
+        "enum": [
+          "con", "prn", "aux", "nul",
+          "com1", "com2", "com3", "com4", "com5", "com6", "com7", "com8", "com9",
+          "lpt1", "lpt2", "lpt3", "lpt4", "lpt5", "lpt6", "lpt7", "lpt8", "lpt9"
+        ]
+      }
+    },
+    "stable_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*(?![\\s\\S])"
+    },
+    "semantic_version": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(?:-(?:0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*)(?:\\.(?:0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*))*)?(?:\\+[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)?(?![\\s\\S])"
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}(?![\\s\\S])"
+    },
+    "construction_mode": {
+      "enum": ["original", "dossier", "researched", "hybrid"]
+    },
+    "visibility": {"enum": ["private", "public_candidate"]},
+    "artifact_reference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["artifact_id", "sha256"],
+      "properties": {
+        "artifact_id": {"$ref": "#/$defs/artifact_id"},
+        "sha256": {"$ref": "#/$defs/sha256"}
+      }
+    }
+  }
+}

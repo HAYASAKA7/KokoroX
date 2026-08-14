@@ -1,0 +1,246 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kokoroarc.local/schemas/v1/pack-soft-evaluation-report.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "artifact_id",
+    "created_by",
+    "namespace",
+    "character_id",
+    "character_version",
+    "mode",
+    "visibility",
+    "source_artifact_id",
+    "source_hash",
+    "compiled_artifact_id",
+    "compiled_hash",
+    "evaluation_input",
+    "evaluator",
+    "rubric_version",
+    "fixture_version",
+    "threshold_profile",
+    "results",
+    "passed"
+  ],
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "artifact_id": {"$ref": "#/$defs/artifact_id"},
+    "created_by": {"$ref": "#/$defs/created_by"},
+    "namespace": {"$ref": "#/$defs/slug_id"},
+    "character_id": {"$ref": "#/$defs/slug_id"},
+    "character_version": {"$ref": "#/$defs/semantic_version"},
+    "mode": {"$ref": "#/$defs/construction_mode"},
+    "visibility": {"$ref": "#/$defs/visibility"},
+    "source_artifact_id": {"$ref": "#/$defs/artifact_id"},
+    "source_hash": {"$ref": "#/$defs/sha256"},
+    "compiled_artifact_id": {"$ref": "#/$defs/artifact_id"},
+    "compiled_hash": {"$ref": "#/$defs/sha256"},
+    "evaluation_input": {"$ref": "#/$defs/artifact_reference"},
+    "evaluator": {"$ref": "#/$defs/evaluator"},
+    "rubric_version": {"$ref": "#/$defs/semantic_version"},
+    "fixture_version": {"$ref": "#/$defs/semantic_version"},
+    "threshold_profile": {"$ref": "#/$defs/threshold_profile"},
+    "results": {"$ref": "#/$defs/dimension_results"},
+    "passed": {"type": "boolean"}
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "mode": {"enum": ["dossier", "researched", "hybrid"]}
+        },
+        "required": ["mode"]
+      },
+      "then": {"properties": {"visibility": {"const": "private"}}}
+    },
+    {
+      "if": {
+        "properties": {"passed": {"const": true}},
+        "required": ["passed"]
+      },
+      "then": {
+        "properties": {
+          "results": {
+            "properties": {
+              "semantic_equivalence": {"properties": {"passed": {"const": true}}},
+              "character_consistency": {"properties": {"passed": {"const": true}}},
+              "locale_naturalness": {"properties": {"passed": {"const": true}}},
+              "cross_language_persona_equivalence": {"properties": {"passed": {"const": true}}},
+              "repetition_catchphrase_quality": {"properties": {"passed": {"const": true}}},
+              "safety_policy_retention": {"properties": {"passed": {"const": true}}}
+            }
+          }
+        }
+      },
+      "else": {
+        "anyOf": [
+          {"properties": {"results": {"properties": {"semantic_equivalence": {"properties": {"passed": {"const": false}}}}}}},
+          {"properties": {"results": {"properties": {"character_consistency": {"properties": {"passed": {"const": false}}}}}}},
+          {"properties": {"results": {"properties": {"locale_naturalness": {"properties": {"passed": {"const": false}}}}}}},
+          {"properties": {"results": {"properties": {"cross_language_persona_equivalence": {"properties": {"passed": {"const": false}}}}}}},
+          {"properties": {"results": {"properties": {"repetition_catchphrase_quality": {"properties": {"passed": {"const": false}}}}}}},
+          {"properties": {"results": {"properties": {"safety_policy_retention": {"properties": {"passed": {"const": false}}}}}}}
+        ]
+      }
+    }
+  ],
+  "$defs": {
+    "artifact_id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9._/-]{0,191}(?![\\s\\S])"
+    },
+    "created_by": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["component", "version"],
+      "properties": {
+        "component": {"const": "kokoroarc"},
+        "version": {"type": "string", "minLength": 1, "maxLength": 64}
+      }
+    },
+    "slug_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*(?![\\s\\S])",
+      "not": {
+        "enum": [
+          "con", "prn", "aux", "nul",
+          "com1", "com2", "com3", "com4", "com5", "com6", "com7", "com8", "com9",
+          "lpt1", "lpt2", "lpt3", "lpt4", "lpt5", "lpt6", "lpt7", "lpt8", "lpt9"
+        ]
+      }
+    },
+    "stable_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*(?![\\s\\S])"
+    },
+    "semantic_version": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(?:-(?:0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*)(?:\\.(?:0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*))*)?(?:\\+[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)?(?![\\s\\S])"
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}(?![\\s\\S])"
+    },
+    "construction_mode": {
+      "enum": ["original", "dossier", "researched", "hybrid"]
+    },
+    "visibility": {"enum": ["private", "public_candidate"]},
+    "finding_code": {
+      "type": "string",
+      "maxLength": 128,
+      "pattern": "^[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)*(?![\\s\\S])"
+    },
+    "artifact_reference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["artifact_id", "sha256"],
+      "properties": {
+        "artifact_id": {"$ref": "#/$defs/artifact_id"},
+        "sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "evaluator": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "version"],
+      "properties": {
+        "id": {"$ref": "#/$defs/stable_id"},
+        "version": {"$ref": "#/$defs/semantic_version"}
+      }
+    },
+    "dimension_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["min_samples", "min_confidence", "threshold"],
+      "properties": {
+        "min_samples": {"type": "integer", "minimum": 1, "maximum": 256},
+        "min_confidence": {"type": "number", "minimum": 0, "maximum": 1},
+        "threshold": {"type": "number", "minimum": 0, "maximum": 1}
+      }
+    },
+    "dimension_policies": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "semantic_equivalence",
+        "character_consistency",
+        "locale_naturalness",
+        "cross_language_persona_equivalence",
+        "repetition_catchphrase_quality",
+        "safety_policy_retention"
+      ],
+      "properties": {
+        "semantic_equivalence": {"$ref": "#/$defs/dimension_policy"},
+        "character_consistency": {"$ref": "#/$defs/dimension_policy"},
+        "locale_naturalness": {"$ref": "#/$defs/dimension_policy"},
+        "cross_language_persona_equivalence": {"$ref": "#/$defs/dimension_policy"},
+        "repetition_catchphrase_quality": {"$ref": "#/$defs/dimension_policy"},
+        "safety_policy_retention": {"$ref": "#/$defs/dimension_policy"}
+      }
+    },
+    "threshold_profile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["profile_id", "version", "aggregation", "dimensions"],
+      "properties": {
+        "profile_id": {"$ref": "#/$defs/stable_id"},
+        "version": {"$ref": "#/$defs/semantic_version"},
+        "aggregation": {"const": "lower_confidence_bound"},
+        "dimensions": {"$ref": "#/$defs/dimension_policies"}
+      }
+    },
+    "dimension_result": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sample_count",
+        "score",
+        "confidence",
+        "lower_bound",
+        "passed",
+        "finding_codes"
+      ],
+      "properties": {
+        "sample_count": {"type": "integer", "minimum": 1, "maximum": 256},
+        "score": {"type": "number", "minimum": 0, "maximum": 1},
+        "confidence": {"type": "number", "minimum": 0, "maximum": 1},
+        "lower_bound": {"type": "number", "minimum": 0, "maximum": 1},
+        "passed": {"type": "boolean"},
+        "finding_codes": {
+          "type": "array",
+          "maxItems": 64,
+          "uniqueItems": true,
+          "items": {"$ref": "#/$defs/finding_code"}
+        }
+      }
+    },
+    "dimension_results": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "semantic_equivalence",
+        "character_consistency",
+        "locale_naturalness",
+        "cross_language_persona_equivalence",
+        "repetition_catchphrase_quality",
+        "safety_policy_retention"
+      ],
+      "properties": {
+        "semantic_equivalence": {"$ref": "#/$defs/dimension_result"},
+        "character_consistency": {"$ref": "#/$defs/dimension_result"},
+        "locale_naturalness": {"$ref": "#/$defs/dimension_result"},
+        "cross_language_persona_equivalence": {"$ref": "#/$defs/dimension_result"},
+        "repetition_catchphrase_quality": {"$ref": "#/$defs/dimension_result"},
+        "safety_policy_retention": {"$ref": "#/$defs/dimension_result"}
+      }
+    }
+  }
+}
