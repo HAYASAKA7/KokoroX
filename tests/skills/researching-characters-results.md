@@ -1,6 +1,6 @@
 # Researching Characters behavioral results
 
-Status: **CORRECTIVE BEHAVIORAL CAMPAIGN PASS; MILESTONE 7 CLOSURE PENDING**.
+Status: **CORRECTIVE BEHAVIORAL CAMPAIGN PASS; MILESTONE 7 COMPLETE**.
 
 ## Immutable first campaign
 
@@ -61,6 +61,6 @@ Behavior passed all declared assertions, but the harness/report layer was not fl
 
 The spoiler evaluator also read the ambient system-mandated `verification-before-completion` Skill after `final.md` was already written; capture `033-verification-before-completion.stdout.txt` retains that content, while the raw report omits the producing command. After the substantive workflow and final response were complete, the root sent one non-behavioral reminder to write the already-required report and stop. This was not a case retry or behavioral coaching. These deviations are disclosed rather than erased, and no affected raw evaluator output was edited.
 
-## Remaining Milestone 7 gates
+## Milestone 7 closure
 
-The focused campaign verifier passes, the current Skill passes the standard validator, and the exact-final full-suite/build/validator gate is recorded on the settled release-evidence commit. Task 11 and Milestone 7 remain open until fresh independent specification and quality reviews both pass. This behavioral result does not approve Milestones 8-9 or the complete standalone suite.
+The focused campaign verifier passes, the current Skill passes the standard validator, and the exact-final full-suite/build/validator gate is recorded for reviewed commit `540e8f97986cb5b83e88ae3257f8042162a87fb9`. Fresh independent specification and quality reviews both returned PASS with no Critical, Important, or Minor findings. Task 11 and Milestone 7 are complete. This behavioral result does not approve Milestones 8-9 or the complete standalone suite.

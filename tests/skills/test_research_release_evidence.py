@@ -46,11 +46,11 @@ def test_readme_documents_repository_local_research_boundary() -> None:
         assert text in section
 
 
-def test_results_document_records_corrective_pass_without_claiming_closure() -> None:
+def test_results_document_records_corrective_pass_with_exact_milestone_boundary() -> None:
     results = RESULTS_PATH.read_text(encoding="utf-8")
     assert (
         "Status: **CORRECTIVE BEHAVIORAL CAMPAIGN PASS; "
-        "MILESTONE 7 CLOSURE PENDING**"
+        "MILESTONE 7 COMPLETE**"
     ) in results
     assert "exactly 22 fresh evaluator runs" in results
     assert "PASS 10/11, RED 1/11" in results
@@ -60,7 +60,8 @@ def test_results_document_records_corrective_pass_without_claiming_closure() -> 
     assert "ten deviations across seven cases" in results
     assert "Exact raw Codex `final_answer`" in results
     assert "independently recomputes every assertion outcome" in results
-    assert "Task 11 and Milestone 7 remain open" in results
+    assert "Task 11 and Milestone 7 are complete" in results
+    assert "does not approve Milestones 8-9 or the complete standalone suite" in results
 
 
 def test_release_evidence_records_smoke_and_exact_milestone_boundary() -> None:
@@ -75,7 +76,7 @@ def test_release_evidence_records_smoke_and_exact_milestone_boundary() -> None:
         "Milestone 7 does not approve the complete standalone suite",
         "Behavioral campaign: CORRECTIVE PASS 11/11",
         "Corrective harness: COMPLETED WITH DISCLOSED DEVIATIONS",
-        "Exact-final verification: ELEVENTH SPEC-REVIEW REMEDIATION PREFLIGHT PASS; EXACT-TREE GATES AND FRESH REVIEWS PENDING",
+        "Exact-final verification: PASS ON EXACT SETTLED COMMIT `540e8f97986cb5b83e88ae3257f8042162a87fb9`; MILESTONE 7 COMPLETE",
         "Fresh specification review of `6afcbeccbc43814700e42c4626a6a9b8e1bddce0`: PASS",
         "Fresh quality review of `6afcbeccbc43814700e42c4626a6a9b8e1bddce0`: IMPORTANT FINDINGS REMEDIATED",
         "Fresh specification review of `646fc91f27eb723334f4ff4b25309985b56046a3`: IMPORTANT FINDINGS REMEDIATED",
@@ -94,8 +95,8 @@ def test_release_evidence_records_smoke_and_exact_milestone_boundary() -> None:
         "Fresh quality review of `bb492bcf1aafa3d1132bc53872616db7565d7e37`: NOT RUN; SPECIFICATION REVIEW FAILED",
         "Fresh specification review of `0dd4d63d9c7754b17d0b7ac1f5a73ade1f8edf87`: INTERRUPTED; CANDIDATE INVALIDATED BY INDEPENDENT REPRODUCTION",
         "Fresh quality review of `0dd4d63d9c7754b17d0b7ac1f5a73ade1f8edf87`: NOT RUN; CANDIDATE INVALIDATED",
-        "Fresh specification review of eleventh spec-review remediation settled tree: PENDING",
-        "Fresh quality review of eleventh spec-review remediation settled tree: PENDING",
+        "Fresh specification review of `540e8f97986cb5b83e88ae3257f8042162a87fb9`: PASS; NO FINDINGS",
+        "Fresh quality review of `540e8f97986cb5b83e88ae3257f8042162a87fb9`: PASS; NO FINDINGS",
     ):
         assert text in evidence
 
@@ -478,8 +479,15 @@ def test_release_evidence_records_eleventh_specification_review_remediation() ->
         "2069 passed, 24 skipped",
         "83C92A92AB7E18E97A76DB97720A898AE58E3F30FB4772C076F529393C5FB170",
         r"D:\tmp\kokoroarc-m7-spec11-remediation-settled-01",
-        "ELEVENTH SPEC-REVIEW REMEDIATION PREFLIGHT PASS; "
-        "EXACT-TREE GATES AND FRESH REVIEWS PENDING",
+        "540e8f97986cb5b83e88ae3257f8042162a87fb9",
+        "793429d9711e10aa8556fc5e4022102fce48502e",
+        "0dd4d63d9c7754b17d0b7ac1f5a73ade1f8edf87",
+        "2069 passed, 24 skipped in 304.48s",
+        "0CF325ED8276CC2105CB846AC5E12FE5DC077D4942505C95246D87196A1A0A55",
+        "178 focused tests",
+        "Fresh specification review returned **PASS** with no Critical, Important, or Minor findings",
+        "Fresh quality review returned **PASS** with no Critical, Important, or Minor findings",
+        "MILESTONE 7 COMPLETE; TASK 11 CLOSED",
     ):
         assert text in evidence
 
