@@ -137,6 +137,11 @@ def test_every_release_artifact_requires_exact_subject_identity_fields(
     "fixture_key,schema_name,path",
     [
         ("hard_report", "pack-hard-validation-report", ("source_hash",)),
+        (
+            "hard_report",
+            "pack-hard-validation-report",
+            ("check_input_hashes", "source_tree_hash"),
+        ),
         ("soft_input", "pack-soft-evaluation-input", ("compiled_hash",)),
         (
             "soft_report",
@@ -163,6 +168,23 @@ def test_release_bindings_require_lowercase_sha256(
     _set_nested(invalid, path, "A" * 64)
 
     _assert_invalid(schema_name, invalid)
+
+
+@pytest.mark.parametrize(
+    "field",
+    [
+        "request_hash",
+        "source_tree_hash",
+        "provenance_hash",
+        "protected_content_hash",
+        "state_replay_hash",
+    ],
+)
+def test_hard_report_requires_every_check_input_hash(field: str) -> None:
+    invalid = deepcopy(_bundle("original-minimal.json")["hard_report"])
+    del invalid["check_input_hashes"][field]
+
+    _assert_invalid("pack-hard-validation-report", invalid)
 
 
 @pytest.mark.parametrize(
@@ -418,6 +440,11 @@ def test_nested_contracts_are_closed() -> None:
             "hard_report",
             "pack-hard-validation-report",
             ("checks", "security"),
+        ),
+        (
+            "hard_report",
+            "pack-hard-validation-report",
+            ("check_input_hashes",),
         ),
         (
             "soft_input",

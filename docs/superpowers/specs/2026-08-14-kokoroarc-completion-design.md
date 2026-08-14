@@ -101,8 +101,11 @@ The loader compiles these documents into one canonical in-memory test corpus and
 
 `pack-hard-validation-report.schema.json` records:
 
-- source identity and canonical source hash;
+- source identity, canonical source hash, and a location-independent hash of
+  the exact source-tree path/size/content inventory;
 - compiled artifact ID/hash and two-pass byte determinism;
+- canonical request/provenance, protected-content probe, and state-replay
+  input hashes so a report cannot be reused after any hard-check input changes;
 - schema, pack-layout, provenance, and security findings;
 - positive/negative fixture structure and coverage;
 - tri-language intent and locale coverage;

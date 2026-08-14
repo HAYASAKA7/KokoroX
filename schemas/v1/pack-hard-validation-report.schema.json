@@ -17,6 +17,7 @@
     "compiled_artifact_id",
     "compiled_hash",
     "corpus_hash",
+    "check_input_hashes",
     "checks",
     "source_snapshot_stable",
     "deterministic",
@@ -36,6 +37,7 @@
     "compiled_artifact_id": {"$ref": "#/$defs/artifact_id"},
     "compiled_hash": {"$ref": "#/$defs/sha256"},
     "corpus_hash": {"$ref": "#/$defs/sha256"},
+    "check_input_hashes": {"$ref": "#/$defs/check_input_hashes"},
     "checks": {"$ref": "#/$defs/hard_checks"},
     "source_snapshot_stable": {"type": "boolean"},
     "deterministic": {"type": "boolean"},
@@ -133,6 +135,24 @@
       "enum": ["original", "dossier", "researched", "hybrid"]
     },
     "visibility": {"enum": ["private", "public_candidate"]},
+    "check_input_hashes": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "request_hash",
+        "source_tree_hash",
+        "provenance_hash",
+        "protected_content_hash",
+        "state_replay_hash"
+      ],
+      "properties": {
+        "request_hash": {"$ref": "#/$defs/sha256"},
+        "source_tree_hash": {"$ref": "#/$defs/sha256"},
+        "provenance_hash": {"$ref": "#/$defs/sha256"},
+        "protected_content_hash": {"$ref": "#/$defs/sha256"},
+        "state_replay_hash": {"$ref": "#/$defs/sha256"}
+      }
+    },
     "finding": {
       "type": "object",
       "additionalProperties": false,

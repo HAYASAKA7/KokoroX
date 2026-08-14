@@ -13,6 +13,13 @@
     "compiled_artifact_id": "research/aoi-kisaragi-fixture/compiled",
     "compiled_hash": "4444444444444444444444444444444444444444444444444444444444444444",
     "corpus_hash": "5555555555555555555555555555555555555555555555555555555555555555",
+    "check_input_hashes": {
+      "request_hash": "6666666666666666666666666666666666666666666666666666666666666666",
+      "source_tree_hash": "7777777777777777777777777777777777777777777777777777777777777777",
+      "provenance_hash": "8888888888888888888888888888888888888888888888888888888888888888",
+      "protected_content_hash": "9999999999999999999999999999999999999999999999999999999999999999",
+      "state_replay_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
     "checks": {
       "source_schema": {"passed": true, "findings": []},
       "pack_layout": {"passed": true, "findings": []},

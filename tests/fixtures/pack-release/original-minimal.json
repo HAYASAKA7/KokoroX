@@ -13,6 +13,13 @@
     "compiled_artifact_id": "original/rin-aster/compiled",
     "compiled_hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
     "corpus_hash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "check_input_hashes": {
+      "request_hash": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "source_tree_hash": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "provenance_hash": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "protected_content_hash": "1111111111111111111111111111111111111111111111111111111111111111",
+      "state_replay_hash": "2222222222222222222222222222222222222222222222222222222222222222"
+    },
     "checks": {
       "source_schema": {"passed": true, "findings": []},
       "pack_layout": {"passed": true, "findings": []},
