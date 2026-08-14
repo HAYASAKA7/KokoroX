@@ -137,6 +137,28 @@ def test_load_yaml_wraps_excessive_document_nesting(tmp_path: Path) -> None:
 @pytest.mark.parametrize(
     "contents",
     [
+        "value: 2023-99-99\n",
+        "value: " + "9" * 5000 + "\n",
+    ],
+)
+def test_load_yaml_wraps_constructor_value_errors(
+    tmp_path: Path, contents: str
+) -> None:
+    path = tmp_path / "hostile-scalar.yaml"
+    path.write_text(contents, encoding="utf-8")
+
+    with pytest.raises(KokoroError) as raised:
+        load_yaml(path)
+
+    assert raised.value.code == "INVALID_PACK_DATA"
+    assert raised.value.details == {"reason": "invalid_yaml"}
+    assert "5000" not in raised.value.message
+    assert "month" not in repr(raised.value.details)
+
+
+@pytest.mark.parametrize(
+    "contents",
+    [
         "root: &root [leaf]\n"
         "level1: &level1 [*root, *root, *root, *root, *root]\n"
         "level2: &level2 [*level1, *level1, *level1, *level1, *level1]\n"

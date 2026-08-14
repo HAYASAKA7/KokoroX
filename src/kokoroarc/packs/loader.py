@@ -138,7 +138,10 @@ def parse_yaml_bytes(contents: bytes) -> dict[str, Any]:
         _reject_alias_events(text)
         loader = _UniqueKeySafeLoader(text)
         document = loader.get_single_data()
-    except (RecursionError, yaml.YAMLError) as error:
+    # SafeLoader constructors can raise ordinary Python exceptions for hostile
+    # implicit scalars (for example invalid timestamps or guarded huge ints).
+    # Keep every data-originated parser failure inside the sanitized boundary.
+    except Exception as error:
         raise _invalid_pack_data("YAML document is invalid.", "invalid_yaml") from error
     finally:
         if loader is not None:

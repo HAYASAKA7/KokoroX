@@ -135,6 +135,31 @@ def test_rejects_tags_aliases_cycles_and_merge_keys(
     assert "secret.yaml" not in repr(raised.value.details)
 
 
+@pytest.mark.parametrize(
+    "hostile_scalar",
+    [
+        "2023-99-99",
+        "9" * 5000,
+    ],
+)
+def test_wraps_yaml_constructor_value_errors_as_invalid_corpus(
+    tmp_path: Path, hostile_scalar: str
+) -> None:
+    pack = tmp_path / "pack"
+    write_corpus(pack, complete_documents())
+    (pack / "tests" / "positive.yaml").write_text(
+        f"scenario: {hostile_scalar}\ncases: []\n", encoding="utf-8"
+    )
+
+    with pytest.raises(KokoroError) as raised:
+        load_test_corpus(pack)
+
+    assert raised.value.code == "INVALID_PACK_TEST_CORPUS"
+    assert raised.value.details == {"reason": "invalid_yaml"}
+    assert "5000" not in raised.value.message
+    assert "month" not in repr(raised.value.details)
+
+
 def test_rejects_symlinked_fixture(tmp_path: Path) -> None:
     pack = tmp_path / "pack"
     write_corpus(pack, complete_documents())
