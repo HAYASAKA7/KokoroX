@@ -1561,6 +1561,70 @@ def test_confinement_rejects_agent_report_command_drift_from_approved_raw(
         assert outcomes[assertion] is False, (command, assertion, outcomes)
 
 
+@pytest.mark.parametrize(
+    "case_id",
+    (
+        "ambiguous-character-stop",
+        "continuity-conflict-clarification",
+        "casual-discussion-non-trigger",
+        "original-character-non-trigger",
+    ),
+)
+@pytest.mark.parametrize("provenance_failure", ("report_drift", "missing_trust"))
+def test_every_outcome_fails_when_agent_report_provenance_is_invalid(
+    tmp_path: Path,
+    case_id: str,
+    provenance_failure: str,
+) -> None:
+    from researching_characters_adjudication import adjudicate_assertions
+
+    run, run_root, report = _mutable_run(tmp_path, "2026-08-13-approved2", case_id)
+    trusted_run_root = _trusted_run_root(run)
+    trusted_cli_context = _trusted_cli_context(run)
+    if provenance_failure == "report_drift":
+        report.setdefault("commands", []).append(
+            {
+                "command": (
+                    "python -m kokoroarc.cli research request validate "
+                    "--request workspace/request.json --json"
+                ),
+                "argv": [
+                    "python",
+                    "-m",
+                    "kokoroarc.cli",
+                    "research",
+                    "request",
+                    "validate",
+                    "--request",
+                    "workspace/request.json",
+                    "--json",
+                ],
+                "cwd": str(trusted_run_root),
+                "exit_code": 0,
+            }
+        )
+        _write_json(run_root / "agent-report.json", report)
+    else:
+        trusted_run_root = None
+        trusted_cli_context = None
+    case = next(item for item in _cases() if item["id"] == case_id)
+
+    outcomes = adjudicate_assertions(
+        case,
+        run_root,
+        run["determinism_pairs"],
+        trusted_run_root=trusted_run_root,
+        trusted_cli_context=trusted_cli_context,
+    )
+
+    assert outcomes
+    assert all(not item["passed"] for item in outcomes), (
+        case_id,
+        provenance_failure,
+        outcomes,
+    )
+
+
 def test_source_safety_rejects_environment_secret_access_command(
     tmp_path: Path,
 ) -> None:

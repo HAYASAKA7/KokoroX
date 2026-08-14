@@ -1459,7 +1459,7 @@ def _observed_assertions(
     determinism_pairs: list[list[str]],
     trusted_run_root: str | Path | None,
     trusted_cli_context: dict | None,
-) -> dict[str, bool]:
+) -> tuple[dict[str, bool], bool]:
     final = (run_root / "final.md").read_text(encoding="utf-8")
     final_lower = final.casefold()
     opened = _strings(report.get("files_opened"))
@@ -1681,7 +1681,7 @@ def _observed_assertions(
         "invoke_research_cli": invoked_research_cli,
         "mutate_state": not state_unchanged,
         "claim_external_verification": external_verification,
-    }
+    }, report_matches_approved_raw
 
 
 def adjudicate_assertions(
@@ -1693,7 +1693,7 @@ def adjudicate_assertions(
     trusted_cli_context: dict | None = None,
 ) -> list[dict]:
     report = _read_json(run_root / "agent-report.json")
-    observed = _observed_assertions(
+    observed, evidence_integrity = _observed_assertions(
         run_root,
         report,
         determinism_pairs,
@@ -1705,9 +1705,12 @@ def adjudicate_assertions(
         for assertion in case.get(requirement, []):
             if assertion not in observed:
                 raise ValueError(f"no evidence adjudicator for assertion: {assertion}")
-            passed = observed[assertion]
-            if requirement == "must_not":
-                passed = not passed
+            if evidence_integrity:
+                passed = observed[assertion]
+                if requirement == "must_not":
+                    passed = not passed
+            else:
+                passed = False
             outcomes.append(
                 {
                     "requirement": requirement,

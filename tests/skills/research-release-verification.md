@@ -399,6 +399,20 @@ The D:-confined dirty-tree full preflight at `D:\tmp\kokoroarc-m7-spec8-remediat
 
 The next exact settled root is assigned `D:\tmp\kokoroarc-m7-spec8-remediation-settled-01`. It must also pass the fixed-base-epoch build and inventory, all three validators, raw replay, final-message binding, original-session rebind, exact base-to-HEAD whitespace and clean-status checks, and a fresh detached `core.autocrlf=true` checkout before either fresh review. Current remediation status is **EIGHTH SPEC-REVIEW REMEDIATION PREFLIGHT PASS; EXACT-TREE GATES AND FRESH REVIEWS PENDING**.
 
+## Ninth specification-review remediation
+
+Exact eighth-remediation commit `3bfe1c9ac358f7d876d5f2e82db0a783dcb16ce3`, tree `6d0333b78f3c8f2e5578da44c7f4f9d5886e3442`, and parent `190c4aadbce96f812a00fe53c06746fcec016f71` passed the assigned `D:\tmp\kokoroarc-m7-spec8-remediation-settled-01` gate: `2014 passed, 24 skipped`, fixed-base-epoch distributions and archive inventory, all three Skill validators, 785-file raw replay, 33 final-message bindings, a 984-file original-session rebind, exact-range whitespace and clean-status checks, and a fresh detached `core.autocrlf=true` checkout with all 984 evidence files byte-identical and 123 focused tests.
+
+Fresh specification review confirmed that both seventh-remediation operational findings now fail closed and independently verified the complete settled gate. It nevertheless returned FAIL with one Important conformance finding, so quality review was not run: invalid or missing report provenance was treated as if no research CLI ran. That allowed both clarification cases to certify `stop_before_research`, and allowed the casual and original-character non-trigger cases to pass their inverted `must_not` requirements, even when `agent-report.json` differed from the approved raw report or no trusted raw root was supplied.
+
+The regression-first remediation carries the report-provenance result out of evidence observation and checks it before requirement interpretation. When provenance is invalid, every declared outcome is `passed: false`; neither a positive observation nor a `must_not` inversion can certify the run. Valid approved evidence retains the existing assertion-specific interpretation. Eight focused regressions cover report drift and absent trust independently for ambiguous-identity clarification, continuity clarification, casual discussion, and original-character non-trigger cases.
+
+The implementation-focused run at `D:\tmp\kokoroarc-m7-spec9-remediation-focused-01` passed 131 tests before this release assertion was added. With this executable release assertion included, the focused research/release evidence gate passes **132 tests** under `D:\tmp\kokoroarc-m7-spec9-remediation-focused-02`.
+
+The D:-confined dirty-tree full preflight at `D:\tmp\kokoroarc-m7-spec9-remediation-preflight-01` exited `0`: **`2023 passed, 24 skipped` in 204.30 seconds**. There were no failures or errors; every skip was an explicit Windows symlink, junction, or FIFO capability case. Captured stdout was 7,269 bytes with SHA-256 `E876AACC9CB9373EECC75694C797BDD37B10B3F201B986640A46BA4095CB0670`; stderr was empty with SHA-256 `E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855`. The harness elapsed time was 207.81 seconds. This dirty-tree preflight preceded the release-record edits that retain its result; the focused gate verifies those edits, and the exact committed tree must repeat the complete suite.
+
+The next exact settled root is assigned `D:\tmp\kokoroarc-m7-spec9-remediation-settled-01`. It must also pass the fixed-base-epoch build and inventory, all three validators, raw replay, final-message binding, original-session rebind, exact base-to-HEAD whitespace and clean-status checks, and a fresh detached `core.autocrlf=true` checkout before either fresh review. Current remediation status is **NINTH SPEC-REVIEW REMEDIATION PREFLIGHT PASS; EXACT-TREE GATES AND FRESH REVIEWS PENDING**.
+
 ## Verified product gates before this record
 
 - Task 8 exact research-to-authoring gate: `380 passed, 7 skipped`.
@@ -411,8 +425,8 @@ These results were obtained before the release-document changes. The settled-inp
 
 ## Remaining closure gates
 
-1. Complete the eighth specification-review remediation full preflight, commit it, and complete its exact-tree rerun under the assigned D:-based root.
+1. Complete the ninth specification-review remediation full preflight, commit it, and complete its exact-tree rerun under the assigned D:-based root.
 2. Obtain fresh independent specification and quality reviews on that exact commit.
 3. Close Milestone 7 only after both reviews report PASS with no Critical or Important findings.
 
-Current status: Behavioral campaign: CORRECTIVE PASS 11/11. Corrective harness: COMPLETED WITH DISCLOSED DEVIATIONS. Exact-final verification: EIGHTH SPEC-REVIEW REMEDIATION PREFLIGHT PASS; EXACT-TREE GATES AND FRESH REVIEWS PENDING. Fresh specification review of eighth spec-review remediation settled tree: PENDING. Fresh quality review of eighth spec-review remediation settled tree: PENDING.
+Current status: Behavioral campaign: CORRECTIVE PASS 11/11. Corrective harness: COMPLETED WITH DISCLOSED DEVIATIONS. Exact-final verification: NINTH SPEC-REVIEW REMEDIATION PREFLIGHT PASS; EXACT-TREE GATES AND FRESH REVIEWS PENDING. Fresh specification review of ninth spec-review remediation settled tree: PENDING. Fresh quality review of ninth spec-review remediation settled tree: PENDING.
