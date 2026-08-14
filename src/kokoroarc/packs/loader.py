@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path, PurePosixPath, PureWindowsPath
 import re
-from typing import Any, cast
+from typing import Any, Callable, Mapping, TypeVar, cast
 
 import yaml
 from yaml.constructor import ConstructorError
@@ -26,6 +26,7 @@ _REQUIRED_COMPONENTS = frozenset(
 )
 _REQUIRED_LOCALES = frozenset({"zh-CN", "en-US", "ja-JP"})
 _SCENARIO_NAME_PATTERN = re.compile(r"[a-z][a-z0-9]*(?:_[a-z0-9]+)*")
+_Reference = TypeVar("_Reference")
 _WINDOWS_ILLEGAL_CHARACTERS = frozenset('*?"<>|')
 _WINDOWS_RESERVED_NAMES = frozenset(
     {
@@ -76,6 +77,19 @@ _UniqueKeySafeLoader.add_constructor(
 
 
 def resolve_pack_file(root: Path, relative: str) -> Path:
+    _validate_pack_reference(relative)
+
+    try:
+        resolved_root = root.resolve(strict=True)
+        resolved = (resolved_root / relative).resolve(strict=False)
+    except (OSError, RuntimeError, ValueError) as error:
+        raise _unsafe_pack_path("reference could not be canonicalized") from error
+    if not resolved.is_relative_to(resolved_root):
+        raise _unsafe_pack_path("reference escapes the pack root")
+    return resolved
+
+
+def _validate_pack_reference(relative: str) -> None:
     if not isinstance(relative, str) or not relative:
         raise _unsafe_pack_path("reference must be a non-empty string")
 
@@ -92,15 +106,6 @@ def resolve_pack_file(root: Path, relative: str) -> Path:
         or not relative.endswith((".yaml", ".yml"))
     ):
         raise _unsafe_pack_path("reference is not a pack-relative YAML path")
-
-    try:
-        resolved_root = root.resolve(strict=True)
-        resolved = (resolved_root / relative).resolve(strict=False)
-    except (OSError, RuntimeError, ValueError) as error:
-        raise _unsafe_pack_path("reference could not be canonicalized") from error
-    if not resolved.is_relative_to(resolved_root):
-        raise _unsafe_pack_path("reference escapes the pack root")
-    return resolved
 
 
 def _is_unsafe_windows_component(component: str) -> bool:
@@ -174,33 +179,86 @@ def load_source_pack(root: Path, schemas: SchemaRegistry) -> dict[str, Any]:
             "Character pack reference was not found.", "unscanned_reference"
         )
     manifest = load_yaml(manifest_path)
+    references = _validated_manifest_references(manifest)
+    resolved_references = _resolve_reference_paths(
+        root, references, scanned_files, manifest_path
+    )
+    return _assemble_source_pack(
+        manifest,
+        resolved_references,
+        load_yaml,
+        schemas,
+    )
+
+
+def load_source_pack_from_contents(
+    contents: Mapping[str, bytes], schemas: SchemaRegistry
+) -> dict[str, Any]:
+    """Assemble a source pack from one already-vetted immutable byte snapshot."""
+    try:
+        files = dict(contents)
+    except (TypeError, ValueError):
+        raise _invalid_pack_data(
+            "Character pack snapshot is invalid.", "invalid_snapshot"
+        ) from None
+    if any(
+        not isinstance(relative, str) or not isinstance(data, bytes)
+        for relative, data in files.items()
+    ):
+        raise _invalid_pack_data(
+            "Character pack snapshot is invalid.", "invalid_snapshot"
+        )
+    manifest_bytes = files.get("character.yaml")
+    if manifest_bytes is None:
+        raise _invalid_pack_data(
+            "Character pack reference was not found.", "unscanned_reference"
+        )
+    manifest = parse_yaml_bytes(manifest_bytes)
+    references = _validated_manifest_references(manifest)
+    resolved_references = _resolve_reference_contents(references, files)
+    return _assemble_source_pack(
+        manifest,
+        resolved_references,
+        lambda relative: parse_yaml_bytes(files[relative]),
+        schemas,
+    )
+
+
+def _validated_manifest_references(
+    manifest: dict[str, Any],
+) -> dict[str, list[tuple[str, str]]]:
     if any(not isinstance(key, str) for key in manifest):
         raise _invalid_pack_data(
             "Character pack manifest is invalid.", "invalid_manifest_key"
         )
-
     references = {
         section: _manifest_reference_items(manifest, section)
         for section in _REFERENCE_SECTIONS
     }
     _validate_reference_names(references)
-    resolved_references = _resolve_reference_paths(
-        root, references, scanned_files, manifest_path
-    )
+    return references
+
+
+def _assemble_source_pack(
+    manifest: dict[str, Any],
+    resolved_references: Mapping[str, list[tuple[str, _Reference]]],
+    load_document: Callable[[_Reference], dict[str, Any]],
+    schemas: SchemaRegistry,
+) -> dict[str, Any]:
     assembled = {
         key: manifest[key]
         for key in sorted(manifest)
         if key not in _REFERENCE_SECTIONS
     }
-    for component, path in resolved_references["files"]:
-        assembled[component] = load_yaml(path)
+    for component, reference in resolved_references["files"]:
+        assembled[component] = load_document(reference)
     assembled["locales"] = {
-        locale: load_yaml(path)
-        for locale, path in resolved_references["locale_files"]
+        locale: load_document(reference)
+        for locale, reference in resolved_references["locale_files"]
     }
     assembled["scenarios"] = {
-        scenario: load_yaml(path)
-        for scenario, path in resolved_references["scenario_files"]
+        scenario: load_document(reference)
+        for scenario, reference in resolved_references["scenario_files"]
     }
     schemas.validate("character-source", assembled)
     return assembled
@@ -279,6 +337,32 @@ def _resolve_reference_paths(
                     "Character pack reference was not found.",
                     "unscanned_reference",
                 )
+    return resolved_references
+
+
+def _resolve_reference_contents(
+    references: dict[str, list[tuple[str, str]]],
+    contents: Mapping[str, bytes],
+) -> dict[str, list[tuple[str, str]]]:
+    resolved_references: dict[str, list[tuple[str, str]]] = {
+        section: [] for section in _REFERENCE_SECTIONS
+    }
+    used_paths = {"character.yaml"}
+    for section in _REFERENCE_SECTIONS:
+        for name, relative in references[section]:
+            _validate_pack_reference(relative)
+            if relative in used_paths:
+                raise _invalid_pack_data(
+                    "Character pack references must be independent.",
+                    "duplicate_reference",
+                )
+            used_paths.add(relative)
+            if relative not in contents:
+                raise _invalid_pack_data(
+                    "Character pack reference was not found.",
+                    "unscanned_reference",
+                )
+            resolved_references[section].append((name, relative))
     return resolved_references
 
 

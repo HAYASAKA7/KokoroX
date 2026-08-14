@@ -91,30 +91,14 @@ def load_test_corpus(
         raise _invalid("fixture_set")
 
     reads: dict[str, _ReadResult] = {}
-    documents: dict[str, dict[str, Any]] = {}
-    source_hashes: dict[str, str] = {}
+    fixture_contents: dict[str, bytes] = {}
     for relative in _FIXTURE_PATHS:
         target = safe_root.joinpath(*relative.split("/"))
         read_result = _read_regular(tests_root, target, limits.max_file_bytes)
         reads[relative] = read_result
-        source_hashes[relative] = sha256(read_result.contents).hexdigest()
-        try:
-            document = parse_yaml_bytes(read_result.contents)
-        except KokoroError:
-            raise _invalid("invalid_yaml") from None
-        _enforce_resource_bounds(document, limits)
-        documents[relative] = document
+        fixture_contents[relative] = read_result.contents
 
-    _validate_documents(documents, limits)
-    payload = {
-        "schema_version": "1.0",
-        "documents": documents,
-        "source_hashes": source_hashes,
-    }
-    try:
-        encoded = canonical_bytes(payload)
-    except KokoroError:
-        raise _invalid("non_canonical_data") from None
+    corpus = _build_test_corpus(safe_root, fixture_contents, limits)
 
     for relative in _FIXTURE_PATHS:
         target = safe_root.joinpath(*relative.split("/"))
@@ -145,8 +129,69 @@ def load_test_corpus(
     ):
         raise _changed("tree")
 
+    return corpus
+
+
+def load_test_corpus_from_contents(
+    root: Path,
+    contents: Mapping[str, bytes],
+    limits: CorpusLimits = CorpusLimits(),
+) -> PackTestCorpus:
+    """Build a corpus from one already-vetted immutable pack snapshot."""
+    _validate_limits(limits)
+    try:
+        test_paths = {
+            relative for relative in contents if relative.startswith("tests/")
+        }
+    except (TypeError, ValueError):
+        raise _invalid("fixture_set") from None
+    if test_paths != _FIXTURE_SET:
+        raise _invalid("fixture_set")
+
+    fixture_contents: dict[str, bytes] = {}
+    total_bytes = 0
+    for relative in _FIXTURE_PATHS:
+        data = contents.get(relative)
+        if not isinstance(data, bytes):
+            raise _invalid("invalid_fixture_bytes", [relative])
+        if len(data) > limits.max_file_bytes:
+            raise _filesystem_limit_exceeded("max_file_bytes")
+        total_bytes += len(data)
+        if total_bytes > limits.max_total_bytes:
+            raise _filesystem_limit_exceeded("max_total_bytes")
+        fixture_contents[relative] = data
+    return _build_test_corpus(Path(root), fixture_contents, limits)
+
+
+def _build_test_corpus(
+    root: Path,
+    fixture_contents: Mapping[str, bytes],
+    limits: CorpusLimits,
+) -> PackTestCorpus:
+    documents: dict[str, dict[str, Any]] = {}
+    source_hashes: dict[str, str] = {}
+    for relative in _FIXTURE_PATHS:
+        data = fixture_contents[relative]
+        source_hashes[relative] = sha256(data).hexdigest()
+        try:
+            document = parse_yaml_bytes(data)
+        except KokoroError:
+            raise _invalid("invalid_yaml") from None
+        _enforce_resource_bounds(document, limits)
+        documents[relative] = document
+
+    _validate_documents(documents, limits)
+    payload = {
+        "schema_version": "1.0",
+        "documents": documents,
+        "source_hashes": source_hashes,
+    }
+    try:
+        encoded = canonical_bytes(payload)
+    except KokoroError:
+        raise _invalid("non_canonical_data") from None
     return PackTestCorpus(
-        root=safe_root,
+        root=root,
         source_hashes=MappingProxyType(dict(source_hashes)),
         corpus_hash=sha256(encoded).hexdigest(),
         canonical_bytes=encoded,
@@ -586,5 +631,13 @@ def _limit_exceeded(limit: str) -> KokoroError:
     return KokoroError(
         "PACK_TEST_CORPUS_LIMIT_EXCEEDED",
         "Character pack test corpus data limit exceeded.",
+        details={"limit": limit},
+    )
+
+
+def _filesystem_limit_exceeded(limit: str) -> KokoroError:
+    return KokoroError(
+        "PACK_LIMIT_EXCEEDED",
+        "Character pack filesystem limit exceeded.",
         details={"limit": limit},
     )

@@ -16,13 +16,16 @@ from kokoroarc import __version__
 from kokoroarc.authoring.validation import validate_authoring_pack
 from kokoroarc.errors import KokoroError
 from kokoroarc.packs.compiler import canonical_bytes, compile_pack
-from kokoroarc.packs.loader import load_source_pack, parse_yaml_bytes
+from kokoroarc.packs.loader import load_source_pack_from_contents, parse_yaml_bytes
 from kokoroarc.packs.security import PackLimits, scan_pack
 from kokoroarc.runtime.planning import build_render_plan
 from kokoroarc.runtime.validation import validate_rendered_output
 from kokoroarc.schemas import SchemaRegistry
 from kokoroarc.state.transitions import apply_event
-from kokoroarc.testing.corpus import PackTestCorpus, load_test_corpus
+from kokoroarc.testing.corpus import (
+    PackTestCorpus,
+    load_test_corpus_from_contents,
+)
 
 
 _FIRST_CLASS_LOCALES = frozenset({"zh-CN", "en-US", "ja-JP"})
@@ -99,8 +102,10 @@ def run_hard_validation(
     )
 
     initial_snapshot = _snapshot_pack(root)
-    source = load_source_pack(root, schemas)
-    corpus = load_test_corpus(root)
+    source = load_source_pack_from_contents(initial_snapshot.contents, schemas)
+    corpus = load_test_corpus_from_contents(
+        initial_snapshot.root, initial_snapshot.contents
+    )
     schemas.validate("character-source", source)
     source_bytes = canonical_bytes(source)
     source_hash = sha256(source_bytes).hexdigest()
@@ -668,6 +673,7 @@ def _check_state_replay(
         inputs_stable = (
             canonical_bytes(initial) == initial_bytes
             and canonical_bytes(event) == event_bytes
+            and canonical_bytes(first) == first_bytes
         )
     except KokoroError:
         inputs_stable = False
@@ -710,9 +716,13 @@ def _source_snapshot_stable(
     schemas: SchemaRegistry,
 ) -> bool:
     try:
-        final_source = load_source_pack(root, schemas)
-        final_corpus = load_test_corpus(root)
         final_snapshot = _snapshot_pack(root)
+        final_source = load_source_pack_from_contents(
+            final_snapshot.contents, schemas
+        )
+        final_corpus = load_test_corpus_from_contents(
+            final_snapshot.root, final_snapshot.contents
+        )
         return (
             canonical_bytes(request) == request_bytes
             and (

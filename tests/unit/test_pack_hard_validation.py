@@ -382,7 +382,10 @@ def test_reports_state_replay_drift_through_shared_alias(
     report = run_hard_validation(RIN_PACK, load_json(ORIGINAL_REQUEST), SCHEMAS)
 
     assert report["checks"]["state_replay"]["passed"] is False
-    assert finding_codes(report, "state_replay") == ["PACK_STATE_REPLAY_DRIFT"]
+    assert finding_codes(report, "state_replay") == [
+        "PACK_STATE_INPUT_MUTATION",
+        "PACK_STATE_REPLAY_DRIFT",
+    ]
     assert report["deterministic"] is False
     assert report["passed"] is False
 
@@ -430,10 +433,45 @@ def test_reports_state_engine_input_mutation_even_when_outputs_are_stable(
     assert report["passed"] is False
 
 
+def test_reports_idempotent_probe_input_mutation_with_detached_output(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    real_apply = hard_module.apply_event
+    calls = 0
+
+    def mutate_idempotent_input(
+        state: dict[str, Any], event: dict[str, Any], **kwargs: Any
+    ) -> dict[str, Any]:
+        nonlocal calls
+        calls += 1
+        result = real_apply(state, event, **kwargs)
+        if calls == 3:
+            state["dimensions"]["trust"] += 0.25
+        return result
+
+    monkeypatch.setattr(hard_module, "apply_event", mutate_idempotent_input)
+
+    report = run_hard_validation(RIN_PACK, load_json(ORIGINAL_REQUEST), SCHEMAS)
+
+    assert report["checks"]["state_replay"]["passed"] is False
+    assert finding_codes(report, "state_replay") == ["PACK_STATE_INPUT_MUTATION"]
+    assert report["deterministic"] is False
+    assert report["passed"] is False
+
+
+def test_raw_hash_inputs_have_checkout_stable_lf_policy() -> None:
+    attributes = (REPOSITORY_ROOT / ".gitattributes").read_text(
+        encoding="utf-8"
+    ).splitlines()
+
+    assert "characters/** text eol=lf" in attributes
+    assert "tests/fixtures/** text eol=lf" in attributes
+
+
 def test_reports_source_mutation_during_run(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    real_load = hard_module.load_source_pack
+    real_load = hard_module.load_source_pack_from_contents
     calls = 0
 
     def changed_second_load(*args: Any, **kwargs: Any) -> dict[str, Any]:
@@ -444,7 +482,9 @@ def test_reports_source_mutation_during_run(
             source["behavior"]["correction_style"] += " changed"
         return source
 
-    monkeypatch.setattr(hard_module, "load_source_pack", changed_second_load)
+    monkeypatch.setattr(
+        hard_module, "load_source_pack_from_contents", changed_second_load
+    )
 
     report = run_hard_validation(RIN_PACK, load_json(ORIGINAL_REQUEST), SCHEMAS)
 

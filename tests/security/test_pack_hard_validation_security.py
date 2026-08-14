@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from hashlib import sha256
 import json
 import os
 from pathlib import Path
@@ -10,6 +11,7 @@ import pytest
 import yaml
 
 from kokoroarc.errors import KokoroError
+from kokoroarc.packs.compiler import canonical_bytes
 from kokoroarc.packs.security import PackLimits
 from kokoroarc.schemas import SchemaRegistry
 from kokoroarc.testing import hard as hard_module
@@ -154,6 +156,72 @@ def test_snapshot_rechecks_aggregate_limit_after_scan(
 
     assert raised.value.code == "PACK_LIMIT_EXCEEDED"
     assert raised.value.details == {"limit": "max_total_bytes"}
+
+
+@pytest.mark.parametrize(
+    ("relative", "old", "new", "hash_field"),
+    [
+        ("behavior.yaml", b"direct", b"gentle", "source_hash"),
+        (
+            "tests/positive.yaml",
+            b"becomes slow",
+            b"becomes loud",
+            "corpus_hash",
+        ),
+    ],
+)
+def test_snapshot_bytes_are_authoritative_across_loader_aba(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    relative: str,
+    old: bytes,
+    new: bytes,
+    hash_field: str,
+) -> None:
+    pack = copy_rin(tmp_path)
+    target = pack / Path(relative)
+    original = target.read_bytes()
+    alternate = original.replace(old, new)
+    assert alternate != original
+    original_stat = target.stat()
+    baseline = run_hard_validation(pack, request(), SCHEMAS)
+    real_snapshot = hard_module._snapshot_pack
+    calls = 0
+
+    def alternate_between_snapshot_and_loader(path: Path) -> Any:
+        nonlocal calls
+        calls += 1
+        if calls % 2:
+            snapshot = real_snapshot(path)
+            target.write_bytes(alternate)
+            os.utime(
+                target,
+                ns=(original_stat.st_atime_ns, original_stat.st_mtime_ns),
+            )
+            return snapshot
+        target.write_bytes(original)
+        os.utime(
+            target,
+            ns=(original_stat.st_atime_ns, original_stat.st_mtime_ns),
+        )
+        return real_snapshot(path)
+
+    monkeypatch.setattr(
+        hard_module, "_snapshot_pack", alternate_between_snapshot_and_loader
+    )
+
+    report = run_hard_validation(pack, request(), SCHEMAS)
+
+    assert calls == 2
+    assert report["passed"] is True
+    assert report["source_snapshot_stable"] is True
+    assert report["check_input_hashes"]["source_tree_hash"] == baseline[
+        "check_input_hashes"
+    ]["source_tree_hash"]
+    assert report[hash_field] == baseline[hash_field]
+    assert sha256(canonical_bytes(report)).hexdigest() == sha256(
+        canonical_bytes(baseline)
+    ).hexdigest()
 
 
 def test_rejects_symlinked_source_file(tmp_path: Path) -> None:
