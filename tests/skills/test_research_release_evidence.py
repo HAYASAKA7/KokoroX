@@ -75,7 +75,7 @@ def test_release_evidence_records_smoke_and_exact_milestone_boundary() -> None:
         "Milestone 7 does not approve the complete standalone suite",
         "Behavioral campaign: CORRECTIVE PASS 11/11",
         "Corrective harness: COMPLETED WITH DISCLOSED DEVIATIONS",
-        "Exact-final verification: SIXTH SPEC-REVIEW REMEDIATION PREFLIGHT PASS; EXACT-TREE GATES AND FRESH REVIEWS PENDING",
+        "Exact-final verification: SEVENTH SPEC-REVIEW REMEDIATION PREFLIGHT PASS; EXACT-TREE GATES AND FRESH REVIEWS PENDING",
         "Fresh specification review of `6afcbeccbc43814700e42c4626a6a9b8e1bddce0`: PASS",
         "Fresh quality review of `6afcbeccbc43814700e42c4626a6a9b8e1bddce0`: IMPORTANT FINDINGS REMEDIATED",
         "Fresh specification review of `646fc91f27eb723334f4ff4b25309985b56046a3`: IMPORTANT FINDINGS REMEDIATED",
@@ -90,8 +90,10 @@ def test_release_evidence_records_smoke_and_exact_milestone_boundary() -> None:
         "Fresh quality review of `670e44bf126daa2198c77889ad3bf142b60d0b72`: NOT RUN; SPECIFICATION REVIEW FAILED",
         "Fresh specification review of `bc183a8f92452a82b733459118764e9304d4878a`: IMPORTANT FINDINGS REMEDIATED",
         "Fresh quality review of `bc183a8f92452a82b733459118764e9304d4878a`: NOT RUN; SPECIFICATION REVIEW FAILED",
-        "Fresh specification review of sixth spec-review remediation settled tree: PENDING",
-        "Fresh quality review of sixth spec-review remediation settled tree: PENDING",
+        "Fresh specification review of `bb492bcf1aafa3d1132bc53872616db7565d7e37`: IMPORTANT FINDINGS REMEDIATED",
+        "Fresh quality review of `bb492bcf1aafa3d1132bc53872616db7565d7e37`: NOT RUN; SPECIFICATION REVIEW FAILED",
+        "Fresh specification review of seventh spec-review remediation settled tree: PENDING",
+        "Fresh quality review of seventh spec-review remediation settled tree: PENDING",
     ):
         assert text in evidence
 
@@ -344,6 +346,32 @@ def test_release_evidence_records_sixth_specification_review_remediation() -> No
         "BA96DC9DE317B700D7A39A1B7DDB22FFCF4CE9478E26E03B98E32E5D1BE6E77A",
         r"D:\tmp\kokoroarc-m7-spec6-remediation-settled-01",
         "PASS ON SIXTH SPEC-REVIEW REMEDIATION SETTLED TREE; FRESH REVIEWS PENDING",
+    ):
+        assert text in evidence
+
+
+def test_release_evidence_records_seventh_specification_review_remediation() -> None:
+    evidence = EVIDENCE_PATH.read_text(encoding="utf-8")
+    for text in (
+        "Seventh specification-review remediation",
+        "bb492bcf1aafa3d1132bc53872616db7565d7e37",
+        "7598e1612d1012e4e0f023aa6b995397188cdf0b",
+        "quoted CLI data argument",
+        "absolute destination outside the trusted run root",
+        "quote awareness",
+        "complete argument token",
+        "explicit filesystem mutation destinations",
+        "Nine focused RED cases",
+        "passes **110 tests**",
+        r"D:\tmp\kokoroarc-m7-spec7-remediation-preflight-01",
+        "1998 passed, 24 skipped",
+        "FEA6AB106E4AEC7FE998A959195D759C89B3D090BBB94A871706DE4431A9C413",
+        "superseded because the three adjacent alias, redirection, and destination-variable RED cases were added afterward",
+        r"D:\tmp\kokoroarc-m7-spec7-remediation-preflight-02",
+        "2001 passed, 24 skipped",
+        "F8E0F6ADD2995C5EA9F0EB0AF55FA42D89D3B55D059A265D22F2A18F21C2FBE6",
+        r"D:\tmp\kokoroarc-m7-spec7-remediation-settled-01",
+        "SEVENTH SPEC-REVIEW REMEDIATION PREFLIGHT PASS; EXACT-TREE GATES AND FRESH REVIEWS PENDING",
     ):
         assert text in evidence
 

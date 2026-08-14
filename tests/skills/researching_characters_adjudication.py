@@ -38,7 +38,6 @@ _CLI_ENTRYPOINT_PATTERN = re.compile(
     r"(?is)(?:\bkokoroarc\.cli\b[^;&|]*?\bresearch\b|"
     r"\bkokoro(?:\.exe)?\s+research\b)"
 )
-_HELP_OPTION = re.compile(r"(?<!\S)--help(?!\S)", re.IGNORECASE)
 _PROTECTED_ROOTS = {
     "compiled",
     "config",
@@ -143,6 +142,79 @@ def _shell_words(
     if token_started:
         words.append("".join(word))
     return words
+
+
+def _prefix_before_shell_control(value: str) -> str:
+    """Return the first unevaluated shell segment while respecting quotes."""
+    quote: str | None = None
+    index = 0
+    while index < len(value):
+        character = value[index]
+        if quote is not None:
+            if character == quote:
+                if (
+                    quote == "'"
+                    and index + 1 < len(value)
+                    and value[index + 1] == "'"
+                ):
+                    index += 2
+                    continue
+                quote = None
+            elif character == "`" and index + 1 < len(value):
+                index += 2
+                continue
+            index += 1
+            continue
+        if character in {"'", '"'}:
+            quote = character
+        elif character in ";|&<>\r\n":
+            return value[:index]
+        index += 1
+    return value
+
+
+def _mask_quoted_text(value: str) -> str:
+    """Preserve offsets while hiding non-executable quoted shell data."""
+    masked = list(value)
+    quote: str | None = None
+    index = 0
+    while index < len(value):
+        if (
+            quote is None
+            and index + 1 < len(value)
+            and value[index] == "@"
+            and value[index + 1] in {"'", '"'}
+        ):
+            delimiter = value[index + 1] + "@"
+            end = value.find(delimiter, index + 2)
+            if end < 0:
+                end = len(value) - 2
+            for position in range(index, min(end + 2, len(masked))):
+                masked[position] = " "
+            index = end + 2
+            continue
+        character = value[index]
+        if quote is not None:
+            masked[index] = " "
+            if character == quote:
+                if (
+                    quote == "'"
+                    and index + 1 < len(value)
+                    and value[index + 1] == "'"
+                ):
+                    masked[index + 1] = " "
+                    index += 2
+                    continue
+                quote = None
+            elif character == "`" and index + 1 < len(value):
+                masked[index + 1] = " "
+                index += 2
+                continue
+        elif character in {"'", '"'}:
+            quote = character
+            masked[index] = " "
+        index += 1
+    return "".join(masked)
 
 
 def _read_json(path: Path) -> dict:
@@ -514,6 +586,32 @@ def _declared_cli_action(
     return action
 
 
+def _cli_occurrences(value: str) -> list[tuple[str | None, bool]]:
+    """Return CLI actions and whether each invocation requests real help."""
+    occurrences: list[tuple[str | None, bool]] = []
+    for match in _CLI_ENTRYPOINT_PATTERN.finditer(value):
+        segment = _prefix_before_shell_control(value[match.end() :])
+        tokens = _shell_words(segment, allow_placeholders=True)
+        action = None
+        if len(tokens) >= 2:
+            candidate = "research " + " ".join(
+                token.casefold() for token in tokens[:2]
+            )
+            if candidate in _CLI_ACTIONS:
+                action = candidate
+        help_requested = bool(
+            tokens and any(token.casefold() == "--help" for token in tokens)
+        )
+        occurrences.append((action, help_requested))
+    return occurrences
+
+
+def _record_declares_cli_help(record: dict) -> bool:
+    return any(
+        token.casefold() == "--help" for token in _declared_cli_tokens(record)
+    )
+
+
 def _record_mentions_cli_action(record: object) -> bool:
     if isinstance(record, str):
         values = [record]
@@ -527,13 +625,11 @@ def _record_mentions_cli_action(record: object) -> bool:
             values.append(" ".join(str(item) for item in argv))
     else:
         return False
-    for value in values:
-        for match in _CLI_ENTRYPOINT_PATTERN.finditer(value):
-            tail = value[match.end() :]
-            segment = re.split(r"[;&|\r\n]", tail, maxsplit=1)[0]
-            if _HELP_OPTION.search(segment) is None:
-                return True
-    return False
+    return any(
+        not help_requested
+        for value in values
+        for _action, help_requested in _cli_occurrences(value)
+    )
 
 
 def _cli_records_are_bound(
@@ -615,8 +711,7 @@ def _successful_cli_commands(
 ) -> list[str]:
     commands: list[str] = []
     for text, record in _command_records(report):
-        lowered = text.casefold()
-        if record is None or _HELP_OPTION.search(lowered) is not None:
+        if record is None or _record_declares_cli_help(record):
             continue
         if record.get("execution_status") == "capture_setup_error_before_cli_launch":
             continue
@@ -639,8 +734,8 @@ def _successful_action_records(
     trusted_cli_context: dict | None,
 ) -> list[dict]:
     records: list[dict] = []
-    for text, record in _command_records(report):
-        if record is None or _HELP_OPTION.search(text) is not None:
+    for _text, record in _command_records(report):
+        if record is None or _record_declares_cli_help(record):
             continue
         if (
             _declared_cli_action(
@@ -667,8 +762,11 @@ def _claims_cli_action(report: dict, action: str) -> bool:
             argv = record.get("argv")
             if isinstance(argv, list):
                 values.append(" ".join(str(item) for item in argv))
-        combined = " ".join(values).casefold()
-        if action in combined and _HELP_OPTION.search(combined) is None:
+        if any(
+            found_action == action and not help_requested
+            for value in values
+            for found_action, help_requested in _cli_occurrences(value)
+        ):
             return True
     return False
 
@@ -969,7 +1067,201 @@ def _final_binds_eligible_bundle(final: str, bundle: dict | None) -> bool:
     )
 
 
-def _safe_commands(report: dict) -> bool:
+_MUTATING_COMMAND = re.compile(
+    r"(?i)(?:(?<![A-Za-z0-9_.-])(?:add-content|clear-content|copy|copy-item|"
+    r"cp|del|erase|md|"
+    r"mkdir|move|move-item|mv|new-item|out-file|rd|remove-item|rename-item|"
+    r"rm|rmdir|robocopy|set-content|tee-object|touch|xcopy)(?![A-Za-z0-9_.-])|"
+    r"\[\s*(?:system\.)?io\.(?:directory|file)\s*\]::"
+    r"(?:appendalltext|copy|createdirectory|delete|move|replace|writeallbytes|"
+    r"writealltext)\b)"
+)
+_WRITE_PATH_OPTION = re.compile(
+    r"(?i)-(?:destination|file-?path|literal-?path|path)(?=\s|$)"
+)
+_WINDOWS_ABSOLUTE_PATH = re.compile(
+    r"(?i)(?<![A-Za-z0-9_<])(?:[A-Z]:[\\/]|\\\\)"
+    r"[^\s'\";,|)}\]]+"
+)
+_UPWARD_RELATIVE_PATH = re.compile(
+    r"(?i)(?:^|[\s'\"(,])\.\.[\\/][^\s'\";,|)}\]]*"
+)
+_LITERAL_PATH_ASSIGNMENT = re.compile(
+    r"(?i)\$(?P<name>[A-Za-z_][A-Za-z0-9_]*)\s*=\s*(?:"
+    r"'(?P<single>(?:''|[^'])*)'|\"(?P<double>[^\"`$]*)\")"
+)
+_VARIABLE_REFERENCE = re.compile(r"(?i)\$(?P<name>[A-Za-z_][A-Za-z0-9_]*)\b")
+
+
+def _literal_path_values(value: str, start: int) -> list[str]:
+    """Read a comma-separated sequence of literal path arguments."""
+    paths: list[str] = []
+    index = start
+    while index < len(value):
+        while index < len(value) and value[index].isspace():
+            index += 1
+        if index >= len(value):
+            break
+        quote = value[index] if value[index] in {"'", '"'} else None
+        if quote is not None:
+            index += 1
+            token: list[str] = []
+            while index < len(value):
+                character = value[index]
+                if character == quote:
+                    if (
+                        quote == "'"
+                        and index + 1 < len(value)
+                        and value[index + 1] == "'"
+                    ):
+                        token.append("'")
+                        index += 2
+                        continue
+                    index += 1
+                    break
+                token.append(character)
+                index += 1
+            else:
+                return []
+            path = "".join(token)
+        else:
+            end = index
+            while (
+                end < len(value)
+                and not value[end].isspace()
+                and value[end] not in ";|)"
+            ):
+                end += 1
+            path = value[index:end]
+            index = end
+        if not path:
+            return paths
+        if path.startswith("$"):
+            paths.append(path)
+            return paths
+        if path.startswith(("(", "[", "{")):
+            return paths
+        bare_paths = [item for item in path.split(",") if item]
+        paths.extend(bare_paths)
+        while index < len(value) and value[index].isspace():
+            index += 1
+        if index >= len(value) or value[index] != ",":
+            break
+        index += 1
+    return paths
+
+
+def _redirection_path_values(value: str) -> list[str]:
+    paths: list[str] = []
+    quote: str | None = None
+    index = 0
+    while index < len(value):
+        character = value[index]
+        if quote is not None:
+            if character == quote:
+                if (
+                    quote == "'"
+                    and index + 1 < len(value)
+                    and value[index + 1] == "'"
+                ):
+                    index += 2
+                    continue
+                quote = None
+            elif character == "`" and index + 1 < len(value):
+                index += 2
+                continue
+            index += 1
+            continue
+        if character in {"'", '"'}:
+            quote = character
+            index += 1
+            continue
+        if character == ">":
+            placeholder_start = value.rfind("<", 0, index)
+            if placeholder_start >= 0 and re.fullmatch(
+                r"<[A-Za-z0-9_-]+>", value[placeholder_start : index + 1]
+            ):
+                index += 1
+                continue
+            while index + 1 < len(value) and value[index + 1] == ">":
+                index += 1
+            paths.extend(_literal_path_values(value, index + 1))
+        index += 1
+    return paths
+
+
+def _relative_output_is_confined(
+    relative: PurePosixPath, *, allow_root_directory: bool
+) -> bool:
+    first = relative.parts[0].casefold()
+    if first in _PROTECTED_ROOTS:
+        return False
+    if len(relative.parts) == 1:
+        return first in _ALLOWED_OUTPUT_FILES or (
+            allow_root_directory and first in _ALLOWED_OUTPUT_ROOTS
+        )
+    return first in _ALLOWED_OUTPUT_ROOTS
+
+
+def _explicit_write_text_is_confined(
+    text: str,
+    report: dict,
+    trusted_run_root: str | Path | None,
+) -> bool:
+    assignments = {
+        match.group("name").casefold(): (
+            match.group("single").replace("''", "'")
+            if match.group("single") is not None
+            else match.group("double")
+        )
+        for match in _LITERAL_PATH_ASSIGNMENT.finditer(text)
+    }
+
+    def resolved(candidate: str) -> str | None:
+        if candidate.startswith("$"):
+            return assignments.get(candidate[1:].casefold())
+        return candidate
+
+    for candidate in _redirection_path_values(text):
+        path = resolved(candidate)
+        if path is None:
+            continue
+        relative = _report_relative_path(path, report, trusted_run_root)
+        if relative is None or not _relative_output_is_confined(
+            relative, allow_root_directory=True
+        ):
+            return False
+
+    executable_text = _mask_quoted_text(text)
+    for match in _MUTATING_COMMAND.finditer(executable_text):
+        clause = _prefix_before_shell_control(text[match.start() :])
+        if _UPWARD_RELATIVE_PATH.search(clause) is not None:
+            return False
+        candidates = {
+            item.rstrip(".:") for item in _WINDOWS_ABSOLUTE_PATH.findall(clause)
+        }
+        for option in _WRITE_PATH_OPTION.finditer(clause):
+            candidates.update(_literal_path_values(clause, option.end()))
+        candidates.update(
+            "$" + variable.group("name")
+            for variable in _VARIABLE_REFERENCE.finditer(clause)
+            if variable.group("name").casefold() in assignments
+        )
+        for candidate in candidates:
+            path = resolved(candidate)
+            if path is None:
+                continue
+            relative = _report_relative_path(path, report, trusted_run_root)
+            if relative is None or not _relative_output_is_confined(
+                relative, allow_root_directory=True
+            ):
+                return False
+    return True
+
+
+def _safe_commands(
+    report: dict, trusted_run_root: str | Path | None
+) -> bool:
     records = _command_records(report)
     if not records:
         return False
@@ -1062,6 +1354,9 @@ def _safe_commands(report: dict) -> bool:
                 or powershell_environment_access.search(inspection_text)
                 or bracket_environment_access.search(inspection_text)
                 or unapproved_interpreter.search(inspection_text)
+                or not _explicit_write_text_is_confined(
+                    inspection_text, report, trusted_run_root
+                )
             ):
                 return False
             if (
@@ -1111,13 +1406,9 @@ def _outputs_are_confined(
         relative = _report_relative_path(value, report, trusted_run_root)
         if relative is None:
             return False
-        first = relative.parts[0].casefold()
-        if first in _PROTECTED_ROOTS:
-            return False
-        if len(relative.parts) == 1:
-            if first not in _ALLOWED_OUTPUT_FILES:
-                return False
-        elif first not in _ALLOWED_OUTPUT_ROOTS:
+        if not _relative_output_is_confined(
+            relative, allow_root_directory=False
+        ):
             return False
     return True
 
@@ -1203,7 +1494,7 @@ def _observed_assertions(
     compile_private = _bundle_outputs_match(compile_output, bundle_output)
 
     source_paths = [path for path in normalized_opened if "/sources/" in f"/{path}"]
-    commands_safe = _safe_commands(report) and cli_records_bound
+    commands_safe = _safe_commands(report, trusted_run_root) and cli_records_bound
     inert = bool(source_paths) and commands_safe
     no_secret_value = not contains_sensitive_material(retained_text)
 
