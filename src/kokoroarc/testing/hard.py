@@ -119,12 +119,35 @@ def run_hard_validation(
         checks["locale_coverage"],
     )
 
-    first_compiled = compile_pack(source, schemas)
-    second_compiled = compile_pack(source, schemas)
+    first_compile_input = cast(dict[str, Any], json.loads(source_bytes))
+    first_compiled = compile_pack(first_compile_input, schemas)
     schemas.validate("compiled-pack", first_compiled)
-    schemas.validate("compiled-pack", second_compiled)
     first_compiled_bytes = canonical_bytes(first_compiled)
+    try:
+        first_compile_input_stable = (
+            canonical_bytes(first_compile_input) == source_bytes
+        )
+    except KokoroError:
+        first_compile_input_stable = False
+
+    second_compile_input = cast(dict[str, Any], json.loads(source_bytes))
+    second_compiled = compile_pack(second_compile_input, schemas)
+    schemas.validate("compiled-pack", second_compiled)
     second_compiled_bytes = canonical_bytes(second_compiled)
+    try:
+        second_compile_input_stable = (
+            canonical_bytes(second_compile_input) == source_bytes
+        )
+    except KokoroError:
+        second_compile_input_stable = False
+    if not first_compile_input_stable or not second_compile_input_stable:
+        checks["compile"].append(
+            _finding(
+                "PACK_COMPILE_INPUT_MUTATION",
+                ["source"],
+                "Compilation mutated its source input.",
+            )
+        )
     if first_compiled.get("source_hash") != source_hash:
         checks["compile"].append(
             _finding(
@@ -590,6 +613,21 @@ def _check_state_replay(
             "repetition_window": repetition_window,
         }
     )
+    initial_bytes = canonical_bytes(initial)
+    event_bytes = canonical_bytes(event)
+    expected = cast(dict[str, Any], json.loads(initial_bytes))
+    confidence = min(max(float(event["confidence"]), 0.0), 1.0)
+    proposed = float(event["effects"]["trust"]) * confidence
+    delta = min(max(proposed, -max_delta), max_delta)
+    expected["dimensions"]["trust"] = min(
+        max(float(expected["dimensions"]["trust"]) + delta, 0.0),
+        100.0,
+    )
+    expected["applied_event_ids"].append(event["event_id"])
+    expected["revision"] += 1
+    expected["turn_index"] += 1
+    expected["recent_novelty"][event["novelty_key"]] = expected["turn_index"]
+    expected_bytes = canonical_bytes(expected)
     try:
         schemas.validate("relationship-state", initial)
         schemas.validate("interaction-event", event)
@@ -599,21 +637,24 @@ def _check_state_replay(
             max_delta=max_delta,
             repetition_window=repetition_window,
         )
+        schemas.validate("relationship-state", first)
+        first_bytes = canonical_bytes(first)
         replay = apply_event(
             initial,
             event,
             max_delta=max_delta,
             repetition_window=repetition_window,
         )
+        schemas.validate("relationship-state", replay)
+        replay_bytes = canonical_bytes(replay)
         idempotent = apply_event(
             first,
             event,
             max_delta=max_delta,
             repetition_window=repetition_window,
         )
-        schemas.validate("relationship-state", first)
-        schemas.validate("relationship-state", replay)
         schemas.validate("relationship-state", idempotent)
+        idempotent_bytes = canonical_bytes(idempotent)
     except (KokoroError, KeyError, TypeError, ValueError, OverflowError):
         findings.append(
             _finding(
@@ -623,11 +664,30 @@ def _check_state_replay(
             )
         )
         return check_input_hash
-    if not (
-        canonical_bytes(first)
-        == canonical_bytes(replay)
-        == canonical_bytes(idempotent)
-    ):
+    try:
+        inputs_stable = (
+            canonical_bytes(initial) == initial_bytes
+            and canonical_bytes(event) == event_bytes
+        )
+    except KokoroError:
+        inputs_stable = False
+    if not inputs_stable:
+        findings.append(
+            _finding(
+                "PACK_STATE_INPUT_MUTATION",
+                ["growth"],
+                "The relationship-state engine mutated a probe input.",
+            )
+        )
+    if first_bytes != expected_bytes:
+        findings.append(
+            _finding(
+                "PACK_STATE_TRANSITION_INVALID",
+                ["growth"],
+                "The relationship-state probe did not apply its declared event.",
+            )
+        )
+    if not (first_bytes == replay_bytes == idempotent_bytes):
         findings.append(
             _finding(
                 "PACK_STATE_REPLAY_DRIFT",
@@ -677,7 +737,8 @@ def _source_snapshot_stable(
 
 
 def _snapshot_pack(root: Path) -> _PackSnapshot:
-    files = scan_pack(root, PackLimits())
+    limits = PackLimits()
+    files = scan_pack(root, limits)
     try:
         resolved_root = Path(root).resolve(strict=True)
     except (OSError, RuntimeError, ValueError) as error:
@@ -689,6 +750,7 @@ def _snapshot_pack(root: Path) -> _PackSnapshot:
     fingerprints: list[_FileFingerprint] = []
     contents: dict[str, bytes] = {}
     executable_permissions: list[str] = []
+    total_bytes = 0
     for path in files:
         try:
             relative = path.relative_to(resolved_root).as_posix()
@@ -697,7 +759,12 @@ def _snapshot_pack(root: Path) -> _PackSnapshot:
                 "UNSAFE_PACK_PATH",
                 "Character pack contains an unsafe filesystem path.",
             ) from None
-        data, file_stat = _read_stable_file(path)
+        data, file_stat = _read_stable_file(
+            path,
+            max_file_bytes=limits.max_file_bytes,
+            max_total_bytes=limits.max_total_bytes - total_bytes,
+        )
+        total_bytes += len(data)
         fingerprints.append(
             (
                 relative,
@@ -720,7 +787,12 @@ def _snapshot_pack(root: Path) -> _PackSnapshot:
     )
 
 
-def _read_stable_file(path: Path) -> tuple[bytes, os.stat_result]:
+def _read_stable_file(
+    path: Path,
+    *,
+    max_file_bytes: int,
+    max_total_bytes: int,
+) -> tuple[bytes, os.stat_result]:
     descriptor: int | None = None
     try:
         initial = path.lstat()
@@ -733,6 +805,10 @@ def _read_stable_file(path: Path) -> tuple[bytes, os.stat_result]:
                 "UNSAFE_PACK_PATH",
                 "Character pack contains an unsafe filesystem path.",
             )
+        if initial.st_size > max_file_bytes:
+            raise _snapshot_limit_exceeded("max_file_bytes")
+        if initial.st_size > max_total_bytes:
+            raise _snapshot_limit_exceeded("max_total_bytes")
         flags = os.O_RDONLY | getattr(os, "O_BINARY", 0) | getattr(
             os, "O_NOFOLLOW", 0
         )
@@ -741,10 +817,20 @@ def _read_stable_file(path: Path) -> tuple[bytes, os.stat_result]:
         if _stat_identity(initial) != _stat_identity(opened):
             raise _pack_changed()
         chunks: list[bytes] = []
+        bytes_read = 0
+        read_limit = min(max_file_bytes, max_total_bytes)
         while True:
-            chunk = os.read(descriptor, 64 * 1024)
+            chunk = os.read(
+                descriptor,
+                min(64 * 1024, read_limit + 1 - bytes_read),
+            )
             if not chunk:
                 break
+            bytes_read += len(chunk)
+            if bytes_read > max_file_bytes:
+                raise _snapshot_limit_exceeded("max_file_bytes")
+            if bytes_read > max_total_bytes:
+                raise _snapshot_limit_exceeded("max_total_bytes")
             chunks.append(chunk)
         final_opened = os.fstat(descriptor)
     except KokoroError:
@@ -789,6 +875,14 @@ def _pack_changed() -> KokoroError:
     return KokoroError(
         "PACK_CHANGED",
         "Character pack changed while hard validation was running.",
+    )
+
+
+def _snapshot_limit_exceeded(limit: str) -> KokoroError:
+    return KokoroError(
+        "PACK_LIMIT_EXCEEDED",
+        "Character pack filesystem limit exceeded.",
+        details={"limit": limit},
     )
 
 

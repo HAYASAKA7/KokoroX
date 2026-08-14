@@ -10,7 +10,9 @@ import pytest
 import yaml
 
 from kokoroarc.errors import KokoroError
+from kokoroarc.packs.security import PackLimits
 from kokoroarc.schemas import SchemaRegistry
+from kokoroarc.testing import hard as hard_module
 from kokoroarc.testing.hard import run_hard_validation
 
 
@@ -104,6 +106,54 @@ def test_prompt_injection_shaped_fixture_text_remains_inert(tmp_path: Path) -> N
 
     assert report["passed"] is True
     assert not marker.exists()
+
+
+def test_snapshot_rechecks_per_file_limit_after_scan(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root = tmp_path / "pack"
+    root.mkdir()
+    target = root / "small.yaml"
+    target.write_bytes(b"x")
+    real_scan = hard_module.scan_pack
+
+    def grow_after_scan(path: Path, limits: PackLimits) -> list[Path]:
+        files = real_scan(path, limits)
+        target.write_bytes(b"x" * (limits.max_file_bytes + 1))
+        return files
+
+    monkeypatch.setattr(hard_module, "scan_pack", grow_after_scan)
+
+    with pytest.raises(KokoroError) as raised:
+        hard_module._snapshot_pack(root)
+
+    assert raised.value.code == "PACK_LIMIT_EXCEEDED"
+    assert raised.value.details == {"limit": "max_file_bytes"}
+
+
+def test_snapshot_rechecks_aggregate_limit_after_scan(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root = tmp_path / "pack"
+    root.mkdir()
+    targets = [root / f"file-{index}.yaml" for index in range(9)]
+    for target in targets:
+        target.write_bytes(b"x")
+    real_scan = hard_module.scan_pack
+
+    def grow_after_scan(path: Path, limits: PackLimits) -> list[Path]:
+        files = real_scan(path, limits)
+        for target in targets:
+            target.write_bytes(b"x" * limits.max_file_bytes)
+        return files
+
+    monkeypatch.setattr(hard_module, "scan_pack", grow_after_scan)
+
+    with pytest.raises(KokoroError) as raised:
+        hard_module._snapshot_pack(root)
+
+    assert raised.value.code == "PACK_LIMIT_EXCEEDED"
+    assert raised.value.details == {"limit": "max_total_bytes"}
 
 
 def test_rejects_symlinked_source_file(tmp_path: Path) -> None:

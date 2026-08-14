@@ -220,6 +220,57 @@ def test_reports_two_pass_compilation_nondeterminism(
     assert report["passed"] is False
 
 
+def test_reports_two_pass_compilation_nondeterminism_through_shared_alias(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    real_compile = hard_module.compile_pack
+    shared: dict[str, Any] | None = None
+    calls = 0
+
+    def aliased_compile(*args: Any, **kwargs: Any) -> dict[str, Any]:
+        nonlocal calls, shared
+        calls += 1
+        if shared is None:
+            shared = real_compile(*args, **kwargs)
+        else:
+            shared["behavior"]["correction_style"] = "drifted shared output"
+        return shared
+
+    monkeypatch.setattr(hard_module, "compile_pack", aliased_compile)
+
+    report = run_hard_validation(RIN_PACK, load_json(ORIGINAL_REQUEST), SCHEMAS)
+
+    assert report["checks"]["compile"]["passed"] is False
+    assert finding_codes(report, "compile") == ["PACK_COMPILE_NONDETERMINISTIC"]
+    assert report["deterministic"] is False
+    assert report["passed"] is False
+
+
+def test_reports_compiler_input_mutation_even_when_outputs_are_stable(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    real_compile = hard_module.compile_pack
+    shared: dict[str, Any] | None = None
+
+    def mutating_compile(
+        source: dict[str, Any], *args: Any, **kwargs: Any
+    ) -> dict[str, Any]:
+        nonlocal shared
+        if shared is None:
+            shared = real_compile(deepcopy(source), *args, **kwargs)
+        source["behavior"]["correction_style"] = "mutated compiler input"
+        return shared
+
+    monkeypatch.setattr(hard_module, "compile_pack", mutating_compile)
+
+    report = run_hard_validation(RIN_PACK, load_json(ORIGINAL_REQUEST), SCHEMAS)
+
+    assert report["checks"]["compile"]["passed"] is False
+    assert finding_codes(report, "compile") == ["PACK_COMPILE_INPUT_MUTATION"]
+    assert report["deterministic"] is False
+    assert report["passed"] is False
+
+
 def test_reports_missing_source_locale_coverage(tmp_path: Path) -> None:
     pack = copy_rin(tmp_path)
     expressions_path = pack / "expressions.yaml"
@@ -308,6 +359,75 @@ def test_reports_state_replay_drift(monkeypatch: pytest.MonkeyPatch) -> None:
     assert report["checks"]["state_replay"]["passed"] is False
     assert finding_codes(report, "state_replay") == ["PACK_STATE_REPLAY_DRIFT"]
     assert report["deterministic"] is False
+
+
+def test_reports_state_replay_drift_through_shared_alias(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    real_apply = hard_module.apply_event
+    shared: dict[str, Any] | None = None
+    calls = 0
+
+    def aliased_apply(*args: Any, **kwargs: Any) -> dict[str, Any]:
+        nonlocal calls, shared
+        calls += 1
+        if shared is None:
+            shared = real_apply(*args, **kwargs)
+        elif calls == 2:
+            shared["dimensions"]["trust"] += 0.25
+        return shared
+
+    monkeypatch.setattr(hard_module, "apply_event", aliased_apply)
+
+    report = run_hard_validation(RIN_PACK, load_json(ORIGINAL_REQUEST), SCHEMAS)
+
+    assert report["checks"]["state_replay"]["passed"] is False
+    assert finding_codes(report, "state_replay") == ["PACK_STATE_REPLAY_DRIFT"]
+    assert report["deterministic"] is False
+    assert report["passed"] is False
+
+
+def test_reports_deterministic_but_noop_state_transition(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def noop_apply(
+        state: dict[str, Any], event: dict[str, Any], **kwargs: Any
+    ) -> dict[str, Any]:
+        return deepcopy(state)
+
+    monkeypatch.setattr(hard_module, "apply_event", noop_apply)
+
+    report = run_hard_validation(RIN_PACK, load_json(ORIGINAL_REQUEST), SCHEMAS)
+
+    assert report["checks"]["state_replay"]["passed"] is False
+    assert finding_codes(report, "state_replay") == [
+        "PACK_STATE_TRANSITION_INVALID"
+    ]
+    assert report["deterministic"] is False
+    assert report["passed"] is False
+
+
+def test_reports_state_engine_input_mutation_even_when_outputs_are_stable(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    real_apply = hard_module.apply_event
+
+    def in_place_apply(
+        state: dict[str, Any], event: dict[str, Any], **kwargs: Any
+    ) -> dict[str, Any]:
+        result = real_apply(state, event, **kwargs)
+        state.clear()
+        state.update(result)
+        return state
+
+    monkeypatch.setattr(hard_module, "apply_event", in_place_apply)
+
+    report = run_hard_validation(RIN_PACK, load_json(ORIGINAL_REQUEST), SCHEMAS)
+
+    assert report["checks"]["state_replay"]["passed"] is False
+    assert finding_codes(report, "state_replay") == ["PACK_STATE_INPUT_MUTATION"]
+    assert report["deterministic"] is False
+    assert report["passed"] is False
 
 
 def test_reports_source_mutation_during_run(
