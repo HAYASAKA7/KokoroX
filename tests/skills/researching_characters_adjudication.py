@@ -1340,6 +1340,63 @@ def _explicit_write_text_is_confined(
     return True
 
 
+_POWERSHELL_EXECUTABLES = {
+    "powershell",
+    "powershell.exe",
+    "pwsh",
+    "pwsh.exe",
+}
+_CMD_EXECUTABLES = {"cmd", "cmd.exe"}
+
+
+def _structured_shell_payloads(
+    command_value: str, argv: list[str]
+) -> list[str] | None:
+    """Return inspectable child-shell payloads, or None for an unsafe wrapper."""
+    if not argv:
+        return []
+    executable = _executable_name(argv[0])
+    arguments = argv[1:]
+    command_executable = _executable_name(command_value)
+    if executable not in _POWERSHELL_EXECUTABLES | _CMD_EXECUTABLES:
+        if command_executable not in _POWERSHELL_EXECUTABLES | _CMD_EXECUTABLES:
+            return []
+        arguments = argv
+        executable = command_executable
+
+    folded = [item.casefold() for item in arguments]
+    if executable in _POWERSHELL_EXECUTABLES:
+        try:
+            execution_index = folded.index("-command")
+        except ValueError:
+            # Some retained reports use "PowerShell" as a narrative tool label.
+            if executable == command_executable and not any(
+                item.startswith(("-c", "-e", "-f")) for item in folded
+            ):
+                return []
+            return None
+        if any(
+            item not in {"-nologo", "-noninteractive", "-noprofile"}
+            for item in folded[:execution_index]
+        ):
+            return None
+        payload = arguments[execution_index + 1 :]
+    else:
+        try:
+            execution_index = folded.index("/c")
+        except ValueError:
+            if executable == command_executable and "/k" not in folded:
+                return []
+            return None
+        if any(item not in {"/d", "/q", "/s"} for item in folded[:execution_index]):
+            return None
+        payload = arguments[execution_index + 1 :]
+
+    if not payload or any(not item.strip() for item in payload):
+        return None
+    return [" ".join(payload)]
+
+
 def _commands_are_safe(
     report: dict,
     trusted_run_root: str | Path | None,
@@ -1411,13 +1468,45 @@ def _commands_are_safe(
     bracket_environment_access = re.compile(
         r"(?i)\b(?:process|deno|bun)\s*\[\s*([\"'])env\1\s*\]"
     )
+    nested_powershell = re.compile(
+        r"(?i)(?<![A-Za-z0-9_.-])"
+        r"(?:[^\s\"';&|{}()]*[\\/])?(?:powershell|pwsh)(?:\.exe)?(?=\s)"
+        r"(?=[^;&|\r\n{}]*\s-(?:c|e|f)[A-Za-z-]*(?:\s|$))"
+    )
+    nested_cmd = re.compile(
+        r"(?i)(?<![A-Za-z0-9_.-])"
+        r"(?:[^\s\"';&|{}()]*[\\/])?cmd(?:\.exe)?(?=\s)"
+        r"(?=[^;&|\r\n{}]*\s/[ck](?:\s|$))"
+    )
+    process_launcher = re.compile(
+        r"(?i)(?<![A-Za-z0-9_.-])"
+        r"(?:microsoft\.powershell\.management[\\/])?"
+        r"start-process(?![A-Za-z0-9_.-])"
+    )
+    quoted_process_call = re.compile(
+        r"(?i)(?:^|[;&|{}]\s*)&\s*[\"'][^\"'\r\n]*"
+        r"(?:powershell|pwsh|cmd|start-process)(?:\.exe)?[\"']"
+    )
+    dynamic_process_call = re.compile(r"(?i)(?:^|[;&|{}]\s*)&\s*(?:\$|\()")
+    dynamic_child_execution = re.compile(
+        r"(?i)(?:"
+        r"\[\s*(?:system\.)?diagnostics\."
+        r"(?:process|processstartinfo)\s*\]|"
+        r"\[\s*(?:system\.management\.automation\.)?"
+        r"powershell\s*\]|"
+        r"\[\s*(?:system\.management\.automation\.)?"
+        r"scriptblock\s*\]\s*::\s*create|"
+        r"(?<![A-Za-z0-9_.-])(?:invoke-command|start-job|start-threadjob)"
+        r"(?![A-Za-z0-9_.-])|\.addscript\s*\()"
+    )
     for text, record in records:
         if not text.strip():
             return False
-        inspection_texts = [text]
+        inspection_texts: list[str] = []
         if record is None:
             if require_execution_metadata:
                 return False
+            inspection_texts.append(text)
         else:
             if require_execution_metadata and "exit_code" not in record:
                 return False
@@ -1433,17 +1522,31 @@ def _commands_are_safe(
             ):
                 return False
             command_value = record.get("command")
-            if (
-                isinstance(command_value, str)
-                and command_value not in inspection_texts
-            ):
-                inspection_texts.append(command_value)
+            command_text = command_value if isinstance(command_value, str) else ""
             if isinstance(argv, list):
-                argv_text = " ".join(argv)
-                if argv_text not in inspection_texts:
-                    inspection_texts.append(argv_text)
+                shell_payloads = _structured_shell_payloads(command_text, argv)
+                if shell_payloads is None:
+                    return False
+                if shell_payloads:
+                    inspection_texts.extend(shell_payloads)
+                    if command_text and _executable_name(
+                        command_text
+                    ) not in _POWERSHELL_EXECUTABLES | _CMD_EXECUTABLES:
+                        inspection_texts.append(command_text)
+                else:
+                    inspection_texts.append(text)
+                    if command_text and command_text not in inspection_texts:
+                        inspection_texts.append(command_text)
+                    argv_text = " ".join(argv)
+                    if argv_text not in inspection_texts:
+                        inspection_texts.append(argv_text)
+            elif command_text:
+                inspection_texts.append(command_text)
+        if not inspection_texts:
+            return False
         for inspection_text in inspection_texts:
             executable_text = _mask_powershell_here_strings(inspection_text)
+            shell_code = _mask_quoted_text(inspection_text)
             lowered = executable_text.casefold()
             if (
                 any(token in lowered for token in forbidden)
@@ -1453,6 +1556,12 @@ def _commands_are_safe(
                 or powershell_environment_access.search(executable_text)
                 or bracket_environment_access.search(executable_text)
                 or unapproved_interpreter.search(executable_text)
+                or nested_powershell.search(shell_code)
+                or nested_cmd.search(shell_code)
+                or process_launcher.search(shell_code)
+                or quoted_process_call.search(inspection_text)
+                or dynamic_process_call.search(shell_code)
+                or dynamic_child_execution.search(shell_code)
                 or not _explicit_write_text_is_confined(
                     inspection_text, report, trusted_run_root
                 )

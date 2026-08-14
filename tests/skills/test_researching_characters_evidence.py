@@ -1665,6 +1665,11 @@ def test_every_outcome_fails_when_agent_report_provenance_is_invalid(
     (
         "unbound_cli",
         "outside_write",
+        "nested_powershell_write",
+        "nested_cmd_write",
+        "spawned_shell_write",
+        "dotnet_process_write",
+        "powershell_api_write",
         "outside_inventory",
         "missing_commands",
         "malformed_commands",
@@ -1678,6 +1683,7 @@ def test_every_outcome_fails_when_bound_report_has_invalid_execution_evidence(
     from researching_characters_adjudication import (
         _agent_report_matches_approved_raw,
         _cli_records_are_bound,
+        _command_history_preserves_integrity,
         _outputs_are_confined,
         _safe_commands,
         adjudicate_assertions,
@@ -1713,6 +1719,64 @@ def test_every_outcome_fails_when_bound_report_has_invalid_execution_evidence(
         }
         command["cwd"] = str(trusted_run_root)
         report.setdefault("commands", []).append(command)
+    elif integrity_failure == "nested_powershell_write":
+        report.setdefault("commands", []).append(
+            {
+                "command": (
+                    "powershell -NoProfile -Command \"Copy-Item "
+                    "workspace/request.json C:\\outside\\leak.txt\""
+                ),
+                "cwd": str(trusted_run_root),
+                "exit_code": 0,
+            }
+        )
+    elif integrity_failure == "nested_cmd_write":
+        report.setdefault("commands", []).append(
+            {
+                "command": (
+                    "cmd /d /c \"copy workspace\\request.json "
+                    "C:\\outside\\leak.txt\""
+                ),
+                "cwd": str(trusted_run_root),
+                "exit_code": 0,
+            }
+        )
+    elif integrity_failure == "spawned_shell_write":
+        report.setdefault("commands", []).append(
+            {
+                "command": (
+                    "Start-Process powershell -ArgumentList "
+                    "'-NoProfile','-Command','Copy-Item workspace/request.json "
+                    "C:\\outside\\leak.txt' -Wait"
+                ),
+                "cwd": str(trusted_run_root),
+                "exit_code": 0,
+            }
+        )
+    elif integrity_failure == "dotnet_process_write":
+        report.setdefault("commands", []).append(
+            {
+                "command": (
+                    "[System.Diagnostics.Process]::Start('powershell', "
+                    "'-Command \"Copy-Item workspace/request.json "
+                    "C:\\outside\\leak.txt\"')"
+                ),
+                "cwd": str(trusted_run_root),
+                "exit_code": 0,
+            }
+        )
+    elif integrity_failure == "powershell_api_write":
+        report.setdefault("commands", []).append(
+            {
+                "command": (
+                    "[System.Management.Automation.PowerShell]::Create()"
+                    ".AddScript('Copy-Item workspace/request.json "
+                    "C:\\outside\\leak.txt').Invoke()"
+                ),
+                "cwd": str(trusted_run_root),
+                "exit_code": 0,
+            }
+        )
     elif integrity_failure == "outside_inventory":
         report.setdefault("files_created", []).append(r"C:\outside\leak.txt")
     elif integrity_failure == "missing_commands":
@@ -1728,11 +1792,21 @@ def test_every_outcome_fails_when_bound_report_has_invalid_execution_evidence(
         assert not _cli_records_are_bound(
             retained_report, trusted_run_root, trusted_cli_context
         )
-    elif integrity_failure == "outside_write":
+    elif integrity_failure in {
+        "outside_write",
+        "nested_powershell_write",
+        "nested_cmd_write",
+        "spawned_shell_write",
+        "dotnet_process_write",
+        "powershell_api_write",
+    }:
         assert _cli_records_are_bound(
             retained_report, trusted_run_root, trusted_cli_context
         )
         assert not _safe_commands(retained_report, trusted_run_root)
+        assert not _command_history_preserves_integrity(
+            retained_report, trusted_run_root
+        )
     elif integrity_failure == "outside_inventory":
         assert _cli_records_are_bound(
             retained_report, trusted_run_root, trusted_cli_context
@@ -1759,6 +1833,42 @@ def test_every_outcome_fails_when_bound_report_has_invalid_execution_evidence(
         integrity_failure,
         outcomes,
     )
+
+
+@pytest.mark.parametrize(
+    "command",
+    (
+        (
+            "[System.Diagnostics.Process]::Start('powershell', "
+            "'-Command \"Copy-Item workspace/request.json "
+            "C:\\outside\\leak.txt\"')"
+        ),
+        (
+            "[scriptblock]::Create('Copy-Item workspace/request.json "
+            "C:\\outside\\leak.txt').Invoke()"
+        ),
+        (
+            "[System.Management.Automation.PowerShell]::Create()"
+            ".AddScript('Copy-Item workspace/request.json "
+            "C:\\outside\\leak.txt').Invoke()"
+        ),
+        (
+            "Invoke-Command -ScriptBlock ([scriptblock]::Create("
+            "'Copy-Item workspace/request.json C:\\outside\\leak.txt'))"
+        ),
+    ),
+)
+def test_command_history_rejects_dynamic_child_code(command: str) -> None:
+    from researching_characters_adjudication import (
+        _command_history_preserves_integrity,
+        _safe_commands,
+    )
+
+    report = {"commands": [{"command": command, "exit_code": 0}]}
+    trusted_run_root = Path(r"D:\tmp\trusted-run")
+
+    assert not _safe_commands(report, trusted_run_root)
+    assert not _command_history_preserves_integrity(report, trusted_run_root)
 
 
 def test_source_safety_rejects_environment_secret_access_command(
