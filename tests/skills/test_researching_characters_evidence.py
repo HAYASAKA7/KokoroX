@@ -246,6 +246,32 @@ def _write_json(path: Path, value: object) -> None:
     )
 
 
+def _bind_report_to_synthetic_raw(
+    tmp_path: Path, run_root: Path, report: dict
+) -> Path:
+    from researching_characters_sanitization import sanitize_sensitive_bytes
+
+    trusted_run_root = tmp_path / "trusted-raw"
+    trusted_run_root.mkdir()
+    raw_report_path = trusted_run_root / "agent-report.json"
+    _write_json(raw_report_path, report)
+    raw = raw_report_path.read_bytes()
+    retained, redaction_count = sanitize_sensitive_bytes(raw)
+    retained_report_path = run_root / "agent-report.json"
+    retained_report_path.write_bytes(retained)
+
+    ledger_path = run_root / "artifact-ledger.json"
+    ledger = _strict_json(ledger_path)
+    report_entry = next(
+        item for item in ledger["files"] if item["path"] == "agent-report.json"
+    )
+    report_entry["raw_sha256"] = hashlib.sha256(raw).hexdigest()
+    report_entry["retained_sha256"] = hashlib.sha256(retained).hexdigest()
+    report_entry["redaction_count"] = redaction_count
+    _write_json(ledger_path, ledger)
+    return trusted_run_root
+
+
 def _frontmatter(document: str) -> dict:
     assert document.startswith("---\n")
     _start, raw, _body = document.split("---", 2)
@@ -1621,6 +1647,116 @@ def test_every_outcome_fails_when_agent_report_provenance_is_invalid(
     assert all(not item["passed"] for item in outcomes), (
         case_id,
         provenance_failure,
+        outcomes,
+    )
+
+
+@pytest.mark.parametrize(
+    "case_id",
+    (
+        "ambiguous-character-stop",
+        "continuity-conflict-clarification",
+        "casual-discussion-non-trigger",
+        "original-character-non-trigger",
+    ),
+)
+@pytest.mark.parametrize(
+    "integrity_failure",
+    (
+        "unbound_cli",
+        "outside_write",
+        "outside_inventory",
+        "missing_commands",
+        "malformed_commands",
+    ),
+)
+def test_every_outcome_fails_when_bound_report_has_invalid_execution_evidence(
+    tmp_path: Path,
+    case_id: str,
+    integrity_failure: str,
+) -> None:
+    from researching_characters_adjudication import (
+        _agent_report_matches_approved_raw,
+        _cli_records_are_bound,
+        _outputs_are_confined,
+        _safe_commands,
+        adjudicate_assertions,
+    )
+
+    run, run_root, report = _mutable_run(tmp_path, "2026-08-13-approved2", case_id)
+    trusted_run_root = tmp_path / "trusted-raw"
+    if integrity_failure == "unbound_cli":
+        command = {
+            "command": (
+                "py -m kokoroarc.cli research request validate "
+                "--request workspace/request.json --json"
+            ),
+            "argv": [
+                "py",
+                "-m",
+                "kokoroarc.cli",
+                "research",
+                "request",
+                "validate",
+                "--request",
+                "workspace/request.json",
+                "--json",
+            ],
+            "exit_code": 0,
+        }
+        command["cwd"] = str(trusted_run_root)
+        report.setdefault("commands", []).append(command)
+    elif integrity_failure == "outside_write":
+        command = {
+            "command": r"Copy-Item workspace/request.json C:\outside\leak.txt",
+            "exit_code": 0,
+        }
+        command["cwd"] = str(trusted_run_root)
+        report.setdefault("commands", []).append(command)
+    elif integrity_failure == "outside_inventory":
+        report.setdefault("files_created", []).append(r"C:\outside\leak.txt")
+    elif integrity_failure == "missing_commands":
+        report.pop("commands", None)
+    else:
+        report["commands"] = {}
+    trusted_run_root = _bind_report_to_synthetic_raw(tmp_path, run_root, report)
+    trusted_cli_context = _trusted_cli_context(run)
+    retained_report = _strict_json(run_root / "agent-report.json")
+
+    assert _agent_report_matches_approved_raw(run_root, trusted_run_root)
+    if integrity_failure == "unbound_cli":
+        assert not _cli_records_are_bound(
+            retained_report, trusted_run_root, trusted_cli_context
+        )
+    elif integrity_failure == "outside_write":
+        assert _cli_records_are_bound(
+            retained_report, trusted_run_root, trusted_cli_context
+        )
+        assert not _safe_commands(retained_report, trusted_run_root)
+    elif integrity_failure == "outside_inventory":
+        assert _cli_records_are_bound(
+            retained_report, trusted_run_root, trusted_cli_context
+        )
+        assert not _outputs_are_confined(retained_report, True, trusted_run_root)
+    else:
+        assert _cli_records_are_bound(
+            retained_report, trusted_run_root, trusted_cli_context
+        )
+        assert not isinstance(retained_report.get("commands"), list)
+
+    case = next(item for item in _cases() if item["id"] == case_id)
+    outcomes = adjudicate_assertions(
+        case,
+        run_root,
+        run["determinism_pairs"],
+        trusted_run_root=trusted_run_root,
+        trusted_cli_context=trusted_cli_context,
+    )
+
+    assert outcomes
+    assert all(not item["passed"] for item in outcomes), (
+        case_id,
+        integrity_failure,
         outcomes,
     )
 

@@ -413,6 +413,22 @@ The D:-confined dirty-tree full preflight at `D:\tmp\kokoroarc-m7-spec9-remediat
 
 The next exact settled root is assigned `D:\tmp\kokoroarc-m7-spec9-remediation-settled-01`. It must also pass the fixed-base-epoch build and inventory, all three validators, raw replay, final-message binding, original-session rebind, exact base-to-HEAD whitespace and clean-status checks, and a fresh detached `core.autocrlf=true` checkout before either fresh review. Current remediation status is **NINTH SPEC-REVIEW REMEDIATION PREFLIGHT PASS; EXACT-TREE GATES AND FRESH REVIEWS PENDING**.
 
+## Tenth specification-review remediation
+
+Exact ninth-remediation commit `8f538a942f5199b4b17984fe6e68389d0a8e472a`, tree `fdb223f0131c6c74f8133f7302f89216b50e46b3`, and parent `3bfe1c9ac358f7d876d5f2e82db0a783dcb16ce3` passed the assigned `D:\tmp\kokoroarc-m7-spec9-remediation-settled-01` gate: `2023 passed, 24 skipped`, fixed-base-epoch distributions and archive inventory, all three Skill validators, 785-file raw replay, 33 final-message bindings, a 984-file original-session rebind, exact-range whitespace and clean-status checks, and a fresh detached `core.autocrlf=true` checkout with all 984 evidence files byte-identical and 132 focused tests.
+
+Fresh specification review confirmed that invalid or missing report-byte provenance now fails every outcome and independently verified the complete settled gate. It nevertheless returned FAIL with one Important conformance finding, so quality review was not run: a byte-authentic report could append either a claimed successful research CLI whose executable/context did not bind to the approval or a successful outside-copy command. Raw/retained sanitizer bytes and ledger hashes could remain exact while clarification, early-stop, and non-trigger outcomes still passed because global integrity covered report provenance but not complete CLI-record binding or command safety.
+
+The regression-first remediation separates strict operational command evidence from a global integrity-safe command-history scan. Before interpreting any `must` or `must_not`, the adjudicator now requires an approval-bound raw report and ledger, a structurally valid command list, complete CLI-record binding, safe command history, confined reported outputs, and unchanged protected state. An honest empty command list and approval-retained historical read-only records without strict execution metadata remain valid; executable hazards and explicit writes are still scanned. PowerShell here-string diagnostic data is masked only for syntactically valid, closed here-strings outside quoted text and comments, preserving the approved first-campaign evidence without treating embedded diagnostics as executable code.
+
+Twenty focused regressions cover ambiguous identity, continuity conflict, casual discussion, and original-character non-trigger cases across five faithfully imported evidence mutations: an unbound `py` research CLI, an explicit outside `Copy-Item`, an outside `files_created` inventory entry, a missing command list, and a malformed command list. Each synthetic raw report is sanitized through the shared implementation, its retained bytes and ledger hashes/redaction count are regenerated, and the test first proves provenance validity before requiring every outcome to fail. The implementation-focused research/release run at `D:\tmp\kokoroarc-m7-spec10-remediation-focused-01` passed **152 tests**. With this executable release assertion included, the focused gate passes **153 tests** under `D:\tmp\kokoroarc-m7-spec10-remediation-focused-02`.
+
+Initial full-preflight root `D:\tmp\kokoroarc-m7-spec10-remediation-preflight-01` is retained as a harness-only setup failure: the launcher omitted the worktree `src` directory from `PYTHONPATH`, producing 38 collection errors before product tests ran. No result from that root is counted as behavioral or release evidence. The corrected launcher bound `PYTHONPATH` to the current worktree and used a new root.
+
+Replacement D:-confined dirty-tree preflight `D:\tmp\kokoroarc-m7-spec10-remediation-preflight-02` exited `0`: **`2044 passed, 24 skipped` in 195.70 seconds**. There were no failures or errors; every skip was an explicit Windows symlink, junction, or FIFO capability case. Captured stdout was 7,285 bytes with SHA-256 `F3C3C8C17F2CAF73B7D46494A15E31A90E5C11211A08B67FC21496AEE7823CFE`; stderr was empty with SHA-256 `E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855`. The harness elapsed time was 198.84 seconds. This dirty-tree preflight preceded the release-record edits that retain its result; the focused gate verifies those edits, and the exact committed tree must repeat the complete suite.
+
+The next exact settled root is assigned `D:\tmp\kokoroarc-m7-spec10-remediation-settled-01`. It must also pass the fixed-base-epoch build and inventory, all three validators, raw replay, final-message binding, original-session rebind, exact base-to-HEAD whitespace and clean-status checks, and a fresh detached `core.autocrlf=true` checkout before either fresh review. Current remediation status is **TENTH SPEC-REVIEW REMEDIATION PREFLIGHT PASS; EXACT-TREE GATES AND FRESH REVIEWS PENDING**.
+
 ## Verified product gates before this record
 
 - Task 8 exact research-to-authoring gate: `380 passed, 7 skipped`.
@@ -425,8 +441,8 @@ These results were obtained before the release-document changes. The settled-inp
 
 ## Remaining closure gates
 
-1. Complete the ninth specification-review remediation full preflight, commit it, and complete its exact-tree rerun under the assigned D:-based root.
+1. Complete the tenth specification-review remediation release assertion and full preflight, commit it, and complete its exact-tree rerun under the assigned D:-based root.
 2. Obtain fresh independent specification and quality reviews on that exact commit.
 3. Close Milestone 7 only after both reviews report PASS with no Critical or Important findings.
 
-Current status: Behavioral campaign: CORRECTIVE PASS 11/11. Corrective harness: COMPLETED WITH DISCLOSED DEVIATIONS. Exact-final verification: NINTH SPEC-REVIEW REMEDIATION PREFLIGHT PASS; EXACT-TREE GATES AND FRESH REVIEWS PENDING. Fresh specification review of ninth spec-review remediation settled tree: PENDING. Fresh quality review of ninth spec-review remediation settled tree: PENDING.
+Current status: Behavioral campaign: CORRECTIVE PASS 11/11. Corrective harness: COMPLETED WITH DISCLOSED DEVIATIONS. Exact-final verification: TENTH SPEC-REVIEW REMEDIATION PREFLIGHT PASS; EXACT-TREE GATES AND FRESH REVIEWS PENDING. Fresh specification review of tenth spec-review remediation settled tree: PENDING. Fresh quality review of tenth spec-review remediation settled tree: PENDING.
