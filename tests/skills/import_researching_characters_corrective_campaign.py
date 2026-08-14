@@ -242,6 +242,15 @@ def import_run(source_root: Path, approval_root: Path, case: dict) -> dict:
     deviations = list(HARNESS_DEVIATIONS.get(case_id, ()))
     harness_status = "completed_with_disclosed_deviations" if deviations else "completed"
     pairs = verify_determinism(source, case_id)
+    write_json(
+        destination / "artifact-ledger.json",
+        {
+            "schema_version": "1.0",
+            "raw_root_retention": "approved D:-based corrective campaign root",
+            "redaction_replacements": REDACTION_REPLACEMENTS,
+            "files": ledger,
+        },
+    )
     outcomes = adjudicate_assertions(
         case,
         destination,
@@ -267,15 +276,6 @@ def import_run(source_root: Path, approval_root: Path, case: dict) -> dict:
         "protected_state_after": after,
     }
     write_json(destination / "result.json", result)
-    write_json(
-        destination / "artifact-ledger.json",
-        {
-            "schema_version": "1.0",
-            "raw_root_retention": "approved D:-based corrective campaign root",
-            "redaction_replacements": REDACTION_REPLACEMENTS,
-            "files": ledger,
-        },
-    )
 
     relative = destination.relative_to(DESTINATION).as_posix()
     return {

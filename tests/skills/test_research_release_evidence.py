@@ -376,6 +376,31 @@ def test_release_evidence_records_seventh_specification_review_remediation() -> 
         assert text in evidence
 
 
+def test_release_evidence_records_eighth_specification_review_remediation() -> None:
+    evidence = EVIDENCE_PATH.read_text(encoding="utf-8")
+    for text in (
+        "Eighth specification-review remediation",
+        "190c4aadbce96f812a00fe53c06746fcec016f71",
+        "5a5c5c401afecd93655f9b380755d176ef97c13c",
+        "positional `Copy-Item`",
+        "`Start-Process`",
+        "approval-controlled raw run",
+        "`agent-report.json`",
+        "raw and retained SHA-256",
+        "redaction count",
+        "Twelve focused regressions",
+        "passes **123 tests**",
+        r"D:\tmp\kokoroarc-m7-spec8-remediation-focused-03",
+        r"D:\tmp\kokoroarc-m7-spec8-remediation-preflight-01",
+        "2014 passed, 24 skipped",
+        "9917CADA1DBA8A1F52B9AD4FD568FDA59A5AEBC808EC727A0EAE290BFF9C2BB4",
+        "E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855",
+        r"D:\tmp\kokoroarc-m7-spec8-remediation-settled-01",
+        "EIGHTH SPEC-REVIEW REMEDIATION PREFLIGHT PASS; EXACT-TREE GATES AND FRESH REVIEWS PENDING",
+    ):
+        assert text in evidence
+
+
 def test_research_skill_and_evidence_are_checkout_byte_stable() -> None:
     attributes = GIT_ATTRIBUTES_PATH.read_text(encoding="utf-8").splitlines()
     assert "skills/** text eol=lf" in attributes

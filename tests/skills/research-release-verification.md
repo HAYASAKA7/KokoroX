@@ -385,6 +385,20 @@ Replacement D:-confined dirty-tree preflight `D:\tmp\kokoroarc-m7-spec7-remediat
 
 The next settled root is assigned `D:\tmp\kokoroarc-m7-spec7-remediation-settled-01`. Its status is **SEVENTH SPEC-REVIEW REMEDIATION PREFLIGHT PASS; EXACT-TREE GATES AND FRESH REVIEWS PENDING** until those gates bind one exact commit. Both independent reviews are still required.
 
+## Eighth specification-review remediation
+
+Exact seventh-remediation commit `190c4aadbce96f812a00fe53c06746fcec016f71`, tree `5a5c5c401afecd93655f9b380755d176ef97c13c`, and parent `bb492bcf1aafa3d1132bc53872616db7565d7e37` passed the assigned `D:\tmp\kokoroarc-m7-spec7-remediation-settled-01` gate: `2001 passed, 24 skipped`, the fixed-base-epoch build and archive inventory, all three Skill validators, 785-file raw replay, 33 final-message bindings, a 984-file original-session rebind, exact-range whitespace and clean-status checks, and a fresh detached `core.autocrlf=true` checkout with all 984 evidence files byte-identical and 110 focused tests.
+
+Fresh specification review confirmed the complete settled positive gate but returned FAIL with two Important evidence-integrity findings, so quality review was not run. First, additional ordinary mutation forms remained outside the command parser: positional `Copy-Item`, destinations assembled with `$env:TEMP` or `Join-Path`, `Expand-Archive`, short and call-operator aliases, and unlisted .NET writes could mutate protected or outside paths while every declared assertion passed. Second, a syntactically valid `Start-Process` record could construct the KokoroArc module from a variable or split literal, hide the invocation behind narrative argv, run from an outside working directory, and still preserve all 19 assertions.
+
+The regression-first remediation adds a class-level trust boundary before the detailed command parser. For every eligible run, the complete retained `agent-report.json` must equal the shared sanitizer's byte-for-byte output for the report in the approval-controlled raw run. Its single artifact-ledger entry must also bind the independently read raw and retained SHA-256 values and the sanitizer redaction count. The campaign importers now write that ledger before adjudication. Any missing report, changed command, forged retained ledger, hash disagreement, redaction disagreement, or sanitizer-replay mismatch fails CLI binding and command safety; the request, workspace, compile, bundle, source-safety, determinism, and confinement assertions consequently fail closed. The existing wrapper, interpreter, and filesystem parsers remain defense in depth for faithfully imported transcripts.
+
+Twelve focused regressions cover positional and call-operator copies, environment- and `Join-Path`-derived destinations, archive and CSV output, the `ni` alias, two additional .NET write APIs, a literal outside path assembled through `Join-Path`, constructed-module `Start-Process`, and a forged retained ledger. The implementation-focused run at `D:\tmp\kokoroarc-m7-spec8-remediation-focused-03` passed 122 tests before this release assertion was added. With this executable release assertion included, the focused research/release evidence gate passes **123 tests** under `D:\tmp\kokoroarc-m7-spec8-remediation-focused-04`.
+
+The D:-confined dirty-tree full preflight at `D:\tmp\kokoroarc-m7-spec8-remediation-preflight-01` exited `0`: **`2014 passed, 24 skipped` in 285.41 seconds**. There were no failures or errors; every skip was an explicit Windows symlink, junction, or FIFO capability case. Captured stdout was 7,269 bytes with SHA-256 `9917CADA1DBA8A1F52B9AD4FD568FDA59A5AEBC808EC727A0EAE290BFF9C2BB4`; stderr was empty with SHA-256 `E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855`. The harness elapsed time was 289.38 seconds. This dirty-tree preflight preceded the release-record edits that retain its result; the focused gate verifies those edits, and the exact committed tree must repeat the complete suite.
+
+The next exact settled root is assigned `D:\tmp\kokoroarc-m7-spec8-remediation-settled-01`. It must also pass the fixed-base-epoch build and inventory, all three validators, raw replay, final-message binding, original-session rebind, exact base-to-HEAD whitespace and clean-status checks, and a fresh detached `core.autocrlf=true` checkout before either fresh review. Current remediation status is **EIGHTH SPEC-REVIEW REMEDIATION PREFLIGHT PASS; EXACT-TREE GATES AND FRESH REVIEWS PENDING**.
+
 ## Verified product gates before this record
 
 - Task 8 exact research-to-authoring gate: `380 passed, 7 skipped`.
@@ -397,8 +411,8 @@ These results were obtained before the release-document changes. The settled-inp
 
 ## Remaining closure gates
 
-1. Complete the seventh specification-review remediation full preflight, commit it, and complete its exact-tree rerun under the assigned D:-based root.
+1. Complete the eighth specification-review remediation full preflight, commit it, and complete its exact-tree rerun under the assigned D:-based root.
 2. Obtain fresh independent specification and quality reviews on that exact commit.
 3. Close Milestone 7 only after both reviews report PASS with no Critical or Important findings.
 
-Current status: Behavioral campaign: CORRECTIVE PASS 11/11. Corrective harness: COMPLETED WITH DISCLOSED DEVIATIONS. Exact-final verification: SEVENTH SPEC-REVIEW REMEDIATION PREFLIGHT PASS; EXACT-TREE GATES AND FRESH REVIEWS PENDING. Fresh specification review of seventh spec-review remediation settled tree: PENDING. Fresh quality review of seventh spec-review remediation settled tree: PENDING.
+Current status: Behavioral campaign: CORRECTIVE PASS 11/11. Corrective harness: COMPLETED WITH DISCLOSED DEVIATIONS. Exact-final verification: EIGHTH SPEC-REVIEW REMEDIATION PREFLIGHT PASS; EXACT-TREE GATES AND FRESH REVIEWS PENDING. Fresh specification review of eighth spec-review remediation settled tree: PENDING. Fresh quality review of eighth spec-review remediation settled tree: PENDING.

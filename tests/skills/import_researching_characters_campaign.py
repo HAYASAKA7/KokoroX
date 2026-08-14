@@ -232,6 +232,15 @@ def import_run(
             [f"captures/{left}", f"captures/{right}"]
             for left, right in DETERMINISM_PAIRS[case["id"]]
         ]
+    write_json(
+        destination / "artifact-ledger.json",
+        {
+            "schema_version": "1.0",
+            "raw_root_retention": "approved D:-based campaign root",
+            "redaction_replacements": REDACTION_REPLACEMENTS,
+            "files": ledger,
+        },
+    )
     outcomes = adjudicate_assertions(
         case,
         destination,
@@ -253,15 +262,6 @@ def import_run(
         "protected_state_after": after,
     }
     write_json(destination / "result.json", result)
-    write_json(
-        destination / "artifact-ledger.json",
-        {
-            "schema_version": "1.0",
-            "raw_root_retention": "approved D:-based campaign root",
-            "redaction_replacements": REDACTION_REPLACEMENTS,
-            "files": ledger,
-        },
-    )
 
     relative = destination.relative_to(DESTINATION).as_posix()
     return {
