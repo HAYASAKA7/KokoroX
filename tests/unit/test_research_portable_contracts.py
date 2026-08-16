@@ -350,7 +350,9 @@ def test_static_ecmascript_subset_rejects_python_only_syntax(pattern: str) -> No
         assert_ecmascript_subset([pattern])
 
 
-@pytest.mark.parametrize("pattern", [r"(?>alpha)", r"alpha++", r"(?-i:alpha)"])
+@pytest.mark.parametrize(
+    "pattern", [r"(?>alpha)", r"alpha++", r"(?P<name>alpha)"]
+)
 def test_reported_extensions_compile_in_python_and_fail_node_unicode(pattern: str) -> None:
     re.compile(pattern)
     node = shutil.which("node")
