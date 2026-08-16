@@ -34,9 +34,24 @@
     "visibility": {"$ref": "#/$defs/visibility"},
     "source_artifact_id": {"$ref": "#/$defs/artifact_id"},
     "source_hash": {"$ref": "#/$defs/sha256"},
-    "compiled_artifact_id": {"$ref": "#/$defs/artifact_id"},
-    "compiled_hash": {"$ref": "#/$defs/sha256"},
-    "corpus_hash": {"$ref": "#/$defs/sha256"},
+    "compiled_artifact_id": {
+      "oneOf": [
+        {"$ref": "#/$defs/artifact_id"},
+        {"type": "null"}
+      ]
+    },
+    "compiled_hash": {
+      "oneOf": [
+        {"$ref": "#/$defs/sha256"},
+        {"type": "null"}
+      ]
+    },
+    "corpus_hash": {
+      "oneOf": [
+        {"$ref": "#/$defs/sha256"},
+        {"type": "null"}
+      ]
+    },
     "check_input_hashes": {"$ref": "#/$defs/check_input_hashes"},
     "checks": {"$ref": "#/$defs/hard_checks"},
     "source_snapshot_stable": {"type": "boolean"},
@@ -62,6 +77,15 @@
         "properties": {
           "source_snapshot_stable": {"const": true},
           "deterministic": {"const": true},
+          "compiled_artifact_id": {"$ref": "#/$defs/artifact_id"},
+          "compiled_hash": {"$ref": "#/$defs/sha256"},
+          "corpus_hash": {"$ref": "#/$defs/sha256"},
+          "check_input_hashes": {
+            "properties": {
+              "protected_content_hash": {"$ref": "#/$defs/sha256"},
+              "state_replay_hash": {"$ref": "#/$defs/sha256"}
+            }
+          },
           "checks": {
             "properties": {
               "source_schema": {"properties": {"passed": {"const": true}}},
@@ -91,6 +115,173 @@
           {"properties": {"checks": {"properties": {"protected_content": {"properties": {"passed": {"const": false}}}}}}},
           {"properties": {"checks": {"properties": {"state_replay": {"properties": {"passed": {"const": false}}}}}}}
         ]
+      }
+    },
+    {
+      "if": {
+        "properties": {"compiled_artifact_id": {"type": "null"}},
+        "required": ["compiled_artifact_id"]
+      },
+      "then": {
+        "properties": {
+          "passed": {"const": false},
+          "deterministic": {"const": false},
+          "compiled_hash": {"type": "null"},
+          "check_input_hashes": {
+            "properties": {"state_replay_hash": {"type": "null"}}
+          },
+          "checks": {
+            "properties": {
+              "compile": {"properties": {"passed": {"const": false}}},
+              "fixture_structure": {"properties": {"passed": {"const": false}}},
+              "locale_coverage": {"properties": {"passed": {"const": false}}},
+              "state_replay": {"properties": {"passed": {"const": false}}}
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {"compiled_hash": {"type": "null"}},
+        "required": ["compiled_hash"]
+      },
+      "then": {
+        "properties": {"compiled_artifact_id": {"type": "null"}}
+      }
+    },
+    {
+      "if": {
+        "properties": {"corpus_hash": {"type": "null"}},
+        "required": ["corpus_hash"]
+      },
+      "then": {
+        "properties": {
+          "passed": {"const": false},
+          "check_input_hashes": {
+            "properties": {"protected_content_hash": {"type": "null"}}
+          },
+          "checks": {
+            "properties": {
+              "fixture_structure": {"properties": {"passed": {"const": false}}},
+              "locale_coverage": {"properties": {"passed": {"const": false}}},
+              "protected_content": {"properties": {"passed": {"const": false}}}
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "check_input_hashes": {
+            "properties": {"protected_content_hash": {"type": "null"}},
+            "required": ["protected_content_hash"]
+          }
+        },
+        "required": ["check_input_hashes"]
+      },
+      "then": {
+        "properties": {
+          "passed": {"const": false},
+          "checks": {
+            "properties": {
+              "protected_content": {"properties": {"passed": {"const": false}}}
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "check_input_hashes": {
+            "properties": {"state_replay_hash": {"type": "null"}},
+            "required": ["state_replay_hash"]
+          }
+        },
+        "required": ["check_input_hashes"]
+      },
+      "then": {
+        "properties": {
+          "passed": {"const": false},
+          "checks": {
+            "properties": {
+              "state_replay": {"properties": {"passed": {"const": false}}}
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "checks": {
+            "properties": {
+              "source_schema": {
+                "properties": {"passed": {"const": false}},
+                "required": ["passed"]
+              }
+            },
+            "required": ["source_schema"]
+          }
+        },
+        "required": ["checks"]
+      },
+      "then": {
+        "properties": {
+          "compiled_artifact_id": {"type": "null"},
+          "compiled_hash": {"type": "null"}
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "checks": {
+            "properties": {
+              "fixture_structure": {
+                "properties": {
+                  "findings": {
+                    "contains": {
+                      "properties": {
+                        "code": {"const": "PACK_TEST_CORPUS_INVALID"}
+                      },
+                      "required": ["code"]
+                    }
+                  }
+                },
+                "required": ["findings"]
+              }
+            },
+            "required": ["fixture_structure"]
+          }
+        },
+        "required": ["checks"]
+      },
+      "then": {
+        "properties": {
+          "passed": {"const": false},
+          "corpus_hash": {"type": "null"},
+          "check_input_hashes": {
+            "properties": {
+              "protected_content_hash": {"type": "null"}
+            }
+          },
+          "checks": {
+            "properties": {
+              "fixture_structure": {
+                "properties": {"passed": {"const": false}}
+              },
+              "locale_coverage": {
+                "properties": {"passed": {"const": false}}
+              },
+              "protected_content": {
+                "properties": {"passed": {"const": false}}
+              }
+            }
+          }
+        }
       }
     }
   ],
@@ -149,8 +340,18 @@
         "request_hash": {"$ref": "#/$defs/sha256"},
         "source_tree_hash": {"$ref": "#/$defs/sha256"},
         "provenance_hash": {"$ref": "#/$defs/sha256"},
-        "protected_content_hash": {"$ref": "#/$defs/sha256"},
-        "state_replay_hash": {"$ref": "#/$defs/sha256"}
+        "protected_content_hash": {
+          "oneOf": [
+            {"$ref": "#/$defs/sha256"},
+            {"type": "null"}
+          ]
+        },
+        "state_replay_hash": {
+          "oneOf": [
+            {"$ref": "#/$defs/sha256"},
+            {"type": "null"}
+          ]
+        }
       }
     },
     "finding": {

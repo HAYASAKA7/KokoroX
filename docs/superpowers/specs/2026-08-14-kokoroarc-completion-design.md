@@ -117,6 +117,17 @@ The loader compiles these documents into one canonical in-memory test corpus and
 
 The runner reuses the authoritative source loader, compiler, schema registry, render planner, hard validator, and state transition engine. A hard report is release-blocking and deterministic for identical bytes. It contains no wall-clock timestamp.
 
+The reportability boundary requires a valid request, a safe immutable snapshot,
+a parseable canonical source candidate, and a source identity that can be
+represented by the report schema. Inside that boundary, validation failures
+still return the same hard-report type. A schema-invalid but identity-valid
+source keeps its real source identity and hash while unavailable compiled
+bindings are `null`. A missing or invalid corpus keeps available source and
+compiled bindings while `corpus_hash` and corpus-dependent check hashes are
+`null`. Every unavailable binding has an explicit blocking finding, forces its
+dependent checks to fail, and prevents overall passage; no placeholder artifact
+or synthetic error hash is permitted.
+
 ### 5.3 Soft-evaluation report
 
 `pack-soft-evaluation-input.schema.json` is an untrusted host input. Each sample binds:

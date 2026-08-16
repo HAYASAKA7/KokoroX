@@ -16,7 +16,10 @@ from kokoroarc import __version__
 from kokoroarc.authoring.validation import validate_authoring_pack
 from kokoroarc.errors import KokoroError
 from kokoroarc.packs.compiler import canonical_bytes, compile_pack
-from kokoroarc.packs.loader import load_source_pack_from_contents, parse_yaml_bytes
+from kokoroarc.packs.loader import (
+    assemble_source_pack_from_contents,
+    parse_yaml_bytes,
+)
 from kokoroarc.packs.security import PackLimits, scan_pack
 from kokoroarc.runtime.planning import build_render_plan
 from kokoroarc.runtime.validation import validate_rendered_output
@@ -75,6 +78,16 @@ class _PackSnapshot:
         return tuple(item[0] for item in self.fingerprints)
 
 
+@dataclass(frozen=True, slots=True)
+class _MutationProbe:
+    check: str
+    code: str
+    path: tuple[str | int, ...]
+    message: str
+    value: Any
+    expected: bytes
+
+
 def run_hard_validation(
     root: Path,
     request: dict[str, Any],
@@ -86,10 +99,10 @@ def run_hard_validation(
 
     ``request`` is required because a source pack intentionally excludes private
     construction metadata and cannot distinguish dossier, researched, and
-    hybrid modes on its own. Unsafe files, invalid YAML, invalid source schemas,
-    and invalid corpus shapes are rejected before a report is constructed.
+    hybrid modes on its own. Unsafe files and invalid YAML are rejected before a
+    report is constructed. Parseable schema and corpus failures are normalized
+    into a deterministic release-blocking report.
     """
-    schemas.validate("character-build-request", request)
     request_bytes = canonical_bytes(request)
     request_snapshot = cast(dict[str, Any], json.loads(request_bytes))
     research_bundle_bytes = (
@@ -102,189 +115,277 @@ def run_hard_validation(
     )
 
     initial_snapshot = _snapshot_pack(root)
-    source = load_source_pack_from_contents(initial_snapshot.contents, schemas)
-    corpus = load_test_corpus_from_contents(
-        initial_snapshot.root, initial_snapshot.contents
+    schemas.validate(
+        "character-build-request",
+        cast(dict[str, Any], json.loads(request_bytes)),
     )
-    schemas.validate("character-source", source)
-    source_bytes = canonical_bytes(source)
-    source_hash = sha256(source_bytes).hexdigest()
-    source_snapshot = cast(dict[str, Any], json.loads(source_bytes))
-
     checks: dict[str, list[dict[str, Any]]] = {
         name: [] for name in _CHECK_NAMES
     }
+    mutation_probes: list[_MutationProbe] = []
     _check_layout(initial_snapshot, checks["pack_layout"])
     _check_security(initial_snapshot, checks["security"])
-    provenance_request = cast(dict[str, Any], json.loads(request_bytes))
-    provenance_source = cast(dict[str, Any], json.loads(source_bytes))
-    provenance_bundle = (
-        cast(dict[str, Any], json.loads(research_bundle_bytes))
-        if research_bundle_bytes is not None
-        else None
-    )
-    _check_provenance(
-        provenance_request,
-        provenance_source,
-        schemas,
-        provenance_bundle,
-        checks["provenance"],
-        checks["locale_coverage"],
-    )
-    if not (
-        _canonical_matches(provenance_request, request_bytes)
-        and _canonical_matches(provenance_source, source_bytes)
-        and (
-            provenance_bundle is None
-            if research_bundle_bytes is None
-            else _canonical_matches(provenance_bundle, research_bundle_bytes)
+    source = assemble_source_pack_from_contents(initial_snapshot.contents)
+    source_bytes = canonical_bytes(source)
+    source_hash = sha256(source_bytes).hexdigest()
+    source_snapshot = cast(dict[str, Any], json.loads(source_bytes))
+    _validate_report_identity(source_snapshot, schemas)
+    source_schema_valid = True
+    try:
+        schemas.validate(
+            "character-source",
+            cast(dict[str, Any], json.loads(source_bytes)),
         )
-    ):
-        checks["provenance"].append(
+    except KokoroError as error:
+        if error.code != "SCHEMA_VALIDATION_FAILED":
+            raise
+        source_schema_valid = False
+        checks["source_schema"].append(
             _finding(
-                "PACK_PROVENANCE_INPUT_MUTATION",
-                ["provenance"],
-                "Provenance validation mutated a canonical probe input.",
+                "PACK_SOURCE_SCHEMA_INVALID",
+                error.details.get("path", ["source"]),
+                "The assembled source pack does not match its schema.",
             )
         )
 
-    first_compile_input = cast(dict[str, Any], json.loads(source_bytes))
-    first_compiled = compile_pack(first_compile_input, schemas)
-    schemas.validate("compiled-pack", first_compiled)
-    first_compiled_bytes = canonical_bytes(first_compiled)
-    second_compile_input = cast(dict[str, Any], json.loads(source_bytes))
-    second_compiled = compile_pack(second_compile_input, schemas)
-    schemas.validate("compiled-pack", second_compiled)
-    second_compiled_bytes = canonical_bytes(second_compiled)
-    first_compile_input_stable = _canonical_matches(
-        first_compile_input, source_bytes
-    )
-    second_compile_input_stable = _canonical_matches(
-        second_compile_input, source_bytes
-    )
-    first_compiled_stable = _canonical_matches(
-        first_compiled, first_compiled_bytes
-    )
-    second_compiled_stable = _canonical_matches(
-        second_compiled, second_compiled_bytes
-    )
-    if not first_compile_input_stable or not second_compile_input_stable:
-        checks["compile"].append(
-            _finding(
-                "PACK_COMPILE_INPUT_MUTATION",
-                ["source"],
-                "Compilation mutated its source input.",
-            )
+    corpus: PackTestCorpus | None
+    try:
+        corpus = load_test_corpus_from_contents(
+            initial_snapshot.root, initial_snapshot.contents
         )
-    if not first_compiled_stable or not second_compiled_stable:
-        checks["compile"].append(
-            _finding(
-                "PACK_COMPILE_OUTPUT_MUTATION",
-                ["compiled"],
-                "Compilation mutated a previously returned output.",
-            )
+    except KokoroError as error:
+        if error.code not in {
+            "INVALID_PACK_TEST_CORPUS",
+            "PACK_LIMIT_EXCEEDED",
+            "PACK_TEST_CORPUS_LIMIT_EXCEEDED",
+        }:
+            raise
+        corpus = None
+
+    if source_schema_valid:
+        provenance_request = cast(dict[str, Any], json.loads(request_bytes))
+        provenance_source = cast(dict[str, Any], json.loads(source_bytes))
+        provenance_bundle = (
+            cast(dict[str, Any], json.loads(research_bundle_bytes))
+            if research_bundle_bytes is not None
+            else None
         )
-    compiled_snapshot = cast(dict[str, Any], json.loads(first_compiled_bytes))
-    if compiled_snapshot.get("source_hash") != source_hash:
-        checks["compile"].append(
-            _finding(
-                "PACK_COMPILED_SOURCE_MISMATCH",
-                ["source_hash"],
-                "Compiled output is not bound to the loaded source hash.",
-            )
+        for value, expected in (
+            (provenance_request, request_bytes),
+            (provenance_source, source_bytes),
+            (provenance_bundle, research_bundle_bytes),
+        ):
+            if value is not None and expected is not None:
+                mutation_probes.append(
+                    _MutationProbe(
+                        check="provenance",
+                        code="PACK_PROVENANCE_INPUT_MUTATION",
+                        path=("provenance",),
+                        message=(
+                            "Provenance validation mutated a canonical probe input."
+                        ),
+                        value=value,
+                        expected=expected,
+                    )
+                )
+        _check_provenance(
+            provenance_request,
+            provenance_source,
+            schemas,
+            provenance_bundle,
+            checks["provenance"],
+            checks["locale_coverage"],
         )
-    if first_compiled_bytes != second_compiled_bytes:
-        checks["compile"].append(
-            _finding(
-                "PACK_COMPILE_NONDETERMINISTIC",
-                ["compiled"],
-                "Two compilations of the same source produced different bytes.",
-            )
+    else:
+        _mark_check_input_unavailable(
+            checks["provenance"], "source", "source schema"
         )
 
-    _check_fixture_structure(
-        corpus,
-        cast(dict[str, Any], json.loads(first_compiled_bytes)),
-        checks["fixture_structure"],
-    )
-    _check_locale_coverage(
-        corpus,
-        cast(dict[str, Any], json.loads(first_compiled_bytes)),
-        checks["locale_coverage"],
-    )
-    protected_content_hash = _check_protected_content(
-        corpus, schemas, checks["protected_content"]
-    )
-    state_replay_hash = _check_state_replay(
-        cast(dict[str, Any], json.loads(first_compiled_bytes)),
-        schemas,
-        checks["state_replay"],
-    )
+    compiled_snapshot: dict[str, Any] | None = None
+    first_compiled_bytes: bytes | None = None
+    if source_schema_valid:
+        compiled_snapshot, first_compiled_bytes = _compile_twice(
+            source_bytes,
+            source_hash,
+            schemas,
+            checks["compile"],
+            mutation_probes,
+        )
+    else:
+        _mark_check_input_unavailable(
+            checks["compile"], "source", "source schema"
+        )
 
-    source_snapshot_stable = _source_snapshot_stable(
-        root,
-        request,
-        request_bytes,
-        research_bundle,
-        research_bundle_bytes,
-        source_bytes,
-        corpus,
-        initial_snapshot,
-        schemas,
-    )
-    normalized_checks = {
-        name: _check_result(checks[name]) for name in _CHECK_NAMES
-    }
-    deterministic = (
-        normalized_checks["compile"]["passed"]
-        and normalized_checks["state_replay"]["passed"]
-    )
-    passed = (
-        source_snapshot_stable
-        and deterministic
-        and all(result["passed"] for result in normalized_checks.values())
-    )
+    if corpus is None:
+        for check_name in (
+            "fixture_structure",
+            "locale_coverage",
+            "protected_content",
+        ):
+            checks[check_name].append(
+                _finding(
+                    "PACK_TEST_CORPUS_INVALID",
+                    ["tests"],
+                    "The closed pack test corpus is missing or invalid.",
+                )
+            )
+
+    if corpus is not None and compiled_snapshot is not None:
+        _check_fixture_structure(
+            corpus,
+            cast(dict[str, Any], json.loads(first_compiled_bytes)),
+            checks["fixture_structure"],
+        )
+        _check_locale_coverage(
+            corpus,
+            cast(dict[str, Any], json.loads(first_compiled_bytes)),
+            checks["locale_coverage"],
+        )
+    elif corpus is not None:
+        _mark_check_input_unavailable(
+            checks["fixture_structure"], "compiled", "compiled pack"
+        )
+        _mark_check_input_unavailable(
+            checks["locale_coverage"], "compiled", "compiled pack"
+        )
+
+    if corpus is not None:
+        protected_content_hash = _check_protected_content(
+            corpus,
+            schemas,
+            checks["protected_content"],
+            mutation_probes,
+        )
+    else:
+        protected_content_hash = None
+
+    if compiled_snapshot is not None:
+        state_replay_hash = _check_state_replay(
+            cast(dict[str, Any], json.loads(first_compiled_bytes)),
+            schemas,
+            checks["state_replay"],
+            mutation_probes,
+        )
+    else:
+        _mark_check_input_unavailable(
+            checks["state_replay"], "compiled", "compiled pack"
+        )
+        state_replay_hash = None
+
+    def source_is_still_stable() -> bool:
+        return _source_snapshot_stable(
+            root,
+            request,
+            request_bytes,
+            research_bundle,
+            research_bundle_bytes,
+            source_bytes,
+            corpus.canonical_bytes if corpus is not None else None,
+            initial_snapshot,
+        )
+
+    source_snapshot_stable = source_is_still_stable()
     visibility = (
         "public_candidate"
         if request_snapshot.get("requested_visibility") == "public"
         else "private"
     )
-    report = {
-        "schema_version": "1.0",
-        "artifact_id": (
-            f"{source_snapshot['namespace']}/{source_snapshot['character_id']}/"
-            "release/hard-validation"
-        ),
-        "created_by": {"component": "kokoroarc", "version": __version__},
-        "namespace": source_snapshot["namespace"],
-        "character_id": source_snapshot["character_id"],
-        "character_version": source_snapshot["character_version"],
-        "mode": request_snapshot["mode"],
-        "visibility": visibility,
-        "source_artifact_id": source_snapshot["artifact_id"],
-        "source_hash": source_hash,
-        "compiled_artifact_id": compiled_snapshot["artifact_id"],
-        "compiled_hash": sha256(first_compiled_bytes).hexdigest(),
-        "corpus_hash": corpus.corpus_hash,
-        "check_input_hashes": {
-            "request_hash": sha256(request_bytes).hexdigest(),
-            "source_tree_hash": _source_tree_hash(initial_snapshot),
-            "provenance_hash": _canonical_hash(
-                {
-                    "request": request_snapshot,
-                    "research_bundle": research_bundle_snapshot,
-                }
+
+    def current_report() -> dict[str, Any]:
+        normalized_checks = {
+            name: _check_result(checks[name]) for name in _CHECK_NAMES
+        }
+        deterministic = (
+            normalized_checks["compile"]["passed"]
+            and normalized_checks["state_replay"]["passed"]
+        )
+        current_snapshot_stable = (
+            source_snapshot_stable
+            and _canonical_matches(request, request_bytes)
+            and (
+                research_bundle is None
+                if research_bundle_bytes is None
+                else _canonical_matches(research_bundle, research_bundle_bytes)
+            )
+        )
+        passed = (
+            current_snapshot_stable
+            and deterministic
+            and all(result["passed"] for result in normalized_checks.values())
+        )
+        return {
+            "schema_version": "1.0",
+            "artifact_id": (
+                f"{source_snapshot['namespace']}/"
+                f"{source_snapshot['character_id']}/release/hard-validation"
             ),
-            "protected_content_hash": protected_content_hash,
-            "state_replay_hash": state_replay_hash,
-        },
-        "checks": normalized_checks,
-        "source_snapshot_stable": source_snapshot_stable,
-        "deterministic": deterministic,
-        "passed": passed,
-    }
-    schemas.validate("pack-hard-validation-report", report)
-    return cast(dict[str, Any], json.loads(canonical_bytes(report)))
+            "created_by": {"component": "kokoroarc", "version": __version__},
+            "namespace": source_snapshot["namespace"],
+            "character_id": source_snapshot["character_id"],
+            "character_version": source_snapshot["character_version"],
+            "mode": request_snapshot["mode"],
+            "visibility": visibility,
+            "source_artifact_id": source_snapshot["artifact_id"],
+            "source_hash": source_hash,
+            "compiled_artifact_id": (
+                compiled_snapshot["artifact_id"]
+                if compiled_snapshot is not None
+                else None
+            ),
+            "compiled_hash": (
+                sha256(first_compiled_bytes).hexdigest()
+                if first_compiled_bytes is not None
+                else None
+            ),
+            "corpus_hash": corpus.corpus_hash if corpus is not None else None,
+            "check_input_hashes": {
+                "request_hash": sha256(request_bytes).hexdigest(),
+                "source_tree_hash": _source_tree_hash(initial_snapshot),
+                "provenance_hash": _canonical_hash(
+                    {
+                        "request": request_snapshot,
+                        "research_bundle": research_bundle_snapshot,
+                    }
+                ),
+                "protected_content_hash": protected_content_hash,
+                "state_replay_hash": state_replay_hash,
+            },
+            "checks": normalized_checks,
+            "source_snapshot_stable": current_snapshot_stable,
+            "deterministic": deterministic,
+            "passed": passed,
+        }
+
+    for _attempt in range(len(_CHECK_NAMES) + 2):
+        _audit_mutation_probes(checks, mutation_probes)
+        report = current_report()
+        report_bytes = canonical_bytes(report)
+        schemas.validate(
+            "pack-hard-validation-report",
+            cast(dict[str, Any], json.loads(report_bytes)),
+        )
+        source_snapshot_stable = (
+            source_snapshot_stable and source_is_still_stable()
+        )
+        _audit_mutation_probes(checks, mutation_probes)
+        if canonical_bytes(current_report()) == report_bytes:
+            return cast(dict[str, Any], json.loads(report_bytes))
+
+    checks["security"].append(
+        _finding(
+            "PACK_FINALIZATION_UNSTABLE",
+            ["report"],
+            "Hard-report inputs continued changing during final validation.",
+        )
+    )
+    report_bytes = canonical_bytes(current_report())
+    schemas.validate(
+        "pack-hard-validation-report",
+        cast(dict[str, Any], json.loads(report_bytes)),
+    )
+    source_snapshot_stable = source_snapshot_stable and source_is_still_stable()
+    _audit_mutation_probes(checks, mutation_probes)
+    return cast(dict[str, Any], json.loads(canonical_bytes(current_report())))
 
 
 def hard_report_is_current(
@@ -297,15 +398,55 @@ def hard_report_is_current(
 ) -> bool:
     """Return whether a report exactly matches a fresh deterministic run."""
     try:
-        schemas.validate("pack-hard-validation-report", report)
+        report_bytes = canonical_bytes(report)
+        request_bytes = canonical_bytes(request)
+        request_snapshot = cast(dict[str, Any], json.loads(request_bytes))
+        research_bundle_bytes = (
+            canonical_bytes(research_bundle)
+            if research_bundle is not None
+            else None
+        )
+        research_bundle_snapshot = (
+            cast(dict[str, Any], json.loads(research_bundle_bytes))
+            if research_bundle_bytes is not None
+            else None
+        )
+        initial_snapshot = _snapshot_pack(root)
+        schemas.validate(
+            "pack-hard-validation-report",
+            json.loads(report_bytes),
+        )
         current = run_hard_validation(
             root,
             request,
             schemas,
             research_bundle=research_bundle,
         )
-        return canonical_bytes(report) == canonical_bytes(current)
+        final_snapshot = _snapshot_pack(root)
+        return (
+            report_bytes == canonical_bytes(current)
+            and _canonical_matches(report, report_bytes)
+            and _canonical_matches(request, request_bytes)
+            and (
+                research_bundle is None
+                if research_bundle_bytes is None
+                else _canonical_matches(research_bundle, research_bundle_bytes)
+            )
+            and final_snapshot == initial_snapshot
+            and current["check_input_hashes"]["request_hash"]
+            == sha256(request_bytes).hexdigest()
+            and current["check_input_hashes"]["source_tree_hash"]
+            == _source_tree_hash(initial_snapshot)
+            and current["check_input_hashes"]["provenance_hash"]
+            == _canonical_hash(
+                {
+                    "request": request_snapshot,
+                    "research_bundle": research_bundle_snapshot,
+                }
+            )
+        )
     except (
+        KeyError,
         KokoroError,
         OSError,
         OverflowError,
@@ -349,6 +490,203 @@ def _check_provenance(
                 severity="warning",
             )
         )
+
+
+def _compile_twice(
+    source_bytes: bytes,
+    source_hash: str,
+    schemas: SchemaRegistry,
+    findings: list[dict[str, Any]],
+    mutation_probes: list[_MutationProbe],
+) -> tuple[dict[str, Any] | None, bytes | None]:
+    try:
+        first_compile_input = cast(dict[str, Any], json.loads(source_bytes))
+        mutation_probes.append(
+            _MutationProbe(
+                check="compile",
+                code="PACK_COMPILE_INPUT_MUTATION",
+                path=("source",),
+                message="Compilation mutated its source input.",
+                value=first_compile_input,
+                expected=source_bytes,
+            )
+        )
+        first_compiled = compile_pack(first_compile_input, schemas)
+        schemas.validate("compiled-pack", first_compiled)
+        first_compiled_bytes = canonical_bytes(first_compiled)
+        mutation_probes.append(
+            _MutationProbe(
+                check="compile",
+                code="PACK_COMPILE_OUTPUT_MUTATION",
+                path=("compiled",),
+                message="Compilation mutated a previously returned output.",
+                value=first_compiled,
+                expected=first_compiled_bytes,
+            )
+        )
+        second_compile_input = cast(dict[str, Any], json.loads(source_bytes))
+        mutation_probes.append(
+            _MutationProbe(
+                check="compile",
+                code="PACK_COMPILE_INPUT_MUTATION",
+                path=("source",),
+                message="Compilation mutated its source input.",
+                value=second_compile_input,
+                expected=source_bytes,
+            )
+        )
+        second_compiled = compile_pack(second_compile_input, schemas)
+        schemas.validate("compiled-pack", second_compiled)
+        second_compiled_bytes = canonical_bytes(second_compiled)
+        mutation_probes.append(
+            _MutationProbe(
+                check="compile",
+                code="PACK_COMPILE_OUTPUT_MUTATION",
+                path=("compiled",),
+                message="Compilation mutated a previously returned output.",
+                value=second_compiled,
+                expected=second_compiled_bytes,
+            )
+        )
+    except (
+        KokoroError,
+        KeyError,
+        OverflowError,
+        TypeError,
+        ValueError,
+    ):
+        findings.append(
+            _finding(
+                "PACK_COMPILE_FAILED",
+                ["compiled"],
+                "The source pack could not be compiled and validated.",
+            )
+        )
+        return None, None
+
+    if not (
+        _canonical_matches(first_compile_input, source_bytes)
+        and _canonical_matches(second_compile_input, source_bytes)
+    ):
+        findings.append(
+            _finding(
+                "PACK_COMPILE_INPUT_MUTATION",
+                ["source"],
+                "Compilation mutated its source input.",
+            )
+        )
+    if not (
+        _canonical_matches(first_compiled, first_compiled_bytes)
+        and _canonical_matches(second_compiled, second_compiled_bytes)
+    ):
+        findings.append(
+            _finding(
+                "PACK_COMPILE_OUTPUT_MUTATION",
+                ["compiled"],
+                "Compilation mutated a previously returned output.",
+            )
+        )
+    compiled_snapshot = cast(dict[str, Any], json.loads(first_compiled_bytes))
+    if compiled_snapshot.get("source_hash") != source_hash:
+        findings.append(
+            _finding(
+                "PACK_COMPILED_SOURCE_MISMATCH",
+                ["source_hash"],
+                "Compiled output is not bound to the loaded source hash.",
+            )
+        )
+    if first_compiled_bytes != second_compiled_bytes:
+        findings.append(
+            _finding(
+                "PACK_COMPILE_NONDETERMINISTIC",
+                ["compiled"],
+                "Two compilations of the same source produced different bytes.",
+            )
+        )
+    return compiled_snapshot, first_compiled_bytes
+
+
+def _mark_check_input_unavailable(
+    findings: list[dict[str, Any]], path: str, dependency: str
+) -> None:
+    findings.append(
+        _finding(
+            "PACK_CHECK_INPUT_UNAVAILABLE",
+            [path],
+            f"The {dependency} did not pass its prerequisite validation.",
+        )
+    )
+
+
+def _validate_report_identity(
+    source: dict[str, Any], schemas: SchemaRegistry
+) -> None:
+    try:
+        namespace = source["namespace"]
+        character_id = source["character_id"]
+        probe = {
+            "schema_version": "1.0",
+            "artifact_id": (
+                f"{namespace}/{character_id}/release/hard-validation"
+            ),
+            "created_by": {"component": "kokoroarc", "version": __version__},
+            "namespace": namespace,
+            "character_id": character_id,
+            "character_version": source["character_version"],
+            "mode": "original",
+            "visibility": "private",
+            "source_artifact_id": source["artifact_id"],
+            "source_hash": "0" * 64,
+            "compiled_artifact_id": None,
+            "compiled_hash": None,
+            "corpus_hash": None,
+            "check_input_hashes": {
+                "request_hash": "0" * 64,
+                "source_tree_hash": "0" * 64,
+                "provenance_hash": "0" * 64,
+                "protected_content_hash": None,
+                "state_replay_hash": None,
+            },
+            "checks": {
+                name: _check_result(
+                    [
+                        _finding(
+                            "PACK_CHECK_BLOCKED",
+                            ["identity"],
+                            (
+                                "The hard-validation identity projection is "
+                                "being checked."
+                            ),
+                        )
+                    ]
+                )
+                for name in _CHECK_NAMES
+            },
+            "source_snapshot_stable": False,
+            "deterministic": False,
+            "passed": False,
+        }
+        schemas.validate("pack-hard-validation-report", probe)
+    except KokoroError as error:
+        if error.code != "SCHEMA_VALIDATION_FAILED":
+            raise
+        raise KokoroError(
+            "SCHEMA_VALIDATION_FAILED",
+            "Character source identity cannot be represented in a hard report.",
+            details={
+                "schema": "pack-hard-validation-report",
+                "path": ["source_identity"],
+            },
+        ) from None
+    except (KeyError, TypeError, ValueError):
+        raise KokoroError(
+            "SCHEMA_VALIDATION_FAILED",
+            "Character source identity cannot be represented in a hard report.",
+            details={
+                "schema": "pack-hard-validation-report",
+                "path": ["source_identity"],
+            },
+        ) from None
 
 
 def _check_layout(
@@ -499,6 +837,7 @@ def _check_protected_content(
     corpus: PackTestCorpus,
     schemas: SchemaRegistry,
     findings: list[dict[str, Any]],
+    mutation_probes: list[_MutationProbe],
 ) -> str:
     fixture = corpus.document("tests/protected-spans.yaml")
     multilingual = corpus.document("tests/multilingual.yaml")
@@ -549,6 +888,32 @@ def _check_protected_content(
     try:
         semantic_for_plan = cast(dict[str, Any], json.loads(semantic_bytes))
         policy_for_plan = cast(dict[str, Any], json.loads(policy_bytes))
+        mutation_probes.extend(
+            (
+                _MutationProbe(
+                    check="protected_content",
+                    code="PACK_PROTECTED_INPUT_MUTATION",
+                    path=("validation",),
+                    message=(
+                        "The protected-content pipeline mutated a canonical "
+                        "probe input."
+                    ),
+                    value=semantic_for_plan,
+                    expected=semantic_bytes,
+                ),
+                _MutationProbe(
+                    check="protected_content",
+                    code="PACK_PROTECTED_INPUT_MUTATION",
+                    path=("validation",),
+                    message=(
+                        "The protected-content pipeline mutated a canonical "
+                        "probe input."
+                    ),
+                    value=policy_for_plan,
+                    expected=policy_bytes,
+                ),
+            )
+        )
         schemas.validate("semantic-result", semantic_for_plan)
         schemas.validate("language-policy", policy_for_plan)
         plan = build_render_plan(
@@ -558,6 +923,19 @@ def _check_protected_content(
         )
         schemas.validate("render-plan", plan)
         plan_bytes = canonical_bytes(plan)
+        mutation_probes.append(
+            _MutationProbe(
+                check="protected_content",
+                code="PACK_PROTECTED_OUTPUT_MUTATION",
+                path=("validation",),
+                message=(
+                    "The protected-content pipeline mutated a previously "
+                    "returned output."
+                ),
+                value=plan,
+                expected=plan_bytes,
+            )
+        )
         plan_snapshot = cast(dict[str, Any], json.loads(plan_bytes))
         rendered = {
             "text": "\n".join([semantic["conclusion"], *spans, warning]),
@@ -580,6 +958,43 @@ def _check_protected_content(
             dict[str, Any], json.loads(semantic_bytes)
         )
         plan_for_validation = cast(dict[str, Any], json.loads(plan_bytes))
+        mutation_probes.extend(
+            (
+                _MutationProbe(
+                    check="protected_content",
+                    code="PACK_PROTECTED_INPUT_MUTATION",
+                    path=("validation",),
+                    message=(
+                        "The protected-content pipeline mutated a canonical "
+                        "probe input."
+                    ),
+                    value=rendered_for_validation,
+                    expected=rendered_bytes,
+                ),
+                _MutationProbe(
+                    check="protected_content",
+                    code="PACK_PROTECTED_INPUT_MUTATION",
+                    path=("validation",),
+                    message=(
+                        "The protected-content pipeline mutated a canonical "
+                        "probe input."
+                    ),
+                    value=semantic_for_validation,
+                    expected=semantic_bytes,
+                ),
+                _MutationProbe(
+                    check="protected_content",
+                    code="PACK_PROTECTED_INPUT_MUTATION",
+                    path=("validation",),
+                    message=(
+                        "The protected-content pipeline mutated a canonical "
+                        "probe input."
+                    ),
+                    value=plan_for_validation,
+                    expected=plan_bytes,
+                ),
+            )
+        )
         validation = validate_rendered_output(
             rendered_for_validation,
             semantic_for_validation,
@@ -588,6 +1003,20 @@ def _check_protected_content(
         schemas.validate("validation-result", validation)
         validation_snapshot = cast(
             dict[str, Any], json.loads(canonical_bytes(validation))
+        )
+        validation_bytes = canonical_bytes(validation_snapshot)
+        mutation_probes.append(
+            _MutationProbe(
+                check="protected_content",
+                code="PACK_PROTECTED_OUTPUT_MUTATION",
+                path=("validation",),
+                message=(
+                    "The protected-content pipeline mutated a previously "
+                    "returned output."
+                ),
+                value=validation,
+                expected=validation_bytes,
+            )
         )
         inputs_stable = (
             _canonical_matches(semantic_for_plan, semantic_bytes)
@@ -651,6 +1080,7 @@ def _check_state_replay(
     compiled: dict[str, Any],
     schemas: SchemaRegistry,
     findings: list[dict[str, Any]],
+    mutation_probes: list[_MutationProbe],
 ) -> str:
     growth = compiled["growth"]
     initial = {
@@ -709,6 +1139,30 @@ def _check_state_replay(
     expected["recent_novelty"][event["novelty_key"]] = expected["turn_index"]
     expected_bytes = canonical_bytes(expected)
     try:
+        mutation_probes.extend(
+            (
+                _MutationProbe(
+                    check="state_replay",
+                    code="PACK_STATE_INPUT_MUTATION",
+                    path=("growth",),
+                    message=(
+                        "The relationship-state engine mutated a probe input."
+                    ),
+                    value=initial,
+                    expected=initial_bytes,
+                ),
+                _MutationProbe(
+                    check="state_replay",
+                    code="PACK_STATE_INPUT_MUTATION",
+                    path=("growth",),
+                    message=(
+                        "The relationship-state engine mutated a probe input."
+                    ),
+                    value=event,
+                    expected=event_bytes,
+                ),
+            )
+        )
         schemas.validate("relationship-state", initial)
         schemas.validate("interaction-event", event)
         first = apply_event(
@@ -719,6 +1173,16 @@ def _check_state_replay(
         )
         schemas.validate("relationship-state", first)
         first_bytes = canonical_bytes(first)
+        mutation_probes.append(
+            _MutationProbe(
+                check="state_replay",
+                code="PACK_STATE_INPUT_MUTATION",
+                path=("growth",),
+                message="The relationship-state engine mutated a probe input.",
+                value=first,
+                expected=first_bytes,
+            )
+        )
         replay = apply_event(
             initial,
             event,
@@ -727,6 +1191,19 @@ def _check_state_replay(
         )
         schemas.validate("relationship-state", replay)
         replay_bytes = canonical_bytes(replay)
+        mutation_probes.append(
+            _MutationProbe(
+                check="state_replay",
+                code="PACK_STATE_OUTPUT_MUTATION",
+                path=("growth",),
+                message=(
+                    "The relationship-state engine mutated a previously "
+                    "returned output."
+                ),
+                value=replay,
+                expected=replay_bytes,
+            )
+        )
         idempotent = apply_event(
             first,
             event,
@@ -735,6 +1212,19 @@ def _check_state_replay(
         )
         schemas.validate("relationship-state", idempotent)
         idempotent_bytes = canonical_bytes(idempotent)
+        mutation_probes.append(
+            _MutationProbe(
+                check="state_replay",
+                code="PACK_STATE_OUTPUT_MUTATION",
+                path=("growth",),
+                message=(
+                    "The relationship-state engine mutated a previously "
+                    "returned output."
+                ),
+                value=idempotent,
+                expected=idempotent_bytes,
+            )
+        )
     except (KokoroError, KeyError, TypeError, ValueError, OverflowError):
         findings.append(
             _finding(
@@ -794,18 +1284,20 @@ def _source_snapshot_stable(
     research_bundle: dict[str, Any] | None,
     research_bundle_bytes: bytes | None,
     source_bytes: bytes,
-    corpus: PackTestCorpus,
+    corpus_bytes: bytes | None,
     initial_snapshot: _PackSnapshot,
-    schemas: SchemaRegistry,
 ) -> bool:
     try:
         final_snapshot = _snapshot_pack(root)
-        final_source = load_source_pack_from_contents(
-            final_snapshot.contents, schemas
+        final_source = assemble_source_pack_from_contents(
+            final_snapshot.contents
         )
-        final_corpus = load_test_corpus_from_contents(
-            final_snapshot.root, final_snapshot.contents
-        )
+        try:
+            final_corpus_bytes = load_test_corpus_from_contents(
+                final_snapshot.root, final_snapshot.contents
+            ).canonical_bytes
+        except KokoroError:
+            final_corpus_bytes = None
         return (
             canonical_bytes(request) == request_bytes
             and (
@@ -815,8 +1307,10 @@ def _source_snapshot_stable(
             )
             == research_bundle_bytes
             and canonical_bytes(final_source) == source_bytes
-            and final_corpus.canonical_bytes == corpus.canonical_bytes
+            and final_corpus_bytes == corpus_bytes
             and final_snapshot.fingerprints == initial_snapshot.fingerprints
+            and final_snapshot.executable_permissions
+            == initial_snapshot.executable_permissions
         )
     except (
         KokoroError,
@@ -872,6 +1366,18 @@ def _snapshot_pack(root: Path) -> _PackSnapshot:
         contents[relative] = data
         if os.name == "posix" and file_stat.st_mode & 0o111:
             executable_permissions.append(relative)
+    final_files = scan_pack(root, limits)
+    try:
+        final_paths = tuple(
+            path.relative_to(resolved_root).as_posix() for path in final_files
+        )
+    except ValueError:
+        raise KokoroError(
+            "UNSAFE_PACK_PATH",
+            "Character pack contains an unsafe filesystem path.",
+        ) from None
+    if final_paths != tuple(item[0] for item in fingerprints):
+        raise _pack_changed()
     return _PackSnapshot(
         root=resolved_root,
         fingerprints=tuple(fingerprints),
@@ -994,8 +1500,29 @@ def _canonical_hash(value: Any) -> str:
 def _canonical_matches(value: Any, expected: bytes) -> bool:
     try:
         return canonical_bytes(value) == expected
-    except (KokoroError, RecursionError):
+    except (
+        KokoroError,
+        OverflowError,
+        RecursionError,
+        TypeError,
+        ValueError,
+    ):
         return False
+
+
+def _audit_mutation_probes(
+    checks: dict[str, list[dict[str, Any]]],
+    probes: list[_MutationProbe],
+) -> None:
+    for probe in probes:
+        if not _canonical_matches(probe.value, probe.expected):
+            checks[probe.check].append(
+                _finding(
+                    probe.code,
+                    probe.path,
+                    probe.message,
+                )
+            )
 
 
 def _domain_finding(item: Mapping[str, Any], severity: str) -> dict[str, Any]:

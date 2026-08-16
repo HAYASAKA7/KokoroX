@@ -183,18 +183,28 @@ def load_source_pack(root: Path, schemas: SchemaRegistry) -> dict[str, Any]:
     resolved_references = _resolve_reference_paths(
         root, references, scanned_files, manifest_path
     )
-    return _assemble_source_pack(
+    source = _assemble_source_pack(
         manifest,
         resolved_references,
         load_yaml,
-        schemas,
     )
+    schemas.validate("character-source", source)
+    return source
 
 
 def load_source_pack_from_contents(
     contents: Mapping[str, bytes], schemas: SchemaRegistry
 ) -> dict[str, Any]:
     """Assemble a source pack from one already-vetted immutable byte snapshot."""
+    source = assemble_source_pack_from_contents(contents)
+    schemas.validate("character-source", source)
+    return source
+
+
+def assemble_source_pack_from_contents(
+    contents: Mapping[str, bytes],
+) -> dict[str, Any]:
+    """Assemble snapshot bytes without applying the source schema gate."""
     try:
         files = dict(contents)
     except (TypeError, ValueError):
@@ -220,7 +230,6 @@ def load_source_pack_from_contents(
         manifest,
         resolved_references,
         lambda relative: parse_yaml_bytes(files[relative]),
-        schemas,
     )
 
 
@@ -243,7 +252,6 @@ def _assemble_source_pack(
     manifest: dict[str, Any],
     resolved_references: Mapping[str, list[tuple[str, _Reference]]],
     load_document: Callable[[_Reference], dict[str, Any]],
-    schemas: SchemaRegistry,
 ) -> dict[str, Any]:
     assembled = {
         key: manifest[key]
@@ -260,7 +268,6 @@ def _assemble_source_pack(
         scenario: load_document(reference)
         for scenario, reference in resolved_references["scenario_files"]
     }
-    schemas.validate("character-source", assembled)
     return assembled
 
 

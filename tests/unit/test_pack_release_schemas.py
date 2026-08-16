@@ -291,6 +291,120 @@ def test_passing_hard_report_requires_every_hard_gate_to_pass() -> None:
     _assert_invalid("pack-hard-validation-report", invalid)
 
 
+@pytest.mark.parametrize(
+    "field", ["compiled_artifact_id", "compiled_hash", "corpus_hash"]
+)
+def test_passing_hard_report_rejects_unavailable_artifact_bindings(
+    field: str,
+) -> None:
+    invalid = deepcopy(_bundle("original-minimal.json")["hard_report"])
+    invalid[field] = None
+
+    _assert_invalid("pack-hard-validation-report", invalid)
+
+
+def _blocked_result(code: str) -> dict[str, Any]:
+    return {
+        "passed": False,
+        "findings": [
+            {
+                "severity": "error",
+                "code": code,
+                "path": ["input"],
+                "message": "The prerequisite input is unavailable.",
+            }
+        ],
+    }
+
+
+def test_failed_hard_report_allows_paired_unavailable_compiled_bindings() -> None:
+    report = deepcopy(_bundle("original-minimal.json")["hard_report"])
+    report["compiled_artifact_id"] = None
+    report["compiled_hash"] = None
+    report["check_input_hashes"]["state_replay_hash"] = None
+    report["checks"]["compile"] = _blocked_result("PACK_COMPILE_FAILED")
+    report["checks"]["fixture_structure"] = _blocked_result(
+        "PACK_CHECK_INPUT_UNAVAILABLE"
+    )
+    report["checks"]["locale_coverage"] = _blocked_result(
+        "PACK_CHECK_INPUT_UNAVAILABLE"
+    )
+    report["checks"]["state_replay"] = _blocked_result(
+        "PACK_CHECK_INPUT_UNAVAILABLE"
+    )
+    report["deterministic"] = False
+    report["passed"] = False
+
+    SCHEMAS.validate("pack-hard-validation-report", report)
+
+    only_artifact_missing = deepcopy(report)
+    only_artifact_missing["compiled_hash"] = "b" * 64
+    _assert_invalid("pack-hard-validation-report", only_artifact_missing)
+
+    compile_claimed_pass = deepcopy(report)
+    compile_claimed_pass["checks"]["compile"] = {
+        "passed": True,
+        "findings": [],
+    }
+    _assert_invalid("pack-hard-validation-report", compile_claimed_pass)
+
+    deterministic_claimed = deepcopy(report)
+    deterministic_claimed["deterministic"] = True
+    _assert_invalid("pack-hard-validation-report", deterministic_claimed)
+
+
+def test_failed_hard_report_allows_unavailable_corpus_bindings() -> None:
+    report = deepcopy(_bundle("original-minimal.json")["hard_report"])
+    report["corpus_hash"] = None
+    report["check_input_hashes"]["protected_content_hash"] = None
+    report["checks"]["fixture_structure"] = _blocked_result(
+        "PACK_TEST_CORPUS_INVALID"
+    )
+    report["checks"]["locale_coverage"] = _blocked_result(
+        "PACK_TEST_CORPUS_INVALID"
+    )
+    report["checks"]["protected_content"] = _blocked_result(
+        "PACK_TEST_CORPUS_INVALID"
+    )
+    report["passed"] = False
+
+    SCHEMAS.validate("pack-hard-validation-report", report)
+
+    protected_claimed_pass = deepcopy(report)
+    protected_claimed_pass["checks"]["protected_content"] = {
+        "passed": True,
+        "findings": [],
+    }
+    _assert_invalid("pack-hard-validation-report", protected_claimed_pass)
+
+    null_without_blocker = deepcopy(report)
+    null_without_blocker["checks"]["fixture_structure"] = {
+        "passed": False,
+        "findings": [],
+    }
+    _assert_invalid("pack-hard-validation-report", null_without_blocker)
+
+
+def test_source_schema_failure_rejects_claimed_compiled_artifact() -> None:
+    invalid = deepcopy(_bundle("original-minimal.json")["hard_report"])
+    invalid["checks"]["source_schema"] = _blocked_result(
+        "PACK_SOURCE_SCHEMA_INVALID"
+    )
+    invalid["passed"] = False
+
+    _assert_invalid("pack-hard-validation-report", invalid)
+
+
+def test_corpus_invalid_finding_rejects_claimed_corpus_artifact() -> None:
+    invalid = deepcopy(_bundle("original-minimal.json")["hard_report"])
+    invalid["checks"]["fixture_structure"] = _blocked_result(
+        "PACK_TEST_CORPUS_INVALID"
+    )
+    invalid["passed"] = False
+
+    _assert_invalid("pack-hard-validation-report", invalid)
+
+
 def test_passing_soft_report_requires_every_dimension_to_pass() -> None:
     invalid = deepcopy(_bundle("original-minimal.json")["soft_report"])
     invalid["results"]["locale_naturalness"]["passed"] = False
