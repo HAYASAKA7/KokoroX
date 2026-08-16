@@ -161,9 +161,9 @@
       "additionalProperties": false,
       "required": ["min_samples", "min_confidence", "threshold"],
       "properties": {
-        "min_samples": {"type": "integer", "minimum": 1, "maximum": 256},
-        "min_confidence": {"type": "number", "minimum": 0, "maximum": 1},
-        "threshold": {"type": "number", "minimum": 0, "maximum": 1}
+        "min_samples": {"const": 3},
+        "min_confidence": {"const": 0.8},
+        "threshold": {"const": 0.8}
       }
     },
     "dimension_policies": {
@@ -191,8 +191,8 @@
       "additionalProperties": false,
       "required": ["profile_id", "version", "aggregation", "dimensions"],
       "properties": {
-        "profile_id": {"$ref": "#/$defs/stable_id"},
-        "version": {"$ref": "#/$defs/semantic_version"},
+        "profile_id": {"const": "default-release"},
+        "version": {"const": "1.0.0"},
         "aggregation": {"const": "lower_confidence_bound"},
         "dimensions": {"$ref": "#/$defs/dimension_policies"}
       }
@@ -220,7 +220,49 @@
           "uniqueItems": true,
           "items": {"$ref": "#/$defs/finding_code"}
         }
-      }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {"passed": {"const": true}},
+            "required": ["passed"]
+          },
+          "then": {
+            "properties": {
+              "sample_count": {"minimum": 3},
+              "score": {"minimum": 0.8},
+              "confidence": {"minimum": 0.8},
+              "lower_bound": {"minimum": 0.8},
+              "finding_codes": {
+                "not": {
+                  "contains": {
+                    "enum": [
+                      "SOFT_INSUFFICIENT_SAMPLES",
+                      "SOFT_CONFIDENCE_BELOW_MINIMUM",
+                      "SOFT_LOWER_BOUND_BELOW_THRESHOLD",
+                      "SOFT_REQUIRED_LOCALE_MISSING"
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "finding_codes": {
+                "contains": {
+                  "enum": [
+                    "SOFT_INSUFFICIENT_SAMPLES",
+                    "SOFT_CONFIDENCE_BELOW_MINIMUM",
+                    "SOFT_LOWER_BOUND_BELOW_THRESHOLD",
+                    "SOFT_REQUIRED_LOCALE_MISSING"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      ]
     },
     "dimension_results": {
       "type": "object",

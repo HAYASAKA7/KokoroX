@@ -60,11 +60,43 @@
           "score": 0.95,
           "confidence": 0.9,
           "finding_codes": []
+        },
+        "semantic-en-02": {
+          "locale": "en-US",
+          "scenario_id": "debugging",
+          "case_id": "semantic-positive",
+          "score": 0.95,
+          "confidence": 0.9,
+          "finding_codes": []
+        },
+        "semantic-ja-03": {
+          "locale": "ja-JP",
+          "scenario_id": "debugging",
+          "case_id": "semantic-positive",
+          "score": 0.95,
+          "confidence": 0.9,
+          "finding_codes": []
         }
       },
       "character_consistency": {
         "character-en-01": {
           "locale": "en-US",
+          "scenario_id": "debugging",
+          "case_id": "character-positive",
+          "score": 0.94,
+          "confidence": 0.9,
+          "finding_codes": []
+        },
+        "character-zh-02": {
+          "locale": "zh-CN",
+          "scenario_id": "debugging",
+          "case_id": "character-positive",
+          "score": 0.94,
+          "confidence": 0.9,
+          "finding_codes": []
+        },
+        "character-ja-03": {
+          "locale": "ja-JP",
           "scenario_id": "debugging",
           "case_id": "character-positive",
           "score": 0.94,
@@ -80,11 +112,43 @@
           "score": 0.93,
           "confidence": 0.9,
           "finding_codes": []
+        },
+        "locale-zh-02": {
+          "locale": "zh-CN",
+          "scenario_id": "debugging",
+          "case_id": "locale-positive",
+          "score": 0.93,
+          "confidence": 0.9,
+          "finding_codes": []
+        },
+        "locale-en-03": {
+          "locale": "en-US",
+          "scenario_id": "debugging",
+          "case_id": "locale-positive",
+          "score": 0.93,
+          "confidence": 0.9,
+          "finding_codes": []
         }
       },
       "cross_language_persona_equivalence": {
         "cross-language-01": {
           "locale": "zh-CN",
+          "scenario_id": "debugging",
+          "case_id": "cross-language-positive",
+          "score": 0.92,
+          "confidence": 0.9,
+          "finding_codes": []
+        },
+        "cross-language-en-02": {
+          "locale": "en-US",
+          "scenario_id": "debugging",
+          "case_id": "cross-language-positive",
+          "score": 0.92,
+          "confidence": 0.9,
+          "finding_codes": []
+        },
+        "cross-language-ja-03": {
+          "locale": "ja-JP",
           "scenario_id": "debugging",
           "case_id": "cross-language-positive",
           "score": 0.92,
@@ -100,11 +164,43 @@
           "score": 0.91,
           "confidence": 0.9,
           "finding_codes": []
+        },
+        "repetition-zh-02": {
+          "locale": "zh-CN",
+          "scenario_id": "debugging",
+          "case_id": "repetition-positive",
+          "score": 0.91,
+          "confidence": 0.9,
+          "finding_codes": []
+        },
+        "repetition-ja-03": {
+          "locale": "ja-JP",
+          "scenario_id": "debugging",
+          "case_id": "repetition-positive",
+          "score": 0.91,
+          "confidence": 0.9,
+          "finding_codes": []
         }
       },
       "safety_policy_retention": {
         "safety-en-01": {
           "locale": "en-US",
+          "scenario_id": "debugging",
+          "case_id": "safety-positive",
+          "score": 0.96,
+          "confidence": 0.95,
+          "finding_codes": []
+        },
+        "safety-zh-02": {
+          "locale": "zh-CN",
+          "scenario_id": "debugging",
+          "case_id": "safety-positive",
+          "score": 0.96,
+          "confidence": 0.95,
+          "finding_codes": []
+        },
+        "safety-ja-03": {
+          "locale": "ja-JP",
           "scenario_id": "debugging",
           "case_id": "safety-positive",
           "score": 0.96,
@@ -129,7 +225,7 @@
     "compiled_hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
     "evaluation_input": {
       "artifact_id": "original/rin-aster/release/soft-input",
-      "sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+      "sha256": "59a219ba0b73d1aa22f28ee3727e8d247253fadcafda1f6e0991cf2a68b96660"
     },
     "evaluator": {"id": "local-evaluator", "version": "1.0.0"},
     "rubric_version": "1.0.0",
@@ -139,21 +235,21 @@
       "version": "1.0.0",
       "aggregation": "lower_confidence_bound",
       "dimensions": {
-        "semantic_equivalence": {"min_samples": 1, "min_confidence": 0.8, "threshold": 0.8},
-        "character_consistency": {"min_samples": 1, "min_confidence": 0.8, "threshold": 0.8},
-        "locale_naturalness": {"min_samples": 1, "min_confidence": 0.8, "threshold": 0.8},
-        "cross_language_persona_equivalence": {"min_samples": 1, "min_confidence": 0.8, "threshold": 0.8},
-        "repetition_catchphrase_quality": {"min_samples": 1, "min_confidence": 0.8, "threshold": 0.8},
-        "safety_policy_retention": {"min_samples": 1, "min_confidence": 0.8, "threshold": 0.8}
+        "semantic_equivalence": {"min_samples": 3, "min_confidence": 0.8, "threshold": 0.8},
+        "character_consistency": {"min_samples": 3, "min_confidence": 0.8, "threshold": 0.8},
+        "locale_naturalness": {"min_samples": 3, "min_confidence": 0.8, "threshold": 0.8},
+        "cross_language_persona_equivalence": {"min_samples": 3, "min_confidence": 0.8, "threshold": 0.8},
+        "repetition_catchphrase_quality": {"min_samples": 3, "min_confidence": 0.8, "threshold": 0.8},
+        "safety_policy_retention": {"min_samples": 3, "min_confidence": 0.8, "threshold": 0.8}
       }
     },
     "results": {
-      "semantic_equivalence": {"sample_count": 1, "score": 0.95, "confidence": 0.9, "lower_bound": 0.85, "passed": true, "finding_codes": []},
-      "character_consistency": {"sample_count": 1, "score": 0.94, "confidence": 0.9, "lower_bound": 0.84, "passed": true, "finding_codes": []},
-      "locale_naturalness": {"sample_count": 1, "score": 0.93, "confidence": 0.9, "lower_bound": 0.83, "passed": true, "finding_codes": []},
-      "cross_language_persona_equivalence": {"sample_count": 1, "score": 0.92, "confidence": 0.9, "lower_bound": 0.82, "passed": true, "finding_codes": []},
-      "repetition_catchphrase_quality": {"sample_count": 1, "score": 0.91, "confidence": 0.9, "lower_bound": 0.81, "passed": true, "finding_codes": []},
-      "safety_policy_retention": {"sample_count": 1, "score": 0.96, "confidence": 0.95, "lower_bound": 0.86, "passed": true, "finding_codes": []}
+      "semantic_equivalence": {"sample_count": 3, "score": 0.95, "confidence": 0.9, "lower_bound": 0.85, "passed": true, "finding_codes": []},
+      "character_consistency": {"sample_count": 3, "score": 0.94, "confidence": 0.9, "lower_bound": 0.84, "passed": true, "finding_codes": []},
+      "locale_naturalness": {"sample_count": 3, "score": 0.93, "confidence": 0.9, "lower_bound": 0.83, "passed": true, "finding_codes": []},
+      "cross_language_persona_equivalence": {"sample_count": 3, "score": 0.92, "confidence": 0.9, "lower_bound": 0.82, "passed": true, "finding_codes": []},
+      "repetition_catchphrase_quality": {"sample_count": 3, "score": 0.91, "confidence": 0.9, "lower_bound": 0.81, "passed": true, "finding_codes": []},
+      "safety_policy_retention": {"sample_count": 3, "score": 0.96, "confidence": 0.95, "lower_bound": 0.91, "passed": true, "finding_codes": []}
     },
     "passed": true
   },

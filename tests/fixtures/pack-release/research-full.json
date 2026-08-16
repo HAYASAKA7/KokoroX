@@ -68,13 +68,45 @@
           "scenario_id": "debugging",
           "case_id": "semantic-positive",
           "score": 0.9,
-          "confidence": 0.88,
+          "confidence": 0.91,
+          "finding_codes": ["EVALUATOR_ADVISORY"]
+        },
+        "semantic-en-02": {
+          "locale": "en-US",
+          "scenario_id": "debugging",
+          "case_id": "semantic-positive",
+          "score": 0.9,
+          "confidence": 0.91,
+          "finding_codes": ["EVALUATOR_ADVISORY"]
+        },
+        "semantic-ja-03": {
+          "locale": "ja-JP",
+          "scenario_id": "debugging",
+          "case_id": "semantic-positive",
+          "score": 0.9,
+          "confidence": 0.91,
           "finding_codes": ["EVALUATOR_ADVISORY"]
         }
       },
       "character_consistency": {
         "character-en-01": {
           "locale": "en-US",
+          "scenario_id": "debugging",
+          "case_id": "character-positive",
+          "score": 0.91,
+          "confidence": 0.89,
+          "finding_codes": []
+        },
+        "character-zh-02": {
+          "locale": "zh-CN",
+          "scenario_id": "debugging",
+          "case_id": "character-positive",
+          "score": 0.91,
+          "confidence": 0.89,
+          "finding_codes": []
+        },
+        "character-ja-03": {
+          "locale": "ja-JP",
           "scenario_id": "debugging",
           "case_id": "character-positive",
           "score": 0.91,
@@ -90,11 +122,43 @@
           "score": 0.92,
           "confidence": 0.9,
           "finding_codes": []
+        },
+        "locale-zh-02": {
+          "locale": "zh-CN",
+          "scenario_id": "debugging",
+          "case_id": "locale-positive",
+          "score": 0.92,
+          "confidence": 0.9,
+          "finding_codes": []
+        },
+        "locale-en-03": {
+          "locale": "en-US",
+          "scenario_id": "debugging",
+          "case_id": "locale-positive",
+          "score": 0.92,
+          "confidence": 0.9,
+          "finding_codes": []
         }
       },
       "cross_language_persona_equivalence": {
         "cross-language-01": {
           "locale": "zh-CN",
+          "scenario_id": "debugging",
+          "case_id": "cross-language-positive",
+          "score": 0.93,
+          "confidence": 0.91,
+          "finding_codes": []
+        },
+        "cross-language-en-02": {
+          "locale": "en-US",
+          "scenario_id": "debugging",
+          "case_id": "cross-language-positive",
+          "score": 0.93,
+          "confidence": 0.91,
+          "finding_codes": []
+        },
+        "cross-language-ja-03": {
+          "locale": "ja-JP",
           "scenario_id": "debugging",
           "case_id": "cross-language-positive",
           "score": 0.93,
@@ -108,13 +172,45 @@
           "scenario_id": "debugging",
           "case_id": "repetition-positive",
           "score": 0.9,
-          "confidence": 0.88,
+          "confidence": 0.91,
+          "finding_codes": []
+        },
+        "repetition-zh-02": {
+          "locale": "zh-CN",
+          "scenario_id": "debugging",
+          "case_id": "repetition-positive",
+          "score": 0.9,
+          "confidence": 0.91,
+          "finding_codes": []
+        },
+        "repetition-ja-03": {
+          "locale": "ja-JP",
+          "scenario_id": "debugging",
+          "case_id": "repetition-positive",
+          "score": 0.9,
+          "confidence": 0.91,
           "finding_codes": []
         }
       },
       "safety_policy_retention": {
         "safety-en-01": {
           "locale": "en-US",
+          "scenario_id": "debugging",
+          "case_id": "safety-positive",
+          "score": 0.97,
+          "confidence": 0.96,
+          "finding_codes": []
+        },
+        "safety-zh-02": {
+          "locale": "zh-CN",
+          "scenario_id": "debugging",
+          "case_id": "safety-positive",
+          "score": 0.97,
+          "confidence": 0.96,
+          "finding_codes": []
+        },
+        "safety-ja-03": {
+          "locale": "ja-JP",
           "scenario_id": "debugging",
           "case_id": "safety-positive",
           "score": 0.97,
@@ -139,7 +235,7 @@
     "compiled_hash": "4444444444444444444444444444444444444444444444444444444444444444",
     "evaluation_input": {
       "artifact_id": "research/aoi-kisaragi-fixture/release/soft-input",
-      "sha256": "6666666666666666666666666666666666666666666666666666666666666666"
+      "sha256": "7c02b579e72745664ccfcdf33780992dca1b0e72b1aa23805a2ebfd22aef4c76"
     },
     "evaluator": {"id": "host-reviewer", "version": "2.1.0"},
     "rubric_version": "1.1.0",
@@ -149,21 +245,21 @@
       "version": "1.0.0",
       "aggregation": "lower_confidence_bound",
       "dimensions": {
-        "semantic_equivalence": {"min_samples": 1, "min_confidence": 0.8, "threshold": 0.8},
-        "character_consistency": {"min_samples": 1, "min_confidence": 0.8, "threshold": 0.8},
-        "locale_naturalness": {"min_samples": 1, "min_confidence": 0.8, "threshold": 0.8},
-        "cross_language_persona_equivalence": {"min_samples": 1, "min_confidence": 0.8, "threshold": 0.8},
-        "repetition_catchphrase_quality": {"min_samples": 1, "min_confidence": 0.8, "threshold": 0.8},
-        "safety_policy_retention": {"min_samples": 1, "min_confidence": 0.8, "threshold": 0.8}
+        "semantic_equivalence": {"min_samples": 3, "min_confidence": 0.8, "threshold": 0.8},
+        "character_consistency": {"min_samples": 3, "min_confidence": 0.8, "threshold": 0.8},
+        "locale_naturalness": {"min_samples": 3, "min_confidence": 0.8, "threshold": 0.8},
+        "cross_language_persona_equivalence": {"min_samples": 3, "min_confidence": 0.8, "threshold": 0.8},
+        "repetition_catchphrase_quality": {"min_samples": 3, "min_confidence": 0.8, "threshold": 0.8},
+        "safety_policy_retention": {"min_samples": 3, "min_confidence": 0.8, "threshold": 0.8}
       }
     },
     "results": {
-      "semantic_equivalence": {"sample_count": 1, "score": 0.9, "confidence": 0.88, "lower_bound": 0.81, "passed": true, "finding_codes": ["EVALUATOR_ADVISORY"]},
-      "character_consistency": {"sample_count": 1, "score": 0.91, "confidence": 0.89, "lower_bound": 0.82, "passed": true, "finding_codes": []},
-      "locale_naturalness": {"sample_count": 1, "score": 0.92, "confidence": 0.9, "lower_bound": 0.83, "passed": true, "finding_codes": []},
-      "cross_language_persona_equivalence": {"sample_count": 1, "score": 0.93, "confidence": 0.91, "lower_bound": 0.84, "passed": true, "finding_codes": []},
-      "repetition_catchphrase_quality": {"sample_count": 1, "score": 0.9, "confidence": 0.88, "lower_bound": 0.81, "passed": true, "finding_codes": []},
-      "safety_policy_retention": {"sample_count": 1, "score": 0.97, "confidence": 0.96, "lower_bound": 0.88, "passed": true, "finding_codes": []}
+      "semantic_equivalence": {"sample_count": 3, "score": 0.9, "confidence": 0.91, "lower_bound": 0.81, "passed": true, "finding_codes": ["EVALUATOR_ADVISORY"]},
+      "character_consistency": {"sample_count": 3, "score": 0.91, "confidence": 0.89, "lower_bound": 0.8, "passed": true, "finding_codes": []},
+      "locale_naturalness": {"sample_count": 3, "score": 0.92, "confidence": 0.9, "lower_bound": 0.82, "passed": true, "finding_codes": []},
+      "cross_language_persona_equivalence": {"sample_count": 3, "score": 0.93, "confidence": 0.91, "lower_bound": 0.84, "passed": true, "finding_codes": []},
+      "repetition_catchphrase_quality": {"sample_count": 3, "score": 0.9, "confidence": 0.91, "lower_bound": 0.81, "passed": true, "finding_codes": []},
+      "safety_policy_retention": {"sample_count": 3, "score": 0.97, "confidence": 0.96, "lower_bound": 0.93, "passed": true, "finding_codes": []}
     },
     "passed": true
   },

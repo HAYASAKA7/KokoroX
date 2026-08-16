@@ -138,7 +138,7 @@ or synthetic error hash is permitted.
 - locale/scenario/case IDs;
 - dimension score in `0..1`;
 - confidence in `0..1`;
-- optional bounded finding codes, never executable instructions.
+- a required bounded finding-code list, which may be empty and never contains executable instructions.
 
 `pack-soft-evaluation-report.schema.json` contains deterministic aggregation. Required dimensions are:
 
@@ -150,6 +150,19 @@ or synthetic error hash is permitted.
 - safety-policy retention.
 
 The threshold profile records minimum samples, minimum confidence, aggregation method, and threshold for each dimension. The default uses a lower confidence bound and never converts one unexplained scalar into a release decision. Soft output cannot change runtime or relationship state.
+
+The v1 aggregation contract is deliberately closed:
+
+- one input artifact carries one source, compiled, evaluator, rubric, and fixture binding; every sample inherits those root bindings and sample-local overrides are invalid;
+- a logical sample is the `(locale, scenario_id, case_id)` tuple within one dimension and cannot be repeated under another sample ID;
+- `default-release@1.0.0` is the only supported threshold profile in v0.3, requires at least three samples and all of `zh-CN`, `en-US`, and `ja-JP` in every dimension, and sets minimum aggregate confidence and lower-bound threshold to `0.8`;
+- score and confidence are order-independent arithmetic means computed with decimal arithmetic, normalized to six decimal places with round-half-even, and the reported lower bound is `max(0, mean_score - (1 - mean_confidence))` using the same normalized decision values shown in the report;
+- a dimension passes only when sample count, locale coverage, normalized confidence, and normalized lower bound all pass; generated failure codes and evaluator codes are sorted and deduplicated, and evaluator input cannot claim aggregator-owned failure codes; and
+- the report binds the canonical SHA-256 of the exact input artifact, validates a disposable copy of all untrusted data, returns detached data, and fails if the caller-owned input changes during aggregation.
+
+The report schema is the closed structural envelope, not a substitute for semantic currentness. Any promotion or other acceptance decision must re-aggregate the exact bound soft-input artifact with the declared threshold profile and require byte-for-byte equality with the candidate report. This currentness check enforces the sibling-field lower-bound formula and six-place normalization that JSON Schema cannot express by comparing sibling numeric values.
+
+Missing samples, locale coverage, confidence, or threshold produce a deterministic failed report. Malformed structure, duplicate logical samples, mixed/sample-local bindings, non-finite numbers, unsupported profiles, or result-overflow attempts fail closed with stable errors. Aggregation imports no provider or network client and never evaluates input text, launches a process, or reads or writes runtime, relationship, or memory state.
 
 ### 5.4 Review and promotion
 

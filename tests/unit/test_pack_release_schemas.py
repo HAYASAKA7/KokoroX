@@ -413,6 +413,60 @@ def test_passing_soft_report_requires_every_dimension_to_pass() -> None:
 
 
 @pytest.mark.parametrize(
+    "field,value",
+    [
+        ("min_samples", 1),
+        ("min_confidence", 0.79),
+        ("threshold", 0.79),
+    ],
+)
+def test_default_soft_threshold_profile_cannot_be_weakened(
+    field: str, value: int | float
+) -> None:
+    invalid = deepcopy(_bundle("original-minimal.json")["soft_report"])
+    invalid["threshold_profile"]["dimensions"]["semantic_equivalence"][
+        field
+    ] = value
+
+    _assert_invalid("pack-soft-evaluation-report", invalid)
+
+
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("sample_count", 2),
+        ("score", 0.79),
+        ("confidence", 0.79),
+        ("lower_bound", 0.79),
+    ],
+)
+def test_passing_soft_dimension_meets_default_release_thresholds(
+    field: str, value: int | float
+) -> None:
+    invalid = deepcopy(_bundle("original-minimal.json")["soft_report"])
+    invalid["results"]["semantic_equivalence"][field] = value
+
+    _assert_invalid("pack-soft-evaluation-report", invalid)
+
+
+def test_passing_soft_dimension_rejects_aggregator_failure_code() -> None:
+    invalid = deepcopy(_bundle("original-minimal.json")["soft_report"])
+    invalid["results"]["semantic_equivalence"]["finding_codes"] = [
+        "SOFT_INSUFFICIENT_SAMPLES"
+    ]
+
+    _assert_invalid("pack-soft-evaluation-report", invalid)
+
+
+def test_failed_soft_dimension_requires_an_aggregator_failure_code() -> None:
+    invalid = deepcopy(_bundle("original-minimal.json")["soft_report"])
+    invalid["passed"] = False
+    invalid["results"]["semantic_equivalence"]["passed"] = False
+
+    _assert_invalid("pack-soft-evaluation-report", invalid)
+
+
+@pytest.mark.parametrize(
     "from_status,to_status",
     [
         ("draft", "verified"),
