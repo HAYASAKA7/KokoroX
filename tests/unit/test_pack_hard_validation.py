@@ -175,6 +175,70 @@ def test_request_context_change_invalidates_report_reuse() -> None:
     assert hard_report_is_current(report, RIN_PACK, changed, SCHEMAS) is False
 
 
+def test_rejects_provenance_validator_request_mutation(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    request = load_json(ORIGINAL_REQUEST)
+    original = deepcopy(request)
+    real_validate = hard_module.validate_authoring_pack
+
+    def mutating_validate(
+        request_input: dict[str, Any],
+        source_input: dict[str, Any],
+        *args: Any,
+        **kwargs: Any,
+    ) -> dict[str, Any]:
+        result = real_validate(request_input, source_input, *args, **kwargs)
+        request_input["mode"] = "dossier"
+        return result
+
+    monkeypatch.setattr(
+        hard_module, "validate_authoring_pack", mutating_validate
+    )
+
+    report = run_hard_validation(RIN_PACK, request, SCHEMAS)
+
+    assert request == original
+    assert report["mode"] == "original"
+    assert report["checks"]["provenance"]["passed"] is False
+    assert "PACK_PROVENANCE_INPUT_MUTATION" in finding_codes(
+        report, "provenance"
+    )
+    assert report["passed"] is False
+
+
+def test_rejects_provenance_validator_source_mutation(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    real_validate = hard_module.validate_authoring_pack
+
+    def mutating_validate(
+        request_input: dict[str, Any],
+        source_input: dict[str, Any],
+        *args: Any,
+        **kwargs: Any,
+    ) -> dict[str, Any]:
+        result = real_validate(request_input, source_input, *args, **kwargs)
+        source_input["character_id"] = "rin-mutant"
+        return result
+
+    monkeypatch.setattr(
+        hard_module, "validate_authoring_pack", mutating_validate
+    )
+
+    report = run_hard_validation(
+        RIN_PACK, load_json(ORIGINAL_REQUEST), SCHEMAS
+    )
+
+    assert report["character_id"] == "rin-aster"
+    assert report["source_artifact_id"] == "original/rin-aster/source"
+    assert report["checks"]["provenance"]["passed"] is False
+    assert "PACK_PROVENANCE_INPUT_MUTATION" in finding_codes(
+        report, "provenance"
+    )
+    assert report["passed"] is False
+
+
 def test_reports_cross_artifact_provenance_failures_without_guessing_mode() -> None:
     request = load_json(
         REPOSITORY_ROOT
@@ -241,7 +305,10 @@ def test_reports_two_pass_compilation_nondeterminism_through_shared_alias(
     report = run_hard_validation(RIN_PACK, load_json(ORIGINAL_REQUEST), SCHEMAS)
 
     assert report["checks"]["compile"]["passed"] is False
-    assert finding_codes(report, "compile") == ["PACK_COMPILE_NONDETERMINISTIC"]
+    assert finding_codes(report, "compile") == [
+        "PACK_COMPILE_NONDETERMINISTIC",
+        "PACK_COMPILE_OUTPUT_MUTATION",
+    ]
     assert report["deterministic"] is False
     assert report["passed"] is False
 
@@ -267,6 +334,66 @@ def test_reports_compiler_input_mutation_even_when_outputs_are_stable(
 
     assert report["checks"]["compile"]["passed"] is False
     assert finding_codes(report, "compile") == ["PACK_COMPILE_INPUT_MUTATION"]
+    assert report["deterministic"] is False
+    assert report["passed"] is False
+
+
+def test_reports_delayed_first_compiler_input_mutation(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    real_compile = hard_module.compile_pack
+    first_input: dict[str, Any] | None = None
+
+    def delayed_input_mutation(
+        source: dict[str, Any], *args: Any, **kwargs: Any
+    ) -> dict[str, Any]:
+        nonlocal first_input
+        if first_input is None:
+            first_input = source
+        else:
+            first_input["behavior"]["correction_style"] = "delayed mutation"
+        return real_compile(source, *args, **kwargs)
+
+    monkeypatch.setattr(hard_module, "compile_pack", delayed_input_mutation)
+
+    report = run_hard_validation(
+        RIN_PACK, load_json(ORIGINAL_REQUEST), SCHEMAS
+    )
+
+    assert report["checks"]["compile"]["passed"] is False
+    assert finding_codes(report, "compile") == ["PACK_COMPILE_INPUT_MUTATION"]
+    assert report["deterministic"] is False
+    assert report["passed"] is False
+
+
+def test_reports_delayed_first_compiler_output_mutation(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    real_compile = hard_module.compile_pack
+    first_output: dict[str, Any] | None = None
+
+    def delayed_output_mutation(
+        source: dict[str, Any], *args: Any, **kwargs: Any
+    ) -> dict[str, Any]:
+        nonlocal first_output
+        result = real_compile(source, *args, **kwargs)
+        if first_output is None:
+            first_output = result
+        else:
+            first_output["artifact_id"] = "original/rin-aster/compiled-mutant"
+        return result
+
+    monkeypatch.setattr(hard_module, "compile_pack", delayed_output_mutation)
+
+    report = run_hard_validation(
+        RIN_PACK, load_json(ORIGINAL_REQUEST), SCHEMAS
+    )
+
+    assert report["compiled_artifact_id"] == "original/rin-aster/compiled"
+    assert report["checks"]["compile"]["passed"] is False
+    assert finding_codes(report, "compile") == [
+        "PACK_COMPILE_OUTPUT_MUTATION"
+    ]
     assert report["deterministic"] is False
     assert report["passed"] is False
 
@@ -338,6 +465,35 @@ def test_reports_protected_span_and_warning_pipeline_drift(
         "PACK_REQUIRED_WARNING_MISSING",
         "PACK_RUNTIME_VALIDATION_FAILED",
     ]
+
+
+def test_reports_runtime_validator_plan_input_mutation(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    real_validate = hard_module.validate_rendered_output
+
+    def mutating_validate(
+        rendered: dict[str, Any],
+        semantic: dict[str, Any],
+        plan: dict[str, Any],
+    ) -> dict[str, Any]:
+        result = real_validate(rendered, semantic, plan)
+        plan["artifact_id"] = "plan/pack-hard-validation-mutant"
+        return result
+
+    monkeypatch.setattr(
+        hard_module, "validate_rendered_output", mutating_validate
+    )
+
+    report = run_hard_validation(
+        RIN_PACK, load_json(ORIGINAL_REQUEST), SCHEMAS
+    )
+
+    assert report["checks"]["protected_content"]["passed"] is False
+    assert finding_codes(report, "protected_content") == [
+        "PACK_PROTECTED_INPUT_MUTATION"
+    ]
+    assert report["passed"] is False
 
 
 def test_reports_state_replay_drift(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -456,6 +612,77 @@ def test_reports_idempotent_probe_input_mutation_with_detached_output(
     assert report["checks"]["state_replay"]["passed"] is False
     assert finding_codes(report, "state_replay") == ["PACK_STATE_INPUT_MUTATION"]
     assert report["deterministic"] is False
+    assert report["passed"] is False
+
+
+def test_reports_replay_output_mutation_during_idempotent_probe(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    real_apply = hard_module.apply_event
+    replay_output: dict[str, Any] | None = None
+    calls = 0
+
+    def mutate_replay_output(
+        state: dict[str, Any], event: dict[str, Any], **kwargs: Any
+    ) -> dict[str, Any]:
+        nonlocal calls, replay_output
+        calls += 1
+        if calls == 3 and replay_output is not None:
+            replay_output["dimensions"]["trust"] += 0.25
+        result = real_apply(state, event, **kwargs)
+        if calls == 2:
+            replay_output = result
+        return result
+
+    monkeypatch.setattr(hard_module, "apply_event", mutate_replay_output)
+
+    report = run_hard_validation(
+        RIN_PACK, load_json(ORIGINAL_REQUEST), SCHEMAS
+    )
+
+    assert report["checks"]["state_replay"]["passed"] is False
+    assert finding_codes(report, "state_replay") == [
+        "PACK_STATE_OUTPUT_MUTATION"
+    ]
+    assert report["deterministic"] is False
+    assert report["passed"] is False
+
+
+def test_finding_limit_retains_release_blocker_and_fails_closed(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    real_validate = hard_module.validate_authoring_pack
+
+    def crowded_validate(*args: Any, **kwargs: Any) -> dict[str, Any]:
+        result = real_validate(*args, **kwargs)
+        result["advisory_findings"] = [
+            {
+                "code": f"AAA_ADVISORY_{index:03d}",
+                "path": ["evidence", index],
+                "message": f"Advisory finding {index}.",
+            }
+            for index in range(256)
+        ]
+        result["hard_failures"] = [
+            {
+                "code": "ZZZ_RELEASE_BLOCKER",
+                "path": ["evidence"],
+                "message": "Release-blocking finding.",
+            }
+        ]
+        result["valid"] = False
+        return result
+
+    monkeypatch.setattr(hard_module, "validate_authoring_pack", crowded_validate)
+
+    report = run_hard_validation(
+        RIN_PACK, load_json(ORIGINAL_REQUEST), SCHEMAS
+    )
+    findings = report["checks"]["provenance"]["findings"]
+
+    assert len(findings) == 256
+    assert any(item["code"] == "ZZZ_RELEASE_BLOCKER" for item in findings)
+    assert report["checks"]["provenance"]["passed"] is False
     assert report["passed"] is False
 
 

@@ -91,11 +91,11 @@ def run_hard_validation(
     """
     schemas.validate("character-build-request", request)
     request_bytes = canonical_bytes(request)
-    request_copy = cast(dict[str, Any], json.loads(request_bytes))
+    request_snapshot = cast(dict[str, Any], json.loads(request_bytes))
     research_bundle_bytes = (
         canonical_bytes(research_bundle) if research_bundle is not None else None
     )
-    research_bundle_copy = (
+    research_bundle_snapshot = (
         cast(dict[str, Any], json.loads(research_bundle_bytes))
         if research_bundle_bytes is not None
         else None
@@ -109,42 +109,65 @@ def run_hard_validation(
     schemas.validate("character-source", source)
     source_bytes = canonical_bytes(source)
     source_hash = sha256(source_bytes).hexdigest()
+    source_snapshot = cast(dict[str, Any], json.loads(source_bytes))
 
     checks: dict[str, list[dict[str, Any]]] = {
         name: [] for name in _CHECK_NAMES
     }
     _check_layout(initial_snapshot, checks["pack_layout"])
     _check_security(initial_snapshot, checks["security"])
+    provenance_request = cast(dict[str, Any], json.loads(request_bytes))
+    provenance_source = cast(dict[str, Any], json.loads(source_bytes))
+    provenance_bundle = (
+        cast(dict[str, Any], json.loads(research_bundle_bytes))
+        if research_bundle_bytes is not None
+        else None
+    )
     _check_provenance(
-        request_copy,
-        source,
+        provenance_request,
+        provenance_source,
         schemas,
-        research_bundle_copy,
+        provenance_bundle,
         checks["provenance"],
         checks["locale_coverage"],
     )
+    if not (
+        _canonical_matches(provenance_request, request_bytes)
+        and _canonical_matches(provenance_source, source_bytes)
+        and (
+            provenance_bundle is None
+            if research_bundle_bytes is None
+            else _canonical_matches(provenance_bundle, research_bundle_bytes)
+        )
+    ):
+        checks["provenance"].append(
+            _finding(
+                "PACK_PROVENANCE_INPUT_MUTATION",
+                ["provenance"],
+                "Provenance validation mutated a canonical probe input.",
+            )
+        )
 
     first_compile_input = cast(dict[str, Any], json.loads(source_bytes))
     first_compiled = compile_pack(first_compile_input, schemas)
     schemas.validate("compiled-pack", first_compiled)
     first_compiled_bytes = canonical_bytes(first_compiled)
-    try:
-        first_compile_input_stable = (
-            canonical_bytes(first_compile_input) == source_bytes
-        )
-    except KokoroError:
-        first_compile_input_stable = False
-
     second_compile_input = cast(dict[str, Any], json.loads(source_bytes))
     second_compiled = compile_pack(second_compile_input, schemas)
     schemas.validate("compiled-pack", second_compiled)
     second_compiled_bytes = canonical_bytes(second_compiled)
-    try:
-        second_compile_input_stable = (
-            canonical_bytes(second_compile_input) == source_bytes
-        )
-    except KokoroError:
-        second_compile_input_stable = False
+    first_compile_input_stable = _canonical_matches(
+        first_compile_input, source_bytes
+    )
+    second_compile_input_stable = _canonical_matches(
+        second_compile_input, source_bytes
+    )
+    first_compiled_stable = _canonical_matches(
+        first_compiled, first_compiled_bytes
+    )
+    second_compiled_stable = _canonical_matches(
+        second_compiled, second_compiled_bytes
+    )
     if not first_compile_input_stable or not second_compile_input_stable:
         checks["compile"].append(
             _finding(
@@ -153,7 +176,16 @@ def run_hard_validation(
                 "Compilation mutated its source input.",
             )
         )
-    if first_compiled.get("source_hash") != source_hash:
+    if not first_compiled_stable or not second_compiled_stable:
+        checks["compile"].append(
+            _finding(
+                "PACK_COMPILE_OUTPUT_MUTATION",
+                ["compiled"],
+                "Compilation mutated a previously returned output.",
+            )
+        )
+    compiled_snapshot = cast(dict[str, Any], json.loads(first_compiled_bytes))
+    if compiled_snapshot.get("source_hash") != source_hash:
         checks["compile"].append(
             _finding(
                 "PACK_COMPILED_SOURCE_MISMATCH",
@@ -171,16 +203,22 @@ def run_hard_validation(
         )
 
     _check_fixture_structure(
-        corpus, first_compiled, checks["fixture_structure"]
+        corpus,
+        cast(dict[str, Any], json.loads(first_compiled_bytes)),
+        checks["fixture_structure"],
     )
     _check_locale_coverage(
-        corpus, first_compiled, checks["locale_coverage"]
+        corpus,
+        cast(dict[str, Any], json.loads(first_compiled_bytes)),
+        checks["locale_coverage"],
     )
     protected_content_hash = _check_protected_content(
         corpus, schemas, checks["protected_content"]
     )
     state_replay_hash = _check_state_replay(
-        first_compiled, schemas, checks["state_replay"]
+        cast(dict[str, Any], json.loads(first_compiled_bytes)),
+        schemas,
+        checks["state_replay"],
     )
 
     source_snapshot_stable = _source_snapshot_stable(
@@ -208,24 +246,24 @@ def run_hard_validation(
     )
     visibility = (
         "public_candidate"
-        if request_copy.get("requested_visibility") == "public"
+        if request_snapshot.get("requested_visibility") == "public"
         else "private"
     )
     report = {
         "schema_version": "1.0",
         "artifact_id": (
-            f"{source['namespace']}/{source['character_id']}/"
+            f"{source_snapshot['namespace']}/{source_snapshot['character_id']}/"
             "release/hard-validation"
         ),
         "created_by": {"component": "kokoroarc", "version": __version__},
-        "namespace": source["namespace"],
-        "character_id": source["character_id"],
-        "character_version": source["character_version"],
-        "mode": request_copy["mode"],
+        "namespace": source_snapshot["namespace"],
+        "character_id": source_snapshot["character_id"],
+        "character_version": source_snapshot["character_version"],
+        "mode": request_snapshot["mode"],
         "visibility": visibility,
-        "source_artifact_id": source["artifact_id"],
+        "source_artifact_id": source_snapshot["artifact_id"],
         "source_hash": source_hash,
-        "compiled_artifact_id": first_compiled["artifact_id"],
+        "compiled_artifact_id": compiled_snapshot["artifact_id"],
         "compiled_hash": sha256(first_compiled_bytes).hexdigest(),
         "corpus_hash": corpus.corpus_hash,
         "check_input_hashes": {
@@ -233,8 +271,8 @@ def run_hard_validation(
             "source_tree_hash": _source_tree_hash(initial_snapshot),
             "provenance_hash": _canonical_hash(
                 {
-                    "request": request_copy,
-                    "research_bundle": research_bundle_copy,
+                    "request": request_snapshot,
+                    "research_bundle": research_bundle_snapshot,
                 }
             ),
             "protected_content_hash": protected_content_hash,
@@ -286,6 +324,7 @@ def _check_provenance(
     provenance_findings: list[dict[str, Any]],
     locale_findings: list[dict[str, Any]],
 ) -> None:
+    mode = request.get("mode")
     report = validate_authoring_pack(
         request,
         source,
@@ -301,7 +340,7 @@ def _check_provenance(
         target.append(_domain_finding(item, "error"))
     for item in report["advisory_findings"]:
         provenance_findings.append(_domain_finding(item, "warning"))
-    if request["mode"] != "original":
+    if mode != "original":
         provenance_findings.append(
             _finding(
                 "PACK_PROVENANCE_PRIVATE_ONLY",
@@ -505,15 +544,21 @@ def _check_protected_content(
             "policy": policy,
         }
     )
+    semantic_bytes = canonical_bytes(semantic)
+    policy_bytes = canonical_bytes(policy)
     try:
-        schemas.validate("semantic-result", semantic)
-        schemas.validate("language-policy", policy)
+        semantic_for_plan = cast(dict[str, Any], json.loads(semantic_bytes))
+        policy_for_plan = cast(dict[str, Any], json.loads(policy_bytes))
+        schemas.validate("semantic-result", semantic_for_plan)
+        schemas.validate("language-policy", policy_for_plan)
         plan = build_render_plan(
-            semantic,
-            policy,
+            semantic_for_plan,
+            policy_for_plan,
             expression_intent=multilingual["intent"],
         )
         schemas.validate("render-plan", plan)
+        plan_bytes = canonical_bytes(plan)
+        plan_snapshot = cast(dict[str, Any], json.loads(plan_bytes))
         rendered = {
             "text": "\n".join([semantic["conclusion"], *spans, warning]),
             "segments": [
@@ -523,13 +568,35 @@ def _check_protected_content(
                     "target_language": segment["target_language"],
                     "semantic_keys": list(segment["semantic_keys"]),
                 }
-                for segment in plan["segments"]
+                for segment in plan_snapshot["segments"]
             ],
             "switch_count": 0,
         }
-        validation = validate_rendered_output(rendered, semantic, plan)
+        rendered_bytes = canonical_bytes(rendered)
+        rendered_for_validation = cast(
+            dict[str, Any], json.loads(rendered_bytes)
+        )
+        semantic_for_validation = cast(
+            dict[str, Any], json.loads(semantic_bytes)
+        )
+        plan_for_validation = cast(dict[str, Any], json.loads(plan_bytes))
+        validation = validate_rendered_output(
+            rendered_for_validation,
+            semantic_for_validation,
+            plan_for_validation,
+        )
         schemas.validate("validation-result", validation)
-    except KokoroError:
+        validation_snapshot = cast(
+            dict[str, Any], json.loads(canonical_bytes(validation))
+        )
+        inputs_stable = (
+            _canonical_matches(semantic_for_plan, semantic_bytes)
+            and _canonical_matches(policy_for_plan, policy_bytes)
+            and _canonical_matches(rendered_for_validation, rendered_bytes)
+            and _canonical_matches(semantic_for_validation, semantic_bytes)
+            and _canonical_matches(plan_for_validation, plan_bytes)
+        )
+    except (KokoroError, KeyError, TypeError, ValueError, OverflowError):
         findings.append(
             _finding(
                 "PACK_PROTECTED_PIPELINE_ERROR",
@@ -539,7 +606,15 @@ def _check_protected_content(
         )
         return check_input_hash
 
-    if plan["protected_spans"] != spans:
+    if not inputs_stable:
+        findings.append(
+            _finding(
+                "PACK_PROTECTED_INPUT_MUTATION",
+                ["validation"],
+                "The protected-content pipeline mutated a canonical probe input.",
+            )
+        )
+    if plan_snapshot["protected_spans"] != spans:
         findings.append(
             _finding(
                 "PACK_PROTECTED_SPAN_MISMATCH",
@@ -549,7 +624,7 @@ def _check_protected_content(
         )
     warning_segments = [
         segment
-        for segment in plan["segments"]
+        for segment in plan_snapshot["segments"]
         if segment["channel"] == "warnings"
         and "warnings" in segment["semantic_keys"]
     ]
@@ -561,7 +636,7 @@ def _check_protected_content(
                 "The required warning was not preserved through render planning.",
             )
         )
-    if validation["valid"] is not True:
+    if validation_snapshot["valid"] is not True:
         findings.append(
             _finding(
                 "PACK_RUNTIME_VALIDATION_FAILED",
@@ -669,20 +744,28 @@ def _check_state_replay(
             )
         )
         return check_input_hash
-    try:
-        inputs_stable = (
-            canonical_bytes(initial) == initial_bytes
-            and canonical_bytes(event) == event_bytes
-            and canonical_bytes(first) == first_bytes
-        )
-    except KokoroError:
-        inputs_stable = False
+    inputs_stable = (
+        _canonical_matches(initial, initial_bytes)
+        and _canonical_matches(event, event_bytes)
+        and _canonical_matches(first, first_bytes)
+    )
+    outputs_stable = _canonical_matches(
+        replay, replay_bytes
+    ) and _canonical_matches(idempotent, idempotent_bytes)
     if not inputs_stable:
         findings.append(
             _finding(
                 "PACK_STATE_INPUT_MUTATION",
                 ["growth"],
                 "The relationship-state engine mutated a probe input.",
+            )
+        )
+    if not outputs_stable:
+        findings.append(
+            _finding(
+                "PACK_STATE_OUTPUT_MUTATION",
+                ["growth"],
+                "The relationship-state engine mutated a previously returned output.",
             )
         )
     if first_bytes != expected_bytes:
@@ -908,6 +991,13 @@ def _canonical_hash(value: Any) -> str:
     return sha256(canonical_bytes(value)).hexdigest()
 
 
+def _canonical_matches(value: Any, expected: bytes) -> bool:
+    try:
+        return canonical_bytes(value) == expected
+    except (KokoroError, RecursionError):
+        return False
+
+
 def _domain_finding(item: Mapping[str, Any], severity: str) -> dict[str, Any]:
     return _finding(
         str(item.get("code", "PACK_DOMAIN_VALIDATION_FAILED")),
@@ -963,17 +1053,20 @@ def _check_result(findings: list[dict[str, Any]]) -> dict[str, Any]:
     unique = {
         canonical_bytes(finding): finding for finding in findings
     }
+    passed = not any(
+        item["severity"] == "error" for item in unique.values()
+    )
     ordered = sorted(
         unique.values(),
         key=lambda item: (
+            item["severity"] != "error",
             item["code"],
             json.dumps(item["path"], ensure_ascii=False, separators=(",", ":")),
             item["message"],
-            item["severity"],
         ),
     )[:_MAX_FINDINGS]
     return {
-        "passed": not any(item["severity"] == "error" for item in ordered),
+        "passed": passed,
         "findings": ordered,
     }
 
