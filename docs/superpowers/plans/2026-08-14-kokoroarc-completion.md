@@ -221,11 +221,20 @@ an explicit canonical-LF/historical-CRLF equivalence proof. Milestone 8 closure
 is reopened until the corrective exact commit passes the complete Skill gate,
 checkout audit, and ordered inline review.
 
+**Corrective exact checkpoint (2026-08-17):** Commit
+`b0b7b0bf04716b737ac61211d5ab5e97ef2300aa` passed the complete fresh-checkout
+Skill gate (268/0), the complete repository suite (2,583 passed with 29
+documented Windows capability skips), all four Skill validators, the 80-file
+LF audit, whitespace checks, and clean-status checks. Inline specification and
+quality/security reviews both passed with no finding. The retained CRLF
+campaign files were not rewritten, no evaluator was rerun, and the released
+metadata remains canonical LF.
+
 - [x] Verify exact base-to-HEAD whitespace/status and a fresh detached `core.autocrlf=true` checkout.
 - [x] Commit the settled release record, rerun exact gates, then obtain fresh specification followed by fresh quality review on the exact commit.
 - [x] Fix every Critical/Important finding with RED coverage and repeat both reviews.
-- [ ] Commit and verify the checkout-portable frozen-metadata remediation.
-- [ ] Mark Milestone 8 complete only after the corrective exact gates PASS; then begin Milestone 9.
+- [x] Commit and verify the checkout-portable frozen-metadata remediation.
+- [x] Mark Milestone 8 complete only after the corrective exact gates PASS; then begin Milestone 9.
 
 ---
 

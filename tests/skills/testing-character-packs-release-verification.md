@@ -7,10 +7,10 @@ review, promotion, publication-readiness, CLI, packaging, and Skill evidence for
 Milestone 8. The candidate record was committed, its exact gates and ordered
 reviews were completed, and the sole Minor review finding was fixed with a
 RED/GREEN documentation regression. A later broader fresh-checkout Skill-suite
-run exposed the checkout-policy defect disclosed below.
-Milestone 8 closure is reopened until that remediation passes its exact gates.
-Milestone 9 and the
-complete standalone suite remain pending.
+run exposed the checkout-policy defect disclosed below, and the corrective
+exact commit passed the widened gates and inline reviews.
+Milestone 8 is complete after the checkout-policy remediation. Milestone 9 and
+the complete standalone suite remain pending.
 
 - Verification date: 2026-08-17 (Asia/Hong_Kong)
 - Milestone 8 base commit: `0eb1a019bb3654810d9b4401cb4c55c7b33bec90`
@@ -320,8 +320,45 @@ endings and project to the exact historical execution hash.
 No retained evaluator output was rewritten, no external evaluator was rerun,
 and no Skill instruction or product behavior changed.
 
+### Corrective exact commit and widened gates
+
+The remediation was committed as
+`b0b7b0bf04716b737ac61211d5ab5e97ef2300aa`, tree
+`9e57b57ecb3b69c8844ac5e16982c79632a2f3fa`, with parent
+`1f4cd77abd958b6a3a37a1751dd76825d05f317b`. Its local detached checkout at
+`D:\tmp\kokoroarc-m8-metadata-b0b7b0b-checkout-01` used
+`core.autocrlf=true` and remained clean.
+
+The complete Skill evidence gate ran once under
+`D:\tmp\kokoroarc-m8-metadata-b0b7b0b-gates-01` and passed:
+**268 passed in 66.49s**. Stderr was empty and stdout SHA-256 was
+`39dfb1c6a66bec2a6f1b078908ab1e2772a7fe2e13608e806757c04d61b666e8`.
+The four Skill validators each exited `0`, printed `Skill is valid!`, and had
+empty stderr. All 80 distribution inputs were LF with zero CR or CRLF
+violations. The live metadata SHA-256 was `04537845...`; the retained
+approved6 harness copy remained `17944978...` and raw CRLF.
+
+The complete exact repository suite then passed in the same checkout:
+**2,583 passed, 29 skipped in 475.80s**. All skips again named unavailable
+Windows filesystem capabilities; none was functional or evidence-related.
+Stderr was empty and the stdout SHA-256 was
+`50dbef16f86fe7379da00b6041e1814e011ddd3745c2e450f408e07c70a1c95f`.
+The base-to-commit and parent-to-commit whitespace checks passed, and final
+status was clean. The five-file remediation changes only tests and records;
+all distribution inputs are byte-identical to the already verified
+`1f4cd77` build, so no archive was rebuilt or recharacterized.
+
+- Specification review: **PASS**. The current-source check now binds exact
+  canonical LF content while historical campaign artifacts retain their exact
+  raw CRLF hash. The no-rewrite and checkout-portability requirements are both
+  met, with no Critical, Important, or Minor finding.
+- Quality/security review: **PASS**. The equivalence helper accepts only exact
+  normalized metadata content, rejects bare CR, keeps retained-artifact checks
+  raw, and is exercised with both newline forms. No Critical, Important, or
+  actionable Minor finding was reproduced.
+
 The closure change contains documentation and executable evidence assertions,
 not Milestone 9 product behavior. Its checked status is accepted only after a
 fresh exact focused recheck and ordered closure review confirm the committed
-delta. Milestone 8 closure remains reopened for the exact remediation gates.
+delta. Milestone 8 is complete after the checkout-policy remediation.
 Milestone 9 and the complete standalone suite remain pending.
