@@ -210,10 +210,22 @@ checkout. Specification review passed. Quality/security review found no
 Critical or Important issue; its one README soft-break Minor was reproduced
 RED and fixed GREEN in the documentation closure.
 
+**Post-closure checkout-policy failure (2026-08-17):** The documentation
+closure commit's nine-test focused gate passed, but a broader fresh
+`core.autocrlf=true` checkout run exposed four frozen-campaign assertion
+failures: retained evaluator metadata is byte-exact CRLF while the released
+Skill metadata is canonical LF. The retained evidence is immutable and
+correct; the current-source assertion incorrectly depended on the original
+worktree's stale CRLF bytes. A RED checkout-portability regression now requires
+an explicit canonical-LF/historical-CRLF equivalence proof. Milestone 8 closure
+is reopened until the corrective exact commit passes the complete Skill gate,
+checkout audit, and ordered inline review.
+
 - [x] Verify exact base-to-HEAD whitespace/status and a fresh detached `core.autocrlf=true` checkout.
 - [x] Commit the settled release record, rerun exact gates, then obtain fresh specification followed by fresh quality review on the exact commit.
 - [x] Fix every Critical/Important finding with RED coverage and repeat both reviews.
-- [x] Mark Milestone 8 complete only after both reviews PASS; then begin Milestone 9.
+- [ ] Commit and verify the checkout-portable frozen-metadata remediation.
+- [ ] Mark Milestone 8 complete only after the corrective exact gates PASS; then begin Milestone 9.
 
 ---
 

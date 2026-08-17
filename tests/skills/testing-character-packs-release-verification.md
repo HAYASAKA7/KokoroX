@@ -6,8 +6,11 @@ This record covers the deterministic testing, soft-evaluation aggregation,
 review, promotion, publication-readiness, CLI, packaging, and Skill evidence for
 Milestone 8. The candidate record was committed, its exact gates and ordered
 reviews were completed, and the sole Minor review finding was fixed with a
-RED/GREEN documentation regression. Milestone 8 is complete. Milestone 9 and
-the complete standalone suite remain pending.
+RED/GREEN documentation regression. A later broader fresh-checkout Skill-suite
+run exposed the checkout-policy defect disclosed below.
+Milestone 8 closure is reopened until that remediation passes its exact gates.
+Milestone 9 and the
+complete standalone suite remain pending.
 
 - Verification date: 2026-08-17 (Asia/Hong_Kong)
 - Milestone 8 base commit: `0eb1a019bb3654810d9b4401cb4c55c7b33bec90`
@@ -288,7 +291,37 @@ and the summary recorded `installed_skill_files: 12` with zero byte mismatch.
   focused RED assertion and fixed GREEN by keeping `publication-readiness`
   contiguous in this closure change.
 
+## Post-closure checkout-policy remediation
+
+Documentation closure commit
+`1f4cd77abd958b6a3a37a1751dd76825d05f317b` passed its nine-test focused
+evidence/archive gate and all four Skill validators from a clean detached
+`core.autocrlf=true` checkout. The broader `tests/skills` gate was then run from
+that same exact checkout and exited `1`: **4 failed, 262 passed in 71.18s**.
+Stderr was empty, status remained clean, and the stdout SHA-256 was
+`72af248b0bc51fb21528793c4443335b37bd7b6ef8e2eb3bea94a4858b7e2cb7`.
+
+All four failures were the approved3 through approved6 frozen-campaign
+structure checks. The campaigns executed and retained `openai.yaml` as raw
+CRLF bytes with SHA-256
+`179449780883aa6f6cdb34674a3637652d8a9fcbba299938ccacc20fd84c0895`.
+The released `skills/testing-character-packs/agents/openai.yaml` is the same
+text committed under `skills/** text eol=lf`; its canonical LF SHA-256 is
+`04537845c9c3c3f1f279c2c73ba74cceb2271d9320acf11ce0c923fabdfd7df0`.
+The original source worktree still held its pre-normalization CRLF file, so a
+raw-current-byte assertion passed there but failed correctly in a fresh LF
+checkout.
+
+The regression-first remediation distinguishes those two boundaries. The
+retained harness copies remain byte-exact CRLF and continue to be checked by
+their historical raw hash. The released metadata remains canonical LF. A
+checkout-portable assertion proves that LF and CRLF forms differ only by line
+endings and project to the exact historical execution hash.
+No retained evaluator output was rewritten, no external evaluator was rerun,
+and no Skill instruction or product behavior changed.
+
 The closure change contains documentation and executable evidence assertions,
 not Milestone 9 product behavior. Its checked status is accepted only after a
 fresh exact focused recheck and ordered closure review confirm the committed
-delta. Milestone 8 is complete. Milestone 9 and the complete standalone suite remain pending.
+delta. Milestone 8 closure remains reopened for the exact remediation gates.
+Milestone 9 and the complete standalone suite remain pending.

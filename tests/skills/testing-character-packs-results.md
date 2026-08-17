@@ -1,11 +1,14 @@
 # Testing Character Packs behavioral results
 
-Status: **Milestone 8 complete; Milestone 9 pending**.
+Status: **Milestone 8 checkout-policy remediation pending; Milestone 9 pending**.
 
 The approved behavioral target is met: baseline remains `1/8` and the final
 Skill-enabled batch is `8/8`. Task 9 exact-commit gates and ordered reviews are
 bound in `testing-character-packs-release-verification.md`. This record does not
-approve Milestone 9 or the complete standalone suite.
+approve Milestone 9 or the complete standalone suite. A post-closure
+checkout-policy failure in the frozen campaign assertions is disclosed in the
+release-verification record; it changes neither retained evaluator bytes nor
+the final `1/8` versus `8/8` behavioral result.
 
 Approval `2026-08-17-approved1` completed exactly 16 external evaluator runs:
 eight baseline, eight Skill-enabled, and zero corrective runs. All processes

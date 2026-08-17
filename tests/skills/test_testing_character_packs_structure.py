@@ -15,6 +15,12 @@ SKILL_DIR = REPOSITORY_ROOT / "skills" / "testing-character-packs"
 SKILL_FILE = SKILL_DIR / "SKILL.md"
 CONTRACT_FILE = SKILL_DIR / "references" / "testing-contract.md"
 METADATA_FILE = SKILL_DIR / "agents" / "openai.yaml"
+CANONICAL_METADATA_LF_SHA256 = (
+    "04537845c9c3c3f1f279c2c73ba74cceb2271d9320acf11ce0c923fabdfd7df0"
+)
+HISTORICAL_METADATA_CRLF_SHA256 = (
+    "179449780883aa6f6cdb34674a3637652d8a9fcbba299938ccacc20fd84c0895"
+)
 
 CASE_IDS = (
     "deterministic-hard-gate-trigger",
@@ -47,6 +53,36 @@ REQUIRED_ASSERTIONS = {
     "use_immutable_promotion_outputs",
     "preserve_private_inactive_state",
 }
+
+
+def _historical_metadata_sha256(raw: bytes) -> str:
+    lf = raw.replace(b"\r\n", b"\n")
+    assert b"\r" not in lf
+    assert sha256(lf).hexdigest() == CANONICAL_METADATA_LF_SHA256
+    historical = lf.replace(b"\n", b"\r\n")
+    return sha256(historical).hexdigest()
+
+
+def _current_frozen_input_hashes(files: dict[str, Path]) -> dict[str, str]:
+    return {
+        name: (
+            _historical_metadata_sha256(path.read_bytes())
+            if name == "metadata_sha256"
+            else sha256(path.read_bytes()).hexdigest()
+        )
+        for name, path in files.items()
+    }
+
+
+def test_frozen_metadata_binding_is_checkout_policy_independent() -> None:
+    raw = METADATA_FILE.read_bytes()
+    lf = raw.replace(b"\r\n", b"\n")
+    crlf = lf.replace(b"\n", b"\r\n")
+
+    assert sha256(lf).hexdigest() == CANONICAL_METADATA_LF_SHA256
+    assert sha256(crlf).hexdigest() == HISTORICAL_METADATA_CRLF_SHA256
+    assert _historical_metadata_sha256(lf) == HISTORICAL_METADATA_CRLF_SHA256
+    assert _historical_metadata_sha256(crlf) == HISTORICAL_METADATA_CRLF_SHA256
 
 
 def _frontmatter() -> dict[str, str]:
@@ -369,10 +405,9 @@ def test_approved3_campaign_is_closed_and_frozen() -> None:
         "runner_sha256": ROOT / "run_testing_character_packs_campaign.py",
         "metadata_sha256": METADATA_FILE,
     }
-    assert {
-        name: sha256(path.read_bytes()).hexdigest()
-        for name, path in unchanged_current.items()
-    } == {name: frozen[name] for name in unchanged_current}
+    assert _current_frozen_input_hashes(unchanged_current) == {
+        name: frozen[name] for name in unchanged_current
+    }
 
     harness = ROOT / "evidence" / "testing-character-packs" / "harness" / "approved3"
     executed = {
@@ -461,10 +496,9 @@ def test_approved4_campaign_is_closed_bounded_and_frozen() -> None:
         "runner_sha256": ROOT / "run_testing_character_packs_campaign.py",
         "metadata_sha256": METADATA_FILE,
     }
-    assert {
-        name: sha256(path.read_bytes()).hexdigest()
-        for name, path in unchanged_current.items()
-    } == {name: frozen[name] for name in unchanged_current}
+    assert _current_frozen_input_hashes(unchanged_current) == {
+        name: frozen[name] for name in unchanged_current
+    }
 
     harness = ROOT / "evidence" / "testing-character-packs" / "harness" / "approved4"
     executed = {
@@ -565,10 +599,9 @@ def test_approved5_campaign_is_closed_bounded_and_frozen() -> None:
         "runner_sha256": ROOT / "run_testing_character_packs_campaign.py",
         "metadata_sha256": METADATA_FILE,
     }
-    assert {
-        name: sha256(path.read_bytes()).hexdigest()
-        for name, path in unchanged_current.items()
-    } == {name: frozen[name] for name in unchanged_current}
+    assert _current_frozen_input_hashes(unchanged_current) == {
+        name: frozen[name] for name in unchanged_current
+    }
 
     harness = ROOT / "evidence" / "testing-character-packs" / "harness" / "approved5"
     executed = {
@@ -683,9 +716,9 @@ def test_approved6_campaign_is_closed_bounded_and_frozen() -> None:
         "contract_sha256": CONTRACT_FILE,
         "metadata_sha256": METADATA_FILE,
     }
-    assert {
-        name: sha256(path.read_bytes()).hexdigest() for name, path in current.items()
-    } == {name: frozen[name] for name in current}
+    assert _current_frozen_input_hashes(current) == {
+        name: frozen[name] for name in current
+    }
 
     harness = ROOT / "evidence" / "testing-character-packs" / "harness" / "approved6"
     executed = {

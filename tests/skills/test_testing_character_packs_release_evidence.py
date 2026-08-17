@@ -163,13 +163,31 @@ def test_release_evidence_records_exact_commit_closure_gates() -> None:
         assert text in closure
 
 
-def test_closure_record_marks_only_milestone_8_complete() -> None:
-    assert "Milestone 8 complete; Milestone 9 pending" in RESULTS
-    assert "Milestone 8 is complete" in EVIDENCE
+def test_release_evidence_discloses_post_closure_checkout_failure() -> None:
+    remediation = _section(EVIDENCE, "Post-closure checkout-policy remediation")
+    for text in (
+        "1f4cd77abd958b6a3a37a1751dd76825d05f317b",
+        "4 failed, 262 passed in 71.18s",
+        "72af248b0bc51fb21528793c4443335b37bd7b6ef8e2eb3bea94a4858b7e2cb7",
+        "179449780883aa6f6cdb34674a3637652d8a9fcbba299938ccacc20fd84c0895",
+        "04537845c9c3c3f1f279c2c73ba74cceb2271d9320acf11ce0c923fabdfd7df0",
+        "retained harness copies remain byte-exact CRLF",
+        "released metadata remains canonical LF",
+        "No retained evaluator output was rewritten",
+    ):
+        assert text in remediation
+    assert "checkout-policy remediation" in RESULTS
+    assert "Post-closure checkout-policy failure" in PLAN
+
+
+def test_closure_record_reopens_only_milestone_8() -> None:
+    assert "Milestone 8 checkout-policy remediation pending" in RESULTS
+    assert "Milestone 8 closure is reopened" in EVIDENCE
     assert "Milestone 9 and the complete standalone suite remain pending" in EVIDENCE
     task9 = PLAN[PLAN.index("### Task 9:") : PLAN.index("## Milestone 9")]
     assert "- [x] Commit the settled release record" in task9
-    assert "- [x] Mark Milestone 8 complete" in task9
+    assert "- [ ] Commit and verify the checkout-portable" in task9
+    assert "- [ ] Mark Milestone 8 complete" in task9
 
 
 def test_every_distribution_input_is_checkout_stable_lf() -> None:
