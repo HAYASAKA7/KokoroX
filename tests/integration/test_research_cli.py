@@ -39,7 +39,9 @@ REQUIRED_DISTRIBUTION_MODULES = {
         "__init__",
         "archive",
         "compatibility",
+        "installer",
         "migrations",
+        "registry",
     )
 }
 REQUIRED_RESEARCH_SCHEMAS = {
@@ -595,13 +597,31 @@ def test_built_archives_and_installed_research_cli_are_complete(
             "-c",
             (
                 "from kokoroarc.distribution import (\n"
+                "    InstallScope,\n"
                 "    apply_karc_migration,\n"
+                "    empty_installed_registry,\n"
+                "    install_karc_archive,\n"
                 "    inspect_karc_compatibility,\n"
+                "    list_installed_packs,\n"
+                "    load_installed_registry,\n"
                 "    preview_karc_migration,\n"
+                "    preview_karc_install,\n"
+                "    recover_karc_installations,\n"
+                "    remove_installed_pack,\n"
+                "    resolve_install_scope,\n"
                 ")\n"
+                "assert callable(InstallScope)\n"
                 "assert callable(apply_karc_migration)\n"
+                "assert callable(empty_installed_registry)\n"
+                "assert callable(install_karc_archive)\n"
                 "assert callable(inspect_karc_compatibility)\n"
+                "assert callable(list_installed_packs)\n"
+                "assert callable(load_installed_registry)\n"
                 "assert callable(preview_karc_migration)\n"
+                "assert callable(preview_karc_install)\n"
+                "assert callable(recover_karc_installations)\n"
+                "assert callable(remove_installed_pack)\n"
+                "assert callable(resolve_install_scope)\n"
             ),
         ],
         check=False,

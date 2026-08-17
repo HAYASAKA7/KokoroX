@@ -273,11 +273,11 @@ metadata remains canonical LF.
 
 **Create:** `distribution/installer.py`, `registry.py`, integration/security tests.
 
-- [ ] Write RED global install/list/idempotent-reinstall tests; add workspace-scope tests using explicit D:-based roots.
-- [ ] Add RED cases for malicious archives, conflicting same-version bytes, unverified activation, outside extraction, link races, registry CAS conflict, lock contention, crash recovery at every write/rename point, active/default/state references, and partial removal.
-- [ ] Implement preflight/dry-run, staged extraction, repeated validation, atomic install/registry cutover, journal recovery, and explicit safe removal.
-- [ ] Prove no command writes outside `KOKOROARC_DATA_DIR` and an explicitly supplied workspace-root-derived scope.
-- [ ] Commit: `feat: install character packs by scope`.
+- [x] Write RED global install/list/idempotent-reinstall tests; add workspace-scope tests using explicit D:-based roots.
+- [x] Add RED cases for malicious archives, conflicting same-version bytes, unverified activation, outside extraction, link races, registry CAS conflict, lock contention, crash recovery at every write/rename point, active/default/state references, and partial removal.
+- [x] Implement preflight/dry-run, staged extraction, repeated validation, atomic install/registry cutover, journal recovery, and explicit safe removal.
+- [x] Prove no command writes outside `KOKOROARC_DATA_DIR` and an explicitly supplied workspace-root-derived scope.
+- [x] Commit: `feat: install character packs by scope`.
 
 ### Task 14: Resolve global/workspace defaults without implicit activation
 
