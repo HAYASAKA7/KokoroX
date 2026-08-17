@@ -120,6 +120,16 @@ class LoadedKarcArchive:
 
 
 @dataclass(frozen=True, slots=True)
+class InspectedKarcContainer:
+    """Structurally safe archive data before version/schema compatibility checks."""
+
+    manifest: dict[str, Any]
+    documents: dict[str, dict[str, Any]]
+    member_payloads: dict[str, bytes]
+    archive_sha256: str
+
+
+@dataclass(frozen=True, slots=True)
 class _CapturedInput:
     name: str
     original: dict[str, Any]
@@ -1008,13 +1018,12 @@ def _validate_manifest(
             )
 
 
-def load_karc_archive(
+def inspect_karc_container(
     payload: bytes,
-    schemas: _SchemaValidator,
     *,
     limits: KarcLimits = KarcLimits(),
-) -> LoadedKarcArchive:
-    """Strictly validate and load a closed ``.karc`` archive from bytes."""
+) -> InspectedKarcContainer:
+    """Read a canonical closed container without assuming current schemas."""
 
     if not isinstance(payload, bytes):
         raise _error("KARC_ARCHIVE_INVALID", "Archive payload must be bytes.")
@@ -1026,6 +1035,35 @@ def load_karc_archive(
     documents = {
         path: value
         for path, value in parsed.items()
+        if path != _MANIFEST_PATH
+    }
+    detached_manifest = _parse_member(member_payloads[_MANIFEST_PATH])
+    detached_documents = {
+        path: _parse_member(member_payloads[path])
+        for path in sorted(documents)
+    }
+    return InspectedKarcContainer(
+        manifest=detached_manifest,
+        documents={_MANIFEST_PATH: detached_manifest, **detached_documents},
+        member_payloads=dict(member_payloads),
+        archive_sha256=_digest(payload),
+    )
+
+
+def load_karc_archive(
+    payload: bytes,
+    schemas: _SchemaValidator,
+    *,
+    limits: KarcLimits = KarcLimits(),
+) -> LoadedKarcArchive:
+    """Strictly validate and load a closed ``.karc`` archive from bytes."""
+
+    container = inspect_karc_container(payload, limits=limits)
+    member_payloads = container.member_payloads
+    manifest = container.manifest
+    documents = {
+        path: value
+        for path, value in container.documents.items()
         if path != _MANIFEST_PATH
     }
     try:
@@ -1049,13 +1087,8 @@ def load_karc_archive(
             "Archive release bindings are invalid.",
             reason=error.code,
         ) from error
-    detached_manifest = _parse_member(member_payloads[_MANIFEST_PATH])
-    detached_documents = {
-        path: _parse_member(member_payloads[path])
-        for path in sorted(documents)
-    }
     return LoadedKarcArchive(
-        manifest=detached_manifest,
-        documents={_MANIFEST_PATH: detached_manifest, **detached_documents},
-        archive_sha256=_digest(payload),
+        manifest=container.manifest,
+        documents=container.documents,
+        archive_sha256=container.archive_sha256,
     )

@@ -263,11 +263,11 @@ metadata remains canonical LF.
 
 **Create:** `distribution/compatibility.py`, `distribution/migrations.py`, tests.
 
-- [ ] Write RED compatibility reports for current, unsupported-newer, malformed, and explicitly migratable fixtures.
-- [ ] Write RED migration preview/apply tests that never overwrite input and produce deterministic output/hash/change lists.
-- [ ] Add failures for absent paths, unregistered steps, cycles, downgrade, changed identity, noncanonical output, and archive-provided code.
-- [ ] Implement an exact-version registry with pure built-in transforms only.
-- [ ] Commit: `feat: inspect and migrate karc compatibility`.
+- [x] Write RED compatibility reports for current, unsupported-newer, malformed, and explicitly migratable fixtures.
+- [x] Write RED migration preview/apply tests that never overwrite input and produce deterministic output/hash/change lists.
+- [x] Add failures for absent paths, unregistered steps, cycles, downgrade, changed identity, noncanonical output, and archive-provided code.
+- [x] Implement an exact-version registry with pure built-in transforms only.
+- [x] Commit: `feat: inspect and migrate karc compatibility`.
 
 ### Task 13: Install, list, recover, and remove packs atomically
 

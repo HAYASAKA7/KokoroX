@@ -33,6 +33,15 @@ REQUIRED_TESTING_MODULES = {
         "storage",
     )
 }
+REQUIRED_DISTRIBUTION_MODULES = {
+    f"kokoroarc/distribution/{name}.py"
+    for name in (
+        "__init__",
+        "archive",
+        "compatibility",
+        "migrations",
+    )
+}
 REQUIRED_RESEARCH_SCHEMAS = {
     f"{name}.schema.json"
     for name in (
@@ -492,7 +501,11 @@ def test_built_archives_and_installed_research_cli_are_complete(
             if member.isfile() and "/skills/" in member.name
         }
 
-    for module in REQUIRED_RESEARCH_MODULES | REQUIRED_TESTING_MODULES:
+    for module in (
+        REQUIRED_DISTRIBUTION_MODULES
+        | REQUIRED_RESEARCH_MODULES
+        | REQUIRED_TESTING_MODULES
+    ):
         assert module in wheel_entries
         assert any(entry.endswith(f"/src/{module}") for entry in sdist_entries)
     for schema in (
@@ -575,6 +588,33 @@ def test_built_archives_and_installed_research_cli_are_complete(
         for name in schema_names
     ]
     assert schema_probe.stderr == ""
+
+    distribution_probe = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            (
+                "from kokoroarc.distribution import (\n"
+                "    apply_karc_migration,\n"
+                "    inspect_karc_compatibility,\n"
+                "    preview_karc_migration,\n"
+                ")\n"
+                "assert callable(apply_karc_migration)\n"
+                "assert callable(inspect_karc_compatibility)\n"
+                "assert callable(preview_karc_migration)\n"
+            ),
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+        env=probe_env,
+        cwd=outside_repository,
+    )
+    assert distribution_probe.returncode == 0, (
+        distribution_probe.stdout + distribution_probe.stderr
+    )
+    assert distribution_probe.stdout == ""
+    assert distribution_probe.stderr == ""
 
     request = _cli(
         [
