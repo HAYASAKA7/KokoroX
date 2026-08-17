@@ -181,7 +181,70 @@ draft -> reviewed -> verified
 - Named or research-backed packs remain `private` by default in every state.
 - Only `verified` records may set `activation_allowed: true`.
 
-Promotion records are canonical JSON and are published atomically beneath `KOKOROARC_DATA_DIR/reports/promotions/<character-id>/`.
+Promotion adjudication captures every caller-owned JSON input before the first
+schema callback, validates only disposable copies, and rechecks current hard and
+soft evidence before returning detached canonical data. For a verified
+transition, soft currentness is checked before the final source/hard-currentness
+check so an evaluator or schema callback cannot change the pack after its last
+source snapshot. Researched and hybrid promotions require the exact Research
+Bundle used by hard validation; both hard-currentness checks bind that same
+captured bundle rather than silently recomputing without it.
+
+The promotion command must adjudicate with `create_promotion_record` immediately
+before storage. The storage boundary independently revalidates the closed record
+and review schemas, their exact canonical hash binding, the published reviewed
+predecessor, and review-ID history. It does not reinterpret a structurally valid
+record as proof that omitted hard or soft evidence passed; downstream release
+decisions still require the bound reports and their semantic currentness checks.
+
+Each record is an immutable two-file bundle:
+
+```text
+KOKOROARC_DATA_DIR/reports/promotions/
+  .records.publish.lock
+  <character-id>/
+    <promotion-id>/
+      promotion.json
+      review-attestation.json
+```
+
+One reports-root lock serializes the append-only review-ID and predecessor
+checks across characters. A review ID may be reused only for the identical
+attestation needed by exactly one matching reviewed-to-verified transition;
+the reviewed record, its one verified successor, and exact retries are the only
+valid topology. Changed bytes, a second reviewed use, or another verified use
+are conflicts.
+
+The destination root is absolutized before the first schema callback. Every
+storage enumeration consumes `os.scandir` directly and stops at limit plus one
+before sorting or materialization; hidden and orphan staging entries count
+toward that bound. Each scan captures entry membership plus file identities.
+After callback-backed validation, the scan rechecks the reports root and every
+enumerated character directory, returns those exact snapshots to its caller,
+and the publisher rechecks them again immediately before cutover. The publisher
+retains the exact character and staging directory identities and their
+no-redirect ancestry across every write, schema callback, history scan,
+cutover, and idempotent return.
+
+The publisher creates a uniquely named same-parent staging directory and
+captures its identity immediately after validating that generated path, before
+any later input, ancestry, or history check can fail. It writes and fsyncs that
+identity-bound directory, verifies canonical contents and file identities
+before and after that sync, rescans review/predecessor history, then verifies
+staging once more. Cutover uses an
+operating-system atomic no-replace operation and never replaces an existing
+promotion directory. Pre-cutover cleanup deletes only the identity-bound
+generated no-follow staging tree; replacement or persistent cleanup failure is
+reported explicitly and never hidden by the original error. An identical retry
+revalidates the exact bundle and retries the parent-directory fsync before it
+can return success. A durability failure reports that durability was not
+confirmed while leaving the complete visible bundle available for that retry.
+If the generated staging directory's identity cannot be captured, cleanup
+deletes nothing and reports an explicit not-visible cleanup failure; it never
+guesses from a pathname and risks deleting a replacement directory.
+After a successful cutover, exact-byte, history, and durability confirmation is
+callback-free; no evaluator or schema callback can introduce a new reported
+failure after the complete bundle becomes visible.
 
 ### 5.5 Publication readiness
 

@@ -6,17 +6,25 @@ from kokoroarc.testing.corpus import (
     load_test_corpus,
 )
 from kokoroarc.testing.hard import hard_report_is_current, run_hard_validation
+from kokoroarc.testing.promotion import create_promotion_record
 from kokoroarc.testing.soft import (
     aggregate_soft_evaluation,
     soft_report_is_current,
+)
+from kokoroarc.testing.storage import (
+    load_published_promotion_record,
+    publish_promotion_record,
 )
 
 __all__ = [
     "CorpusLimits",
     "PackTestCorpus",
     "aggregate_soft_evaluation",
+    "create_promotion_record",
     "hard_report_is_current",
     "load_test_corpus",
+    "load_published_promotion_record",
+    "publish_promotion_record",
     "run_hard_validation",
     "soft_report_is_current",
 ]
