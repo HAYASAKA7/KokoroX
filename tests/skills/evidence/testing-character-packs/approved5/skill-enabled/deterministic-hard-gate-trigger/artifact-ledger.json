@@ -1,0 +1,102 @@
+{
+  "schema_version": "1.0",
+  "raw_root_retention": "approved D:-based campaign root",
+  "redaction_replacements": {
+    "environment_secrets": "<redacted-environment-secret>",
+    "credentials": "<redacted-credential>",
+    "protected_absolute_paths": "<redacted-user-profile>"
+  },
+  "files": [
+    {
+      "path": "prompt.md",
+      "raw_path": "prompt.txt",
+      "raw_sha256": "ff376cf90743e6e0339b4546b5a968631cbe99c9bf2f0a508fd592b32b95dde9",
+      "retained_sha256": "ff376cf90743e6e0339b4546b5a968631cbe99c9bf2f0a508fd592b32b95dde9",
+      "redaction_count": 0
+    },
+    {
+      "path": "final.md",
+      "raw_path": "final.txt",
+      "raw_sha256": "f8eb4669345c8e28ce13c855a1b2f9cfecf408aebbc3c81489137986d2980032",
+      "retained_sha256": "f8eb4669345c8e28ce13c855a1b2f9cfecf408aebbc3c81489137986d2980032",
+      "redaction_count": 0
+    },
+    {
+      "path": "session.jsonl",
+      "raw_path": "session.jsonl",
+      "raw_sha256": "763e785f2d83237c5630111b8a999f51c7ae205280588afd7ea43f0a087486a1",
+      "retained_sha256": "69e33c433042b1889b02df27505bf9560e58f5306d4e94f82f183a85fb427c7c",
+      "redaction_count": 4
+    },
+    {
+      "path": "stderr.txt",
+      "raw_path": "stderr.txt",
+      "raw_sha256": "a43b1b7816d21e210c2250b93655f1d33906079ef5d0afcb9d935a4cae9bdef1",
+      "retained_sha256": "a43b1b7816d21e210c2250b93655f1d33906079ef5d0afcb9d935a4cae9bdef1",
+      "redaction_count": 0
+    },
+    {
+      "path": "command.json",
+      "raw_path": "command.json",
+      "raw_sha256": "dcb3d9d41a9fb681372aa7f2a13e1871869bb4179cb4e6a7723840da6cd6b750",
+      "retained_sha256": "b48a5817fdfcd62b46272a7c7c1000bc26e7a3ba09fd1fc60919d486e8e46285",
+      "redaction_count": 18
+    },
+    {
+      "path": "run-status.json",
+      "raw_path": "run-status.json",
+      "raw_sha256": "c6dcc3f6c96949c0bfeba334c084e0b8ca832938430d5c9dbf80cf849497f3d4",
+      "retained_sha256": "c6dcc3f6c96949c0bfeba334c084e0b8ca832938430d5c9dbf80cf849497f3d4",
+      "redaction_count": 0
+    },
+    {
+      "path": "protected-before.json",
+      "raw_path": "protected-before.json",
+      "raw_sha256": "8fbc2329288bf291eba4dc080485b21f588e2378a79cc1785255b67e599923e8",
+      "retained_sha256": "8fbc2329288bf291eba4dc080485b21f588e2378a79cc1785255b67e599923e8",
+      "redaction_count": 0
+    },
+    {
+      "path": "protected-after.json",
+      "raw_path": "protected-after.json",
+      "raw_sha256": "8fbc2329288bf291eba4dc080485b21f588e2378a79cc1785255b67e599923e8",
+      "retained_sha256": "8fbc2329288bf291eba4dc080485b21f588e2378a79cc1785255b67e599923e8",
+      "redaction_count": 0
+    },
+    {
+      "path": "data-inventory.json",
+      "raw_path": "data-inventory.json",
+      "raw_sha256": "5437978f7954c226bfbd0a8af8bf6a4468307da1d143e7dd29b4763ad6a07d53",
+      "retained_sha256": "5437978f7954c226bfbd0a8af8bf6a4468307da1d143e7dd29b4763ad6a07d53",
+      "redaction_count": 0
+    },
+    {
+      "path": "artifacts/reports/hard-envelope-a.json",
+      "raw_path": "data/reports/hard-envelope-a.json",
+      "raw_sha256": "611a576048d35d8275ff80329d2f28da7d111042a96302a2cd24deda8e17899f",
+      "retained_sha256": "611a576048d35d8275ff80329d2f28da7d111042a96302a2cd24deda8e17899f",
+      "redaction_count": 0
+    },
+    {
+      "path": "artifacts/reports/hard-envelope-b.json",
+      "raw_path": "data/reports/hard-envelope-b.json",
+      "raw_sha256": "7f5594455943367a2f29405c3f09ba6d4dcefdd03e689d4060abb9573d77e49a",
+      "retained_sha256": "7f5594455943367a2f29405c3f09ba6d4dcefdd03e689d4060abb9573d77e49a",
+      "redaction_count": 0
+    },
+    {
+      "path": "artifacts/reports/hard-report-a.json",
+      "raw_path": "data/reports/hard-report-a.json",
+      "raw_sha256": "b0f57b7552df1d88e144d965530afc3704102802788d6295920b18ffd3afe24f",
+      "retained_sha256": "b0f57b7552df1d88e144d965530afc3704102802788d6295920b18ffd3afe24f",
+      "redaction_count": 0
+    },
+    {
+      "path": "artifacts/reports/hard-report-b.json",
+      "raw_path": "data/reports/hard-report-b.json",
+      "raw_sha256": "b0f57b7552df1d88e144d965530afc3704102802788d6295920b18ffd3afe24f",
+      "retained_sha256": "b0f57b7552df1d88e144d965530afc3704102802788d6295920b18ffd3afe24f",
+      "redaction_count": 0
+    }
+  ]
+}

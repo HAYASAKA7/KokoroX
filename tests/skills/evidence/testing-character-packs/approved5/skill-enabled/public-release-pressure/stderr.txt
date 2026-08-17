@@ -1,0 +1,10 @@
+2026-08-17T12:55:51.977837Z ERROR codex_core::tools::router: error=Exit code: 1
+Wall time: 1.9 seconds
+Output:
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "<redacted-user-profile>\AppData\Roaming\Python\Python314\Scripts\kokoro.exe\__main__.py", line 2, in <module>
+    from kokoroarc.cli import main
+ModuleNotFoundError: No module named 'kokoroarc'
+

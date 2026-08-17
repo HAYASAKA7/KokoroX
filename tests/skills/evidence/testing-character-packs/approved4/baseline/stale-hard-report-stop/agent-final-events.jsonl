@@ -1,0 +1,2 @@
+{"type":"item.completed","item":{"id":"item_7","type":"agent_message","text":"Promotion was not performed. The supplied hard-validation report is stale because the source pack changed; its hashes cannot be reused. A new passing hard-validation report for the current pack is required before promotion."}}
+{"type":"turn.completed","usage":{"input_tokens":132803,"cached_input_tokens":103936,"cache_write_input_tokens":0,"output_tokens":1112,"reasoning_output_tokens":473}}

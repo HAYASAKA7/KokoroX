@@ -1,0 +1,1 @@
+Promotion was not performed. The supplied hard-validation report is stale because the source pack changed; its hashes cannot be reused. A new passing hard-validation report for the current pack is required before promotion.

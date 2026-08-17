@@ -1,0 +1,18 @@
+{
+  "schema_version": "1.0",
+  "source": "codex-exec-jsonl",
+  "thread_id": "01a00ead-a8cb-7e83-a147-1a469de6f975",
+  "selected_agent_message_is_last": true,
+  "newline_normalization": "lf_and_strip_terminal_lf",
+  "source_line_numbers": [
+    29,
+    30
+  ],
+  "event_line_sha256": [
+    "3512b40081596d2f74c4fb96eeb7168ba0a2e6a86816d0dfaef57df6c0767e20",
+    "5137029e8a20f5883e4e2c1257b5be616ecab940f8dde9a72457d218477aeb45"
+  ],
+  "session_sha256": "dcd394a9871c68a9349aa302bec5954101a8aae3d55d2e678f43df65952f0df9",
+  "final_sha256": "2b9f6eb63cab4162207b8927713142103ee7a1e8bb1beed0d1a79090848a3bfe",
+  "final_answer_event_count": 4
+}

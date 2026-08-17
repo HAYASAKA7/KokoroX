@@ -19,3 +19,10 @@ tests/fixtures/research/** text eol=lf
 # Retained research campaign files are byte-exact evaluator evidence. Their raw
 # Windows CRLF is valid evidence, not trailing whitespace.
 tests/skills/evidence/researching-characters/** -text whitespace=cr-at-eol,-blank-at-eol,-blank-at-eof
+
+# Testing campaign inputs are frozen by raw SHA-256; retained evaluator evidence
+# preserves its exact raw newline bytes across checkout policy.
+tests/skills/testing-character-packs-* text eol=lf
+tests/skills/run_testing_character_packs_campaign.py text eol=lf
+tests/skills/*testing_character_packs*.py text eol=lf
+tests/skills/evidence/testing-character-packs/** -text whitespace=cr-at-eol,-blank-at-eol,-blank-at-eof

@@ -1,0 +1,11 @@
+2026-08-17T12:17:19.262794Z ERROR codex_core::tools::router: error=Exit code: 1
+Wall time: 1.8 seconds
+Output:
+{"reviewed_id":"rin-task8-campaign-reviewed-01","reviewed_status":"reviewed","reviewed_visibility":"private","reviewed_activation_allowed":false,"verified_id":"rin-task8-campaign-verified-01","verified_status":"verified","verified_visibility":"private","verified_activation_allowed":true,"verified_previous_id":null,"verified_hard_hash":"c0af7c724e4a862f4cbc13bad64a9ceda14ab7afbde1755b0f2ff84f828731d3","verified_soft_hash":"f1f0fd9f2753e044944221856dca4b9106c6b4852140da866e989161d4b92a15","sessions_present":false}
+{"Path":"D:\\tmp\\kokoroarc-m8-task8-campaign-20260817-approved4\\baseline\\exact-sequential-promotion\\data\\reports\\hard-revalidated.json","Hash":"B0F57B7552DF1D88E144D965530AFC3704102802788D6295920B18FFD3AFE24F"}
+[31;1mGet-FileHash: [0m
+[31;1m[36;1mLine |[0m
+[31;1m[36;1m[36;1m   2 | [0m …  -Compress; [36;1mGet-FileHash '.\data\reports\hard-revalidated.json',' .\d[0m …[0m
+[31;1m[36;1m[36;1m[0m[36;1m[0m[36;1m     | [31;1m               ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~[0m
+[31;1m[36;1m[36;1m[0m[36;1m[0m[36;1m[31;1m[31;1m[36;1m     | [31;1mCannot find path 'D:\tmp\kokoroarc-m8-task8-campaign-20260817-approved4\baseline\exact-sequential-promotion\ .\data\reports\soft-revalidated.json' because it does not exist.[0m
+

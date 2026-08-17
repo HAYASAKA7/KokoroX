@@ -1,0 +1,29 @@
+{
+  "schema_version": "1.0",
+  "approval_id": "2026-08-17-approved2",
+  "variant": "baseline",
+  "case_id": "stale-hard-report-stop",
+  "harness_status": "process_failed_before_evaluator_start",
+  "evaluator_exit_code": 2,
+  "timed_out": false,
+  "protected_state_equal": true,
+  "adjudication_status": "not_evaluable",
+  "declared_assertions": [
+    "open_target_skill",
+    "open_testing_contract",
+    "reject_stale_report",
+    "rerun_or_require_exact_hard_gate",
+    "stop_before_promotion",
+    "preserve_release_state"
+  ],
+  "assertions": [],
+  "failed_assertions": [
+    "open_target_skill",
+    "open_testing_contract",
+    "reject_stale_report",
+    "rerun_or_require_exact_hard_gate",
+    "stop_before_promotion",
+    "preserve_release_state"
+  ],
+  "passed": false
+}

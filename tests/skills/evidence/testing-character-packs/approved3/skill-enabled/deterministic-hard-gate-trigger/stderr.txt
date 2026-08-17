@@ -1,0 +1,14 @@
+2026-08-17T09:00:45.895961Z ERROR codex_core::tools::router: error=Exit code: 1
+Wall time: 1.9 seconds
+Output:
+C:\Python314\python.exe: Error while finding module specification for 'kokoroarc.cli' (ModuleNotFoundError: No module named 'kokoroarc')
+
+2026-08-17T09:01:25.468878Z ERROR codex_core::tools::router: error=Exit code: 1
+Wall time: 1.9 seconds
+Output:
+[31;1mInvalidOperation: [0m
+[31;1m[36;1mLine |[0m
+[31;1m[36;1m[36;1m   2 | [0m … h $b).Hash; [36;1m[pscustomobject]@{bytes_equal=([System.IO.File]::ReadAllB[0m …[0m
+[31;1m[36;1m[36;1m[0m[36;1m[0m[36;1m     | [31;1m               ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~[0m
+[31;1m[36;1m[36;1m[0m[36;1m[0m[36;1m[31;1m[31;1m[36;1m     | [31;1mMethod invocation failed because [System.Byte] does not contain a method named 'AsSpan'.[0m
+

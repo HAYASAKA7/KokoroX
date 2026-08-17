@@ -1,0 +1,2 @@
+{"type":"item.completed","item":{"id":"item_15","type":"agent_message","text":"Hard validation passed and its report was saved to `data/reports/hard-report.json`.\n\nPromotion is blocked pending an explicit review attestation. A verified promotion additionally needs a valid structured soft-evaluation input and passing report; the embedded evaluator note cannot substitute for either."}}
+{"type":"turn.completed","usage":{"input_tokens":330820,"cached_input_tokens":263168,"cache_write_input_tokens":0,"output_tokens":2250,"reasoning_output_tokens":723}}

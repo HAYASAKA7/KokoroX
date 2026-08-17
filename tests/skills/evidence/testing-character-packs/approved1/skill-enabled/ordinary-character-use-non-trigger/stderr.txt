@@ -1,0 +1,131 @@
+2026-08-17T07:48:44.187556Z ERROR codex_core::tools::router: error=`"C:\\Program Files\\PowerShell\\7\\pwsh.exe" -Command "Get-ChildItem -Recurse .\\inputs, .\\data -Force | Select-Object FullName,Length; Get-Content -Raw .\\src\\kokoroarc\\packs\\loader.py; Get-Content -Raw .\\src\\kokoroarc\\cli.py | Select-String -Pattern 'def _reject_constant' -Context 0,45"` rejected: blocked by policy
+2026-08-17T07:48:55.249609Z ERROR codex_core::tools::router: error=`"C:\\Program Files\\PowerShell\\7\\pwsh.exe" -Command '$env:PYTHONPATH='"'.'; "'$env:KOKOROARC_DATA_DIR='"'.\\data'; python -m kokoroarc.cli session show --session campaign-active --json; python -m kokoroarc.cli runtime context --session campaign-active --locale en-US --scenario debugging --json"` rejected: blocked by policy
+2026-08-17T07:48:59.740955Z ERROR codex_core::tools::router: error=`"C:\\Program Files\\PowerShell\\7\\pwsh.exe" -Command '$env:PYTHONPATH = '"'.'
+"'$env:KOKOROARC_DATA_DIR = '"'.\\data'
+python -m kokoroarc.cli session show --session campaign-active --json"` rejected: blocked by policy
+2026-08-17T07:49:04.029431Z ERROR codex_core::tools::router: error=`"C:\\Program Files\\PowerShell\\7\\pwsh.exe" -Command 'kokoro session show --session campaign-active --json'` rejected: blocked by policy
+2026-08-17T07:49:21.187754Z ERROR codex_core::tools::router: error=Exit code: 1
+Wall time: 2.7 seconds
+Output:
+.\src\kokoroarc\cli.py-332-
+.\src\kokoroarc\cli.py-333-
+.\src\kokoroarc\cli.py-334-def _reject_constant(_value: str) -> None:
+.\src\kokoroarc\cli.py:335:    raise ValueError("non-finite number")
+.\src\kokoroarc\cli.py-336-
+.\src\kokoroarc\cli.py-337-
+.\src\kokoroarc\cli.py-338-def _input_error(code: str, message: str) -> KokoroError:
+--
+.\src\kokoroarc\packs\loader.py-64-            ) from error
+.\src\kokoroarc\packs\loader.py-65-        if duplicate:
+.\src\kokoroarc\packs\loader.py-66-            raise ConstructorError(
+.\src\kokoroarc\packs\loader.py:67:                None, None, "duplicate mapping key", key_node.start_mark
+.\src\kokoroarc\packs\loader.py-68-            )
+.\src\kokoroarc\packs\loader.py-69-        mapping[key] = loader.construct_object(value_node, deep=deep)
+.\src\kokoroarc\packs\loader.py-70-    return mapping
+--
+.\src\kokoroarc\packs\loader.py-126-            "YAML file could not be read.", "read_failed"
+.\src\kokoroarc\packs\loader.py-127-        ) from error
+.\src\kokoroarc\packs\loader.py-128-
+.\src\kokoroarc\packs\loader.py:129:    return parse_yaml_bytes(contents)
+.\src\kokoroarc\packs\loader.py-130-
+.\src\kokoroarc\packs\loader.py-131-
+.\src\kokoroarc\packs\loader.py:132:def parse_yaml_bytes(contents: bytes) -> dict[str, Any]:
+.\src\kokoroarc\packs\loader.py-133-    """Parse UTF-8 YAML bytes with the pack loader's data-only rules."""
+.\src\kokoroarc\packs\loader.py-134-    try:
+.\src\kokoroarc\packs\loader.py-135-        text = contents.decode("utf-8")
+--
+.\src\kokoroarc\packs\loader.py-165-        for event in events:
+.\src\kokoroarc\packs\loader.py-166-            if isinstance(event, yaml.events.AliasEvent):
+.\src\kokoroarc\packs\loader.py-167-                raise ConstructorError(
+.\src\kokoroarc\packs\loader.py:168:                    None, None, "YAML aliases are disabled", event.start_mark
+.\src\kokoroarc\packs\loader.py-169-                )
+.\src\kokoroarc\packs\loader.py-170-    finally:
+.\src\kokoroarc\packs\loader.py-171-        events.close()
+--
+.\src\kokoroarc\packs\loader.py-223-        raise _invalid_pack_data(
+.\src\kokoroarc\packs\loader.py-224-            "Character pack reference was not found.", "unscanned_reference"
+.\src\kokoroarc\packs\loader.py-225-        )
+.\src\kokoroarc\packs\loader.py:226:    manifest = parse_yaml_bytes(manifest_bytes)
+.\src\kokoroarc\packs\loader.py-227-    references = _validated_manifest_references(manifest)
+.\src\kokoroarc\packs\loader.py-228-    resolved_references = _resolve_reference_contents(references, files)
+.\src\kokoroarc\packs\loader.py-229-    return _assemble_source_pack(
+.\src\kokoroarc\packs\loader.py-230-        manifest,
+.\src\kokoroarc\packs\loader.py-231-        resolved_references,
+.\src\kokoroarc\packs\loader.py:232:        lambda relative: parse_yaml_bytes(files[relative]),
+.\src\kokoroarc\packs\loader.py-233-    )
+.\src\kokoroarc\packs\loader.py-234-
+.\src\kokoroarc\packs\loader.py-235-
+--
+.\src\kokoroarc\testing\corpus.py-14-
+.\src\kokoroarc\testing\corpus.py-15-from kokoroarc.errors import KokoroError
+.\src\kokoroarc\testing\corpus.py-16-from kokoroarc.packs.compiler import canonical_bytes
+.\src\kokoroarc\testing\corpus.py:17:from kokoroarc.packs.loader import parse_yaml_bytes
+.\src\kokoroarc\testing\corpus.py-18-from kokoroarc.packs.security import PackLimits, scan_pack
+.\src\kokoroarc\testing\corpus.py-19-
+.\src\kokoroarc\testing\corpus.py-20-
+--
+.\src\kokoroarc\testing\corpus.py-174-        data = fixture_contents[relative]
+.\src\kokoroarc\testing\corpus.py-175-        source_hashes[relative] = sha256(data).hexdigest()
+.\src\kokoroarc\testing\corpus.py-176-        try:
+.\src\kokoroarc\testing\corpus.py:177:            document = parse_yaml_bytes(data)
+.\src\kokoroarc\testing\corpus.py-178-        except KokoroError:
+.\src\kokoroarc\testing\corpus.py-179-            raise _invalid("invalid_yaml") from None
+.\src\kokoroarc\testing\corpus.py-180-        _enforce_resource_bounds(document, limits)
+--
+.\src\kokoroarc\testing\hard.py-18-from kokoroarc.packs.compiler import canonical_bytes, compile_pack
+.\src\kokoroarc\testing\hard.py-19-from kokoroarc.packs.loader import (
+.\src\kokoroarc\testing\hard.py-20-    assemble_source_pack_from_contents,
+.\src\kokoroarc\testing\hard.py:21:    parse_yaml_bytes,
+.\src\kokoroarc\testing\hard.py-22-)
+.\src\kokoroarc\testing\hard.py-23-from kokoroarc.packs.security import PackLimits, scan_pack
+.\src\kokoroarc\testing\hard.py-24-from kokoroarc.runtime.planning import build_render_plan
+--
+.\src\kokoroarc\testing\hard.py-692-def _check_layout(
+.\src\kokoroarc\testing\hard.py-693-    snapshot: _PackSnapshot, findings: list[dict[str, Any]]
+.\src\kokoroarc\testing\hard.py-694-) -> None:
+.\src\kokoroarc\testing\hard.py:695:    manifest = parse_yaml_bytes(snapshot.contents["character.yaml"])
+.\src\kokoroarc\testing\hard.py-696-    expected = {
+.\src\kokoroarc\testing\hard.py-697-        "character.yaml",
+.\src\kokoroarc\testing\hard.py-698-        "tests/multilingual.yaml",
+--
+.\src\kokoroarc\state\store.py-207-
+.\src\kokoroarc\state\store.py-208-
+.\src\kokoroarc\state\store.py-209-def _reject_json_constant(_value: str) -> None:
+.\src\kokoroarc\state\store.py:210:    raise ValueError("non-finite JSON number")
+.\src\kokoroarc\state\store.py-211-
+.\src\kokoroarc\state\store.py-212-
+.\src\kokoroarc\state\store.py-213-def _thread_lock_for(data_root: Path, session_id: str) -> threading.Lock:
+--
+.\src\kokoroarc\testing\publication.py-15-from kokoroarc.packs.compiler import canonical_bytes, compile_pack
+.\src\kokoroarc\testing\publication.py-16-from kokoroarc.packs.loader import (
+.\src\kokoroarc\testing\publication.py-17-    assemble_source_pack_from_contents,
+.\src\kokoroarc\testing\publication.py:18:    parse_yaml_bytes,
+.\src\kokoroarc\testing\publication.py-19-)
+.\src\kokoroarc\testing\publication.py-20-from kokoroarc.schemas import SchemaRegistry
+.\src\kokoroarc\testing\publication.py-21-from kokoroarc.testing.hard import _PackSnapshot, _snapshot_pack
+--
+.\src\kokoroarc\testing\publication.py-705-                    )
+.\src\kokoroarc\testing\publication.py-706-                )
+.\src\kokoroarc\testing\publication.py-707-            try:
+.\src\kokoroarc\testing\publication.py:708:                fixture = parse_yaml_bytes(snapshot.contents[relative])
+.\src\kokoroarc\testing\publication.py-709-            except KokoroError:
+.\src\kokoroarc\testing\publication.py-710-                fixture = None
+.\src\kokoroarc\testing\publication.py-711-            if fixture is not None:
+--
+.\src\kokoroarc\testing\publication.py-1057-    manifest_bytes = snapshot.contents.get("character.yaml")
+.\src\kokoroarc\testing\publication.py-1058-    if manifest_bytes is None:
+.\src\kokoroarc\testing\publication.py-1059-        return set()
+.\src\kokoroarc\testing\publication.py:1060:    manifest = parse_yaml_bytes(manifest_bytes)
+.\src\kokoroarc\testing\publication.py-1061-    expected = {
+.\src\kokoroarc\testing\publication.py-1062-        "character.yaml",
+.\src\kokoroarc\testing\publication.py-1063-        "tests/multilingual.yaml",
+--
+.\src\kokoroarc\research\workspace.py-469-        value = json.loads(
+.\src\kokoroarc\research\workspace.py-470-            contents.decode("utf-8"),
+.\src\kokoroarc\research\workspace.py-471-            object_pairs_hook=pairs,
+.\src\kokoroarc\research\workspace.py:472:            parse_constant=lambda _value: (_ for _ in ()).throw(ValueError("non-finite")),
+.\src\kokoroarc\research\workspace.py-473-        )
+.\src\kokoroarc\research\workspace.py-474-    except (UnicodeDecodeError, json.JSONDecodeError, RecursionError, ValueError):
+.\src\kokoroarc\research\workspace.py-475-        raise _workspace_error("RESEARCH_WORKSPACE_INVALID", stage) from None
+rg: .\tests: 系统找不到指定的文件。 (os error 2)
+

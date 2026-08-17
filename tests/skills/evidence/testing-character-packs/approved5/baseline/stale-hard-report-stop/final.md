@@ -1,0 +1,1 @@
+Promotion was not created. The supplied hard-validation report is stale for the changed pack, and promotion requires a current passing report bound to the exact source inputs. Reusing its hashes without rerunning validation is not permitted.

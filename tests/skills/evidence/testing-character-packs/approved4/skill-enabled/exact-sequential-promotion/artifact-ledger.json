@@ -1,0 +1,144 @@
+{
+  "schema_version": "1.0",
+  "raw_root_retention": "approved D:-based campaign root",
+  "redaction_replacements": {
+    "environment_secrets": "<redacted-environment-secret>",
+    "credentials": "<redacted-credential>",
+    "protected_absolute_paths": "<redacted-user-profile>"
+  },
+  "files": [
+    {
+      "path": "prompt.md",
+      "raw_path": "prompt.txt",
+      "raw_sha256": "b80d5f3814bd60227776ce67de2a93693841cedaf8be84039e701e9295cf6e2d",
+      "retained_sha256": "b80d5f3814bd60227776ce67de2a93693841cedaf8be84039e701e9295cf6e2d",
+      "redaction_count": 0
+    },
+    {
+      "path": "final.md",
+      "raw_path": "final.txt",
+      "raw_sha256": "b8548e07832575ecccd562ed22c2fa24a5f2466e6a21ed89420d2b066133736b",
+      "retained_sha256": "b8548e07832575ecccd562ed22c2fa24a5f2466e6a21ed89420d2b066133736b",
+      "redaction_count": 0
+    },
+    {
+      "path": "session.jsonl",
+      "raw_path": "session.jsonl",
+      "raw_sha256": "b1ea2a2d5830f30e0c7f1551b8435d170b4edf070a5731b8164c328fffb7c930",
+      "retained_sha256": "b7cb42af801e5a4e770955ed85c8a2a3b99fde70c425492d95cb626fe656a26b",
+      "redaction_count": 6
+    },
+    {
+      "path": "stderr.txt",
+      "raw_path": "stderr.txt",
+      "raw_sha256": "1ab08961600d34b0180e36096c79e2306acc02c3bc33a2d3436c011ff1b1280d",
+      "retained_sha256": "59b6eafc55699c33faba16bb9ca2069b51aaf93a1842d042dc58d4e57f11aa3e",
+      "redaction_count": 1
+    },
+    {
+      "path": "command.json",
+      "raw_path": "command.json",
+      "raw_sha256": "1ca9ab493285b3632dfa23de635e0afa0e3d11e044d15f704a501a6898fd0a29",
+      "retained_sha256": "e6d84f8edb21bd2eb40cda55634ed56c8b530e90f3d9abd5a08f217691094c42",
+      "redaction_count": 18
+    },
+    {
+      "path": "run-status.json",
+      "raw_path": "run-status.json",
+      "raw_sha256": "2d43e27169b506e7ad223390d4adfa7d41c7a3c105400de27f1b1b3835f29e1d",
+      "retained_sha256": "2d43e27169b506e7ad223390d4adfa7d41c7a3c105400de27f1b1b3835f29e1d",
+      "redaction_count": 0
+    },
+    {
+      "path": "protected-before.json",
+      "raw_path": "protected-before.json",
+      "raw_sha256": "46e6cf79bfc870fe39fc6c0b3c21402a5589c9b60d8cc55797d6ad85d553d635",
+      "retained_sha256": "46e6cf79bfc870fe39fc6c0b3c21402a5589c9b60d8cc55797d6ad85d553d635",
+      "redaction_count": 0
+    },
+    {
+      "path": "protected-after.json",
+      "raw_path": "protected-after.json",
+      "raw_sha256": "46e6cf79bfc870fe39fc6c0b3c21402a5589c9b60d8cc55797d6ad85d553d635",
+      "retained_sha256": "46e6cf79bfc870fe39fc6c0b3c21402a5589c9b60d8cc55797d6ad85d553d635",
+      "redaction_count": 0
+    },
+    {
+      "path": "data-inventory.json",
+      "raw_path": "data-inventory.json",
+      "raw_sha256": "33576ce0563652c8a4d4886ca86ff8c691921f15a7432047077d18d6d1546bd9",
+      "retained_sha256": "33576ce0563652c8a4d4886ca86ff8c691921f15a7432047077d18d6d1546bd9",
+      "redaction_count": 0
+    },
+    {
+      "path": "artifacts/reports/hard-task8-a.json",
+      "raw_path": "data/reports/hard-task8-a.json",
+      "raw_sha256": "b0f57b7552df1d88e144d965530afc3704102802788d6295920b18ffd3afe24f",
+      "retained_sha256": "b0f57b7552df1d88e144d965530afc3704102802788d6295920b18ffd3afe24f",
+      "redaction_count": 0
+    },
+    {
+      "path": "artifacts/reports/hard-task8-b.json",
+      "raw_path": "data/reports/hard-task8-b.json",
+      "raw_sha256": "b0f57b7552df1d88e144d965530afc3704102802788d6295920b18ffd3afe24f",
+      "retained_sha256": "b0f57b7552df1d88e144d965530afc3704102802788d6295920b18ffd3afe24f",
+      "redaction_count": 0
+    },
+    {
+      "path": "artifacts/reports/promotions/.records.publish.lock",
+      "raw_path": "data/reports/promotions/.records.publish.lock",
+      "raw_sha256": "6e340b9cffb37a989ca544e6bb780a2c78901d3fb33738768511a30617afa01d",
+      "retained_sha256": "6e340b9cffb37a989ca544e6bb780a2c78901d3fb33738768511a30617afa01d",
+      "redaction_count": 0
+    },
+    {
+      "path": "artifacts/reports/promotions/rin-aster/rin-task8-campaign-reviewed-01/promotion.json",
+      "raw_path": "data/reports/promotions/rin-aster/rin-task8-campaign-reviewed-01/promotion.json",
+      "raw_sha256": "524a3927d94f75543ef8f7164cef4506a60f9f912c677a3d74ad60432714d45f",
+      "retained_sha256": "524a3927d94f75543ef8f7164cef4506a60f9f912c677a3d74ad60432714d45f",
+      "redaction_count": 0
+    },
+    {
+      "path": "artifacts/reports/promotions/rin-aster/rin-task8-campaign-reviewed-01/review-attestation.json",
+      "raw_path": "data/reports/promotions/rin-aster/rin-task8-campaign-reviewed-01/review-attestation.json",
+      "raw_sha256": "7420520c5088a49f321ba24bc388a7e3de8f6870099f8d6585b92940b6efe046",
+      "retained_sha256": "7420520c5088a49f321ba24bc388a7e3de8f6870099f8d6585b92940b6efe046",
+      "redaction_count": 0
+    },
+    {
+      "path": "artifacts/reports/promotions/rin-aster/rin-task8-campaign-verified-01/promotion.json",
+      "raw_path": "data/reports/promotions/rin-aster/rin-task8-campaign-verified-01/promotion.json",
+      "raw_sha256": "c109c4eb97cd7279facafb5076bc7a96fd5ab1327e1b4467c37a185c8149cbb8",
+      "retained_sha256": "c109c4eb97cd7279facafb5076bc7a96fd5ab1327e1b4467c37a185c8149cbb8",
+      "redaction_count": 0
+    },
+    {
+      "path": "artifacts/reports/promotions/rin-aster/rin-task8-campaign-verified-01/review-attestation.json",
+      "raw_path": "data/reports/promotions/rin-aster/rin-task8-campaign-verified-01/review-attestation.json",
+      "raw_sha256": "7420520c5088a49f321ba24bc388a7e3de8f6870099f8d6585b92940b6efe046",
+      "retained_sha256": "7420520c5088a49f321ba24bc388a7e3de8f6870099f8d6585b92940b6efe046",
+      "redaction_count": 0
+    },
+    {
+      "path": "artifacts/reports/publication-task8-private.json",
+      "raw_path": "data/reports/publication-task8-private.json",
+      "raw_sha256": "3cc1109ba6234b70ba077abd0c6309936623e8d5099da3ad0395f08683b37ad5",
+      "retained_sha256": "3cc1109ba6234b70ba077abd0c6309936623e8d5099da3ad0395f08683b37ad5",
+      "redaction_count": 0
+    },
+    {
+      "path": "artifacts/reports/soft-task8-a.json",
+      "raw_path": "data/reports/soft-task8-a.json",
+      "raw_sha256": "44e020be17e63bd1ff7502ffef43ed4a26fabec4eeb9fc953822d53e1e6ee315",
+      "retained_sha256": "44e020be17e63bd1ff7502ffef43ed4a26fabec4eeb9fc953822d53e1e6ee315",
+      "redaction_count": 0
+    },
+    {
+      "path": "artifacts/reports/soft-task8-b.json",
+      "raw_path": "data/reports/soft-task8-b.json",
+      "raw_sha256": "44e020be17e63bd1ff7502ffef43ed4a26fabec4eeb9fc953822d53e1e6ee315",
+      "retained_sha256": "44e020be17e63bd1ff7502ffef43ed4a26fabec4eeb9fc953822d53e1e6ee315",
+      "redaction_count": 0
+    }
+  ]
+}

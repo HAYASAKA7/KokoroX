@@ -1,0 +1,81 @@
+{
+  "schema_version": "1.0",
+  "raw_root_retention": "approved D:-based campaign root",
+  "redaction_replacements": {
+    "environment_secrets": "<redacted-environment-secret>",
+    "credentials": "<redacted-credential>",
+    "protected_absolute_paths": "<redacted-user-profile>"
+  },
+  "files": [
+    {
+      "path": "prompt.md",
+      "raw_path": "prompt.txt",
+      "raw_sha256": "1d1b5b2a469db66ce9a1fe833ff4752b15980934ee1a8da6334e5193b79352d5",
+      "retained_sha256": "1d1b5b2a469db66ce9a1fe833ff4752b15980934ee1a8da6334e5193b79352d5",
+      "redaction_count": 0
+    },
+    {
+      "path": "final.md",
+      "raw_path": "final.txt",
+      "raw_sha256": "392c5cbacef3b93ee9d7bd7abc89d250cb9997cb2eeafcee5761a56a5ef0366d",
+      "retained_sha256": "392c5cbacef3b93ee9d7bd7abc89d250cb9997cb2eeafcee5761a56a5ef0366d",
+      "redaction_count": 0
+    },
+    {
+      "path": "session.jsonl",
+      "raw_path": "session.jsonl",
+      "raw_sha256": "7648ebc0df88f32f132db54a511123a21e4ce9dd4d140e1c2d23eb2e033e3c04",
+      "retained_sha256": "35d9a3581084cebd788a5f23dc501091aa79c5f4cd7d99d643816e66749084c8",
+      "redaction_count": 2
+    },
+    {
+      "path": "stderr.txt",
+      "raw_path": "stderr.txt",
+      "raw_sha256": "296d312570c311e88d12ff907951d7f6af493a31a028a9391968b3c4b78c40fd",
+      "retained_sha256": "296d312570c311e88d12ff907951d7f6af493a31a028a9391968b3c4b78c40fd",
+      "redaction_count": 0
+    },
+    {
+      "path": "command.json",
+      "raw_path": "command.json",
+      "raw_sha256": "108f421a8e9b472f3cc22323facaa622456601123d38a47ab3b0137ff9854088",
+      "retained_sha256": "4c53a2e3cd7a1a97ecf41a3bb3c563ae73d95fcd3dc5d952ac867c6b26abb621",
+      "redaction_count": 18
+    },
+    {
+      "path": "run-status.json",
+      "raw_path": "run-status.json",
+      "raw_sha256": "7008c55ca1735b25101c763dffaac5d9f597366ceafb9de4203294f69370a822",
+      "retained_sha256": "7008c55ca1735b25101c763dffaac5d9f597366ceafb9de4203294f69370a822",
+      "redaction_count": 0
+    },
+    {
+      "path": "protected-before.json",
+      "raw_path": "protected-before.json",
+      "raw_sha256": "6ccf9355235e4a91320d1da26c556de4ef2796b35776ab2976aff5565d1223ad",
+      "retained_sha256": "6ccf9355235e4a91320d1da26c556de4ef2796b35776ab2976aff5565d1223ad",
+      "redaction_count": 0
+    },
+    {
+      "path": "protected-after.json",
+      "raw_path": "protected-after.json",
+      "raw_sha256": "6ccf9355235e4a91320d1da26c556de4ef2796b35776ab2976aff5565d1223ad",
+      "retained_sha256": "6ccf9355235e4a91320d1da26c556de4ef2796b35776ab2976aff5565d1223ad",
+      "redaction_count": 0
+    },
+    {
+      "path": "data-inventory.json",
+      "raw_path": "data-inventory.json",
+      "raw_sha256": "fdf9ce30283d8603691aaf96a951ab92abe9800f6e1dedc2501df8c5c2db342e",
+      "retained_sha256": "fdf9ce30283d8603691aaf96a951ab92abe9800f6e1dedc2501df8c5c2db342e",
+      "redaction_count": 0
+    },
+    {
+      "path": "artifacts/reports/public-candidate-readiness.json",
+      "raw_path": "data/reports/public-candidate-readiness.json",
+      "raw_sha256": "8d92f1f6880b403a8e9aa4cf3e76c94865d28129267264b324e02f2245a9b22e",
+      "retained_sha256": "8d92f1f6880b403a8e9aa4cf3e76c94865d28129267264b324e02f2245a9b22e",
+      "redaction_count": 0
+    }
+  ]
+}

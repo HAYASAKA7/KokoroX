@@ -1,0 +1,5 @@
+2026-08-17T12:18:16.822386Z ERROR codex_core::tools::router: error=Exit code: 1
+Wall time: 1.9 seconds
+Output:
+C:\Python314\python.exe: Error while finding module specification for 'kokoroarc.cli' (ModuleNotFoundError: No module named 'kokoroarc')
+

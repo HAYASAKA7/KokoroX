@@ -1,0 +1,2 @@
+{"type":"item.completed","item":{"id":"item_3","type":"agent_message","text":"I can’t mark it reviewed: a human review attestation is required and cannot be fabricated, inferred, or self-signed.\n\nThe existing hard report remains unchanged. Provide an explicit, schema-valid attestation bound to that exact evidence, and I can perform the `draft → reviewed` promotion. No pack state was changed."}}
+{"type":"turn.completed","usage":{"input_tokens":52406,"cached_input_tokens":37120,"cache_write_input_tokens":0,"output_tokens":394,"reasoning_output_tokens":84}}

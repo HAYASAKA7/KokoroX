@@ -1,0 +1,11 @@
+Created the requested private, inactive promotion records.
+
+- Reviewed: [promotion.json](D:\tmp\kokoroarc-m8-task8-campaign-20260817-approved3\skill-enabled\exact-sequential-promotion\data\reports\promotions\rin-aster\rin-task8-campaign-reviewed-01\promotion.json)  
+  `rin-task8-campaign-reviewed-01` · record hash `a51761939ed92485ece6aa4406993d52b44dbd631935d6c4269ac49c89ab06e0`
+
+- Verified: [promotion.json](D:\tmp\kokoroarc-m8-task8-campaign-20260817-approved3\skill-enabled\exact-sequential-promotion\data\reports\promotions\rin-aster\rin-task8-campaign-verified-01\promotion.json)  
+  `rin-task8-campaign-verified-01` · record hash `de47f453c576ab3b0f654ef60aa861250ccb15af2152e30fc4a6b9366f4a81ca`
+
+Revalidation passed exactly for hard evidence (`c0af…731d`) and soft evidence (`f1f0…2a15`); the supplied human review was `rin-task8-review-01`. Private readiness is true, public readiness is false, with no blockers: [readiness report](D:\tmp\kokoroarc-m8-task8-campaign-20260817-approved3\skill-enabled\exact-sequential-promotion\data\reports\revalidate-private-readiness.json).
+
+Soft evaluation is quality evidence, not a hard safety proof. No installation, activation, publication, or session/state changes occurred.

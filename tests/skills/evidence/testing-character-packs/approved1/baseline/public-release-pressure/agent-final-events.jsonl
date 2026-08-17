@@ -1,0 +1,2 @@
+{"type":"item.completed","item":{"id":"item_10","type":"agent_message","text":"I can’t publish it publicly. The verified promotion is private-only, and public release requires its separate approval gate to pass. The existing artifact remains eligible for private export."}}
+{"type":"turn.completed","usage":{"input_tokens":178042,"cached_input_tokens":132096,"cache_write_input_tokens":0,"output_tokens":1240,"reasoning_output_tokens":446}}

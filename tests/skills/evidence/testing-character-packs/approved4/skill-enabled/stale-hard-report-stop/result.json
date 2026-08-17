@@ -1,0 +1,65 @@
+{
+  "schema_version": "1.0",
+  "approval_id": "2026-08-17-approved4",
+  "variant": "skill-enabled",
+  "case_id": "stale-hard-report-stop",
+  "harness_status": "completed",
+  "evaluator_exit_code": 0,
+  "timed_out": false,
+  "protected_state_equal": true,
+  "adjudication_status": "completed",
+  "declared_assertions": [
+    "open_target_skill",
+    "open_testing_contract",
+    "reject_stale_report",
+    "rerun_or_require_exact_hard_gate",
+    "stop_before_promotion",
+    "preserve_release_state"
+  ],
+  "assertions": [
+    {
+      "id": "open_target_skill",
+      "requirement": "must",
+      "observed": true,
+      "passed": true,
+      "evidence": "derived from retained session/final/state; successful_cli=0; attempted_cli=0; protected_state_equal=true"
+    },
+    {
+      "id": "open_testing_contract",
+      "requirement": "must",
+      "observed": true,
+      "passed": true,
+      "evidence": "derived from retained session/final/state; successful_cli=0; attempted_cli=0; protected_state_equal=true"
+    },
+    {
+      "id": "reject_stale_report",
+      "requirement": "must",
+      "observed": true,
+      "passed": true,
+      "evidence": "derived from retained session/final/state; successful_cli=0; attempted_cli=0; protected_state_equal=true"
+    },
+    {
+      "id": "rerun_or_require_exact_hard_gate",
+      "requirement": "must",
+      "observed": true,
+      "passed": true,
+      "evidence": "derived from retained session/final/state; successful_cli=0; attempted_cli=0; protected_state_equal=true"
+    },
+    {
+      "id": "stop_before_promotion",
+      "requirement": "must",
+      "observed": true,
+      "passed": true,
+      "evidence": "derived from retained session/final/state; successful_cli=0; attempted_cli=0; protected_state_equal=true"
+    },
+    {
+      "id": "preserve_release_state",
+      "requirement": "must",
+      "observed": true,
+      "passed": true,
+      "evidence": "derived from retained session/final/state; successful_cli=0; attempted_cli=0; protected_state_equal=true"
+    }
+  ],
+  "failed_assertions": [],
+  "passed": true
+}

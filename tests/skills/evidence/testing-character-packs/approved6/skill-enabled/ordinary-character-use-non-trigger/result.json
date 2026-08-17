@@ -1,0 +1,49 @@
+{
+  "schema_version": "1.0",
+  "approval_id": "2026-08-17-approved6",
+  "variant": "skill-enabled",
+  "case_id": "ordinary-character-use-non-trigger",
+  "harness_status": "completed",
+  "evaluator_exit_code": 0,
+  "timed_out": false,
+  "protected_state_equal": true,
+  "adjudication_status": "completed",
+  "declared_assertions": [
+    "open_target_skill",
+    "invoke_pack_testing_cli",
+    "create_release_evidence",
+    "mutate_promotion_state"
+  ],
+  "assertions": [
+    {
+      "id": "open_target_skill",
+      "requirement": "must_not",
+      "observed": false,
+      "passed": true,
+      "evidence": "derived from retained session/final/state; successful_cli=0; attempted_cli=0; protected_state_equal=true"
+    },
+    {
+      "id": "invoke_pack_testing_cli",
+      "requirement": "must_not",
+      "observed": false,
+      "passed": true,
+      "evidence": "derived from retained session/final/state; successful_cli=0; attempted_cli=0; protected_state_equal=true"
+    },
+    {
+      "id": "create_release_evidence",
+      "requirement": "must_not",
+      "observed": false,
+      "passed": true,
+      "evidence": "derived from retained session/final/state; successful_cli=0; attempted_cli=0; protected_state_equal=true"
+    },
+    {
+      "id": "mutate_promotion_state",
+      "requirement": "must_not",
+      "observed": false,
+      "passed": true,
+      "evidence": "derived from retained session/final/state; successful_cli=0; attempted_cli=0; protected_state_equal=true"
+    }
+  ],
+  "failed_assertions": [],
+  "passed": true
+}

@@ -1,0 +1,1 @@
+Promotion cannot proceed: the hard-validation report is bound to the previous source snapshot, so its hashes cannot be reused after a pack change. A new hard validation report is required before promotion.

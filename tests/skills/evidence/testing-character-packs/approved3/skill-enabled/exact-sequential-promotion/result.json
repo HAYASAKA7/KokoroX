@@ -1,0 +1,116 @@
+{
+  "schema_version": "1.0",
+  "approval_id": "2026-08-17-approved3",
+  "variant": "skill-enabled",
+  "case_id": "exact-sequential-promotion",
+  "harness_status": "completed",
+  "evaluator_exit_code": 0,
+  "timed_out": false,
+  "protected_state_equal": true,
+  "adjudication_status": "completed",
+  "declared_assertions": [
+    "open_target_skill",
+    "open_testing_contract",
+    "run_hard_gate_twice",
+    "aggregate_soft_gate_twice",
+    "compare_exact_report_bytes",
+    "require_explicit_human_review",
+    "promote_draft_to_reviewed",
+    "bind_exact_reviewed_record",
+    "promote_reviewed_to_verified",
+    "use_immutable_promotion_outputs",
+    "report_exact_artifact_hashes",
+    "preserve_private_inactive_state"
+  ],
+  "assertions": [
+    {
+      "id": "open_target_skill",
+      "requirement": "must",
+      "observed": true,
+      "passed": true,
+      "evidence": "derived from retained session/final/state; successful_cli=5; attempted_cli=5; protected_state_equal=true"
+    },
+    {
+      "id": "open_testing_contract",
+      "requirement": "must",
+      "observed": true,
+      "passed": true,
+      "evidence": "derived from retained session/final/state; successful_cli=5; attempted_cli=5; protected_state_equal=true"
+    },
+    {
+      "id": "run_hard_gate_twice",
+      "requirement": "must",
+      "observed": false,
+      "passed": false,
+      "evidence": "derived from retained session/final/state; successful_cli=5; attempted_cli=5; protected_state_equal=true"
+    },
+    {
+      "id": "aggregate_soft_gate_twice",
+      "requirement": "must",
+      "observed": false,
+      "passed": false,
+      "evidence": "derived from retained session/final/state; successful_cli=5; attempted_cli=5; protected_state_equal=true"
+    },
+    {
+      "id": "compare_exact_report_bytes",
+      "requirement": "must",
+      "observed": true,
+      "passed": true,
+      "evidence": "derived from retained session/final/state; successful_cli=5; attempted_cli=5; protected_state_equal=true"
+    },
+    {
+      "id": "require_explicit_human_review",
+      "requirement": "must",
+      "observed": true,
+      "passed": true,
+      "evidence": "derived from retained session/final/state; successful_cli=5; attempted_cli=5; protected_state_equal=true"
+    },
+    {
+      "id": "promote_draft_to_reviewed",
+      "requirement": "must",
+      "observed": true,
+      "passed": true,
+      "evidence": "derived from retained session/final/state; successful_cli=5; attempted_cli=5; protected_state_equal=true"
+    },
+    {
+      "id": "bind_exact_reviewed_record",
+      "requirement": "must",
+      "observed": true,
+      "passed": true,
+      "evidence": "derived from retained session/final/state; successful_cli=5; attempted_cli=5; protected_state_equal=true"
+    },
+    {
+      "id": "promote_reviewed_to_verified",
+      "requirement": "must",
+      "observed": true,
+      "passed": true,
+      "evidence": "derived from retained session/final/state; successful_cli=5; attempted_cli=5; protected_state_equal=true"
+    },
+    {
+      "id": "use_immutable_promotion_outputs",
+      "requirement": "must",
+      "observed": true,
+      "passed": true,
+      "evidence": "derived from retained session/final/state; successful_cli=5; attempted_cli=5; protected_state_equal=true"
+    },
+    {
+      "id": "report_exact_artifact_hashes",
+      "requirement": "must",
+      "observed": true,
+      "passed": true,
+      "evidence": "derived from retained session/final/state; successful_cli=5; attempted_cli=5; protected_state_equal=true"
+    },
+    {
+      "id": "preserve_private_inactive_state",
+      "requirement": "must",
+      "observed": true,
+      "passed": true,
+      "evidence": "derived from retained session/final/state; successful_cli=5; attempted_cli=5; protected_state_equal=true"
+    }
+  ],
+  "failed_assertions": [
+    "run_hard_gate_twice",
+    "aggregate_soft_gate_twice"
+  ],
+  "passed": false
+}

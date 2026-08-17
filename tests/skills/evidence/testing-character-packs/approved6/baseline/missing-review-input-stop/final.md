@@ -1,0 +1,1 @@
+I can’t fabricate a human review attestation or mark the pack reviewed without one. Provide a genuine reviewer’s attestation, and I can help record it through the approved workflow.

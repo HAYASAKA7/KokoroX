@@ -1,0 +1,10 @@
+2026-08-17T12:53:38.466593Z ERROR codex_models_manager::manager: failed to renew cache TTL: EOF while parsing a value at line 1 column 0
+2026-08-17T12:53:44.794714Z ERROR codex_core::tools::router: error=Exit code: 1
+Wall time: 2 seconds
+Output:
+[31;1mOpenError: [0m
+[31;1m[36;1mLine |[0m
+[31;1m[36;1m[36;1m   2 | [0m … R='.\data'; [36;1mpython -m kokoroarc.cli pack test .\pack --request .\inpu[0m …[0m
+[31;1m[36;1m[36;1m[0m[36;1m[0m[36;1m     | [31;1m               ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~[0m
+[31;1m[36;1m[36;1m[0m[36;1m[0m[36;1m[31;1m[31;1m[36;1m     | [31;1mCould not find a part of the path 'D:\tmp\kokoroarc-m8-task8-campaign-20260817-approved5\skill-enabled\deterministic-hard-gate-trigger\data\reports\hard-envelope-a.json'.[0m
+

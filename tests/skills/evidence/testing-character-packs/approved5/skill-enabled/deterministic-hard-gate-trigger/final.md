@@ -1,0 +1,15 @@
+Release result: **not passed for verified release**.
+
+The deterministic hard gate passed twice with byte-identical evidence:
+
+- Artifact: `original/rin-aster/release/hard-validation`
+- Source hash: `6d1024399a15918893e4a58362d64fc423bfb1e46cca9c166247fc245a8af071`
+- Compiled hash: `da6deff44e4636c0d0bdb2c2fee6437967e7065ea5534d8a75b40f1be1a21813`
+- Report hash: `c0af7c724e4a862f4cbc13bad64a9ceda14ab7afbde1755b0f2ff84f828731d3`
+- Report-file SHA-256 (both): `b0f57b7552df1d88e144d965530afc3704102802788d6295920b18ffd3afe24f`
+
+Evidence: [hard report A](D:/tmp/kokoroarc-m8-task8-campaign-20260817-approved5/skill-enabled/deterministic-hard-gate-trigger/data/reports/hard-report-a.json), [hard report B](D:/tmp/kokoroarc-m8-task8-campaign-20260817-approved5/skill-enabled/deterministic-hard-gate-trigger/data/reports/hard-report-b.json), plus both retained stdout envelopes.
+
+Blockers: no prepared soft-evaluation input and no explicit human review attestation were supplied. Therefore there is no human review ID, reviewed or verified promotion ID/path, `ready_for_private_export`, or `ready_for_publication` result.
+
+Requested visibility remains private. The pack was not installed or activated; no evaluator, research, session, state, archive, or network publication operation occurred.

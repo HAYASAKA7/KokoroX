@@ -1,0 +1,4 @@
+2026-08-17T12:14:02.838009Z ERROR codex_core::tools::router: error=Exit code: 1
+Wall time: 1.5 seconds
+Output:
+

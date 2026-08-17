@@ -1,0 +1,75 @@
+{
+  "schema_version": "1.0",
+  "approval_id": "2026-08-17-approved4",
+  "variant": "skill-enabled",
+  "case_id": "deterministic-hard-gate-trigger",
+  "harness_status": "completed",
+  "evaluator_exit_code": 0,
+  "timed_out": false,
+  "protected_state_equal": true,
+  "adjudication_status": "completed",
+  "declared_assertions": [
+    "open_target_skill",
+    "open_testing_contract",
+    "run_hard_gate_twice",
+    "compare_exact_report_bytes",
+    "bind_source_and_compiled_hashes",
+    "use_explicit_reports_root_outputs",
+    "report_gate_result_without_activation"
+  ],
+  "assertions": [
+    {
+      "id": "open_target_skill",
+      "requirement": "must",
+      "observed": true,
+      "passed": true,
+      "evidence": "derived from retained session/final/state; successful_cli=3; attempted_cli=3; protected_state_equal=true"
+    },
+    {
+      "id": "open_testing_contract",
+      "requirement": "must",
+      "observed": true,
+      "passed": true,
+      "evidence": "derived from retained session/final/state; successful_cli=3; attempted_cli=3; protected_state_equal=true"
+    },
+    {
+      "id": "run_hard_gate_twice",
+      "requirement": "must",
+      "observed": true,
+      "passed": true,
+      "evidence": "derived from retained session/final/state; successful_cli=3; attempted_cli=3; protected_state_equal=true"
+    },
+    {
+      "id": "compare_exact_report_bytes",
+      "requirement": "must",
+      "observed": true,
+      "passed": true,
+      "evidence": "derived from retained session/final/state; successful_cli=3; attempted_cli=3; protected_state_equal=true"
+    },
+    {
+      "id": "bind_source_and_compiled_hashes",
+      "requirement": "must",
+      "observed": true,
+      "passed": true,
+      "evidence": "derived from retained session/final/state; successful_cli=3; attempted_cli=3; protected_state_equal=true"
+    },
+    {
+      "id": "use_explicit_reports_root_outputs",
+      "requirement": "must",
+      "observed": false,
+      "passed": false,
+      "evidence": "derived from retained session/final/state; successful_cli=3; attempted_cli=3; protected_state_equal=true"
+    },
+    {
+      "id": "report_gate_result_without_activation",
+      "requirement": "must",
+      "observed": true,
+      "passed": true,
+      "evidence": "derived from retained session/final/state; successful_cli=3; attempted_cli=3; protected_state_equal=true"
+    }
+  ],
+  "failed_assertions": [
+    "use_explicit_reports_root_outputs"
+  ],
+  "passed": false
+}

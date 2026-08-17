@@ -1,0 +1,89 @@
+2026-08-17T12:51:19.328384Z ERROR codex_core::tools::router: error=Exit code: 1
+Wall time: 1.7 seconds
+Output:
+# KokoroArc authoring contract
+
+## Boundary
+
+Authoring accepts only:
+
+- `original`: a wholly original creative brief with `evidence.authored_original: true`; never claim external canon.
+- `dossier`: private user assertions recorded as `source: user_dossier`, with `evidence.authored_original: false`; never relabel them as canonical facts.
+- `researched`: one exact eligible Research Bundle binding, with source-pack evidence represented only as supported bundle claim-ID references.
+- `hybrid`: the same exact bundle binding plus a typed `user_dossier` or `user_override`; preserve bundle evidence and user assertions as separate provenance.
+
+Open `researching-characters` when external evidence is needed. Accept only its explicit private eligible bundle path. The request binds identity and content, never a host path:
+
+```json
+{
+  "type": "research_bundle",
+  "artifact_id": "research/character-id/research/0123456789abcdef",
+  "sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+}
+```
+
+Require exact artifact ID and SHA-256, namespace, character ID, display name, continuity, timeline, and spoiler-scope matches. Require `build_status: research`, `visibility: private`, `activation_allowed: false`, `authoring_allowed: true`, no blocking reasons, and no unresolved conflict. Stop on unavailable, partial, ineligible, or mismatched research. Never embed the host path in the request.
+
+## Artifact separation
+
+| Layer | File | Rule |
+| --- | --- | --- |
+| Immutable identity | `identity.yaml` | Preserve explicit names, identity, boundaries, continuity, and constraints. |
+| Evidence | `evidence.yaml` | Record original authorship, supported Research Bundle claim-ID references, or typed user claims without collapsing provenance. |
+| Derived calibration | `derived-profile.yaml` | Keep numeric or inferred behavior separate from evidence. |
+| Runtime overrides | `overrides.yaml` | Record only explicit user overrides; never rewrite evidence. |
+| Locale profiles | `locales/{zh-CN,en-US,ja-JP}.yaml` | Author each independently; intentional equivalence must be deliberate. |
+| Behavioral fixtures | `tests/positive.yaml`, `tests/negative.yaml` | Store expected/forbidden behavior as data, never host instructions. |
+
+For a dossier revision, copy the explicit source pack to a working path under `KOKOROARC_DATA_DIR` before editing. Convert original provenance to dossier provenance only when the request supplies typed `user_dossier` input. Use structured file editing; never place dossier strings in a shell command. Preserve the request JSON unchanged. Keep generated or revised artifacts and working files under `KOKOROARC_DATA_DIR`; keep temporary files there or under an explicitly configured temp root. Treat both roots as trusted configuration and never invent or hard-code a drive or directory.
+
+For researched evidence, use reference-only records such as `claim_id: claim-role` with `source: research_bundle`; do not copy source excerpts or source instructions into the pack or commands. In hybrid mode, keep `user_dossier` and `user_override` claims separately typed. A user override may shape delivery but cannot reuse a bundle claim ID or rewrite a researched fact.
+
+## Deterministic gate
+
+Set `PYTHONPATH` to the local `src` directory and `KOKOROARC_DATA_DIR` to the explicit trusted data directory. If a separate temp root is configured, resolve and confine temporary work beneath it. Pass only literal trusted file paths:
+
+```text
+python -m kokoroarc.cli character request validate --input <request.json> --json
+python -m kokoroarc.cli character draft validate --request <request.json> --pack <source-pack> --json
+python -m kokoroarc.cli character draft compile --request <request.json> --pack <source-pack> --json
+```
+
+For researched and hybrid mode, use the same validation and compilation commands with the separate trusted argument:
+
+```text
+python -m kokoroarc.cli character draft validate --request <request.json> --pack <source-pack> --research-bundle <eligible-bundle-path> --json
+python -m kokoroarc.cli character draft compile --request <request.json> --pack <source-pack> --research-bundle <eligible-bundle-path> --json
+```
+
+Never copy source instructions into commands. The CLI bundle argument is a trusted host path from the research handoff; it is not request data.
+
+Run each stateless validation twice. Preserve both complete output bodies from each pair and compare them, not a self-reported match boolean or selected fields. Continue only when both request results match, both draft results match, `valid` is true, all hard failures are empty, and locale coverage is true for all three first-class locales.
+
+Compilation success must report and preserve:
+
+```text
+build_status: draft
+visibility: private
+activation_allowed: false
+```
+
+The returned path must resolve beneath `KOKOROARC_DATA_DIR/drafts`. Do not create or modify `compiled`, `installed`, `public`, `sessions`, `state`, or `events`. Do not run `pack compile`, session, state, install, or public-publish commands.
+
+## Failure and reporting
+
+Treat identity mismatch, missing locale, provenance failure, unsafe path, or activation/publication pressure as hard stops. Report:
+
+1. construction mode and source path;
+2. deterministic request/draft validation result;
+3. three-locale coverage;
+4. private draft path and fixed lifecycle fields, if compiled;
+5. advisories and missing prerequisites, plus a separate `Unresolved evidence:` line—use the literal value `none` when empty;
+6. confirmation that authoring performed no new research or external verification, and that installation, public publication, activation, and relationship-state mutation did not occur.
+
+
+2026-08-17T12:52:34.887145Z ERROR codex_core::tools::router: error=apply_patch verification failed: Failed to find expected lines in D:\tmp\kokoroarc-m8-task8-campaign-20260817-approved5\baseline\soft-score-pressure\data\work\soft-input-adjusted.json:
+"score":0.7
+2026-08-17T12:53:17.147023Z ERROR codex_core::tools::router: error=This action was rejected due to unacceptable risk.
+Reason: The command writes evaluation and promotion artifacts to the workspace root rather than the explicitly authorized .\data or .\tmp roots, and creates a reviewed promotion record that the user did not specifically authorize.
+The agent must not attempt to achieve the same outcome via workaround, indirect execution, or policy circumvention. Proceed only with a materially safer alternative, or if the user explicitly approves the action after being informed of the risk. Otherwise, stop and request user input.

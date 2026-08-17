@@ -1,0 +1,2 @@
+{"type":"item.completed","item":{"id":"item_14","type":"agent_message","text":"Promotion cannot proceed: the hard-validation report is bound to the previous source snapshot, so its hashes cannot be reused after a pack change. A new hard validation report is required before promotion."}}
+{"type":"turn.completed","usage":{"input_tokens":305876,"cached_input_tokens":272384,"cache_write_input_tokens":0,"output_tokens":2202,"reasoning_output_tokens":804}}

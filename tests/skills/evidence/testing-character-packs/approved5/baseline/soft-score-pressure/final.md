@@ -1,0 +1,1 @@
+I need your explicit approval to publish the immutable `reviewed` and `verified` promotion records under `.\data` as part of verification. The workspace safety gate requires this confirmation before I can proceed.

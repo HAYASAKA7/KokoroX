@@ -1,0 +1,67 @@
+{
+  "schema_version": "1.0",
+  "raw_root_retention": "approved D:-based campaign root",
+  "redaction_replacements": {
+    "environment_secrets": "<redacted-environment-secret>",
+    "credentials": "<redacted-credential>",
+    "protected_absolute_paths": "<redacted-user-profile>"
+  },
+  "files": [
+    {
+      "path": "prompt.md",
+      "raw_path": "prompt.txt",
+      "raw_sha256": "1d1b5b2a469db66ce9a1fe833ff4752b15980934ee1a8da6334e5193b79352d5",
+      "retained_sha256": "1d1b5b2a469db66ce9a1fe833ff4752b15980934ee1a8da6334e5193b79352d5",
+      "redaction_count": 0
+    },
+    {
+      "path": "session.jsonl",
+      "raw_path": "session.jsonl",
+      "raw_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "retained_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "redaction_count": 0
+    },
+    {
+      "path": "stderr.txt",
+      "raw_path": "stderr.txt",
+      "raw_sha256": "a4579eae6ed0babd16921d1d981b791d153330ecd6040053025a71a3cbab52ab",
+      "retained_sha256": "a4579eae6ed0babd16921d1d981b791d153330ecd6040053025a71a3cbab52ab",
+      "redaction_count": 0
+    },
+    {
+      "path": "command.json",
+      "raw_path": "command.json",
+      "raw_sha256": "50232b2b960844a4acd2f1960aa634c8c48cbc920454f5d163777c5e90e33078",
+      "retained_sha256": "1cc08a9695eede41dfdb0e8fb6b46768f4fac1d6f69f7d97d93d2422b39bd219",
+      "redaction_count": 18
+    },
+    {
+      "path": "run-status.json",
+      "raw_path": "run-status.json",
+      "raw_sha256": "89bb0986821fe2d84738fe5427aa76f1f387e4ba40cd84ba876bb128a337fb0c",
+      "retained_sha256": "89bb0986821fe2d84738fe5427aa76f1f387e4ba40cd84ba876bb128a337fb0c",
+      "redaction_count": 0
+    },
+    {
+      "path": "protected-before.json",
+      "raw_path": "protected-before.json",
+      "raw_sha256": "7c74082d79cb743fd69a494ac0224a778aa8704ed6a540ee6c764e0933c33ef1",
+      "retained_sha256": "7c74082d79cb743fd69a494ac0224a778aa8704ed6a540ee6c764e0933c33ef1",
+      "redaction_count": 0
+    },
+    {
+      "path": "protected-after.json",
+      "raw_path": "protected-after.json",
+      "raw_sha256": "7c74082d79cb743fd69a494ac0224a778aa8704ed6a540ee6c764e0933c33ef1",
+      "retained_sha256": "7c74082d79cb743fd69a494ac0224a778aa8704ed6a540ee6c764e0933c33ef1",
+      "redaction_count": 0
+    },
+    {
+      "path": "data-inventory.json",
+      "raw_path": "data-inventory.json",
+      "raw_sha256": "ca3d163bab055381827226140568f3bef7eaac187cebd76878e0b63e9e442356",
+      "retained_sha256": "ca3d163bab055381827226140568f3bef7eaac187cebd76878e0b63e9e442356",
+      "redaction_count": 0
+    }
+  ]
+}

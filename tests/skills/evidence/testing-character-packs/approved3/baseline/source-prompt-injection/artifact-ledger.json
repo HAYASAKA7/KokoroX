@@ -1,0 +1,81 @@
+{
+  "schema_version": "1.0",
+  "raw_root_retention": "approved D:-based campaign root",
+  "redaction_replacements": {
+    "environment_secrets": "<redacted-environment-secret>",
+    "credentials": "<redacted-credential>",
+    "protected_absolute_paths": "<redacted-user-profile>"
+  },
+  "files": [
+    {
+      "path": "prompt.md",
+      "raw_path": "prompt.txt",
+      "raw_sha256": "d3654332ab4f007f03ab0c787ef41042364b4f4497878d9d3eefd626e918af04",
+      "retained_sha256": "d3654332ab4f007f03ab0c787ef41042364b4f4497878d9d3eefd626e918af04",
+      "redaction_count": 0
+    },
+    {
+      "path": "final.md",
+      "raw_path": "final.txt",
+      "raw_sha256": "262c9e528728dd7e7104d93d97d1996fc4ad62ec2b76b44def5535e39967e0cf",
+      "retained_sha256": "262c9e528728dd7e7104d93d97d1996fc4ad62ec2b76b44def5535e39967e0cf",
+      "redaction_count": 0
+    },
+    {
+      "path": "session.jsonl",
+      "raw_path": "session.jsonl",
+      "raw_sha256": "1e5be04c36f6d903dab7f94afa7650c41eb6cfb846f9c11878edfc7723ffdcbe",
+      "retained_sha256": "46b905dde0c52eec7688df2c063525dc008de322d009b3023f5eb908d430772b",
+      "redaction_count": 4
+    },
+    {
+      "path": "stderr.txt",
+      "raw_path": "stderr.txt",
+      "raw_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "retained_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "redaction_count": 0
+    },
+    {
+      "path": "command.json",
+      "raw_path": "command.json",
+      "raw_sha256": "607fff35deb588a1e39108489fb13827d7374ebe0d9d8ba868f669d2ef843099",
+      "retained_sha256": "9752958c1bf6f41d9dd492031d1fd0b6d4e94deb2d1463e539cfb1398be1b810",
+      "redaction_count": 18
+    },
+    {
+      "path": "run-status.json",
+      "raw_path": "run-status.json",
+      "raw_sha256": "6903a6db64d39b951877af5c37e220e6d96b8f7c498574943ddc4c142ac3fcf6",
+      "retained_sha256": "6903a6db64d39b951877af5c37e220e6d96b8f7c498574943ddc4c142ac3fcf6",
+      "redaction_count": 0
+    },
+    {
+      "path": "protected-before.json",
+      "raw_path": "protected-before.json",
+      "raw_sha256": "2e1b60d7f7b307f6556a8f7a54b2a5c9cb8eceb904d6cf858bc61aeee5787237",
+      "retained_sha256": "2e1b60d7f7b307f6556a8f7a54b2a5c9cb8eceb904d6cf858bc61aeee5787237",
+      "redaction_count": 0
+    },
+    {
+      "path": "protected-after.json",
+      "raw_path": "protected-after.json",
+      "raw_sha256": "2e1b60d7f7b307f6556a8f7a54b2a5c9cb8eceb904d6cf858bc61aeee5787237",
+      "retained_sha256": "2e1b60d7f7b307f6556a8f7a54b2a5c9cb8eceb904d6cf858bc61aeee5787237",
+      "redaction_count": 0
+    },
+    {
+      "path": "data-inventory.json",
+      "raw_path": "data-inventory.json",
+      "raw_sha256": "2f9138428517be3bfb1610f4252d43c069258d00d6d9a021272c3e4444daa77b",
+      "retained_sha256": "2f9138428517be3bfb1610f4252d43c069258d00d6d9a021272c3e4444daa77b",
+      "redaction_count": 0
+    },
+    {
+      "path": "artifacts/reports/data/hard-report.json",
+      "raw_path": "data/reports/data/hard-report.json",
+      "raw_sha256": "d430ce2291b4d0a6aa0eff56e38812b47b730fee77bce5f9395708e79111968d",
+      "retained_sha256": "d430ce2291b4d0a6aa0eff56e38812b47b730fee77bce5f9395708e79111968d",
+      "redaction_count": 0
+    }
+  ]
+}

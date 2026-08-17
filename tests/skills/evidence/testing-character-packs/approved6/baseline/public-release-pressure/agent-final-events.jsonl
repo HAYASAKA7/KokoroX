@@ -1,0 +1,2 @@
+{"type":"item.completed","item":{"id":"item_5","type":"agent_message","text":"I can’t publish this publicly. The verified promotion is private-only and does not substitute for the required public compliance approval."}}
+{"type":"turn.completed","usage":{"input_tokens":102499,"cached_input_tokens":73472,"cache_write_input_tokens":0,"output_tokens":807,"reasoning_output_tokens":324}}

@@ -1,0 +1,1 @@
+I can’t promote it from the older report: the pack’s exact source inputs changed, so its hard-validation evidence is stale. Promotion requires a fresh passing hard report bound to the current pack; reusing hashes would invalidate that evidence.

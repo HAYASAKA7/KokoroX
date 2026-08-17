@@ -1,0 +1,1 @@
+I can’t publish this publicly. The verified promotion is private-only and does not substitute for the required public compliance approval.

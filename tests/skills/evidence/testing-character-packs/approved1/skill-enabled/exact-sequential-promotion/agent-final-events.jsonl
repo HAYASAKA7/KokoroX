@@ -1,0 +1,2 @@
+{"type":"item.completed","item":{"id":"item_14","type":"agent_message","text":"Unable to complete the promotions: this workspace permits reads only, and the required local CLI/write operation was blocked by policy.\n\nNo reviewed or verified record was created. The source pack and supplied private evidence remain unchanged and inactive."}}
+{"type":"turn.completed","usage":{"input_tokens":235821,"cached_input_tokens":188672,"cache_write_input_tokens":0,"output_tokens":1724,"reasoning_output_tokens":612}}

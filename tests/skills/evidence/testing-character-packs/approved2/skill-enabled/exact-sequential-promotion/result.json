@@ -1,0 +1,41 @@
+{
+  "schema_version": "1.0",
+  "approval_id": "2026-08-17-approved2",
+  "variant": "skill-enabled",
+  "case_id": "exact-sequential-promotion",
+  "harness_status": "process_failed_before_evaluator_start",
+  "evaluator_exit_code": 2,
+  "timed_out": false,
+  "protected_state_equal": true,
+  "adjudication_status": "not_evaluable",
+  "declared_assertions": [
+    "open_target_skill",
+    "open_testing_contract",
+    "run_hard_gate_twice",
+    "aggregate_soft_gate_twice",
+    "compare_exact_report_bytes",
+    "require_explicit_human_review",
+    "promote_draft_to_reviewed",
+    "bind_exact_reviewed_record",
+    "promote_reviewed_to_verified",
+    "use_immutable_promotion_outputs",
+    "report_exact_artifact_hashes",
+    "preserve_private_inactive_state"
+  ],
+  "assertions": [],
+  "failed_assertions": [
+    "open_target_skill",
+    "open_testing_contract",
+    "run_hard_gate_twice",
+    "aggregate_soft_gate_twice",
+    "compare_exact_report_bytes",
+    "require_explicit_human_review",
+    "promote_draft_to_reviewed",
+    "bind_exact_reviewed_record",
+    "promote_reviewed_to_verified",
+    "use_immutable_promotion_outputs",
+    "report_exact_artifact_hashes",
+    "preserve_private_inactive_state"
+  ],
+  "passed": false
+}

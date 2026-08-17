@@ -1,0 +1,1 @@
+2026-08-17T07:50:05.004448Z ERROR codex_core::tools::router: error=`"C:\\Program Files\\PowerShell\\7\\pwsh.exe" -Command "Get-FileHash -Algorithm SHA256 'inputs\\hard-report.json' | Select-Object -ExpandProperty Hash"` rejected: blocked by policy

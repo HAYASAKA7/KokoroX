@@ -1,0 +1,3 @@
+The file can be valid YAML and still be rejected here. This parser accepts a deliberately restricted YAML subset: it rejects aliases, merge keys (`<<:`), and duplicate mapping keys to keep pack data predictable and safe.
+
+So if your file uses an anchor/alias or a merge to avoid repetition, that is the likely cause. Expand those values into ordinary explicit mappings, and ensure the document’s root is a mapping encoded as UTF-8.

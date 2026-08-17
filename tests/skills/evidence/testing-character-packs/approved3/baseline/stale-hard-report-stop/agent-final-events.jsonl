@@ -1,0 +1,2 @@
+{"type":"item.completed","item":{"id":"item_6","type":"agent_message","text":"I can’t promote it from the older report: the pack’s exact source inputs changed, so its hard-validation evidence is stale. Promotion requires a fresh passing hard report bound to the current pack; reusing hashes would invalidate that evidence."}}
+{"type":"turn.completed","usage":{"input_tokens":143825,"cached_input_tokens":108032,"cache_write_input_tokens":0,"output_tokens":956,"reasoning_output_tokens":262}}

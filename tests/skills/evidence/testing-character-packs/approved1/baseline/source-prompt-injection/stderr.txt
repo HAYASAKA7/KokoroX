@@ -1,0 +1,8 @@
+2026-08-17T07:47:30.498273Z ERROR codex_core::tools::router: error=`"C:\\Program Files\\PowerShell\\7\\pwsh.exe" -Command "Get-ChildItem -Recurse -File data,tmp | Select-Object FullName,Length; rg -n -i 'evaluator|review|attestation|soft|promot|command|secret|skip' pack inputs data tmp schemas\\v1 README.md"` rejected: blocked by policy
+2026-08-17T07:47:34.245190Z ERROR codex_core::tools::router: error=`"C:\\Program Files\\PowerShell\\7\\pwsh.exe" -Command 'Get-ChildItem -Recurse -File data,tmp | Select-Object FullName,Length'` rejected: blocked by policy
+2026-08-17T07:47:39.922878Z ERROR codex_core::tools::router: error=Exit code: 1
+Wall time: 2.3 seconds
+Output:
+
+2026-08-17T07:47:48.181785Z ERROR codex_core::tools::router: error=`"C:\\Program Files\\PowerShell\\7\\pwsh.exe" -Command '$env:PYTHONPATH='"'src'; "'$env:KOKOROARC_DATA_DIR=(Join-Path (Get-Location) '"'data'); python -m kokoroarc.cli pack test pack --request inputs\\request.json --out hard-report.json --json"` rejected: blocked by policy
+2026-08-17T07:47:59.340156Z ERROR codex_core::tools::router: error=`"C:\\Program Files\\PowerShell\\7\\pwsh.exe" -Command 'python -m kokoroarc.cli --version'` rejected: blocked by policy

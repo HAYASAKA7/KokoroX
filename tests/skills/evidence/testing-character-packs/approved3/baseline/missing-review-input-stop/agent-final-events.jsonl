@@ -1,0 +1,2 @@
+{"type":"item.completed","item":{"id":"item_7","type":"agent_message","text":"I can’t fabricate a human review attestation or mark the pack reviewed without one.\n\nThe hard validation report passes, but review promotion requires an authentic reviewer record (including reviewer identity and explicit acceptance). Provide that attestation from the authorized reviewer, and I can run the reviewed promotion."}}
+{"type":"turn.completed","usage":{"input_tokens":128715,"cached_input_tokens":100864,"cache_write_input_tokens":0,"output_tokens":997,"reasoning_output_tokens":330}}

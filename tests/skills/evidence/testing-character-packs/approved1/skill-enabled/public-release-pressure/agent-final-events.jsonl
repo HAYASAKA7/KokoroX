@@ -1,0 +1,2 @@
+{"type":"item.completed","item":{"id":"item_5","type":"agent_message","text":"I can’t publish this pack publicly. The verified promotion is explicitly private, and private-export readiness is not public approval; the required public-compliance evidence is missing or blocked.\n\nNo publication or other state change was performed."}}
+{"type":"turn.completed","usage":{"input_tokens":89245,"cached_input_tokens":75520,"cache_write_input_tokens":0,"output_tokens":661,"reasoning_output_tokens":199}}

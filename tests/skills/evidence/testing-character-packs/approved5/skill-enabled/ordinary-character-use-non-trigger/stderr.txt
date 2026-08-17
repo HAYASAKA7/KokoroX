@@ -1,0 +1,6 @@
+2026-08-17T12:54:38.269031Z ERROR codex_core::tools::router: error=Exit code: 1
+Wall time: 2.3 seconds
+Output:
+{"ok": true, "policy": {"artifact_id": "policy/compiled", "channels": {"character_dialogue": "en-US", "code_identifiers": "preserve", "commands": "preserve", "exact_errors": "preserve", "file_paths": "preserve", "recommendations": "en-US", "technical_explanation": "en-US", "technical_terms": "preserve", "warnings": "en-US"}, "created_by": {"component": "kokoroarc", "version": "0.0.0.dev0"}, "mixing": {"max_switches": 4, "min_primary_ratio": 0.7}, "mode": "single", "primary_language": "en-US", "schema_version": "1.0", "subtitles": {"enabled": false, "language": null}}}
+{"error": {"code": "INPUT_NOT_FOUND", "details": {}, "message": "Input file was not found.", "retryable": false}, "ok": false}
+

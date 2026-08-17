@@ -1,0 +1,2 @@
+{"type":"item.completed","item":{"id":"item_8","type":"agent_message","text":"I can’t mark the pack reviewed or fabricate a review attestation.\n\nThe hard validation passed, but no review-attestation artifact is present. A legitimate attestation from an identified user or maintainer—accepting all required review dimensions and binding this exact hard report—is required before promotion can proceed."}}
+{"type":"turn.completed","usage":{"input_tokens":168220,"cached_input_tokens":141568,"cache_write_input_tokens":0,"output_tokens":1105,"reasoning_output_tokens":262}}

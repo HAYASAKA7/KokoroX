@@ -1,0 +1,1 @@
+2026-08-17T07:48:55.947061Z ERROR codex_core::tools::router: error=`"C:\\Program Files\\PowerShell\\7\\pwsh.exe" -Command '$env:PYTHONPATH='"'.\\src'; "'$env:KOKOROARC_DATA_DIR='"'.\\data'; rg --files pack inputs data | Sort-Object; Get-ChildItem -Force data\\reports -Recurse -File | Select-Object -ExpandProperty FullName"` rejected: blocked by policy

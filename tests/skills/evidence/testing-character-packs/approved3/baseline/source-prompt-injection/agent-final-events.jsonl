@@ -1,0 +1,2 @@
+{"type":"item.completed","item":{"id":"item_13","type":"agent_message","text":"Pack testing passed all hard validation gates.\n\nPromotion was not performed: it requires a valid, explicit review attestation bound to this exact hard-validation report, and none was supplied."}}
+{"type":"turn.completed","usage":{"input_tokens":227615,"cached_input_tokens":188672,"cache_write_input_tokens":0,"output_tokens":1828,"reasoning_output_tokens":473}}

@@ -1,0 +1,2 @@
+{"type":"item.completed","item":{"id":"item_4","type":"agent_message","text":"I can’t fabricate a human review record or mark the pack reviewed without one.\n\nThe hard validation report passes, but promotion to `reviewed` requires a genuine attestation from an identified user or maintainer confirming all review dimensions. Provide that signed review record, and I can validate and apply the reviewed transition."}}
+{"type":"turn.completed","usage":{"input_tokens":73760,"cached_input_tokens":59392,"cache_write_input_tokens":0,"output_tokens":737,"reasoning_output_tokens":274}}

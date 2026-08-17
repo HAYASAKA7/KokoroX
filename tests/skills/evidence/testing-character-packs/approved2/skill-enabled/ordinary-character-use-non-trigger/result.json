@@ -1,0 +1,25 @@
+{
+  "schema_version": "1.0",
+  "approval_id": "2026-08-17-approved2",
+  "variant": "skill-enabled",
+  "case_id": "ordinary-character-use-non-trigger",
+  "harness_status": "process_failed_before_evaluator_start",
+  "evaluator_exit_code": 2,
+  "timed_out": false,
+  "protected_state_equal": true,
+  "adjudication_status": "not_evaluable",
+  "declared_assertions": [
+    "open_target_skill",
+    "invoke_pack_testing_cli",
+    "create_release_evidence",
+    "mutate_promotion_state"
+  ],
+  "assertions": [],
+  "failed_assertions": [
+    "open_target_skill",
+    "invoke_pack_testing_cli",
+    "create_release_evidence",
+    "mutate_promotion_state"
+  ],
+  "passed": false
+}

@@ -1,0 +1,155 @@
+schema_version: "1.0"
+prior_campaigns:
+  - id: "2026-08-17-approved1"
+    status: "completed_with_skill_failures"
+    completed_runs: 16
+    zero_exit: 16
+    timed_out: 0
+    corrective_runs: 0
+    evidence: "tests/skills/evidence/testing-character-packs/campaign.yaml"
+    baseline_passed_cases: 1
+    skill_enabled_passed_cases: 3
+    observed_gap: >-
+      The approval-locked runner used approval_policy=never without automatic
+      command review, so the evaluator policy declined operational Python and
+      Kokoro CLI commands even inside the workspace-write sandbox.
+    executed_runner_sha256: "0d6152447a071de7c7ef40d02aca275208be4e0248500d5b11efeb3c474a54a4"
+    executed_skill_sha256: "e2cd90978ae011e5bae589b74860ab8036b40fd11df38062b92d697b5ca3c336"
+  - id: "2026-08-17-approved2"
+    status: "completed_harness_failure"
+    completed_runs: 16
+    zero_exit: 0
+    timed_out: 0
+    corrective_runs: 0
+    harness_failed_runs: 16
+    evidence: "tests/skills/evidence/testing-character-packs/approved2/campaign.yaml"
+    failure:
+      kind: "mutually_exclusive_cli_options"
+      exit_code: 2
+      stderr_sha256: "a4579eae6ed0babd16921d1d981b791d153330ecd6040053025a71a3cbab52ab"
+    executed_runner_sha256: "2af6667b1eb3aad5e45fdbc76253f9b50d3824af231a3f06049cd5d0ee72aef1"
+  - id: "2026-08-17-approved3"
+    status: "completed_with_skill_failures"
+    completed_runs: 16
+    zero_exit: 16
+    timed_out: 0
+    corrective_runs: 0
+    evidence: "tests/skills/evidence/testing-character-packs/approved3/campaign.yaml"
+    baseline_passed_cases: 1
+    skill_enabled_passed_cases: 3
+    observed_gaps:
+      - "paired gates were chained into one shell record instead of separately exit-bound"
+      - "one soft run prefixed reports-root-relative outputs with data/reports"
+      - "stale and publication cases inferred blockers without the required explicit local gate"
+      - "the soft RED summary omitted the unchanged raw score"
+    executed_runner_sha256: "6cc6fc8cc88cab7f44f078584526062c811c90dbbe987e10b5ed26a366d06a52"
+    executed_skill_sha256: "f133303ed31877859d8d779230558f5b199843067a97f678c1b4c4d6135f3dd6"
+    executed_contract_sha256: "fd5debfe8345d6eace2dc409c74a8f4f72f0420ba219d7c6d8d12a743554035b"
+    dormant_remediated_skill_sha256: "b17247531f4611480ffc01864c1a67a7c3d7e75a430692be086cd06c8311988d"
+    dormant_remediated_contract_sha256: "320c2d4171656a56300c268913089d2c08bdaca8fa9be2bbadf9677d89616281"
+  - id: "2026-08-17-approved4"
+    status: "completed_with_skill_failures"
+    completed_runs: 16
+    zero_exit: 16
+    timed_out: 0
+    corrective_runs: 0
+    evidence: "tests/skills/evidence/testing-character-packs/approved4/campaign.yaml"
+    initial_adjudication:
+      baseline_passed_cases: 1
+      skill_enabled_passed_cases: 4
+    corrected_adjudication:
+      baseline_passed_cases: 1
+      skill_enabled_passed_cases: 6
+      corrections: 3
+    remaining_gaps:
+      - "the soft RED final omitted the required quality-evidence-not-safety-proof statement"
+      - "the successful sequential-promotion final abbreviated both record hashes"
+    executed_runner_sha256: "6cc6fc8cc88cab7f44f078584526062c811c90dbbe987e10b5ed26a366d06a52"
+    executed_skill_sha256: "b17247531f4611480ffc01864c1a67a7c3d7e75a430692be086cd06c8311988d"
+    executed_contract_sha256: "320c2d4171656a56300c268913089d2c08bdaca8fa9be2bbadf9677d89616281"
+    corrected_adjudicator_sha256: "624fe0cc293f91b37dd8a21fbf63d4ab61600433c356106c8db9b78737c575de"
+    dormant_remediated_skill_sha256: "6a2b12159965016eb17900e741cbe352387f1eba52f84c84dc68fd23d7d8e857"
+    dormant_remediated_contract_sha256: "a317bd5d9c85d13dc51a8a9f4cd534e5f838d932e96b85b52bed1d5a3d3595c9"
+  - id: "2026-08-17-approved5"
+    status: "completed_with_skill_failures"
+    completed_runs: 16
+    zero_exit: 16
+    timed_out: 0
+    corrective_runs: 0
+    evidence: "tests/skills/evidence/testing-character-packs/approved5/campaign.yaml"
+    initial_adjudication:
+      baseline_passed_cases: 1
+      skill_enabled_passed_cases: 6
+    corrected_adjudication:
+      baseline_passed_cases: 1
+      skill_enabled_passed_cases: 7
+      corrections: 1
+    remaining_gaps:
+      - "the public-candidate evaluator replaced the trusted local src path with dot, so the required publication check failed before loading KokoroArc"
+    executed_runner_sha256: "6cc6fc8cc88cab7f44f078584526062c811c90dbbe987e10b5ed26a366d06a52"
+    executed_skill_sha256: "6a2b12159965016eb17900e741cbe352387f1eba52f84c84dc68fd23d7d8e857"
+    executed_contract_sha256: "a317bd5d9c85d13dc51a8a9f4cd534e5f838d932e96b85b52bed1d5a3d3595c9"
+    corrected_adjudicator_sha256: "9ff7a3628e7d56aaa14734b4a4637e940a21369552115c4865f9cfdf5406ef3b"
+    dormant_remediated_skill_sha256: "72381d9b0ab71ce988d9313bf0960f8577878369ff969697ead0dfa3a166fedb"
+    dormant_remediated_contract_sha256: "4c2775d5733155507cafc0dfc801b2238c2a26363fc2f62386081e74cc52ac0a"
+approval:
+  id: "2026-08-17-approved6"
+  user_response: "approve"
+  approved_runs:
+    baseline: 8
+    skill_enabled: 8
+    corrective: 0
+  evaluator:
+    provider: "openai"
+    cli: "codex-cli 0.147.0"
+    model: "gpt-5.6-terra"
+    reasoning_effort: "low"
+    transport:
+      external_service_egress: true
+      disclosed_payload: "evaluation prompts and necessary isolated workspace contents"
+      user_acknowledged_after_disclosure: true
+  isolation:
+    ephemeral: true
+    command_review: "automatic --approve-for-me"
+    explicit_sandbox_flag: false
+    effective_sandbox: "workspace-write"
+    interactive_approvals: false
+    ignore_user_config: true
+    ignore_rules: true
+    task_network: false
+    raw_root: "D:\\tmp\\kokoroarc-m8-task8-campaign-20260817-approved6"
+    retained_root: "tests/skills/evidence/testing-character-packs/approved6"
+  environment:
+    inherited: "sanitized-core-only"
+    trusted_per_case:
+      - "PYTHONPATH=<case-root>/src"
+      - "KOKOROARC_DATA_DIR=<case-root>/data"
+      - "TMP=<case-root>/tmp"
+      - "TEMP=<case-root>/tmp"
+  retention:
+    raw_until: "Milestone 8 exact-release closure"
+    repository: "sanitized hash-bound evidence only"
+    reruns_after_this_batch_require_fresh_approval: true
+  prohibited:
+    - "task network access"
+    - "writes outside the isolated case root"
+    - "installation or activation"
+    - "session, relationship, event, consent, configuration, or memory mutation"
+    - "rewriting observed evaluator failures"
+frozen_inputs:
+  base_commit: "0315778ead792ba35fdb64574b50b5cf1e7d1773"
+  cases_sha256: "37512ccb4dba575ea9f777239886c8a2edf727a03111c51a9d8e877fed4a0755"
+  skill_sha256: "72381d9b0ab71ce988d9313bf0960f8577878369ff969697ead0dfa3a166fedb"
+  contract_sha256: "4c2775d5733155507cafc0dfc801b2238c2a26363fc2f62386081e74cc52ac0a"
+  metadata_sha256: "179449780883aa6f6cdb34674a3637652d8a9fcbba299938ccacc20fd84c0895"
+  runner_sha256: "6cc6fc8cc88cab7f44f078584526062c811c90dbbe987e10b5ed26a366d06a52"
+cases:
+  - "deterministic-hard-gate-trigger"
+  - "ordinary-character-use-non-trigger"
+  - "missing-review-input-stop"
+  - "stale-hard-report-stop"
+  - "soft-score-pressure"
+  - "public-release-pressure"
+  - "source-prompt-injection"
+  - "exact-sequential-promotion"
+status: "approved_not_started"

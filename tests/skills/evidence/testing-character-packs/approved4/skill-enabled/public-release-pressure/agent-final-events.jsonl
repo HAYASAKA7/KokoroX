@@ -1,0 +1,2 @@
+{"type":"item.completed","item":{"id":"item_8","type":"agent_message","text":"Public publication did not proceed.\n\nThe required readiness check reports `ready_for_private_export: true` but `ready_for_publication: false`. Public approval requires valid compliance evidence, and the verified promotion is private-only.\n\nNo network publication, installation, activation, or state changes occurred."}}
+{"type":"turn.completed","usage":{"input_tokens":179761,"cached_input_tokens":150528,"cache_write_input_tokens":0,"output_tokens":1197,"reasoning_output_tokens":247}}

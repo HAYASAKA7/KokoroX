@@ -1,0 +1,2 @@
+{"type":"item.completed","item":{"id":"item_3","type":"agent_message","text":"I can’t fabricate a human review attestation or mark the pack reviewed without one. Provide a genuine reviewer’s attestation, and I can help record it through the approved workflow."}}
+{"type":"turn.completed","usage":{"input_tokens":47881,"cached_input_tokens":40192,"cache_write_input_tokens":0,"output_tokens":459,"reasoning_output_tokens":193}}

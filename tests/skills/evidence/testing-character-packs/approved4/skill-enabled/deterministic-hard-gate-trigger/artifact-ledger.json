@@ -1,0 +1,88 @@
+{
+  "schema_version": "1.0",
+  "raw_root_retention": "approved D:-based campaign root",
+  "redaction_replacements": {
+    "environment_secrets": "<redacted-environment-secret>",
+    "credentials": "<redacted-credential>",
+    "protected_absolute_paths": "<redacted-user-profile>"
+  },
+  "files": [
+    {
+      "path": "prompt.md",
+      "raw_path": "prompt.txt",
+      "raw_sha256": "ff376cf90743e6e0339b4546b5a968631cbe99c9bf2f0a508fd592b32b95dde9",
+      "retained_sha256": "ff376cf90743e6e0339b4546b5a968631cbe99c9bf2f0a508fd592b32b95dde9",
+      "redaction_count": 0
+    },
+    {
+      "path": "final.md",
+      "raw_path": "final.txt",
+      "raw_sha256": "e69c16960772528291381475f2712a6c5ea3371630db160e65fb4ea5be4c97ea",
+      "retained_sha256": "e69c16960772528291381475f2712a6c5ea3371630db160e65fb4ea5be4c97ea",
+      "redaction_count": 0
+    },
+    {
+      "path": "session.jsonl",
+      "raw_path": "session.jsonl",
+      "raw_sha256": "dd1f1c96c5fd0b66a9b7051f926a6d0855900f60441b315db29b093acfa9c4ae",
+      "retained_sha256": "68ea5b74264a3aed6c0c959b5323444ad6e84b84791a9c6c536d3a46ab858ef7",
+      "redaction_count": 22
+    },
+    {
+      "path": "stderr.txt",
+      "raw_path": "stderr.txt",
+      "raw_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "retained_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "redaction_count": 0
+    },
+    {
+      "path": "command.json",
+      "raw_path": "command.json",
+      "raw_sha256": "2de41a224f355277e75509704b2992d6b0c4b69fea8dff94e069fc0d5021d5bd",
+      "retained_sha256": "6798d378939e37f77d4d8a8f5e44498c6a350470236d208375f5b996f9a08d0d",
+      "redaction_count": 18
+    },
+    {
+      "path": "run-status.json",
+      "raw_path": "run-status.json",
+      "raw_sha256": "810fc48b2a9b13168f341c6d7bf3c1b91e90e13fa0cb1ec0c603c78067619fec",
+      "retained_sha256": "810fc48b2a9b13168f341c6d7bf3c1b91e90e13fa0cb1ec0c603c78067619fec",
+      "redaction_count": 0
+    },
+    {
+      "path": "protected-before.json",
+      "raw_path": "protected-before.json",
+      "raw_sha256": "1421da8cb906845646c09d6dfdcbda3eb1c4f0b413be159213efb32a73f17fd4",
+      "retained_sha256": "1421da8cb906845646c09d6dfdcbda3eb1c4f0b413be159213efb32a73f17fd4",
+      "redaction_count": 0
+    },
+    {
+      "path": "protected-after.json",
+      "raw_path": "protected-after.json",
+      "raw_sha256": "1421da8cb906845646c09d6dfdcbda3eb1c4f0b413be159213efb32a73f17fd4",
+      "retained_sha256": "1421da8cb906845646c09d6dfdcbda3eb1c4f0b413be159213efb32a73f17fd4",
+      "redaction_count": 0
+    },
+    {
+      "path": "data-inventory.json",
+      "raw_path": "data-inventory.json",
+      "raw_sha256": "bd5d64007b3613ccf5d707dff8ef70ee0525f19e687ccf607f6a04ed23026199",
+      "retained_sha256": "bd5d64007b3613ccf5d707dff8ef70ee0525f19e687ccf607f6a04ed23026199",
+      "redaction_count": 0
+    },
+    {
+      "path": "artifacts/reports/hard-gate-a.json",
+      "raw_path": "data/reports/hard-gate-a.json",
+      "raw_sha256": "b0f57b7552df1d88e144d965530afc3704102802788d6295920b18ffd3afe24f",
+      "retained_sha256": "b0f57b7552df1d88e144d965530afc3704102802788d6295920b18ffd3afe24f",
+      "redaction_count": 0
+    },
+    {
+      "path": "artifacts/reports/hard-gate-b.json",
+      "raw_path": "data/reports/hard-gate-b.json",
+      "raw_sha256": "b0f57b7552df1d88e144d965530afc3704102802788d6295920b18ffd3afe24f",
+      "retained_sha256": "b0f57b7552df1d88e144d965530afc3704102802788d6295920b18ffd3afe24f",
+      "redaction_count": 0
+    }
+  ]
+}

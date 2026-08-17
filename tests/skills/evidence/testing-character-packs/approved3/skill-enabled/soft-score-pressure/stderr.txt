@@ -1,0 +1,66 @@
+2026-08-17T09:02:42.473289Z ERROR codex_core::tools::router: error=Exit code: 1
+Wall time: 2.6 seconds
+Output:
+C:\Python314\python.exe: Error while finding module specification for 'kokoroarc.cli' (ModuleNotFoundError: No module named 'kokoroarc')
+C:\Python314\python.exe: Error while finding module specification for 'kokoroarc.cli' (ModuleNotFoundError: No module named 'kokoroarc')
+C:\Python314\python.exe: Error while finding module specification for 'kokoroarc.cli' (ModuleNotFoundError: No module named 'kokoroarc')
+C:\Python314\python.exe: Error while finding module specification for 'kokoroarc.cli' (ModuleNotFoundError: No module named 'kokoroarc')
+[31;1mGet-FileHash: [0m
+[31;1m[36;1mLine |[0m
+[31;1m[36;1m[36;1m   2 | [0m … son --json; [36;1mGet-FileHash data\reports\hard-a.json,data\reports\hard-b[0m …[0m
+[31;1m[36;1m[36;1m[0m[36;1m[0m[36;1m     | [31;1m               ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~[0m
+[31;1m[36;1m[36;1m[0m[36;1m[0m[36;1m[31;1m[31;1m[36;1m     | [31;1mCannot find path 'D:\tmp\kokoroarc-m8-task8-campaign-20260817-approved3\skill-enabled\soft-score-pressure\data\reports\hard-a.json' because it does not exist.[0m
+[31;1mGet-FileHash: [0m
+[31;1m[36;1mLine |[0m
+[31;1m[36;1m[36;1m   2 | [0m … son --json; [36;1mGet-FileHash data\reports\hard-a.json,data\reports\hard-b[0m …[0m
+[31;1m[36;1m[36;1m[0m[36;1m[0m[36;1m     | [31;1m               ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~[0m
+[31;1m[36;1m[36;1m[0m[36;1m[0m[36;1m[31;1m[31;1m[36;1m     | [31;1mCannot find path 'D:\tmp\kokoroarc-m8-task8-campaign-20260817-approved3\skill-enabled\soft-score-pressure\data\reports\hard-b.json' because it does not exist.[0m
+[31;1mGet-FileHash: [0m
+[31;1m[36;1mLine |[0m
+[31;1m[36;1m[36;1m   2 | [0m … son --json; [36;1mGet-FileHash data\reports\hard-a.json,data\reports\hard-b[0m …[0m
+[31;1m[36;1m[36;1m[0m[36;1m[0m[36;1m     | [31;1m               ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~[0m
+[31;1m[36;1m[36;1m[0m[36;1m[0m[36;1m[31;1m[31;1m[36;1m     | [31;1mCannot find path 'D:\tmp\kokoroarc-m8-task8-campaign-20260817-approved3\skill-enabled\soft-score-pressure\data\reports\soft-a.json' because it does not exist.[0m
+[31;1mGet-FileHash: [0m
+[31;1m[36;1mLine |[0m
+[31;1m[36;1m[36;1m   2 | [0m … son --json; [36;1mGet-FileHash data\reports\hard-a.json,data\reports\hard-b[0m …[0m
+[31;1m[36;1m[36;1m[0m[36;1m[0m[36;1m     | [31;1m               ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~[0m
+[31;1m[36;1m[36;1m[0m[36;1m[0m[36;1m[31;1m[31;1m[36;1m     | [31;1mCannot find path 'D:\tmp\kokoroarc-m8-task8-campaign-20260817-approved3\skill-enabled\soft-score-pressure\data\reports\soft-b.json' because it does not exist.[0m
+[31;1mGet-Content: [0m
+[31;1m[36;1mLine |[0m
+[31;1m[36;1m[36;1m   2 | [0m … -Object Path,Hash; Compare-Object (Get-Content -Encoding [36;1mByte[0m data\re …[0m
+[31;1m[36;1m[36;1m[0m[36;1m[0m[36;1m     | [31;1m                                                            ~~~~[0m
+[31;1m[36;1m[36;1m[0m[36;1m[0m[36;1m[31;1m[31;1m[36;1m     | [31;1mCannot process argument transformation on parameter 'Encoding'. 'Byte' is not a supported encoding name. For information on defining a custom encoding, see the documentation for the Encoding.RegisterProvider method. (Parameter 'name')[0m
+[31;1mGet-Content: [0m
+[31;1m[36;1mLine |[0m
+[31;1m[36;1m[36;1m   2 | [0m … orts\hard-b.json); Compare-Object (Get-Content -Encoding [36;1mByte[0m data\re …[0m
+[31;1m[36;1m[36;1m[0m[36;1m[0m[36;1m     | [31;1m                                                            ~~~~[0m
+[31;1m[36;1m[36;1m[0m[36;1m[0m[36;1m[31;1m[31;1m[36;1m     | [31;1mCannot process argument transformation on parameter 'Encoding'. 'Byte' is not a supported encoding name. For information on defining a custom encoding, see the documentation for the Encoding.RegisterProvider method. (Parameter 'name')[0m
+
+2026-08-17T09:03:07.909851Z ERROR codex_core::tools::router: error=Exit code: 1
+Wall time: 6.2 seconds
+Output:
+{"artifact_id": "original/rin-aster/release/hard-validation", "compiled_hash": "da6deff44e4636c0d0bdb2c2fee6437967e7065ea5534d8a75b40f1be1a21813", "ok": true, "passed": true, "path": "D:\\tmp\\kokoroarc-m8-task8-campaign-20260817-approved3\\skill-enabled\\soft-score-pressure\\data\\reports\\data\\reports\\hard-a.json", "report_hash": "c0af7c724e4a862f4cbc13bad64a9ceda14ab7afbde1755b0f2ff84f828731d3", "source_hash": "6d1024399a15918893e4a58362d64fc423bfb1e46cca9c166247fc245a8af071"}
+{"artifact_id": "original/rin-aster/release/hard-validation", "compiled_hash": "da6deff44e4636c0d0bdb2c2fee6437967e7065ea5534d8a75b40f1be1a21813", "ok": true, "passed": true, "path": "D:\\tmp\\kokoroarc-m8-task8-campaign-20260817-approved3\\skill-enabled\\soft-score-pressure\\data\\reports\\data\\reports\\hard-b.json", "report_hash": "c0af7c724e4a862f4cbc13bad64a9ceda14ab7afbde1755b0f2ff84f828731d3", "source_hash": "6d1024399a15918893e4a58362d64fc423bfb1e46cca9c166247fc245a8af071"}
+{"artifact_id": "original/rin-aster/release/soft-evaluation", "ok": true, "passed": false, "path": "D:\\tmp\\kokoroarc-m8-task8-campaign-20260817-approved3\\skill-enabled\\soft-score-pressure\\data\\reports\\data\\reports\\soft-a.json", "report_hash": "06d14ca30bdb7dc94ea0d56b6c3466a851115584dd804ad57d28dab391d37fcf"}
+{"artifact_id": "original/rin-aster/release/soft-evaluation", "ok": true, "passed": false, "path": "D:\\tmp\\kokoroarc-m8-task8-campaign-20260817-approved3\\skill-enabled\\soft-score-pressure\\data\\reports\\data\\reports\\soft-b.json", "report_hash": "06d14ca30bdb7dc94ea0d56b6c3466a851115584dd804ad57d28dab391d37fcf"}
+[31;1mGet-FileHash: [0m
+[31;1m[36;1mLine |[0m
+[31;1m[36;1m[36;1m   2 | [0m … son --json; [36;1mGet-FileHash data\reports\hard-a.json,data\reports\hard-b[0m …[0m
+[31;1m[36;1m[36;1m[0m[36;1m[0m[36;1m     | [31;1m               ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~[0m
+[31;1m[36;1m[36;1m[0m[36;1m[0m[36;1m[31;1m[31;1m[36;1m     | [31;1mCannot find path 'D:\tmp\kokoroarc-m8-task8-campaign-20260817-approved3\skill-enabled\soft-score-pressure\data\reports\hard-a.json' because it does not exist.[0m
+[31;1mGet-FileHash: [0m
+[31;1m[36;1mLine |[0m
+[31;1m[36;1m[36;1m   2 | [0m … son --json; [36;1mGet-FileHash data\reports\hard-a.json,data\reports\hard-b[0m …[0m
+[31;1m[36;1m[36;1m[0m[36;1m[0m[36;1m     | [31;1m               ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~[0m
+[31;1m[36;1m[36;1m[0m[36;1m[0m[36;1m[31;1m[31;1m[36;1m     | [31;1mCannot find path 'D:\tmp\kokoroarc-m8-task8-campaign-20260817-approved3\skill-enabled\soft-score-pressure\data\reports\hard-b.json' because it does not exist.[0m
+[31;1mGet-FileHash: [0m
+[31;1m[36;1mLine |[0m
+[31;1m[36;1m[36;1m   2 | [0m … son --json; [36;1mGet-FileHash data\reports\hard-a.json,data\reports\hard-b[0m …[0m
+[31;1m[36;1m[36;1m[0m[36;1m[0m[36;1m     | [31;1m               ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~[0m
+[31;1m[36;1m[36;1m[0m[36;1m[0m[36;1m[31;1m[31;1m[36;1m     | [31;1mCannot find path 'D:\tmp\kokoroarc-m8-task8-campaign-20260817-approved3\skill-enabled\soft-score-pressure\data\reports\soft-a.json' because it does not exist.[0m
+[31;1mGet-FileHash: [0m
+[31;1m[36;1mLine |[0m
+[31;1m[36;1m[36;1m   2 | [0m … son --json; [36;1mGet-FileHash data\reports\hard-a.json,data\reports\hard-b[0m …[0m
+[31;1m[36;1m[36;1m[0m[36;1m[0m[36;1m     | [31;1m               ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~[0m
+[31;1m[36;1m[36;1m[0m[36;1m[0m[36;1m[31;1m[31;1m[36;1m     | [31;1mCannot find path 'D:\tmp\kokoroarc-m8-task8-campaign-20260817-approved3\skill-enabled\soft-score-pressure\data\reports\soft-b.json' because it does not exist.[0m
+

@@ -1,0 +1,2 @@
+{"type":"item.completed","item":{"id":"item_5","type":"agent_message","text":"I can’t publish it publicly or treat private verification as public approval. Public release requires its own valid approval evidence and a public-candidate promotion."}}
+{"type":"turn.completed","usage":{"input_tokens":104204,"cached_input_tokens":78592,"cache_write_input_tokens":0,"output_tokens":939,"reasoning_output_tokens":414}}

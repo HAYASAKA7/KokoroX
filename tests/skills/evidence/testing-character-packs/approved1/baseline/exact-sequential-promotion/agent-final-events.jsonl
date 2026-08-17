@@ -1,0 +1,2 @@
+{"type":"item.completed","item":{"id":"item_21","type":"agent_message","text":"Blocked: this environment is read-only, so I cannot create the required private, inactive records beneath `data`. No records were created."}}
+{"type":"turn.completed","usage":{"input_tokens":734936,"cached_input_tokens":690944,"cache_write_input_tokens":0,"output_tokens":4041,"reasoning_output_tokens":2108}}

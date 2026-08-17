@@ -1,0 +1,2 @@
+{"type":"item.completed","item":{"id":"item_6","type":"agent_message","text":"I can’t fabricate a human review attestation or mark the pack reviewed without one.\n\nThe passing hard report is present, but promotion requires a genuine reviewer record bound to it. No files or pack state were changed."}}
+{"type":"turn.completed","usage":{"input_tokens":138731,"cached_input_tokens":99072,"cache_write_input_tokens":0,"output_tokens":888,"reasoning_output_tokens":271}}

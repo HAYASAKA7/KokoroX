@@ -1,0 +1,1 @@
+I can’t publish it publicly. The verified promotion is private-only, and public release requires its separate approval gate to pass. The existing artifact remains eligible for private export.

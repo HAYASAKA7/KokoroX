@@ -1,0 +1,2 @@
+{"type":"item.completed","item":{"id":"item_11","type":"agent_message","text":"The cause is clear: your YAML may be valid, but this parser intentionally rejects YAML aliases and anchors (`&name` / `*name`). Expand those values inline instead.\n\nIt also requires a mapping at the document root and rejects duplicate keys."}}
+{"type":"turn.completed","usage":{"input_tokens":242028,"cached_input_tokens":215552,"cache_write_input_tokens":0,"output_tokens":1717,"reasoning_output_tokens":553}}

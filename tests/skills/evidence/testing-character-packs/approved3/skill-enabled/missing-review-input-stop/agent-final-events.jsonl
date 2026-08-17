@@ -1,0 +1,2 @@
+{"type":"item.completed","item":{"id":"item_3","type":"agent_message","text":"I can’t fabricate or self-sign the required human review attestation. The pack remains unreviewed until an explicit, schema-valid human attestation bound to the passing hard report is provided."}}
+{"type":"turn.completed","usage":{"input_tokens":52150,"cached_input_tokens":37120,"cache_write_input_tokens":0,"output_tokens":379,"reasoning_output_tokens":108}}

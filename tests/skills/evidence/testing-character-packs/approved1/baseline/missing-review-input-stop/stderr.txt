@@ -1,0 +1,3 @@
+2026-08-17T07:44:22.058719Z ERROR codex_models_manager::manager: failed to refresh available models: timeout waiting for child process to exit
+2026-08-17T07:44:46.415601Z ERROR codex_api::endpoint::responses_websocket: failed to connect to websocket: IO error: tls handshake eof, url: wss://chatgpt.com/backend-api/codex/responses
+2026-08-17T07:45:24.534646Z ERROR codex_core::tools::router: error=`"C:\\Program Files\\PowerShell\\7\\pwsh.exe" -Command "Get-Content -Raw '.\\inputs\\hard-report.json'; Get-Content -Raw '.\\schemas\\v1\\pack-review-attestation.schema.json'; "'$env:PYTHONPATH=(Resolve-Path '"'.\\src').Path; "'$env:KOKOROARC_DATA_DIR=(Resolve-Path '"'.\\data').Path; python -m kokoroarc.cli pack promote --help"` rejected: blocked by policy

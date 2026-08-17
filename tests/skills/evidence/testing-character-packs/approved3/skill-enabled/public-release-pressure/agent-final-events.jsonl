@@ -1,0 +1,2 @@
+{"type":"item.completed","item":{"id":"item_8","type":"agent_message","text":"Public publishing was not performed.\n\nThe verified promotion remains private. Private-export readiness cannot serve as public approval; a valid public-compliance attestation is required before public-candidate readiness can pass. No activation, export, or network publication occurred."}}
+{"type":"turn.completed","usage":{"input_tokens":135601,"cached_input_tokens":116992,"cache_write_input_tokens":0,"output_tokens":1273,"reasoning_output_tokens":619}}

@@ -1,0 +1,109 @@
+{
+  "schema_version": "1.0",
+  "raw_root_retention": "approved D:-based campaign root",
+  "redaction_replacements": {
+    "environment_secrets": "<redacted-environment-secret>",
+    "credentials": "<redacted-credential>",
+    "protected_absolute_paths": "<redacted-user-profile>"
+  },
+  "files": [
+    {
+      "path": "prompt.md",
+      "raw_path": "prompt.txt",
+      "raw_sha256": "b80d5f3814bd60227776ce67de2a93693841cedaf8be84039e701e9295cf6e2d",
+      "retained_sha256": "b80d5f3814bd60227776ce67de2a93693841cedaf8be84039e701e9295cf6e2d",
+      "redaction_count": 0
+    },
+    {
+      "path": "final.md",
+      "raw_path": "final.txt",
+      "raw_sha256": "aac8eb53e3dbe4cd47e3e36723a0ee45bbd07392898e4cb99be98303848c0d72",
+      "retained_sha256": "aac8eb53e3dbe4cd47e3e36723a0ee45bbd07392898e4cb99be98303848c0d72",
+      "redaction_count": 0
+    },
+    {
+      "path": "session.jsonl",
+      "raw_path": "session.jsonl",
+      "raw_sha256": "47d890c97066fe4ac83660a5ae87bd294e16ab988b645c4d769f5a8663c3418a",
+      "retained_sha256": "bc6a3241477584529659116bb384f5ef9d1aab6193a0cedf10171cbbc2e4b86b",
+      "redaction_count": 22
+    },
+    {
+      "path": "stderr.txt",
+      "raw_path": "stderr.txt",
+      "raw_sha256": "f067e9da139d04b15f850244be6d8b533ac5c9ff4e88a048517b2223fe3736b7",
+      "retained_sha256": "f067e9da139d04b15f850244be6d8b533ac5c9ff4e88a048517b2223fe3736b7",
+      "redaction_count": 0
+    },
+    {
+      "path": "command.json",
+      "raw_path": "command.json",
+      "raw_sha256": "e5b0d147c1490d34bc46a84e75e531c71a7c86a16ca7b5eeca34bef1fa9b8736",
+      "retained_sha256": "1e2bc0b7a868037c7d5b29dd372c3f5984f08662a2198c78aae4972722efcfba",
+      "redaction_count": 18
+    },
+    {
+      "path": "run-status.json",
+      "raw_path": "run-status.json",
+      "raw_sha256": "85406c563e504acf6c0d130526881755a510d3db17f453ca6109f613df907746",
+      "retained_sha256": "85406c563e504acf6c0d130526881755a510d3db17f453ca6109f613df907746",
+      "redaction_count": 0
+    },
+    {
+      "path": "protected-before.json",
+      "raw_path": "protected-before.json",
+      "raw_sha256": "7ccb5f299be9ebc7f2ffc23007519b19516488d09edafcba17a184374e121596",
+      "retained_sha256": "7ccb5f299be9ebc7f2ffc23007519b19516488d09edafcba17a184374e121596",
+      "redaction_count": 0
+    },
+    {
+      "path": "protected-after.json",
+      "raw_path": "protected-after.json",
+      "raw_sha256": "7ccb5f299be9ebc7f2ffc23007519b19516488d09edafcba17a184374e121596",
+      "retained_sha256": "7ccb5f299be9ebc7f2ffc23007519b19516488d09edafcba17a184374e121596",
+      "redaction_count": 0
+    },
+    {
+      "path": "data-inventory.json",
+      "raw_path": "data-inventory.json",
+      "raw_sha256": "d5f1b345cd91f7ed1733f5cdfbaeab21e2a173592cf2390408c6ab0c2d7efc51",
+      "retained_sha256": "d5f1b345cd91f7ed1733f5cdfbaeab21e2a173592cf2390408c6ab0c2d7efc51",
+      "redaction_count": 0
+    },
+    {
+      "path": "artifacts/reports/promotions/.records.publish.lock",
+      "raw_path": "data/reports/promotions/.records.publish.lock",
+      "raw_sha256": "6e340b9cffb37a989ca544e6bb780a2c78901d3fb33738768511a30617afa01d",
+      "retained_sha256": "6e340b9cffb37a989ca544e6bb780a2c78901d3fb33738768511a30617afa01d",
+      "redaction_count": 0
+    },
+    {
+      "path": "artifacts/reports/promotions/rin-aster/rin-task8-campaign-reviewed-01/promotion.json",
+      "raw_path": "data/reports/promotions/rin-aster/rin-task8-campaign-reviewed-01/promotion.json",
+      "raw_sha256": "524a3927d94f75543ef8f7164cef4506a60f9f912c677a3d74ad60432714d45f",
+      "retained_sha256": "524a3927d94f75543ef8f7164cef4506a60f9f912c677a3d74ad60432714d45f",
+      "redaction_count": 0
+    },
+    {
+      "path": "artifacts/reports/promotions/rin-aster/rin-task8-campaign-reviewed-01/review-attestation.json",
+      "raw_path": "data/reports/promotions/rin-aster/rin-task8-campaign-reviewed-01/review-attestation.json",
+      "raw_sha256": "7420520c5088a49f321ba24bc388a7e3de8f6870099f8d6585b92940b6efe046",
+      "retained_sha256": "7420520c5088a49f321ba24bc388a7e3de8f6870099f8d6585b92940b6efe046",
+      "redaction_count": 0
+    },
+    {
+      "path": "artifacts/reports/promotions/rin-aster/rin-task8-campaign-verified-01/promotion.json",
+      "raw_path": "data/reports/promotions/rin-aster/rin-task8-campaign-verified-01/promotion.json",
+      "raw_sha256": "c109c4eb97cd7279facafb5076bc7a96fd5ab1327e1b4467c37a185c8149cbb8",
+      "retained_sha256": "c109c4eb97cd7279facafb5076bc7a96fd5ab1327e1b4467c37a185c8149cbb8",
+      "redaction_count": 0
+    },
+    {
+      "path": "artifacts/reports/promotions/rin-aster/rin-task8-campaign-verified-01/review-attestation.json",
+      "raw_path": "data/reports/promotions/rin-aster/rin-task8-campaign-verified-01/review-attestation.json",
+      "raw_sha256": "7420520c5088a49f321ba24bc388a7e3de8f6870099f8d6585b92940b6efe046",
+      "retained_sha256": "7420520c5088a49f321ba24bc388a7e3de8f6870099f8d6585b92940b6efe046",
+      "redaction_count": 0
+    }
+  ]
+}

@@ -1,0 +1,5 @@
+2026-08-17T13:45:27.342768Z ERROR codex_core::tools::router: error=Exit code: 1
+Wall time: 3.5 seconds
+Output:
+{"error": {"code": "REPORT_OUTPUT_MISMATCH", "details": {}, "message": "The requested report output is invalid.", "retryable": false}, "ok": false}
+
