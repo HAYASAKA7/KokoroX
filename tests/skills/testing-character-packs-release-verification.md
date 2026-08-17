@@ -4,16 +4,21 @@
 
 This record covers the deterministic testing, soft-evaluation aggregation,
 review, promotion, publication-readiness, CLI, packaging, and Skill evidence for
-Milestone 8. Milestone 8 is not complete yet: exact-commit checkout gates and
-fresh specification and quality reviews remain required. Milestone 9 and the
-complete standalone suite remain pending.
+Milestone 8. The candidate record was committed, its exact gates and ordered
+reviews were completed, and the sole Minor review finding was fixed with a
+RED/GREEN documentation regression. Milestone 8 is complete. Milestone 9 and
+the complete standalone suite remain pending.
 
 - Verification date: 2026-08-17 (Asia/Hong_Kong)
 - Milestone 8 base commit: `0eb1a019bb3654810d9b4401cb4c55c7b33bec90`
 - Smoke/full-suite product HEAD: `94b4edeaaab1d97f50902488dfea4e077c019a0a`
+- Exact gated release commit: `6419307e61385de122bb7041f0863c1f0dad338a`
+- Exact gated tree: `48769f4d5d861a4aa98b0011eaa49a8147c1950b`
 - Fixed base epoch: `1786691951`
 - Candidate smoke/suite root: `D:\tmp\kokoroarc-m8-release-20260817-candidate1`
 - Superseding distribution root: `D:\tmp\kokoroarc-m8-release-20260817-candidate3`
+- Exact gate root: `D:\tmp\kokoroarc-m8-release-exact-6419307-01`
+- Exact detached checkout: `D:\tmp\kokoroarc-m8-release-exact-6419307-checkout-01`
 - Behavioral result: baseline `1/8`; Skill-enabled `8/8`
 
 The distribution candidate additionally contains the regression-first
@@ -189,14 +194,101 @@ stderr.
 Archive inventory also proved byte equality for every metadata and contract
 file, not only the four `SKILL.md` files.
 
-## Pending exact-commit closure
+## Exact-commit closure gates
 
-This candidate deliberately does not claim release closure. The settled record
-must be committed, then the exact commit must pass the focused evidence/package
-tests, full repository suite, fixed-epoch build, all four validators,
-base-to-HEAD whitespace/status checks, and a fresh detached checkout with
-`core.autocrlf=true`. Fresh specification review must pass before fresh quality
-review. Every Critical or Important finding requires RED coverage and another
-exact review cycle.
+The settled candidate was committed as
+`6419307e61385de122bb7041f0863c1f0dad338a`, tree
+`48769f4d5d861a4aa98b0011eaa49a8147c1950b`, with parent
+`94b4edeaaab1d97f50902488dfea4e077c019a0a`. The exact base-to-HEAD
+`git diff --check` passed and both the source worktree and detached checkout
+were clean.
 
-Milestone 8 is not complete yet. Milestone 9 and the complete standalone suite remain pending.
+### Exact D:-confined smoke
+
+The ten documented CLI commands ran once under
+`D:\tmp\kokoroarc-m8-release-exact-6419307-01`. All ten command exit captures
+were `0`, all ten stderr captures were empty, paired hard/soft/publication
+reports and promotion retry envelopes were exact, source/input snapshots were
+unchanged, and the only data-root entry was `reports`.
+
+The surrounding first audit wrapper exited nonzero only after those successful
+commands because it indexed a one-element PowerShell scalar as though it were
+an array. That wrapper-only failure is retained. A corrected read-only audit
+used the existing captures, rewrote no CLI output, and ran no command again:
+
+```text
+audit_attempt: 2
+commands_rerun: 0
+failed: []
+passed: true
+```
+
+| Exact smoke evidence | SHA-256 |
+| --- | --- |
+| Raw ordered stdout transcript | `5c669ed699214062a2bdff7a374d16710e52543fdf3bba2169363730a6c48c4a` |
+| Hard report file | `b0f57b7552df1d88e144d965530afc3704102802788d6295920b18ffd3afe24f` |
+| Soft report file | `f2ff67a32f2980385df16ebfd687302ce466417da05a710ab97cb9a42e108dc7` |
+| Reviewed record canonical bytes | `457fba5b2bc2ccb316de119c25ecb9ad5f8702b7b5d098f9f70c86e0fd3836f8` |
+| Verified record canonical bytes | `9a549e95d049ee21537d70b336b7a161cc0e5d3bf3ececa3f21080699877ea97` |
+| Publication report file | `aa9f766e4387152d1f330050ed7759a6215ad9729ba7d73585420ef74f89ba2e` |
+| Before snapshot | `ba99686607b714b4aa1820e131a89abae289b110cbeb190c2c60d1c56fe7ac9a` |
+| After snapshot | `95ec6dc076145ad0cd3f3b5811eb92e7ccca736be93272c577e7f88a88fbf89b` |
+
+The hard report retained source hash
+`6d1024399a15918893e4a58362d64fc423bfb1e46cca9c166247fc245a8af071`
+and compiled hash
+`da6deff44e4636c0d0bdb2c2fee6437967e7065ea5534d8a75b40f1be1a21813`.
+Private readiness was true, public readiness was false, and blockers were empty.
+
+### Exact full suite and checkout
+
+The exact suite exited `0`: **2,580 passed, 29 skipped in 599.06s**. Every skip
+identified a Windows filesystem capability: symlink/junction creation, FIFO
+creation, POSIX symlink behavior, or POSIX executable bits. Stderr was empty.
+
+```text
+pytest_outcome: 2580 passed / 29 skipped
+stdout_sha256: cc4f9c5d9698d292f0ca23c44881db48645e506c329f3975408b79f7d485f432
+stderr_sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+```
+
+A local detached checkout of the exact commit used `core.autocrlf=true`. All
+80 distribution inputs were LF with zero CRLF/mixed violations, status was
+clean, and its focused evidence/archive gate reported **8 passed in 9.85s**.
+Each of the four Skills separately returned `Skill is valid!`, exit `0`, and
+empty stderr.
+
+### Exact fixed-epoch distribution
+
+Two builds from the detached LF checkout used `SOURCE_DATE_EPOCH=1786691951`.
+Every required byte matched the checkout: seven testing modules, six release
+schemas, and all twelve files in the four current Skill directories.
+
+| Artifact | Bytes | Entries | SHA-256 | Content-manifest SHA-256 |
+| --- | ---: | ---: | --- | --- |
+| Wheel | 193,850 | 83 | `d6adc0abe91b38df2a9467a05a0dfe3e08b2c8402801ee66358d10601f904e99` | `94dc843baacedd31b5cd4b4ff96e5f68203ac9d70fe76019b8e9c0e7885b9d1d` |
+| sdist | 149,926 | 88 | `30dccb700196c7002691a01757bedf0f184457fd805fae783cdc3be8a2d5be5a` | `86d61d51d9ce9ac446b2b491e256d926f3c20df4c7328ff7d3745d99c9d5cba6` |
+
+The repeat wheel was byte-identical. Setuptools again varied only generated
+sdist container metadata: the repeat raw sdist was 149,954 bytes with SHA-256
+`48777d05cdf9862666fd2a31791123acd3b171bb5f0b0b1ab15ba2a3c2efa5fd`,
+while its sorted path/size/member-hash manifest remained exactly
+`86d61d51d9ce9ac446b2b491e256d926f3c20df4c7328ff7d3745d99c9d5cba6`.
+
+The exact wheel was installed without dependencies outside the checkout. Its
+Milestone 8 `pack test` command passed with empty stderr, the imported module
+resolved from that isolated installation, every release schema was present,
+and the summary recorded `installed_skill_files: 12` with zero byte mismatch.
+
+### Ordered exact reviews
+
+- Specification review: **PASS**, with no Critical, Important, or Minor finding.
+- Quality/security review: **PASS_WITH_MINOR**, with no Critical or Important
+  finding. Its sole `README_SOFTBREAK_WORD_SPLIT` Minor was reproduced by a
+  focused RED assertion and fixed GREEN by keeping `publication-readiness`
+  contiguous in this closure change.
+
+The closure change contains documentation and executable evidence assertions,
+not Milestone 9 product behavior. Its checked status is accepted only after a
+fresh exact focused recheck and ordered closure review confirm the committed
+delta. Milestone 8 is complete. Milestone 9 and the complete standalone suite remain pending.

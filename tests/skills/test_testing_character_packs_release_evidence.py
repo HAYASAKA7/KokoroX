@@ -42,6 +42,7 @@ def test_readme_routes_agent_led_testing_through_repository_skill() -> None:
         "skills/testing-character-packs/SKILL.md",
         "$testing-character-packs",
         "validation, evaluation, review, promotion",
+        "publication-readiness work",
         "ordinary character use",
         "private",
         "does not install",
@@ -139,13 +140,36 @@ def test_documented_skill_hashes_match_repository_bytes() -> None:
     assert validators.count("Skill is valid!") == 4
 
 
-def test_candidate_record_does_not_overclaim_milestone_or_suite_completion() -> None:
-    assert "Milestone 8 release candidate; exact-commit reviews pending" in RESULTS
-    assert "Milestone 8 is not complete yet" in EVIDENCE
+def test_release_evidence_records_exact_commit_closure_gates() -> None:
+    closure = _section(EVIDENCE, "Exact-commit closure gates")
+    for text in (
+        "6419307e61385de122bb7041f0863c1f0dad338a",
+        "48769f4d5d861a4aa98b0011eaa49a8147c1950b",
+        "2,580 passed, 29 skipped in 599.06s",
+        "cc4f9c5d9698d292f0ca23c44881db48645e506c329f3975408b79f7d485f432",
+        "wrapper-only",
+        "commands_rerun: 0",
+        "2580 passed",
+        "8 passed in 9.85s",
+        "80 distribution inputs",
+        "d6adc0abe91b38df2a9467a05a0dfe3e08b2c8402801ee66358d10601f904e99",
+        "94dc843baacedd31b5cd4b4ff96e5f68203ac9d70fe76019b8e9c0e7885b9d1d",
+        "86d61d51d9ce9ac446b2b491e256d926f3c20df4c7328ff7d3745d99c9d5cba6",
+        "installed_skill_files: 12",
+        "Specification review: **PASS**",
+        "Quality/security review: **PASS_WITH_MINOR**",
+        "README_SOFTBREAK_WORD_SPLIT",
+    ):
+        assert text in closure
+
+
+def test_closure_record_marks_only_milestone_8_complete() -> None:
+    assert "Milestone 8 complete; Milestone 9 pending" in RESULTS
+    assert "Milestone 8 is complete" in EVIDENCE
     assert "Milestone 9 and the complete standalone suite remain pending" in EVIDENCE
     task9 = PLAN[PLAN.index("### Task 9:") : PLAN.index("## Milestone 9")]
-    assert "- [ ] Commit the settled release record" in task9
-    assert "- [ ] Mark Milestone 8 complete" in task9
+    assert "- [x] Commit the settled release record" in task9
+    assert "- [x] Mark Milestone 8 complete" in task9
 
 
 def test_every_distribution_input_is_checkout_stable_lf() -> None:

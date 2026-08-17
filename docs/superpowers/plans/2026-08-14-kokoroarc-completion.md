@@ -202,10 +202,18 @@ the four-Skill data-file fix, then passed and produced an exact-repeat wheel and
 an identical normalized sdist content manifest. Exact-commit checkout gates and
 both ordered reviews remain pending, so Milestone 8 is not yet complete.
 
-- [ ] Verify exact base-to-HEAD whitespace/status and a fresh detached `core.autocrlf=true` checkout.
-- [ ] Commit the settled release record, rerun exact gates, then obtain fresh specification followed by fresh quality review on the exact commit.
-- [ ] Fix every Critical/Important finding with RED coverage and repeat both reviews.
-- [ ] Mark Milestone 8 complete only after both reviews PASS; then begin Milestone 9.
+**Exact closure checkpoint (2026-08-17):** Commit `6419307e61385de122bb7041f0863c1f0dad338a`
+passed 2,580 tests with 29 documented filesystem-capability skips, the exact
+D:-confined CLI smoke, fixed-epoch package inventory, four validators, an
+installed-wheel Milestone 8 smoke, and a clean detached `core.autocrlf=true`
+checkout. Specification review passed. Quality/security review found no
+Critical or Important issue; its one README soft-break Minor was reproduced
+RED and fixed GREEN in the documentation closure.
+
+- [x] Verify exact base-to-HEAD whitespace/status and a fresh detached `core.autocrlf=true` checkout.
+- [x] Commit the settled release record, rerun exact gates, then obtain fresh specification followed by fresh quality review on the exact commit.
+- [x] Fix every Critical/Important finding with RED coverage and repeat both reviews.
+- [x] Mark Milestone 8 complete only after both reviews PASS; then begin Milestone 9.
 
 ---
 
