@@ -1,0 +1,278 @@
+{
+  "karc_manifest": {
+    "schema_version": "1.0",
+    "artifact_id": "original/rin-aster/distribution/karc-manifest",
+    "created_by": {"component": "kokoroarc", "version": "0.0.0.dev0"},
+    "archive_id": "original.rin-aster.1.0.0",
+    "format_version": "1.0.0",
+    "namespace": "original",
+    "character_id": "rin-aster",
+    "character_version": "1.0.0",
+    "source_artifact_id": "original/rin-aster/source",
+    "source_hash": "1111111111111111111111111111111111111111111111111111111111111111",
+    "compiled_artifact_id": "original/rin-aster/compiled",
+    "compiled_hash": "2222222222222222222222222222222222222222222222222222222222222222",
+    "hard_validation_report": {
+      "artifact_id": "original/rin-aster/hard-validation",
+      "sha256": "3333333333333333333333333333333333333333333333333333333333333333"
+    },
+    "soft_evaluation_report": {
+      "artifact_id": "original/rin-aster/soft-evaluation",
+      "sha256": "4444444444444444444444444444444444444444444444444444444444444444"
+    },
+    "review_attestation": {
+      "artifact_id": "original/rin-aster/review-attestation",
+      "sha256": "5555555555555555555555555555555555555555555555555555555555555555"
+    },
+    "promotion_record": {
+      "artifact_id": "original/rin-aster/promotion-verified",
+      "sha256": "6666666666666666666666666666666666666666666666666666666666666666"
+    },
+    "publication_readiness_report": null,
+    "promotion_status": "verified",
+    "visibility": "private",
+    "activation_allowed": true,
+    "trust": "unsigned_local",
+    "compatibility": {
+      "runtime": {
+        "minimum_inclusive": "0.0.0",
+        "maximum_exclusive": "1.0.0"
+      },
+      "schemas": {
+        "compiled_pack": {
+          "minimum_inclusive": "1.0.0",
+          "maximum_exclusive": "2.0.0"
+        },
+        "hard_validation_report": {
+          "minimum_inclusive": "1.0.0",
+          "maximum_exclusive": "2.0.0"
+        },
+        "soft_evaluation_report": {
+          "minimum_inclusive": "1.0.0",
+          "maximum_exclusive": "2.0.0"
+        },
+        "review_attestation": {
+          "minimum_inclusive": "1.0.0",
+          "maximum_exclusive": "2.0.0"
+        },
+        "promotion_record": {
+          "minimum_inclusive": "1.0.0",
+          "maximum_exclusive": "2.0.0"
+        },
+        "publication_readiness_report": null
+      }
+    },
+    "members": [
+      {
+        "path": "pack/compiled.json",
+        "role": "compiled_pack",
+        "size": 1200,
+        "sha256": "2222222222222222222222222222222222222222222222222222222222222222"
+      },
+      {
+        "path": "release/hard-validation-report.json",
+        "role": "hard_validation_report",
+        "size": 2200,
+        "sha256": "3333333333333333333333333333333333333333333333333333333333333333"
+      },
+      {
+        "path": "release/promotion-record.json",
+        "role": "promotion_record",
+        "size": 900,
+        "sha256": "6666666666666666666666666666666666666666666666666666666666666666"
+      },
+      {
+        "path": "release/review-attestation.json",
+        "role": "review_attestation",
+        "size": 700,
+        "sha256": "5555555555555555555555555555555555555555555555555555555555555555"
+      },
+      {
+        "path": "release/soft-evaluation-report.json",
+        "role": "soft_evaluation_report",
+        "size": 1800,
+        "sha256": "4444444444444444444444444444444444444444444444444444444444444444"
+      }
+    ]
+  },
+  "compatibility_report": {
+    "schema_version": "1.0",
+    "artifact_id": "original/rin-aster/distribution/compatibility-report",
+    "created_by": {"component": "kokoroarc", "version": "0.0.0.dev0"},
+    "archive_sha256": "7777777777777777777777777777777777777777777777777777777777777777",
+    "manifest": {
+      "artifact_id": "original/rin-aster/distribution/karc-manifest",
+      "sha256": "8888888888888888888888888888888888888888888888888888888888888888"
+    },
+    "format_version": "1.0.0",
+    "namespace": "original",
+    "character_id": "rin-aster",
+    "character_version": "1.0.0",
+    "source_hash": "1111111111111111111111111111111111111111111111111111111111111111",
+    "compiled_hash": "2222222222222222222222222222222222222222222222222222222222222222",
+    "visibility": "private",
+    "trust": "unsigned_local",
+    "target_runtime_version": "0.0.0",
+    "target_schema_versions": {
+      "compiled_pack": "1.0.0",
+      "hard_validation_report": "1.0.0",
+      "soft_evaluation_report": "1.0.0",
+      "review_attestation": "1.0.0",
+      "promotion_record": "1.0.0",
+      "publication_readiness_report": null
+    },
+    "checks": {
+      "archive_structure": {"passed": true, "findings": []},
+      "manifest_schema": {"passed": true, "findings": []},
+      "member_inventory": {"passed": true, "findings": []},
+      "member_integrity": {"passed": true, "findings": []},
+      "runtime_version": {"passed": true, "findings": []},
+      "schema_versions": {"passed": true, "findings": []},
+      "release_bindings": {"passed": true, "findings": []}
+    },
+    "migration": {
+      "required": false,
+      "available": false,
+      "target_format_version": null,
+      "migration_id": null
+    },
+    "compatible": true,
+    "installation_allowed": true
+  },
+  "migration_plan": {
+    "schema_version": "1.0",
+    "artifact_id": "original/rin-aster/distribution/migration-plan",
+    "created_by": {"component": "kokoroarc", "version": "0.0.0.dev0"},
+    "migration_id": "karc-format-0.9.0-to-1.0.0",
+    "namespace": "original",
+    "character_id": "rin-aster",
+    "character_version": "1.0.0",
+    "input_archive_sha256": "7777777777777777777777777777777777777777777777777777777777777777",
+    "output_archive_sha256": "8888888888888888888888888888888888888888888888888888888888888888",
+    "source_format_version": "0.9.0",
+    "target_format_version": "1.0.0",
+    "source_schema_versions": {
+      "compiled_pack": "0.9.0",
+      "hard_validation_report": "0.9.0",
+      "soft_evaluation_report": "0.9.0",
+      "review_attestation": "0.9.0",
+      "promotion_record": "0.9.0",
+      "publication_readiness_report": null
+    },
+    "target_schema_versions": {
+      "compiled_pack": "1.0.0",
+      "hard_validation_report": "1.0.0",
+      "soft_evaluation_report": "1.0.0",
+      "review_attestation": "1.0.0",
+      "promotion_record": "1.0.0",
+      "publication_readiness_report": null
+    },
+    "registry_step_ids": ["karc-format-0.9.0-to-1.0.0"],
+    "changes": [
+      {
+        "operation": "replace",
+        "path": "/format_version",
+        "before_sha256": "9999999999999999999999999999999999999999999999999999999999999999",
+        "after_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      }
+    ],
+    "compatibility_before": {
+      "artifact_id": "original/rin-aster/distribution/compatibility-before",
+      "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    },
+    "compatibility_after": {
+      "artifact_id": "original/rin-aster/distribution/compatibility-after",
+      "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+    },
+    "state_migration_required": false,
+    "state_migration_plan": null,
+    "mode": "preview",
+    "archive_code_accepted": false
+  },
+  "installed_registry": {
+    "schema_version": "1.0",
+    "artifact_id": "registry/global/installed-packs",
+    "created_by": {"component": "kokoroarc", "version": "0.0.0.dev0"},
+    "scope": "global",
+    "workspace_id": null,
+    "revision": 1,
+    "entries": {
+      "original/rin-aster/1.0.0": {
+        "installation_id": "original.rin-aster.1.0.0.77777777",
+        "archive_sha256": "7777777777777777777777777777777777777777777777777777777777777777",
+        "manifest_sha256": "8888888888888888888888888888888888888888888888888888888888888888",
+        "compiled_artifact_id": "original/rin-aster/compiled",
+        "compiled_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+        "visibility": "private",
+        "promotion_status": "verified",
+        "activation_allowed": true,
+        "trust": "unsigned_local",
+        "relative_path": "global/rin-aster/1.0.0"
+      }
+    }
+  },
+  "default_config": {
+    "schema_version": "1.0",
+    "artifact_id": "config/global/character-default",
+    "created_by": {"component": "kokoroarc", "version": "0.0.0.dev0"},
+    "scope": "global",
+    "workspace_id": null,
+    "revision": 1,
+    "binding": {
+      "installation_id": "original.rin-aster.1.0.0.77777777",
+      "namespace": "original",
+      "character_id": "rin-aster",
+      "character_version": "1.0.0",
+      "archive_sha256": "7777777777777777777777777777777777777777777777777777777777777777",
+      "compiled_sha256": "2222222222222222222222222222222222222222222222222222222222222222"
+    },
+    "activation_policy": "explicit_only"
+  },
+  "persistence_consent": {
+    "schema_version": "1.0",
+    "artifact_id": "consents/global/rin-aster/consent-01",
+    "created_by": {"component": "kokoroarc", "version": "0.0.0.dev0"},
+    "consent_id": "rin-aster-consent-01",
+    "scope": "global",
+    "workspace_id": null,
+    "installation": {
+      "installation_id": "original.rin-aster.1.0.0.77777777",
+      "namespace": "original",
+      "character_id": "rin-aster",
+      "character_version": "1.0.0",
+      "archive_sha256": "7777777777777777777777777777777777777777777777777777777777777777",
+      "compiled_sha256": "2222222222222222222222222222222222222222222222222222222222222222"
+    },
+    "permissions": ["relationship_state", "mood_state", "memory_references"],
+    "status": "active",
+    "grant_revision": 1,
+    "revoked_revision": null,
+    "persistence_policy": "explicit_consent_only"
+  },
+  "memory_reference": {
+    "schema_version": "1.0",
+    "artifact_id": "memory-references/global/rin-aster/preference-01",
+    "created_by": {"component": "kokoroarc", "version": "0.0.0.dev0"},
+    "memory_reference_id": "rin-aster-preference-01",
+    "source_kind": "host_approved_reference",
+    "host_memory_id": "host-memory-preference-01",
+    "scope": "global",
+    "workspace_id": null,
+    "installation_id": "original.rin-aster.1.0.0.77777777",
+    "namespace": "original",
+    "character_id": "rin-aster",
+    "character_version": "1.0.0",
+    "consent_id": "rin-aster-consent-01",
+    "consent_revision": 1,
+    "permission": "memory_references",
+    "summary": "The user approved a preference for concise technical explanations.",
+    "localized_summaries": {
+      "zh-CN": "用户已批准偏好简洁的技术说明。",
+      "en-US": "The user approved concise technical explanations.",
+      "ja-JP": "ユーザーは簡潔な技術説明の設定を承認しました。"
+    },
+    "content_hash": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "embedded_content": false,
+    "canonical_fact_authority": false
+  }
+}

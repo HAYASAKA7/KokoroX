@@ -1,0 +1,348 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kokoroarc.local/schemas/v1/pack-compatibility-report.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "artifact_id",
+    "created_by",
+    "archive_sha256",
+    "manifest",
+    "format_version",
+    "namespace",
+    "character_id",
+    "character_version",
+    "source_hash",
+    "compiled_hash",
+    "visibility",
+    "trust",
+    "target_runtime_version",
+    "target_schema_versions",
+    "checks",
+    "migration",
+    "compatible",
+    "installation_allowed"
+  ],
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "artifact_id": {"$ref": "#/$defs/artifact_id"},
+    "created_by": {"$ref": "#/$defs/created_by"},
+    "archive_sha256": {"$ref": "#/$defs/sha256"},
+    "manifest": {
+      "oneOf": [
+        {"type": "null"},
+        {"$ref": "#/$defs/artifact_reference"}
+      ]
+    },
+    "format_version": {"$ref": "#/$defs/nullable_semantic_version"},
+    "namespace": {"$ref": "#/$defs/nullable_slug_id"},
+    "character_id": {"$ref": "#/$defs/nullable_slug_id"},
+    "character_version": {"$ref": "#/$defs/nullable_semantic_version"},
+    "source_hash": {"$ref": "#/$defs/nullable_sha256"},
+    "compiled_hash": {"$ref": "#/$defs/nullable_sha256"},
+    "visibility": {
+      "oneOf": [
+        {"type": "null"},
+        {"$ref": "#/$defs/visibility"}
+      ]
+    },
+    "trust": {"enum": [null, "unsigned_local"]},
+    "target_runtime_version": {"$ref": "#/$defs/semantic_version"},
+    "target_schema_versions": {"$ref": "#/$defs/schema_versions"},
+    "checks": {"$ref": "#/$defs/checks"},
+    "migration": {"$ref": "#/$defs/migration_summary"},
+    "compatible": {"type": "boolean"},
+    "installation_allowed": {"type": "boolean"}
+  },
+  "oneOf": [
+    {
+      "properties": {
+        "manifest": {"$ref": "#/$defs/artifact_reference"},
+        "format_version": {"$ref": "#/$defs/semantic_version"},
+        "namespace": {"$ref": "#/$defs/slug_id"},
+        "character_id": {"$ref": "#/$defs/slug_id"},
+        "character_version": {"$ref": "#/$defs/semantic_version"},
+        "source_hash": {"$ref": "#/$defs/sha256"},
+        "compiled_hash": {"$ref": "#/$defs/sha256"},
+        "visibility": {"$ref": "#/$defs/visibility"},
+        "trust": {"const": "unsigned_local"},
+        "checks": {
+          "properties": {
+            "archive_structure": {"$ref": "#/$defs/passing_check"},
+            "manifest_schema": {"$ref": "#/$defs/passing_check"},
+            "member_inventory": {"$ref": "#/$defs/passing_check"},
+            "member_integrity": {"$ref": "#/$defs/passing_check"},
+            "runtime_version": {"$ref": "#/$defs/passing_check"},
+            "schema_versions": {"$ref": "#/$defs/passing_check"},
+            "release_bindings": {"$ref": "#/$defs/passing_check"}
+          }
+        },
+        "compatible": {"const": true},
+        "installation_allowed": {"const": true}
+      }
+    },
+    {
+      "properties": {
+        "checks": {
+          "anyOf": [
+            {
+              "properties": {
+                "archive_structure": {"$ref": "#/$defs/failing_check"}
+              }
+            },
+            {
+              "properties": {
+                "manifest_schema": {"$ref": "#/$defs/failing_check"}
+              }
+            },
+            {
+              "properties": {
+                "member_inventory": {"$ref": "#/$defs/failing_check"}
+              }
+            },
+            {
+              "properties": {
+                "member_integrity": {"$ref": "#/$defs/failing_check"}
+              }
+            },
+            {
+              "properties": {
+                "runtime_version": {"$ref": "#/$defs/failing_check"}
+              }
+            },
+            {
+              "properties": {
+                "schema_versions": {"$ref": "#/$defs/failing_check"}
+              }
+            },
+            {
+              "properties": {
+                "release_bindings": {"$ref": "#/$defs/failing_check"}
+              }
+            }
+          ]
+        },
+        "compatible": {"const": false},
+        "installation_allowed": {"const": false}
+      }
+    }
+  ],
+  "$defs": {
+    "artifact_id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9._/-]{0,191}(?![\\s\\S])"
+    },
+    "created_by": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["component", "version"],
+      "properties": {
+        "component": {"const": "kokoroarc"},
+        "version": {"type": "string", "minLength": 1, "maxLength": 64}
+      }
+    },
+    "slug_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*(?![\\s\\S])",
+      "not": {
+        "enum": [
+          "con", "prn", "aux", "nul",
+          "com1", "com2", "com3", "com4", "com5", "com6", "com7", "com8", "com9",
+          "lpt1", "lpt2", "lpt3", "lpt4", "lpt5", "lpt6", "lpt7", "lpt8", "lpt9"
+        ]
+      }
+    },
+    "semantic_version": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(?:-(?:0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*)(?:\\.(?:0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*))*)?(?:\\+[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)?(?![\\s\\S])"
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}(?![\\s\\S])"
+    },
+    "stable_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*(?![\\s\\S])"
+    },
+    "visibility": {"enum": ["private", "public_candidate"]},
+    "artifact_reference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["artifact_id", "sha256"],
+      "properties": {
+        "artifact_id": {"$ref": "#/$defs/artifact_id"},
+        "sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "nullable_semantic_version": {
+      "oneOf": [
+        {"type": "null"},
+        {"$ref": "#/$defs/semantic_version"}
+      ]
+    },
+    "nullable_slug_id": {
+      "oneOf": [
+        {"type": "null"},
+        {"$ref": "#/$defs/slug_id"}
+      ]
+    },
+    "nullable_sha256": {
+      "oneOf": [
+        {"type": "null"},
+        {"$ref": "#/$defs/sha256"}
+      ]
+    },
+    "schema_versions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "compiled_pack",
+        "hard_validation_report",
+        "soft_evaluation_report",
+        "review_attestation",
+        "promotion_record",
+        "publication_readiness_report"
+      ],
+      "properties": {
+        "compiled_pack": {"$ref": "#/$defs/semantic_version"},
+        "hard_validation_report": {"$ref": "#/$defs/semantic_version"},
+        "soft_evaluation_report": {"$ref": "#/$defs/semantic_version"},
+        "review_attestation": {"$ref": "#/$defs/semantic_version"},
+        "promotion_record": {"$ref": "#/$defs/semantic_version"},
+        "publication_readiness_report": {
+          "$ref": "#/$defs/nullable_semantic_version"
+        }
+      }
+    },
+    "finding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "message", "path"],
+      "properties": {
+        "code": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 96,
+          "pattern": "^[A-Z][A-Z0-9_]*(?![\\s\\S])"
+        },
+        "message": {"type": "string", "minLength": 1, "maxLength": 512},
+        "path": {
+          "type": "array",
+          "maxItems": 16,
+          "items": {"type": "string", "minLength": 1, "maxLength": 128}
+        }
+      }
+    },
+    "check_result": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["passed", "findings"],
+      "properties": {
+        "passed": {"type": "boolean"},
+        "findings": {
+          "type": "array",
+          "maxItems": 64,
+          "items": {"$ref": "#/$defs/finding"}
+        }
+      }
+    },
+    "passing_check": {
+      "allOf": [
+        {"$ref": "#/$defs/check_result"},
+        {
+          "properties": {
+            "passed": {"const": true},
+            "findings": {"maxItems": 0}
+          }
+        }
+      ]
+    },
+    "failing_check": {
+      "allOf": [
+        {"$ref": "#/$defs/check_result"},
+        {
+          "properties": {
+            "passed": {"const": false},
+            "findings": {"minItems": 1}
+          }
+        }
+      ]
+    },
+    "checks": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "archive_structure",
+        "manifest_schema",
+        "member_inventory",
+        "member_integrity",
+        "runtime_version",
+        "schema_versions",
+        "release_bindings"
+      ],
+      "properties": {
+        "archive_structure": {"$ref": "#/$defs/check_result"},
+        "manifest_schema": {"$ref": "#/$defs/check_result"},
+        "member_inventory": {"$ref": "#/$defs/check_result"},
+        "member_integrity": {"$ref": "#/$defs/check_result"},
+        "runtime_version": {"$ref": "#/$defs/check_result"},
+        "schema_versions": {"$ref": "#/$defs/check_result"},
+        "release_bindings": {"$ref": "#/$defs/check_result"}
+      }
+    },
+    "migration_summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "required",
+        "available",
+        "target_format_version",
+        "migration_id"
+      ],
+      "properties": {
+        "required": {"type": "boolean"},
+        "available": {"type": "boolean"},
+        "target_format_version": {"$ref": "#/$defs/nullable_semantic_version"},
+        "migration_id": {
+          "oneOf": [
+            {"type": "null"},
+            {"$ref": "#/$defs/stable_id"}
+          ]
+        }
+      },
+      "oneOf": [
+        {
+          "properties": {
+            "required": {"const": false},
+            "available": {"const": false},
+            "target_format_version": {"type": "null"},
+            "migration_id": {"type": "null"}
+          }
+        },
+        {
+          "properties": {
+            "required": {"const": true},
+            "available": {"const": false},
+            "target_format_version": {"$ref": "#/$defs/semantic_version"},
+            "migration_id": {"type": "null"}
+          }
+        },
+        {
+          "properties": {
+            "required": {"const": true},
+            "available": {"const": true},
+            "target_format_version": {"$ref": "#/$defs/semantic_version"},
+            "migration_id": {"$ref": "#/$defs/stable_id"}
+          }
+        }
+      ]
+    }
+  }
+}

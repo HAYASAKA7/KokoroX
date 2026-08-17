@@ -57,6 +57,18 @@ REQUIRED_PACK_RELEASE_SCHEMAS = {
         "pack-publication-readiness-report",
     )
 }
+REQUIRED_STANDALONE_SCHEMAS = {
+    f"{name}.schema.json"
+    for name in (
+        "karc-manifest",
+        "pack-compatibility-report",
+        "pack-migration-plan",
+        "installed-pack-registry",
+        "character-default-config",
+        "persistence-consent",
+        "memory-reference",
+    )
+}
 REQUIRED_SKILL_FILES = {
     f"{skill}/{relative}"
     for skill, contract in (
@@ -483,7 +495,11 @@ def test_built_archives_and_installed_research_cli_are_complete(
     for module in REQUIRED_RESEARCH_MODULES | REQUIRED_TESTING_MODULES:
         assert module in wheel_entries
         assert any(entry.endswith(f"/src/{module}") for entry in sdist_entries)
-    for schema in REQUIRED_RESEARCH_SCHEMAS | REQUIRED_PACK_RELEASE_SCHEMAS:
+    for schema in (
+        REQUIRED_RESEARCH_SCHEMAS
+        | REQUIRED_PACK_RELEASE_SCHEMAS
+        | REQUIRED_STANDALONE_SCHEMAS
+    ):
         wheel_suffix = f"/share/kokoroarc/schemas/v1/{schema}"
         assert any(entry.endswith(wheel_suffix) for entry in wheel_entries)
         assert any(entry.endswith(f"/schemas/v1/{schema}") for entry in sdist_entries)
@@ -525,6 +541,40 @@ def test_built_archives_and_installed_research_cli_are_complete(
     )
     outside_repository = tmp_path / "working"
     outside_repository.mkdir()
+
+    probe_env = os.environ.copy()
+    probe_env["PYTHONPATH"] = str(installed)
+    probe_env.pop("KOKOROARC_DATA_DIR", None)
+    schema_names = sorted(
+        name.removesuffix(".schema.json")
+        for name in REQUIRED_STANDALONE_SCHEMAS
+    )
+    schema_probe = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            (
+                "import json\n"
+                "from kokoroarc.config import resolve_schema_dir\n"
+                "from kokoroarc.schemas import SchemaRegistry\n"
+                f"names = {schema_names!r}\n"
+                "registry = SchemaRegistry(resolve_schema_dir())\n"
+                "print(json.dumps([registry.load(name)['$id'] "
+                "for name in names], sort_keys=True))\n"
+            ),
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+        env=probe_env,
+        cwd=outside_repository,
+    )
+    assert schema_probe.returncode == 0, schema_probe.stdout + schema_probe.stderr
+    assert json.loads(schema_probe.stdout) == [
+        f"https://kokoroarc.local/schemas/v1/{name}.schema.json"
+        for name in schema_names
+    ]
+    assert schema_probe.stderr == ""
 
     request = _cli(
         [

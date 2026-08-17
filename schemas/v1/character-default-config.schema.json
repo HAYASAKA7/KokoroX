@@ -1,0 +1,116 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kokoroarc.local/schemas/v1/character-default-config.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "artifact_id",
+    "created_by",
+    "scope",
+    "workspace_id",
+    "revision",
+    "binding",
+    "activation_policy"
+  ],
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "artifact_id": {"$ref": "#/$defs/artifact_id"},
+    "created_by": {"$ref": "#/$defs/created_by"},
+    "scope": {"$ref": "#/$defs/scope"},
+    "workspace_id": {"$ref": "#/$defs/nullable_sha256"},
+    "revision": {"type": "integer", "minimum": 0},
+    "binding": {
+      "oneOf": [
+        {"type": "null"},
+        {"$ref": "#/$defs/installation_binding"}
+      ]
+    },
+    "activation_policy": {"const": "explicit_only"}
+  },
+  "oneOf": [
+    {
+      "properties": {
+        "scope": {"const": "global"},
+        "workspace_id": {"type": "null"}
+      }
+    },
+    {
+      "properties": {
+        "scope": {"const": "workspace"},
+        "workspace_id": {"$ref": "#/$defs/sha256"}
+      }
+    }
+  ],
+  "$defs": {
+    "artifact_id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9._/-]{0,191}(?![\\s\\S])"
+    },
+    "created_by": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["component", "version"],
+      "properties": {
+        "component": {"const": "kokoroarc"},
+        "version": {"type": "string", "minLength": 1, "maxLength": 64}
+      }
+    },
+    "slug_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*(?![\\s\\S])",
+      "not": {
+        "enum": [
+          "con", "prn", "aux", "nul",
+          "com1", "com2", "com3", "com4", "com5", "com6", "com7", "com8", "com9",
+          "lpt1", "lpt2", "lpt3", "lpt4", "lpt5", "lpt6", "lpt7", "lpt8", "lpt9"
+        ]
+      }
+    },
+    "semantic_version": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(?:-(?:0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*)(?:\\.(?:0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*))*)?(?:\\+[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)?(?![\\s\\S])"
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}(?![\\s\\S])"
+    },
+    "stable_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*(?![\\s\\S])"
+    },
+    "scope": {"enum": ["global", "workspace"]},
+    "nullable_sha256": {
+      "oneOf": [
+        {"type": "null"},
+        {"$ref": "#/$defs/sha256"}
+      ]
+    },
+    "installation_binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "installation_id",
+        "namespace",
+        "character_id",
+        "character_version",
+        "archive_sha256",
+        "compiled_sha256"
+      ],
+      "properties": {
+        "installation_id": {"$ref": "#/$defs/stable_id"},
+        "namespace": {"$ref": "#/$defs/slug_id"},
+        "character_id": {"$ref": "#/$defs/slug_id"},
+        "character_version": {"$ref": "#/$defs/semantic_version"},
+        "archive_sha256": {"$ref": "#/$defs/sha256"},
+        "compiled_sha256": {"$ref": "#/$defs/sha256"}
+      }
+    }
+  }
+}

@@ -242,12 +242,12 @@ metadata remains canonical LF.
 
 ### Task 10: Define archive, compatibility, migration, registry, defaults, consent, and memory schemas
 
-- [ ] Write RED schema discovery and installed-wheel tests for all seven Milestone 9 contracts.
-- [ ] Add valid global/workspace/private/public-candidate fixtures.
-- [ ] Add negative matrices for unsafe members, invalid version ranges, duplicate registry identities, unbound defaults, overbroad consent, embedded memory content, and executable migration fields.
-- [ ] Implement closed schemas and update package data.
-- [ ] Run full schema regression GREEN.
-- [ ] Commit: `feat: define standalone distribution contracts`.
+- [x] Write RED schema discovery and installed-wheel tests for all seven Milestone 9 contracts.
+- [x] Add valid global/workspace/private/public-candidate fixtures.
+- [x] Add negative matrices for unsafe members, invalid version ranges, duplicate registry identities, unbound defaults, overbroad consent, embedded memory content, and executable migration fields.
+- [x] Implement closed schemas and update package data.
+- [x] Run full schema regression GREEN.
+- [x] Commit: `feat: define standalone distribution contracts`.
 
 ### Task 11: Export deterministic `.karc` archives
 

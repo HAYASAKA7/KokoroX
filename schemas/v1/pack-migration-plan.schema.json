@@ -1,0 +1,209 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kokoroarc.local/schemas/v1/pack-migration-plan.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "artifact_id",
+    "created_by",
+    "migration_id",
+    "namespace",
+    "character_id",
+    "character_version",
+    "input_archive_sha256",
+    "output_archive_sha256",
+    "source_format_version",
+    "target_format_version",
+    "source_schema_versions",
+    "target_schema_versions",
+    "registry_step_ids",
+    "changes",
+    "compatibility_before",
+    "compatibility_after",
+    "state_migration_required",
+    "state_migration_plan",
+    "mode",
+    "archive_code_accepted"
+  ],
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "artifact_id": {"$ref": "#/$defs/artifact_id"},
+    "created_by": {"$ref": "#/$defs/created_by"},
+    "migration_id": {"$ref": "#/$defs/stable_id"},
+    "namespace": {"$ref": "#/$defs/slug_id"},
+    "character_id": {"$ref": "#/$defs/slug_id"},
+    "character_version": {"$ref": "#/$defs/semantic_version"},
+    "input_archive_sha256": {"$ref": "#/$defs/sha256"},
+    "output_archive_sha256": {"$ref": "#/$defs/sha256"},
+    "source_format_version": {"$ref": "#/$defs/semantic_version"},
+    "target_format_version": {"$ref": "#/$defs/semantic_version"},
+    "source_schema_versions": {"$ref": "#/$defs/schema_versions"},
+    "target_schema_versions": {"$ref": "#/$defs/schema_versions"},
+    "registry_step_ids": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 64,
+      "uniqueItems": true,
+      "items": {"$ref": "#/$defs/stable_id"}
+    },
+    "changes": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 512,
+      "uniqueItems": true,
+      "items": {"$ref": "#/$defs/change"}
+    },
+    "compatibility_before": {"$ref": "#/$defs/artifact_reference"},
+    "compatibility_after": {"$ref": "#/$defs/artifact_reference"},
+    "state_migration_required": {"type": "boolean"},
+    "state_migration_plan": {
+      "oneOf": [
+        {"type": "null"},
+        {"$ref": "#/$defs/artifact_reference"}
+      ]
+    },
+    "mode": {"enum": ["preview", "applied"]},
+    "archive_code_accepted": {"const": false}
+  },
+  "oneOf": [
+    {
+      "properties": {
+        "state_migration_required": {"const": false},
+        "state_migration_plan": {"type": "null"}
+      }
+    },
+    {
+      "properties": {
+        "state_migration_required": {"const": true},
+        "state_migration_plan": {"$ref": "#/$defs/artifact_reference"}
+      }
+    }
+  ],
+  "$defs": {
+    "artifact_id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9._/-]{0,191}(?![\\s\\S])"
+    },
+    "created_by": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["component", "version"],
+      "properties": {
+        "component": {"const": "kokoroarc"},
+        "version": {"type": "string", "minLength": 1, "maxLength": 64}
+      }
+    },
+    "slug_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*(?![\\s\\S])",
+      "not": {
+        "enum": [
+          "con", "prn", "aux", "nul",
+          "com1", "com2", "com3", "com4", "com5", "com6", "com7", "com8", "com9",
+          "lpt1", "lpt2", "lpt3", "lpt4", "lpt5", "lpt6", "lpt7", "lpt8", "lpt9"
+        ]
+      }
+    },
+    "semantic_version": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(?:-(?:0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*)(?:\\.(?:0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*))*)?(?:\\+[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)?(?![\\s\\S])"
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}(?![\\s\\S])"
+    },
+    "stable_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*(?![\\s\\S])"
+    },
+    "artifact_reference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["artifact_id", "sha256"],
+      "properties": {
+        "artifact_id": {"$ref": "#/$defs/artifact_id"},
+        "sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "nullable_semantic_version": {
+      "oneOf": [
+        {"type": "null"},
+        {"$ref": "#/$defs/semantic_version"}
+      ]
+    },
+    "schema_versions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "compiled_pack",
+        "hard_validation_report",
+        "soft_evaluation_report",
+        "review_attestation",
+        "promotion_record",
+        "publication_readiness_report"
+      ],
+      "properties": {
+        "compiled_pack": {"$ref": "#/$defs/semantic_version"},
+        "hard_validation_report": {"$ref": "#/$defs/semantic_version"},
+        "soft_evaluation_report": {"$ref": "#/$defs/semantic_version"},
+        "review_attestation": {"$ref": "#/$defs/semantic_version"},
+        "promotion_record": {"$ref": "#/$defs/semantic_version"},
+        "publication_readiness_report": {
+          "$ref": "#/$defs/nullable_semantic_version"
+        }
+      }
+    },
+    "nullable_sha256": {
+      "oneOf": [
+        {"type": "null"},
+        {"$ref": "#/$defs/sha256"}
+      ]
+    },
+    "change": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["operation", "path", "before_sha256", "after_sha256"],
+      "properties": {
+        "operation": {"enum": ["add", "remove", "replace"]},
+        "path": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512,
+          "pattern": "^(?:/(?:[^~/]|~0|~1)*)+(?![\\s\\S])"
+        },
+        "before_sha256": {"$ref": "#/$defs/nullable_sha256"},
+        "after_sha256": {"$ref": "#/$defs/nullable_sha256"}
+      },
+      "oneOf": [
+        {
+          "properties": {
+            "operation": {"const": "add"},
+            "before_sha256": {"type": "null"},
+            "after_sha256": {"$ref": "#/$defs/sha256"}
+          }
+        },
+        {
+          "properties": {
+            "operation": {"const": "remove"},
+            "before_sha256": {"$ref": "#/$defs/sha256"},
+            "after_sha256": {"type": "null"}
+          }
+        },
+        {
+          "properties": {
+            "operation": {"const": "replace"},
+            "before_sha256": {"$ref": "#/$defs/sha256"},
+            "after_sha256": {"$ref": "#/$defs/sha256"}
+          }
+        }
+      ]
+    }
+  }
+}
