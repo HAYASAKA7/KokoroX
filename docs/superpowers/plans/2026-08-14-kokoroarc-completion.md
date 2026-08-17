@@ -253,11 +253,11 @@ metadata remains canonical LF.
 
 **Create:** `distribution/archive.py`, unit/integration/security tests.
 
-- [ ] Write RED tests for byte-identical repeated export and exact manifest/member inventory.
-- [ ] Add RED cases for non-verified promotion, stale report, missing member, extra/source/raw member, unsafe name, duplicate/case collision, links, devices/ADS, encryption, extras/comments, zip bomb ratios, oversized data, and source mutation.
-- [ ] Implement fixed-metadata, lexicographic, manifest-bound standard-library archives.
-- [ ] Prove no source/dossier/research/state/memory bytes enter the archive.
-- [ ] Commit: `feat: export deterministic karc archives`.
+- [x] Write RED tests for byte-identical repeated export and exact manifest/member inventory.
+- [x] Add RED cases for non-verified promotion, stale report, missing member, extra/source/raw member, unsafe name, duplicate/case collision, links, devices/ADS, encryption, extras/comments, zip bomb ratios, oversized data, and source mutation.
+- [x] Implement fixed-metadata, lexicographic, manifest-bound standard-library archives.
+- [x] Prove no source/dossier/research/state/memory bytes enter the archive.
+- [x] Commit: `feat: export deterministic karc archives`.
 
 ### Task 12: Inspect compatibility and apply registered migrations
 
