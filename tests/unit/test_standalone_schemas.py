@@ -245,6 +245,16 @@ def test_migration_plan_never_accepts_archive_code() -> None:
     _assert_invalid("pack-migration-plan", invalid)
 
 
+def test_migration_plan_accepts_only_escaped_json_pointer_tildes() -> None:
+    escaped = deepcopy(_bundle("private-global.json")["migration_plan"])
+    escaped["changes"][0]["path"] = "/manifest/a~0b/~1"
+    unescaped = deepcopy(escaped)
+    unescaped["changes"][0]["path"] = "/manifest/a~2b"
+
+    SCHEMAS.validate("pack-migration-plan", escaped)
+    _assert_invalid("pack-migration-plan", unescaped)
+
+
 def test_state_migration_flag_requires_a_bound_plan() -> None:
     private_plan = deepcopy(_bundle("private-global.json")["migration_plan"])
     private_plan["state_migration_required"] = True
@@ -271,6 +281,14 @@ def test_registry_rejects_duplicate_identity_array_representation() -> None:
         {"identity": key, **entry},
         {"identity": key, **duplicate},
     ]
+
+    _assert_invalid("installed-pack-registry", invalid)
+
+
+def test_registry_rejects_backslash_installed_paths() -> None:
+    invalid = deepcopy(_bundle("private-global.json")["installed_registry"])
+    entry = next(iter(invalid["entries"].values()))
+    entry["relative_path"] = "global\\rin-aster\\1.0.0"
 
     _assert_invalid("installed-pack-registry", invalid)
 
@@ -416,3 +434,10 @@ def test_memory_reference_requires_host_approval_and_no_fact_authority() -> None
     _assert_invalid("memory-reference", unapproved)
     _assert_invalid("memory-reference", embedded)
     _assert_invalid("memory-reference", authoritative)
+
+
+def test_memory_reference_rejects_whitespace_only_summaries() -> None:
+    invalid = deepcopy(_bundle("private-global.json")["memory_reference"])
+    invalid["localized_summaries"]["en-US"] = " \t\r\n "
+
+    _assert_invalid("memory-reference", invalid)

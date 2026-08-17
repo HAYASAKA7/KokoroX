@@ -176,7 +176,7 @@
           "type": "string",
           "minLength": 1,
           "maxLength": 512,
-          "pattern": "^(?:/(?:[^~/]|~0|~1)*)+(?![\\s\\S])"
+          "pattern": "^(?:/(?:[^\\u007e/]|\\u007e0|\\u007e1)*)+(?![\\s\\S])"
         },
         "before_sha256": {"$ref": "#/$defs/nullable_sha256"},
         "after_sha256": {"$ref": "#/$defs/nullable_sha256"}
