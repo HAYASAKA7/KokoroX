@@ -4,6 +4,7 @@ created_by: {component: kokoroarc, version: 0.0.0.dev0}
 character_id: rin-aster
 character_version: 1.0.0
 namespace: original
+spoiler_scope: No spoiler-sensitive source material is present.
 files:
   identity: identity.yaml
   evidence: evidence.yaml

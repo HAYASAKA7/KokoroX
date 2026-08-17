@@ -30,6 +30,7 @@
     "character_id": {"$ref": "#/$defs/path_slug_id"},
     "character_version": {"$ref": "#/$defs/character_version"},
     "namespace": {"$ref": "#/$defs/path_slug_id"},
+    "spoiler_scope": {"$ref": "#/$defs/bounded_string"},
     "identity": {"$ref": "#/$defs/identity"},
     "evidence": {"$ref": "#/$defs/evidence"},
     "derived_profile": {"$ref": "#/$defs/derived_profile"},

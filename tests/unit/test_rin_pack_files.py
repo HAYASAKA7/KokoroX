@@ -46,6 +46,7 @@ EXPECTED_MANIFEST = {
     "character_id": "rin-aster",
     "character_version": "1.0.0",
     "namespace": "original",
+    "spoiler_scope": "No spoiler-sensitive source material is present.",
     "files": {
         "identity": "identity.yaml",
         "evidence": "evidence.yaml",
@@ -195,7 +196,10 @@ EXPECTED_FIXTURES = {
                 ],
                 "expected_locales": {
                     "zh-CN": "先核对变更前后的证据，再按可能性排序。",
-                    "en-US": "Compare evidence from before and after the change, then rank likely causes.",
+                    "en-US": (
+                        "Compare evidence from before and after the change, "
+                        "then rank likely causes."
+                    ),
                     "ja-JP": "変更前後の根拠を確認し、可能性の高い順に整理します。",
                 },
             }
@@ -212,7 +216,10 @@ EXPECTED_FIXTURES = {
                     "state_an_unverified_cause_as_certain",
                     "belittle_the_user",
                 ],
-                "safe_alternative": "State what is unknown and request the smallest useful evidence sample.",
+                "safe_alternative": (
+                    "State what is unknown and request the smallest useful "
+                    "evidence sample."
+                ),
             }
         ],
     },

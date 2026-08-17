@@ -144,11 +144,15 @@ tests/skills/
 
 ### Task 6: Produce publication-readiness reports without publishing
 
-**Create:** `testing/publication.py`, unit/security tests.
+**Create:** `testing/publication.py`, unit/security/integration tests.
+
+**Modify:** publication/source schemas, Rin source declarations, release
+fixtures, and the testing API exports.
 
 - [ ] Write RED tests for private Rin portability, an original public candidate, and a blocked researched public candidate.
 - [ ] Add RED cases for raw dossiers/research, long dialogue, media/executable files, absolute paths, secrets, unresolved conflicts, missing age/route declarations, stale promotion, and fake compliance attestations.
 - [ ] Implement deterministic local readiness reporting; never perform network I/O or mutate pack/release inputs.
+- [ ] Reproduce the verified promotion from exact hard/review/soft/request evidence and bind evidence, compliance, and the complete source tree in the report.
 - [ ] Prove private export remains possible when public readiness is blocked.
 - [ ] Commit: `feat: assess character pack publication readiness`.
 

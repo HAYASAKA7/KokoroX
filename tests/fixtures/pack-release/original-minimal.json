@@ -319,12 +319,15 @@
     "requested_visibility": "private",
     "source_artifact_id": "original/rin-aster/source",
     "source_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "source_tree_hash": "3333333333333333333333333333333333333333333333333333333333333333",
     "compiled_artifact_id": "original/rin-aster/compiled",
     "compiled_hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
     "promotion": {
       "artifact_id": "original/rin-aster/release/promotion-verified",
       "sha256": "2222222222222222222222222222222222222222222222222222222222222222"
     },
+    "promotion_evidence_hash": "5555555555555555555555555555555555555555555555555555555555555555",
+    "compliance_input_hash": "6666666666666666666666666666666666666666666666666666666666666666",
     "checks": {
       "verified_promotion": {"passed": true, "findings": []},
       "visibility_policy": {"passed": true, "findings": []},
@@ -335,6 +338,7 @@
       "absolute_paths_absent": {"passed": true, "findings": []},
       "compliance": {"passed": true, "findings": []},
       "continuity": {"passed": true, "findings": []},
+      "spoiler_scope": {"passed": true, "findings": []},
       "source_references": {"passed": true, "findings": []},
       "age_routes": {"passed": true, "findings": []}
     },

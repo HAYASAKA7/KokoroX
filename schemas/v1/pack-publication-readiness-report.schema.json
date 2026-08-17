@@ -14,9 +14,12 @@
     "requested_visibility",
     "source_artifact_id",
     "source_hash",
+    "source_tree_hash",
     "compiled_artifact_id",
     "compiled_hash",
     "promotion",
+    "promotion_evidence_hash",
+    "compliance_input_hash",
     "checks",
     "blockers",
     "compliance_attestation",
@@ -34,9 +37,12 @@
     "requested_visibility": {"enum": ["private", "public_candidate"]},
     "source_artifact_id": {"$ref": "#/$defs/artifact_id"},
     "source_hash": {"$ref": "#/$defs/sha256"},
+    "source_tree_hash": {"$ref": "#/$defs/sha256"},
     "compiled_artifact_id": {"$ref": "#/$defs/artifact_id"},
     "compiled_hash": {"$ref": "#/$defs/sha256"},
     "promotion": {"$ref": "#/$defs/artifact_reference"},
+    "promotion_evidence_hash": {"$ref": "#/$defs/sha256"},
+    "compliance_input_hash": {"$ref": "#/$defs/sha256"},
     "checks": {"$ref": "#/$defs/publication_checks"},
     "blockers": {
       "type": "array",
@@ -110,6 +116,25 @@
       "else": {
         "properties": {
           "checks": {"$ref": "#/$defs/private_export_check_failure"}
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "requested_visibility": {"const": "public_candidate"},
+          "ready_for_private_export": {"const": true},
+          "ready_for_publication": {"const": false}
+        },
+        "required": [
+          "requested_visibility",
+          "ready_for_private_export",
+          "ready_for_publication"
+        ]
+      },
+      "then": {
+        "properties": {
+          "checks": {"$ref": "#/$defs/public_decision_check_failure"}
         }
       }
     }
@@ -253,6 +278,7 @@
         "absolute_paths_absent",
         "compliance",
         "continuity",
+        "spoiler_scope",
         "source_references",
         "age_routes"
       ],
@@ -266,6 +292,7 @@
         "absolute_paths_absent": {"$ref": "#/$defs/check_result"},
         "compliance": {"$ref": "#/$defs/check_result"},
         "continuity": {"$ref": "#/$defs/check_result"},
+        "spoiler_scope": {"$ref": "#/$defs/check_result"},
         "source_references": {"$ref": "#/$defs/check_result"},
         "age_routes": {"$ref": "#/$defs/check_result"}
       }
@@ -282,6 +309,7 @@
         "absolute_paths_absent": {"properties": {"passed": {"const": true}}},
         "compliance": {"properties": {"passed": {"const": true}}},
         "continuity": {"properties": {"passed": {"const": true}}},
+        "spoiler_scope": {"properties": {"passed": {"const": true}}},
         "source_references": {"properties": {"passed": {"const": true}}},
         "age_routes": {"properties": {"passed": {"const": true}}}
       }
@@ -290,13 +318,13 @@
       "type": "object",
       "properties": {
         "verified_promotion": {"properties": {"passed": {"const": true}}},
-        "visibility_policy": {"properties": {"passed": {"const": true}}},
         "provenance": {"properties": {"passed": {"const": true}}},
         "private_material_absent": {"properties": {"passed": {"const": true}}},
         "executable_content_absent": {"properties": {"passed": {"const": true}}},
         "secrets_absent": {"properties": {"passed": {"const": true}}},
         "absolute_paths_absent": {"properties": {"passed": {"const": true}}},
         "continuity": {"properties": {"passed": {"const": true}}},
+        "spoiler_scope": {"properties": {"passed": {"const": true}}},
         "source_references": {"properties": {"passed": {"const": true}}},
         "age_routes": {"properties": {"passed": {"const": true}}}
       }
@@ -305,15 +333,22 @@
       "type": "object",
       "anyOf": [
         {"properties": {"verified_promotion": {"properties": {"passed": {"const": false}}}}},
-        {"properties": {"visibility_policy": {"properties": {"passed": {"const": false}}}}},
         {"properties": {"provenance": {"properties": {"passed": {"const": false}}}}},
         {"properties": {"private_material_absent": {"properties": {"passed": {"const": false}}}}},
         {"properties": {"executable_content_absent": {"properties": {"passed": {"const": false}}}}},
         {"properties": {"secrets_absent": {"properties": {"passed": {"const": false}}}}},
         {"properties": {"absolute_paths_absent": {"properties": {"passed": {"const": false}}}}},
         {"properties": {"continuity": {"properties": {"passed": {"const": false}}}}},
+        {"properties": {"spoiler_scope": {"properties": {"passed": {"const": false}}}}},
         {"properties": {"source_references": {"properties": {"passed": {"const": false}}}}},
         {"properties": {"age_routes": {"properties": {"passed": {"const": false}}}}}
+      ]
+    },
+    "public_decision_check_failure": {
+      "type": "object",
+      "anyOf": [
+        {"properties": {"visibility_policy": {"properties": {"passed": {"const": false}}}}},
+        {"properties": {"compliance": {"properties": {"passed": {"const": false}}}}}
       ]
     },
     "artifact_reference": {
@@ -355,7 +390,29 @@
             "pattern": "^[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)*(?![\\s\\S])"
           }
         }
-      }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {"conclusion": {"const": "approved"}},
+            "required": ["conclusion"]
+          },
+          "then": {
+            "properties": {
+              "basis_codes": {
+                "items": {
+                  "enum": [
+                    "DISTRIBUTION_RIGHTS_CONFIRMED",
+                    "LICENSE_VERIFIED",
+                    "ORIGINAL_AUTHORSHIP_CONFIRMED",
+                    "PUBLIC_DOMAIN_VERIFIED"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      ]
     }
   }
 }

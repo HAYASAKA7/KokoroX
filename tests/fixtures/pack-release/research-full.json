@@ -341,12 +341,15 @@
     "requested_visibility": "public_candidate",
     "source_artifact_id": "research/aoi-kisaragi-fixture/source",
     "source_hash": "3333333333333333333333333333333333333333333333333333333333333333",
+    "source_tree_hash": "5555555555555555555555555555555555555555555555555555555555555555",
     "compiled_artifact_id": "research/aoi-kisaragi-fixture/compiled",
     "compiled_hash": "4444444444444444444444444444444444444444444444444444444444444444",
     "promotion": {
       "artifact_id": "research/aoi-kisaragi-fixture/release/promotion-verified",
       "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
     },
+    "promotion_evidence_hash": "6666666666666666666666666666666666666666666666666666666666666666",
+    "compliance_input_hash": "7777777777777777777777777777777777777777777777777777777777777777",
     "checks": {
       "verified_promotion": {"passed": true, "findings": []},
       "visibility_policy": {"passed": true, "findings": []},
@@ -367,6 +370,7 @@
         ]
       },
       "continuity": {"passed": true, "findings": []},
+      "spoiler_scope": {"passed": true, "findings": []},
       "source_references": {"passed": true, "findings": []},
       "age_routes": {"passed": true, "findings": []}
     },

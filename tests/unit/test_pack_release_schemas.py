@@ -76,7 +76,9 @@ def test_pack_release_schemas_share_identity_version_and_hash_definitions() -> N
         )
 
 
-@pytest.mark.parametrize("fixture_name", ["original-minimal.json", "research-full.json"])
+@pytest.mark.parametrize(
+    "fixture_name", ["original-minimal.json", "research-full.json"]
+)
 def test_pack_release_fixtures_are_valid(fixture_name: str) -> None:
     artifacts = _bundle(fixture_name)
     assert set(artifacts) == set(SCHEMA_BY_FIXTURE_KEY)
@@ -85,7 +87,9 @@ def test_pack_release_fixtures_are_valid(fixture_name: str) -> None:
         SCHEMAS.validate(schema_name, artifacts[fixture_key])
 
 
-@pytest.mark.parametrize("fixture_name", ["original-minimal.json", "research-full.json"])
+@pytest.mark.parametrize(
+    "fixture_name", ["original-minimal.json", "research-full.json"]
+)
 @pytest.mark.parametrize("fixture_key,schema_name", SCHEMA_BY_FIXTURE_KEY.items())
 def test_pack_release_schemas_reject_unknown_root_fields(
     fixture_name: str, fixture_key: str, schema_name: str
@@ -108,6 +112,21 @@ def test_pack_release_schemas_reject_unknown_root_fields(
             "publication_report",
             "pack-publication-readiness-report",
             "ready_for_private_export",
+        ),
+        (
+            "publication_report",
+            "pack-publication-readiness-report",
+            "source_tree_hash",
+        ),
+        (
+            "publication_report",
+            "pack-publication-readiness-report",
+            "promotion_evidence_hash",
+        ),
+        (
+            "publication_report",
+            "pack-publication-readiness-report",
+            "compliance_input_hash",
         ),
     ],
 )
@@ -158,6 +177,21 @@ def test_every_release_artifact_requires_exact_subject_identity_fields(
             "publication_report",
             "pack-publication-readiness-report",
             ("promotion", "sha256"),
+        ),
+        (
+            "publication_report",
+            "pack-publication-readiness-report",
+            ("source_tree_hash",),
+        ),
+        (
+            "publication_report",
+            "pack-publication-readiness-report",
+            ("promotion_evidence_hash",),
+        ),
+        (
+            "publication_report",
+            "pack-publication-readiness-report",
+            ("compliance_input_hash",),
         ),
     ],
 )
@@ -537,9 +571,36 @@ def test_publication_ready_requires_approved_compliance_attestation() -> None:
     _assert_invalid("pack-publication-readiness-report", invalid)
 
 
+def test_publication_ready_rejects_self_asserted_compliance_basis() -> None:
+    invalid = deepcopy(_bundle("research-full.json")["publication_report"])
+    invalid["ready_for_publication"] = True
+    invalid["blockers"] = []
+    invalid["compliance_attestation"]["conclusion"] = "approved"
+    invalid["compliance_attestation"]["basis_codes"] = ["SELF_ASSERTED"]
+    invalid["checks"]["compliance"] = {"passed": True, "findings": []}
+
+    _assert_invalid("pack-publication-readiness-report", invalid)
+
+
 def test_blocked_public_candidate_requires_a_blocker() -> None:
     invalid = deepcopy(_bundle("research-full.json")["publication_report"])
     invalid["blockers"] = []
+
+    _assert_invalid("pack-publication-readiness-report", invalid)
+
+
+def test_public_failure_requires_a_failed_public_decision_check() -> None:
+    invalid = deepcopy(_bundle("research-full.json")["publication_report"])
+    invalid["checks"]["compliance"] = {"passed": True, "findings": []}
+    invalid["compliance_attestation"] = None
+    invalid["blockers"] = [
+        {
+            "severity": "error",
+            "code": "UNRELATED_BLOCKER",
+            "path": ["checks"],
+            "message": "An unrelated blocker cannot explain public failure.",
+        }
+    ]
 
     _assert_invalid("pack-publication-readiness-report", invalid)
 
@@ -548,13 +609,13 @@ def test_blocked_public_candidate_requires_a_blocker() -> None:
     "check_name",
     [
         "verified_promotion",
-        "visibility_policy",
         "provenance",
         "private_material_absent",
         "executable_content_absent",
         "secrets_absent",
         "absolute_paths_absent",
         "continuity",
+        "spoiler_scope",
         "source_references",
         "age_routes",
     ],

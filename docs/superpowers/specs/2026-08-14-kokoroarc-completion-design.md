@@ -258,7 +258,55 @@ failure after the complete bundle becomes visible.
 - continuity, spoiler, unresolved-conflict, age, and route declarations;
 - source/reference completeness without exporting private source history.
 
-For a named copyrighted character, readiness defaults to blocked. A compliance attestation may make the artifact a `public_candidate`, but the core still performs no upload. A private portable export does not require public readiness.
+The checker receives a source directory, one exact verified promotion record,
+the closed evidence needed to reproduce that record, an explicit requested
+visibility, and an optional compliance attestation. Promotion evidence contains
+the exact request, hard report, review attestation, reviewed predecessor, soft
+evaluation input and report, plus the exact Research Bundle when the mode needs
+one; a structurally valid promotion record without this evidence is not proof
+that its hard and soft gates passed. The checker captures canonical caller
+inputs and one bounded no-follow source snapshot before the first schema
+callback, recreates the verified promotion through the normal semantic
+currentness gates, assembles and compiles only detached data, and rechecks
+caller values, retained dependency outputs, source bytes, file identities, and
+executable permission bits across every callback and before return. It performs
+no network operation and writes nothing.
+
+Baseline private-export readiness requires the verified promotion to bind the
+current canonical source and compiled pack. The closed source layout may not
+contain raw dossiers or research snapshots, long dialogue/transcript corpora,
+artwork, audio, executable content, credential-like material, or host-absolute
+paths. Test-corpus protected spans are not part of the portable compiled
+surface; every other closed-layout source and test byte is scanned and bound by
+the report's source-tree hash. Non-original evidence must remain bounded to
+explicit, nonblank claim source references. The source manifest must carry a
+usable spoiler-scope declaration, identity must declare a semantic age or age
+class rather than an incidental number, relationship growth must contain an
+initial and a later stage, and no source text may retain an unresolved
+continuity marker. Findings use only bounded generic or digested paths and
+messages; they never echo suspect source text, keys, credentials, or private
+history.
+
+Public readiness is a separate decision layered on top of a passing private
+baseline. It requires an exact-hash compliance attestation with conclusion
+`approved` and a closed basis from `ORIGINAL_AUTHORSHIP_CONFIRMED`,
+`PUBLIC_DOMAIN_VERIFIED`, `LICENSE_VERIFIED`, or
+`DISTRIBUTION_RIGHTS_CONFIRMED`. A malformed, blocked, mismatched, or
+self-asserted attestation cannot unlock publication. For a named copyrighted
+character, readiness therefore defaults to blocked. An approved local
+attestation may make the artifact a `public_candidate`, but it is advisory
+evidence rather than a signature or upload authorization, and the core still
+performs no upload. Public failure does not block a private portable export
+when every baseline check passes. A private verified promotion cannot be
+elevated by asking for a public check; a verified `public_candidate` may be
+checked or exported privately as a safe downgrade. The report binds the exact
+promotion-evidence and compliance input bytes by SHA-256, including canonical
+`null` for absent inputs, without retaining malformed compliance material.
+Exact report currentness recreates the promotion and recomputes from those
+inputs, the full source-tree snapshot, and the promotion bytes. A valid embedded
+attestation can be reused directly; an invalid attestation must be supplied
+again to prove the exact blocked report. Any changed bound byte invalidates
+reuse.
 
 ## 6. Milestone 8 CLI and Skill
 
@@ -271,6 +319,11 @@ kokoro pack promote <source-dir> --target verified \
   --previous <reviewed.json> --hard-report <report.json> \
   --soft-report <report.json> --out <record.json> --json
 kokoro pack publication-check <source-dir> --promotion <verified.json> \
+  --request <request.json> --hard-report <report.json> \
+  --review <attestation.json> --previous <reviewed.json> \
+  --soft-input <input.json> --soft-report <report.json> \
+  [--research-bundle <bundle.json>] \
+  --visibility <private|public_candidate> \
   [--compliance <attestation.json>] --out <report.json> --json
 ```
 
