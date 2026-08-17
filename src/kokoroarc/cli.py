@@ -2,13 +2,15 @@ from __future__ import annotations
 
 import argparse
 from contextlib import redirect_stderr
+from dataclasses import dataclass
+from hashlib import sha256
 from io import StringIO
 import json
 import os
 from pathlib import Path
 import re
 import stat
-from typing import Any, Callable
+from typing import Any, Callable, cast
 
 from kokoroarc import __version__
 from kokoroarc.authoring.drafts import build_character_draft
@@ -18,7 +20,11 @@ from kokoroarc.authoring.validation import validate_authoring_pack
 from kokoroarc.config import Settings, resolve_schema_dir
 from kokoroarc.errors import KokoroError
 from kokoroarc.json_compat import find_json_incompatibility
-from kokoroarc.packs.compiler import compile_pack, write_compiled_pack
+from kokoroarc.packs.compiler import (
+    canonical_bytes,
+    compile_pack,
+    write_compiled_pack,
+)
 from kokoroarc.packs.loader import load_source_pack
 from kokoroarc.policy.compiler import normalize_policy
 from kokoroarc.research.bundles import build_research_bundle
@@ -35,6 +41,11 @@ from kokoroarc.runtime.validation import validate_rendered_output
 from kokoroarc.schemas import SchemaRegistry
 from kokoroarc.state.store import SessionStore
 from kokoroarc.state.transitions import apply_event
+from kokoroarc.testing.hard import run_hard_validation
+from kokoroarc.testing.promotion import create_promotion_record
+from kokoroarc.testing.publication import assess_publication_readiness
+from kokoroarc.testing.soft import aggregate_soft_evaluation
+from kokoroarc.testing.storage import publish_promotion_record
 
 
 JSON_INPUT_MAX_BYTES = 4 * 1024 * 1024
@@ -43,6 +54,16 @@ COMPILED_SCAN_MAX_BYTES = 32 * 1024 * 1024
 # Compiled filenames use the first 16 lowercase SHA-256 hex characters.
 SOURCE_HASH_PREFIX_LENGTH = 16
 _PUBLIC_ERROR_CODE = re.compile(r"[A-Z][A-Z0-9_]{0,127}")
+_WINDOWS_RESERVED_OUTPUT_NAMES = frozenset(
+    {
+        "aux",
+        "con",
+        "nul",
+        "prn",
+        *(f"com{number}" for number in range(1, 10)),
+        *(f"lpt{number}" for number in range(1, 10)),
+    }
+)
 _PUBLIC_MESSAGES = {
     "ARGUMENT_INVALID": "Command arguments are invalid.",
     "AUTHORING_MODE_UNSUPPORTED": (
@@ -105,11 +126,41 @@ _PUBLIC_MESSAGES = {
     ),
     "RESEARCH_WORKSPACE_NOT_FOUND": "Research workspace was not found.",
     "RESEARCH_WORKSPACE_UNSAFE": "Research workspace path is unsafe.",
+    "REPORT_OUTPUT_CHANGED": "Report output changed during publication.",
+    "REPORT_OUTPUT_MISMATCH": "The requested report output is invalid.",
+    "REPORT_OUTPUT_PATH_UNSAFE": "Report output path is unsafe.",
+    "REPORT_OUTPUT_WRITE_FAILED": "Report output could not be written.",
     "SCHEMA_VALIDATION_FAILED": "Input did not match the required schema.",
+    "SOFT_EVALUATION_INPUT_INVALID": "Soft-evaluation input is invalid.",
     "STATE_REVISION_CONFLICT": "Relationship state revision conflicted.",
     "UNSAFE_PACK_PATH": "Character pack path is unsafe.",
     "UNSAFE_RESEARCH_PATH": "Research publication path is unsafe.",
 }
+
+
+@dataclass(frozen=True, slots=True)
+class _PathIdentity:
+    device: int
+    inode: int
+    size: int
+    modified_ns: int
+    file_type: int
+    links: int
+
+
+@dataclass(frozen=True, slots=True)
+class _DirectoryIdentity:
+    path: Path
+    device: int
+    inode: int
+    file_type: int
+
+
+@dataclass(frozen=True, slots=True)
+class _ReportOutput:
+    target: Path
+    directories: tuple[_DirectoryIdentity, ...]
+    initial_target: _PathIdentity | None
 
 
 def _leaf_json(parser: argparse.ArgumentParser) -> None:
@@ -129,6 +180,49 @@ def build_parser() -> argparse.ArgumentParser:
     pack_validate = pack_commands.add_parser("validate")
     pack_validate.add_argument("pack_path")
     _leaf_json(pack_validate)
+    pack_test = pack_commands.add_parser("test")
+    pack_test.add_argument("source_dir")
+    pack_test.add_argument("--request", required=True)
+    pack_test.add_argument("--research-bundle")
+    pack_test.add_argument("--out", required=True)
+    _leaf_json(pack_test)
+    pack_soft_eval = pack_commands.add_parser("soft-eval")
+    pack_soft_eval.add_argument("input")
+    pack_soft_eval.add_argument("--out", required=True)
+    _leaf_json(pack_soft_eval)
+    pack_promote = pack_commands.add_parser("promote")
+    pack_promote.add_argument("source_dir")
+    pack_promote.add_argument(
+        "--target",
+        choices=("reviewed", "verified"),
+        required=True,
+    )
+    pack_promote.add_argument("--promotion-id", required=True)
+    pack_promote.add_argument("--request", required=True)
+    pack_promote.add_argument("--hard-report", required=True)
+    pack_promote.add_argument("--review", required=True)
+    pack_promote.add_argument("--previous")
+    pack_promote.add_argument("--soft-input")
+    pack_promote.add_argument("--soft-report")
+    pack_promote.add_argument("--research-bundle")
+    pack_promote.add_argument("--out", required=True)
+    _leaf_json(pack_promote)
+    publication_check = pack_commands.add_parser("publication-check")
+    publication_check.add_argument("source_dir")
+    publication_check.add_argument("--promotion", required=True)
+    publication_check.add_argument("--request", required=True)
+    publication_check.add_argument("--hard-report", required=True)
+    publication_check.add_argument("--review", required=True)
+    publication_check.add_argument("--previous", required=True)
+    publication_check.add_argument("--soft-input", required=True)
+    publication_check.add_argument("--soft-report", required=True)
+    publication_check.add_argument("--research-bundle")
+    publication_check.add_argument(
+        "--visibility", choices=("private", "public_candidate"), required=True
+    )
+    publication_check.add_argument("--compliance")
+    publication_check.add_argument("--out", required=True)
+    _leaf_json(publication_check)
 
     character = commands.add_parser("character")
     character_commands = character.add_subparsers(
@@ -245,49 +339,345 @@ def _input_error(code: str, message: str) -> KokoroError:
     return KokoroError(code, message)
 
 
+def _input_identity(path_stat: os.stat_result) -> _PathIdentity:
+    return _PathIdentity(
+        device=path_stat.st_dev,
+        inode=path_stat.st_ino,
+        size=path_stat.st_size,
+        modified_ns=path_stat.st_mtime_ns,
+        file_type=stat.S_IFMT(path_stat.st_mode),
+        links=path_stat.st_nlink,
+    )
+
+
 def _read_json(path: Path, *, max_bytes: int = JSON_INPUT_MAX_BYTES) -> Any:
     try:
         path_stat = path.lstat()
     except FileNotFoundError as error:
         raise _input_error("INPUT_NOT_FOUND", "Input file was not found.") from error
     except OSError as error:
-        raise _input_error("INPUT_READ_FAILED", "Input file could not be read.") from error
+        raise _input_error(
+            "INPUT_READ_FAILED",
+            "Input file could not be read.",
+        ) from error
     reparse = getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0)
     attributes = getattr(path_stat, "st_file_attributes", 0)
     is_junction = getattr(path, "is_junction", None)
     try:
         junction = bool(is_junction is not None and is_junction())
     except OSError as error:
-        raise _input_error("INPUT_READ_FAILED", "Input file could not be read.") from error
+        raise _input_error(
+            "INPUT_READ_FAILED",
+            "Input file could not be read.",
+        ) from error
     if (
         not stat.S_ISREG(path_stat.st_mode)
         or stat.S_ISLNK(path_stat.st_mode)
         or junction
         or bool(reparse and attributes & reparse)
+        or path_stat.st_nlink != 1
     ):
         raise _input_error("INPUT_PATH_UNSAFE", "Input file path is unsafe.")
     if path_stat.st_size > max_bytes:
         raise _input_error("INPUT_TOO_LARGE", "Input file exceeds the size limit.")
+    initial_identity = _input_identity(path_stat)
+    descriptor: int | None = None
     try:
-        with path.open("rb") as handle:
+        flags = os.O_RDONLY | getattr(os, "O_BINARY", 0)
+        flags |= getattr(os, "O_NOFOLLOW", 0)
+        descriptor = os.open(path, flags)
+        with os.fdopen(descriptor, "rb") as handle:
+            descriptor = None
+            opened_identity = _input_identity(os.fstat(handle.fileno()))
+            if opened_identity != initial_identity:
+                raise _input_error(
+                    "INPUT_PATH_UNSAFE",
+                    "Input file path is unsafe.",
+                )
             contents = handle.read(max_bytes + 1)
+            handle.seek(0)
+            repeated = handle.read(max_bytes + 1)
+            final_open_identity = _input_identity(os.fstat(handle.fileno()))
     except FileNotFoundError as error:
         raise _input_error("INPUT_NOT_FOUND", "Input file was not found.") from error
+    except KokoroError:
+        raise
     except OSError as error:
-        raise _input_error("INPUT_READ_FAILED", "Input file could not be read.") from error
+        raise _input_error(
+            "INPUT_READ_FAILED",
+            "Input file could not be read.",
+        ) from error
+    finally:
+        if descriptor is not None:
+            try:
+                os.close(descriptor)
+            except OSError:
+                pass
     if len(contents) > max_bytes:
         raise _input_error("INPUT_TOO_LARGE", "Input file exceeds the size limit.")
+    if contents != repeated or final_open_identity != initial_identity:
+        raise _input_error("INPUT_PATH_UNSAFE", "Input file path is unsafe.")
+    try:
+        final_stat = path.lstat()
+    except OSError as error:
+        raise _input_error("INPUT_PATH_UNSAFE", "Input file path is unsafe.") from error
+    if _input_identity(final_stat) != initial_identity:
+        raise _input_error("INPUT_PATH_UNSAFE", "Input file path is unsafe.")
     try:
         value = json.loads(
             contents.decode("utf-8"),
             object_pairs_hook=_strict_object,
             parse_constant=_reject_constant,
         )
-    except (UnicodeDecodeError, json.JSONDecodeError, RecursionError, ValueError) as error:
-        raise _input_error("INPUT_INVALID_JSON", "Input file contains invalid JSON.") from error
+    except (
+        UnicodeDecodeError,
+        json.JSONDecodeError,
+        RecursionError,
+        ValueError,
+    ) as error:
+        raise _input_error(
+            "INPUT_INVALID_JSON",
+            "Input file contains invalid JSON.",
+        ) from error
     if find_json_incompatibility(value) is not None:
         raise _input_error("INPUT_INVALID_JSON", "Input file contains invalid JSON.")
     return value
+
+
+def _output_unsafe() -> KokoroError:
+    return KokoroError("REPORT_OUTPUT_PATH_UNSAFE", "Report output path is unsafe.")
+
+
+def _output_redirect(path: Path, path_stat: os.stat_result) -> bool:
+    if stat.S_ISLNK(path_stat.st_mode):
+        return True
+    is_junction = getattr(path, "is_junction", None)
+    try:
+        if is_junction is not None and is_junction():
+            return True
+    except OSError as error:
+        raise _output_unsafe() from error
+    reparse = getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0)
+    attributes = getattr(path_stat, "st_file_attributes", 0)
+    return bool(reparse and attributes & reparse)
+
+
+def _directory_identity(path: Path) -> _DirectoryIdentity:
+    try:
+        path_stat = path.lstat()
+        resolved = path.resolve(strict=True)
+    except OSError as error:
+        raise _output_unsafe() from error
+    if (
+        not stat.S_ISDIR(path_stat.st_mode)
+        or _output_redirect(path, path_stat)
+        or resolved != path
+    ):
+        raise _output_unsafe()
+    return _DirectoryIdentity(
+        path=path,
+        device=path_stat.st_dev,
+        inode=path_stat.st_ino,
+        file_type=stat.S_IFMT(path_stat.st_mode),
+    )
+
+
+def _path_identity(path: Path) -> _PathIdentity | None:
+    try:
+        path_stat = path.lstat()
+    except FileNotFoundError:
+        return None
+    except OSError as error:
+        raise _output_unsafe() from error
+    if (
+        not stat.S_ISREG(path_stat.st_mode)
+        or _output_redirect(path, path_stat)
+        or path_stat.st_nlink != 1
+    ):
+        raise _output_unsafe()
+    return _PathIdentity(
+        device=path_stat.st_dev,
+        inode=path_stat.st_ino,
+        size=path_stat.st_size,
+        modified_ns=path_stat.st_mtime_ns,
+        file_type=stat.S_IFMT(path_stat.st_mode),
+        links=path_stat.st_nlink,
+    )
+
+
+def _assert_safe_output_component(component: str) -> None:
+    if (
+        component.rstrip(" .") != component
+        or ":" in component
+        or any(ord(character) < 32 for character in component)
+        or component.split(".", 1)[0].lower()
+        in _WINDOWS_RESERVED_OUTPUT_NAMES
+    ):
+        raise _output_unsafe()
+
+
+def _resolve_report_target(settings: Settings, raw_path: str) -> tuple[Path, Path]:
+    root = Path(os.path.abspath(settings.data_dir / "reports"))
+    try:
+        root.mkdir(parents=True, exist_ok=True)
+    except OSError as error:
+        raise _output_unsafe() from error
+    _directory_identity(root)
+
+    supplied = Path(raw_path).expanduser()
+    if ".." in supplied.parts:
+        raise _output_unsafe()
+    for component in supplied.parts:
+        if component != supplied.anchor:
+            _assert_safe_output_component(component)
+    target = Path(
+        os.path.abspath(supplied if supplied.is_absolute() else root / supplied)
+    )
+    if target == root or not target.is_relative_to(root):
+        raise _output_unsafe()
+    for component in target.relative_to(root).parts:
+        _assert_safe_output_component(component)
+    if target.suffix.lower() != ".json":
+        raise _output_unsafe()
+    try:
+        resolved = target.resolve(strict=False)
+    except OSError as error:
+        raise _output_unsafe() from error
+    if not resolved.is_relative_to(root):
+        raise _output_unsafe()
+    return target, root
+
+
+def _assert_output_not_alias(
+    target: Path,
+    *,
+    inputs: tuple[Path, ...],
+    protected_roots: tuple[Path, ...],
+) -> None:
+    target_resolved = target.resolve(strict=False)
+    for input_path in inputs:
+        try:
+            if target_resolved == input_path.resolve(strict=False):
+                raise _output_unsafe()
+        except OSError as error:
+            raise _output_unsafe() from error
+    for protected_root in protected_roots:
+        try:
+            if target_resolved.is_relative_to(protected_root.resolve(strict=True)):
+                raise _output_unsafe()
+        except FileNotFoundError:
+            continue
+        except OSError as error:
+            raise _output_unsafe() from error
+
+
+def _prepare_report_output(
+    settings: Settings,
+    raw_path: str,
+    *,
+    inputs: tuple[Path, ...] = (),
+    protected_roots: tuple[Path, ...] = (),
+) -> _ReportOutput:
+    target, root = _resolve_report_target(settings, raw_path)
+    _assert_output_not_alias(
+        target,
+        inputs=inputs,
+        protected_roots=protected_roots,
+    )
+
+    directories = [_directory_identity(root)]
+    cursor = root
+    for component in target.parent.relative_to(root).parts:
+        cursor = cursor / component
+        try:
+            cursor.mkdir()
+        except FileExistsError:
+            pass
+        except OSError as error:
+            raise _output_unsafe() from error
+        directories.append(_directory_identity(cursor))
+    return _ReportOutput(
+        target=target,
+        directories=tuple(directories),
+        initial_target=_path_identity(target),
+    )
+
+
+def _assert_output_directories(output: _ReportOutput) -> None:
+    for expected in output.directories:
+        actual = _directory_identity(expected.path)
+        if actual != expected:
+            raise _output_unsafe()
+
+
+def _assert_report_output_current(output: _ReportOutput) -> None:
+    _assert_output_directories(output)
+    if _path_identity(output.target) != output.initial_target:
+        raise KokoroError(
+            "REPORT_OUTPUT_CHANGED",
+            "Report output changed during publication.",
+        )
+
+
+def _validated_artifact(
+    value: dict[str, Any],
+    schemas: SchemaRegistry,
+    schema_name: str,
+) -> tuple[dict[str, Any], bytes]:
+    payload = canonical_bytes(value)
+    snapshot = cast(dict[str, Any], json.loads(payload))
+    schemas.validate(schema_name, cast(dict[str, Any], json.loads(payload)))
+    schemas.validate(schema_name, cast(dict[str, Any], json.loads(payload)))
+    if canonical_bytes(value) != payload:
+        raise KokoroError(
+            "REPORT_OUTPUT_CHANGED",
+            "Report output changed during publication.",
+        )
+    return snapshot, payload
+
+
+def _publish_report_output(
+    output: _ReportOutput,
+    value: dict[str, Any],
+    schemas: SchemaRegistry,
+    schema_name: str,
+) -> tuple[dict[str, Any], str]:
+    snapshot, payload = _validated_artifact(value, schemas, schema_name)
+    _assert_report_output_current(output)
+    try:
+        write_compiled_pack(snapshot, output.target)
+    except OSError as error:
+        raise KokoroError(
+            "REPORT_OUTPUT_WRITE_FAILED",
+            "Report output could not be written.",
+        ) from error
+    _assert_output_directories(output)
+    expected = payload + b"\n"
+    try:
+        actual = output.target.read_bytes()
+    except OSError as error:
+        raise KokoroError(
+            "REPORT_OUTPUT_WRITE_FAILED",
+            "Report output could not be written.",
+        ) from error
+    if actual != expected or _path_identity(output.target) is None:
+        raise KokoroError(
+            "REPORT_OUTPUT_CHANGED",
+            "Report output changed during publication.",
+        )
+    _assert_output_directories(output)
+    try:
+        if output.target.read_bytes() != expected:
+            raise KokoroError(
+                "REPORT_OUTPUT_CHANGED",
+                "Report output changed during publication.",
+            )
+    except OSError as error:
+        raise KokoroError(
+            "REPORT_OUTPUT_WRITE_FAILED",
+            "Report output could not be written.",
+        ) from error
+    return snapshot, sha256(payload).hexdigest()
 
 
 def _path_is_redirect(path: Path) -> bool:
@@ -302,7 +692,10 @@ def _path_is_redirect(path: Path) -> bool:
         except FileNotFoundError:
             return False
     except OSError as error:
-        raise KokoroError("COMPILED_PATH_UNSAFE", "Compiled artifact path is unsafe.") from error
+        raise KokoroError(
+            "COMPILED_PATH_UNSAFE",
+            "Compiled artifact path is unsafe.",
+        ) from error
     reparse = getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0)
     attributes = getattr(path_stat, "st_file_attributes", 0)
     return bool(reparse and attributes & reparse)
@@ -318,7 +711,10 @@ def _compiled_directory(settings: Settings, *, create: bool) -> Path:
             directory.mkdir(parents=True, exist_ok=True)
         resolved = directory.resolve(strict=False)
     except OSError as error:
-        raise KokoroError("COMPILED_PATH_UNSAFE", "Compiled artifact path is unsafe.") from error
+        raise KokoroError(
+            "COMPILED_PATH_UNSAFE",
+            "Compiled artifact path is unsafe.",
+        ) from error
     if not resolved.is_relative_to(root) or _path_is_redirect(directory):
         raise KokoroError("COMPILED_PATH_UNSAFE", "Compiled artifact path is unsafe.")
     if directory.exists() and not directory.is_dir():
@@ -336,7 +732,10 @@ def _compiled_file(settings: Settings, raw_path: str) -> Path:
         resolved = path.resolve(strict=True)
         path_stat = path.stat(follow_symlinks=False)
     except (FileNotFoundError, OSError) as error:
-        raise KokoroError("COMPILED_PATH_UNSAFE", "Compiled artifact path is unsafe.") from error
+        raise KokoroError(
+            "COMPILED_PATH_UNSAFE",
+            "Compiled artifact path is unsafe.",
+        ) from error
     if (
         resolved.parent != directory_resolved
         or not stat.S_ISREG(path_stat.st_mode)
@@ -391,7 +790,10 @@ def _find_compiled(
     except KokoroError:
         raise
     except OSError as error:
-        raise KokoroError("COMPILED_SCAN_FAILED", "Compiled artifacts could not be scanned.") from error
+        raise KokoroError(
+            "COMPILED_SCAN_FAILED",
+            "Compiled artifacts could not be scanned.",
+        ) from error
     for entry in sorted(entries, key=lambda item: item.name):
         path = Path(entry.path)
         try:
@@ -400,7 +802,10 @@ def _find_compiled(
                 or not entry.is_file(follow_symlinks=False)
                 or _path_is_redirect(path)
             ):
-                raise KokoroError("COMPILED_PATH_UNSAFE", "Compiled artifact path is unsafe.")
+                raise KokoroError(
+                    "COMPILED_PATH_UNSAFE",
+                    "Compiled artifact path is unsafe.",
+                )
             entry_stat = path.stat(follow_symlinks=False)
             if entry_stat.st_nlink != 1:
                 raise KokoroError(
@@ -411,12 +816,21 @@ def _find_compiled(
         except KokoroError:
             raise
         except OSError as error:
-            raise KokoroError("COMPILED_SCAN_FAILED", "Compiled artifacts could not be scanned.") from error
+            raise KokoroError(
+                "COMPILED_SCAN_FAILED",
+                "Compiled artifacts could not be scanned.",
+            ) from error
         aggregate += size
         if aggregate > COMPILED_SCAN_MAX_BYTES:
-            raise KokoroError("COMPILED_SCAN_LIMIT", "Compiled artifact scan limit was exceeded.")
+            raise KokoroError(
+                "COMPILED_SCAN_LIMIT",
+                "Compiled artifact scan limit was exceeded.",
+            )
         if path.suffix != ".json":
-            raise KokoroError("COMPILED_PATH_UNSAFE", "Compiled artifact path is unsafe.")
+            raise KokoroError(
+                "COMPILED_PATH_UNSAFE",
+                "Compiled artifact path is unsafe.",
+            )
         compiled = _validated_compiled(path, schemas)
         if compiled["source_hash"] == manifest["compiled_pack_hash"]:
             if (
@@ -430,9 +844,15 @@ def _find_compiled(
                 )
             matches.append(compiled)
     if not matches:
-        raise KokoroError("COMPILED_PACK_NOT_FOUND", "Compiled artifact was not found for the session.")
+        raise KokoroError(
+            "COMPILED_PACK_NOT_FOUND",
+            "Compiled artifact was not found for the session.",
+        )
     if len(matches) != 1:
-        raise KokoroError("COMPILED_PACK_AMBIGUOUS", "Multiple compiled artifacts match the session.")
+        raise KokoroError(
+            "COMPILED_PACK_AMBIGUOUS",
+            "Multiple compiled artifacts match the session.",
+        )
     return matches[0]
 
 
@@ -470,7 +890,10 @@ def _handle_pack_compile(
     try:
         write_compiled_pack(compiled, target)
     except OSError as error:
-        raise KokoroError("COMPILED_WRITE_FAILED", "Compiled artifact could not be written.") from error
+        raise KokoroError(
+            "COMPILED_WRITE_FAILED",
+            "Compiled artifact could not be written.",
+        ) from error
     return {
         "ok": True,
         "path": str(target.resolve()),
@@ -491,6 +914,369 @@ def _handle_pack_validate(
         "artifact_id": source["artifact_id"],
         "character_id": source["character_id"],
         "character_version": source["character_version"],
+    }
+
+
+def _argument_path(raw_path: str) -> Path:
+    return Path(os.path.abspath(Path(raw_path).expanduser()))
+
+
+def _read_object(path: Path, code: str, message: str) -> dict[str, Any]:
+    value = _read_json(path)
+    if not isinstance(value, dict):
+        raise KokoroError(code, message)
+    return value
+
+
+def _optional_research_bundle(
+    raw_path: str | None,
+    schemas: SchemaRegistry,
+) -> dict[str, Any] | None:
+    if raw_path is None:
+        return None
+    return load_published_research_bundle(_argument_path(raw_path), schemas)
+
+
+def _handle_pack_test(
+    args: argparse.Namespace,
+    settings: Settings,
+    schemas: SchemaRegistry,
+) -> dict[str, Any]:
+    source_root = _argument_path(args.source_dir)
+    request_path = _argument_path(args.request)
+    output = _prepare_report_output(
+        settings,
+        args.out,
+        inputs=(request_path,),
+        protected_roots=(
+            source_root,
+            *(
+                (_argument_path(args.research_bundle),)
+                if args.research_bundle is not None
+                else ()
+            ),
+        ),
+    )
+    request = _read_object(
+        request_path,
+        "SCHEMA_VALIDATION_FAILED",
+        "Input did not match the required schema.",
+    )
+    research_bundle = _optional_research_bundle(args.research_bundle, schemas)
+    report = run_hard_validation(
+        source_root,
+        request,
+        schemas,
+        research_bundle=research_bundle,
+    )
+    report, report_hash = _publish_report_output(
+        output,
+        report,
+        schemas,
+        "pack-hard-validation-report",
+    )
+    return {
+        "ok": True,
+        "path": str(output.target),
+        "artifact_id": report["artifact_id"],
+        "passed": report["passed"],
+        "source_hash": report["source_hash"],
+        "compiled_hash": report["compiled_hash"],
+        "report_hash": report_hash,
+    }
+
+
+def _handle_pack_soft_eval(
+    args: argparse.Namespace,
+    settings: Settings,
+    schemas: SchemaRegistry,
+) -> dict[str, Any]:
+    input_path = _argument_path(args.input)
+    output = _prepare_report_output(
+        settings,
+        args.out,
+        inputs=(input_path,),
+    )
+    evaluation_input = _read_object(
+        input_path,
+        "SOFT_EVALUATION_INPUT_INVALID",
+        "Soft-evaluation input is invalid.",
+    )
+    report = aggregate_soft_evaluation(evaluation_input, schemas)
+    report, report_hash = _publish_report_output(
+        output,
+        report,
+        schemas,
+        "pack-soft-evaluation-report",
+    )
+    return {
+        "ok": True,
+        "path": str(output.target),
+        "artifact_id": report["artifact_id"],
+        "passed": report["passed"],
+        "report_hash": report_hash,
+    }
+
+
+def _promotion_input_paths(args: argparse.Namespace) -> tuple[Path, ...]:
+    raw_paths = (
+        args.request,
+        args.hard_report,
+        args.review,
+        args.previous,
+        args.soft_input,
+        args.soft_report,
+    )
+    return tuple(_argument_path(value) for value in raw_paths if value is not None)
+
+
+def _handle_pack_promote(
+    args: argparse.Namespace,
+    settings: Settings,
+    schemas: SchemaRegistry,
+) -> dict[str, Any]:
+    source_root = _argument_path(args.source_dir)
+    input_paths = _promotion_input_paths(args)
+    requested_target, reports_root = _resolve_report_target(settings, args.out)
+    _assert_output_not_alias(
+        requested_target,
+        inputs=input_paths,
+        protected_roots=(
+            source_root,
+            *(
+                (_argument_path(args.research_bundle),)
+                if args.research_bundle is not None
+                else ()
+            ),
+        ),
+    )
+    request = _read_object(
+        _argument_path(args.request),
+        "PACK_PROMOTION_INPUT_INVALID",
+        "A promotion input is invalid.",
+    )
+    hard_report = _read_object(
+        _argument_path(args.hard_report),
+        "PACK_PROMOTION_INPUT_INVALID",
+        "A promotion input is invalid.",
+    )
+    review = _read_object(
+        _argument_path(args.review),
+        "PACK_PROMOTION_INPUT_INVALID",
+        "A promotion input is invalid.",
+    )
+    previous = (
+        None
+        if args.previous is None
+        else _read_object(
+            _argument_path(args.previous),
+            "PACK_PROMOTION_INPUT_INVALID",
+            "A promotion input is invalid.",
+        )
+    )
+    soft_input = (
+        None
+        if args.soft_input is None
+        else _read_object(
+            _argument_path(args.soft_input),
+            "PACK_PROMOTION_INPUT_INVALID",
+            "A promotion input is invalid.",
+        )
+    )
+    soft_report = (
+        None
+        if args.soft_report is None
+        else _read_object(
+            _argument_path(args.soft_report),
+            "PACK_PROMOTION_INPUT_INVALID",
+            "A promotion input is invalid.",
+        )
+    )
+    research_bundle = _optional_research_bundle(args.research_bundle, schemas)
+    record = create_promotion_record(
+        source_root,
+        request,
+        hard_report,
+        review,
+        schemas,
+        target=args.target,
+        promotion_id=args.promotion_id,
+        research_bundle=research_bundle,
+        previous_promotion=previous,
+        soft_evaluation_input=soft_input,
+        soft_evaluation_report=soft_report,
+    )
+    record, record_bytes = _validated_artifact(
+        record,
+        schemas,
+        "pack-promotion-record",
+    )
+    expected_target = (
+        reports_root
+        / "promotions"
+        / record["character_id"]
+        / record["promotion_id"]
+        / "promotion.json"
+    )
+    if os.path.normcase(str(requested_target)) != os.path.normcase(
+        str(expected_target)
+    ):
+        raise KokoroError(
+            "REPORT_OUTPUT_MISMATCH",
+            "The requested report output is invalid.",
+        )
+    actual_target = publish_promotion_record(
+        settings.data_dir,
+        record,
+        review,
+        schemas,
+    )
+    if os.path.normcase(str(actual_target)) != os.path.normcase(
+        str(expected_target)
+    ):
+        raise KokoroError(
+            "REPORT_OUTPUT_MISMATCH",
+            "The requested report output is invalid.",
+        )
+    stored = _read_object(
+        actual_target,
+        "PACK_PROMOTION_BUNDLE_INVALID",
+        "The stored promotion bundle is invalid.",
+    )
+    schemas.validate("pack-promotion-record", stored)
+    if canonical_bytes(stored) != record_bytes:
+        raise KokoroError(
+            "PACK_PROMOTION_BUNDLE_INVALID",
+            "The stored promotion bundle is invalid.",
+        )
+    return {
+        "ok": True,
+        "path": str(actual_target),
+        "bundle_path": str(actual_target.parent),
+        "artifact_id": record["artifact_id"],
+        "promotion_id": record["promotion_id"],
+        "to_status": record["to_status"],
+        "activation_allowed": record["activation_allowed"],
+        "record_hash": sha256(record_bytes).hexdigest(),
+    }
+
+
+def _publication_input_paths(args: argparse.Namespace) -> tuple[Path, ...]:
+    raw_paths = (
+        args.promotion,
+        args.request,
+        args.hard_report,
+        args.review,
+        args.previous,
+        args.soft_input,
+        args.soft_report,
+        args.compliance,
+    )
+    return tuple(_argument_path(value) for value in raw_paths if value is not None)
+
+
+def _handle_pack_publication_check(
+    args: argparse.Namespace,
+    settings: Settings,
+    schemas: SchemaRegistry,
+) -> dict[str, Any]:
+    source_root = _argument_path(args.source_dir)
+    input_paths = _publication_input_paths(args)
+    output = _prepare_report_output(
+        settings,
+        args.out,
+        inputs=input_paths,
+        protected_roots=(
+            source_root,
+            *(
+                (_argument_path(args.research_bundle),)
+                if args.research_bundle is not None
+                else ()
+            ),
+        ),
+    )
+    values = {
+        "promotion": _read_object(
+            _argument_path(args.promotion),
+            "PACK_PUBLICATION_PROMOTION_INVALID",
+            "The verified promotion record is invalid.",
+        ),
+        "request": _read_object(
+            _argument_path(args.request),
+            "PACK_PUBLICATION_PROMOTION_EVIDENCE_INVALID",
+            "The promotion evidence is invalid.",
+        ),
+        "hard_report": _read_object(
+            _argument_path(args.hard_report),
+            "PACK_PUBLICATION_PROMOTION_EVIDENCE_INVALID",
+            "The promotion evidence is invalid.",
+        ),
+        "review_attestation": _read_object(
+            _argument_path(args.review),
+            "PACK_PUBLICATION_PROMOTION_EVIDENCE_INVALID",
+            "The promotion evidence is invalid.",
+        ),
+        "previous_promotion": _read_object(
+            _argument_path(args.previous),
+            "PACK_PUBLICATION_PROMOTION_EVIDENCE_INVALID",
+            "The promotion evidence is invalid.",
+        ),
+        "soft_evaluation_input": _read_object(
+            _argument_path(args.soft_input),
+            "PACK_PUBLICATION_PROMOTION_EVIDENCE_INVALID",
+            "The promotion evidence is invalid.",
+        ),
+        "soft_evaluation_report": _read_object(
+            _argument_path(args.soft_report),
+            "PACK_PUBLICATION_PROMOTION_EVIDENCE_INVALID",
+            "The promotion evidence is invalid.",
+        ),
+    }
+    research_bundle = _optional_research_bundle(args.research_bundle, schemas)
+    evidence = {
+        "request": values["request"],
+        "hard_report": values["hard_report"],
+        "review_attestation": values["review_attestation"],
+        "previous_promotion": values["previous_promotion"],
+        "soft_evaluation_input": values["soft_evaluation_input"],
+        "soft_evaluation_report": values["soft_evaluation_report"],
+        **(
+            {"research_bundle": research_bundle}
+            if research_bundle is not None
+            else {}
+        ),
+    }
+    compliance = (
+        None
+        if args.compliance is None
+        else _read_object(
+            _argument_path(args.compliance),
+            "PACK_PUBLICATION_COMPLIANCE_INVALID",
+            "The publication compliance attestation is invalid.",
+        )
+    )
+    report = assess_publication_readiness(
+        source_root,
+        values["promotion"],
+        schemas,
+        promotion_evidence=evidence,
+        requested_visibility=args.visibility,
+        compliance_attestation=compliance,
+    )
+    report, report_hash = _publish_report_output(
+        output,
+        report,
+        schemas,
+        "pack-publication-readiness-report",
+    )
+    return {
+        "ok": True,
+        "path": str(output.target),
+        "artifact_id": report["artifact_id"],
+        "ready_for_private_export": report["ready_for_private_export"],
+        "ready_for_publication": report["ready_for_publication"],
+        "blockers": report["blockers"],
+        "report_hash": report_hash,
     }
 
 
@@ -808,7 +1594,10 @@ def _growth_config(compiled: dict[str, Any]) -> tuple[float, int]:
     )
 
 
-def _validated_event(args: argparse.Namespace, schemas: SchemaRegistry) -> dict[str, Any]:
+def _validated_event(
+    args: argparse.Namespace,
+    schemas: SchemaRegistry,
+) -> dict[str, Any]:
     event = _read_json(Path(args.event))
     schemas.validate("interaction-event", event)
     return event
@@ -895,6 +1684,10 @@ def _public_error_envelope(error: KokoroError) -> dict[str, Any]:
 
 _HANDLERS: dict[tuple[str, str], Callable[..., dict[str, Any]]] = {
     ("pack", "compile"): _handle_pack_compile,
+    ("pack", "promote"): _handle_pack_promote,
+    ("pack", "publication-check"): _handle_pack_publication_check,
+    ("pack", "soft-eval"): _handle_pack_soft_eval,
+    ("pack", "test"): _handle_pack_test,
     ("pack", "validate"): _handle_pack_validate,
     ("session", "start"): _handle_session_start,
     ("session", "show"): _handle_session_show,

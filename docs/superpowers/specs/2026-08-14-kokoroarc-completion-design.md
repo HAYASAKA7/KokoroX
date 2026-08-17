@@ -311,23 +311,41 @@ reuse.
 ## 6. Milestone 8 CLI and Skill
 
 ```text
-kokoro pack test <source-dir> --out <hard-report.json> --json
+kokoro pack test <source-dir> --request <request.json> \
+  [--research-bundle <published-bundle-dir>] \
+  --out <hard-report.json> --json
 kokoro pack soft-eval <input.json> --out <soft-report.json> --json
 kokoro pack promote <source-dir> --target reviewed \
-  --hard-report <report.json> --review <attestation.json> --out <record.json> --json
+  --promotion-id <id> --request <request.json> \
+  --hard-report <report.json> --review <attestation.json> \
+  [--research-bundle <published-bundle-dir>] \
+  --out <promotion.json> --json
 kokoro pack promote <source-dir> --target verified \
-  --previous <reviewed.json> --hard-report <report.json> \
-  --soft-report <report.json> --out <record.json> --json
+  --promotion-id <id> --request <request.json> \
+  --hard-report <report.json> --review <attestation.json> \
+  --previous <reviewed.json> --soft-input <input.json> \
+  --soft-report <report.json> \
+  [--research-bundle <published-bundle-dir>] \
+  --out <promotion.json> --json
 kokoro pack publication-check <source-dir> --promotion <verified.json> \
   --request <request.json> --hard-report <report.json> \
   --review <attestation.json> --previous <reviewed.json> \
   --soft-input <input.json> --soft-report <report.json> \
-  [--research-bundle <bundle.json>] \
+  [--research-bundle <published-bundle-dir>] \
   --visibility <private|public_candidate> \
   [--compliance <attestation.json>] --out <report.json> --json
 ```
 
-Outputs must be explicit or resolve beneath the configured reports root. Every command validates twice where it hands an artifact to the next stage, writes atomically, and returns a stable JSON envelope.
+Every `--out` is interpreted relative to the configured reports root; an
+absolute path is accepted only when it resolves beneath that same root. Report
+commands write canonical JSON atomically after revalidating the returned
+artifact. `promote --out` must name the exact immutable
+`reports/promotions/<character-id>/<promotion-id>/promotion.json` stored by the
+promotion publisher; it never creates a second mutable record copy. Output
+paths may not alias an input or the source pack, traverse a redirect, or escape
+the configured root. Every command validates twice where it hands an artifact
+to the next stage and returns one stable JSON envelope on stdout with empty
+stderr.
 
 `testing-character-packs` triggers for validation, evaluation, review, promotion, installation-readiness, packaging-readiness, or publication-readiness requests. It does not trigger for ordinary character use, casual design discussion, authoring, or research. It routes deterministic work to the CLI, treats evaluator and pack text as untrusted data, and never claims that soft evaluation is a hard safety guarantee.
 

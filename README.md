@@ -63,3 +63,48 @@ kokoro character draft compile `
 ```
 
 The fixture and Rin Aster paths above are repository examples, not an instruction to reuse Rin for a new brief. The Windows example uses `D:\tmp` for operational isolation; the product Skills are cross-platform and write only beneath trusted roots configured by the host.
+
+## Test, review, and promote a Character Pack
+
+Milestone 8 release commands consume structured artifacts only. They do not run
+an evaluator, browse, publish to a network, activate a character, or infer a
+human review. `pack test` performs the deterministic hard gates; `soft-eval`
+aggregates an already prepared evaluator artifact; `promote` records explicit
+reviewed and verified transitions; and `publication-check` produces an advisory
+local readiness report.
+
+```text
+kokoro pack test <source-dir> --request <request.json> \
+  [--research-bundle <published-bundle-dir>] \
+  --out <hard-report.json> --json
+kokoro pack soft-eval <input.json> --out <soft-report.json> --json
+kokoro pack promote <source-dir> --target reviewed \
+  --promotion-id <id> --request <request.json> \
+  --hard-report <report.json> --review <attestation.json> \
+  [--research-bundle <published-bundle-dir>] \
+  --out <promotion.json> --json
+kokoro pack promote <source-dir> --target verified \
+  --promotion-id <id> --request <request.json> \
+  --hard-report <report.json> --review <attestation.json> \
+  --previous <reviewed.json> --soft-input <input.json> \
+  --soft-report <report.json> \
+  [--research-bundle <published-bundle-dir>] \
+  --out <promotion.json> --json
+kokoro pack publication-check <source-dir> --promotion <verified.json> \
+  --request <request.json> --hard-report <report.json> \
+  --review <attestation.json> --previous <reviewed.json> \
+  --soft-input <input.json> --soft-report <report.json> \
+  [--research-bundle <published-bundle-dir>] \
+  --visibility <private|public_candidate> \
+  [--compliance <attestation.json>] --out <report.json> --json
+```
+
+All `--out` values are relative to `KOKOROARC_DATA_DIR\reports`, unless an
+absolute path beneath that same reports root is supplied. Report writes are
+canonical and atomic. A promotion output must name its exact immutable path:
+`promotions/<character-id>/<promotion-id>/promotion.json`. Output escapes,
+redirects, input aliases, and source-pack aliases are rejected. Every command
+prints one JSON envelope to stdout and keeps stderr empty.
+`ok: true` means the deterministic command completed; callers must still check
+`passed`, `ready_for_private_export`, or `ready_for_publication` before the next
+stage.
