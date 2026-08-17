@@ -21,6 +21,18 @@ REQUIRED_RESEARCH_MODULES = {
     "kokoroarc/research/validation.py",
     "kokoroarc/research/workspace.py",
 }
+REQUIRED_TESTING_MODULES = {
+    f"kokoroarc/testing/{name}.py"
+    for name in (
+        "__init__",
+        "corpus",
+        "hard",
+        "promotion",
+        "publication",
+        "soft",
+        "storage",
+    )
+}
 REQUIRED_RESEARCH_SCHEMAS = {
     f"{name}.schema.json"
     for name in (
@@ -43,6 +55,20 @@ REQUIRED_PACK_RELEASE_SCHEMAS = {
         "pack-review-attestation",
         "pack-promotion-record",
         "pack-publication-readiness-report",
+    )
+}
+REQUIRED_SKILL_FILES = {
+    f"{skill}/{relative}"
+    for skill, contract in (
+        ("using-kokoroarc", "runtime-contract.md"),
+        ("authoring-character-packs", "authoring-contract.md"),
+        ("researching-characters", "research-contract.md"),
+        ("testing-character-packs", "testing-contract.md"),
+    )
+    for relative in (
+        "SKILL.md",
+        "agents/openai.yaml",
+        f"references/{contract}",
     )
 }
 PROTECTED_STATE_ROOTS = (
@@ -441,16 +467,39 @@ def test_built_archives_and_installed_research_cli_are_complete(
 
     with zipfile.ZipFile(wheel) as archive:
         wheel_entries = set(archive.namelist())
+        wheel_payloads = {
+            name: archive.read(name)
+            for name in wheel_entries
+            if "/share/kokoroarc/skills/" in name
+        }
     with tarfile.open(sdist, "r:gz") as archive:
         sdist_entries = {member.name for member in archive.getmembers()}
+        sdist_payloads = {
+            member.name: archive.extractfile(member).read()
+            for member in archive.getmembers()
+            if member.isfile() and "/skills/" in member.name
+        }
 
-    for module in REQUIRED_RESEARCH_MODULES:
+    for module in REQUIRED_RESEARCH_MODULES | REQUIRED_TESTING_MODULES:
         assert module in wheel_entries
         assert any(entry.endswith(f"/src/{module}") for entry in sdist_entries)
     for schema in REQUIRED_RESEARCH_SCHEMAS | REQUIRED_PACK_RELEASE_SCHEMAS:
         wheel_suffix = f"/share/kokoroarc/schemas/v1/{schema}"
         assert any(entry.endswith(wheel_suffix) for entry in wheel_entries)
         assert any(entry.endswith(f"/schemas/v1/{schema}") for entry in sdist_entries)
+    for relative in REQUIRED_SKILL_FILES:
+        wheel_suffix = f"/share/kokoroarc/skills/{relative}"
+        wheel_name = next(
+            entry for entry in wheel_entries if entry.endswith(wheel_suffix)
+        )
+        sdist_name = next(
+            entry
+            for entry in sdist_entries
+            if entry.endswith(f"/skills/{relative}")
+        )
+        expected = (REPOSITORY_ROOT / "skills" / relative).read_bytes()
+        assert wheel_payloads[wheel_name] == expected
+        assert sdist_payloads[sdist_name] == expected
 
     installed = tmp_path / "installed"
     installed_result = subprocess.run(

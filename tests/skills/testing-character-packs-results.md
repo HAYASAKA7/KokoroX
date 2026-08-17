@@ -1,5 +1,12 @@
 # Testing Character Packs behavioral results
 
+Status: **Milestone 8 release candidate; exact-commit reviews pending**.
+
+The approved behavioral target is met: baseline remains `1/8` and the final
+Skill-enabled batch is `8/8`. Task 9 release gates and independent exact-commit
+reviews still control Milestone 8 completion; this record does not approve
+Milestone 9 or the complete standalone suite.
+
 Approval `2026-08-17-approved1` completed exactly 16 external evaluator runs:
 eight baseline, eight Skill-enabled, and zero corrective runs. All processes
 exited zero, none timed out, and protected inputs/product state were unchanged.

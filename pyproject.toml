@@ -24,6 +24,42 @@ where = ["src"]
 
 [tool.setuptools.data-files]
 "share/kokoroarc/schemas/v1" = ["schemas/v1/*.schema.json"]
+"share/kokoroarc/skills/using-kokoroarc" = [
+  "skills/using-kokoroarc/SKILL.md",
+]
+"share/kokoroarc/skills/using-kokoroarc/agents" = [
+  "skills/using-kokoroarc/agents/*.yaml",
+]
+"share/kokoroarc/skills/using-kokoroarc/references" = [
+  "skills/using-kokoroarc/references/*.md",
+]
+"share/kokoroarc/skills/authoring-character-packs" = [
+  "skills/authoring-character-packs/SKILL.md",
+]
+"share/kokoroarc/skills/authoring-character-packs/agents" = [
+  "skills/authoring-character-packs/agents/*.yaml",
+]
+"share/kokoroarc/skills/authoring-character-packs/references" = [
+  "skills/authoring-character-packs/references/*.md",
+]
+"share/kokoroarc/skills/researching-characters" = [
+  "skills/researching-characters/SKILL.md",
+]
+"share/kokoroarc/skills/researching-characters/agents" = [
+  "skills/researching-characters/agents/*.yaml",
+]
+"share/kokoroarc/skills/researching-characters/references" = [
+  "skills/researching-characters/references/*.md",
+]
+"share/kokoroarc/skills/testing-character-packs" = [
+  "skills/testing-character-packs/SKILL.md",
+]
+"share/kokoroarc/skills/testing-character-packs/agents" = [
+  "skills/testing-character-packs/agents/*.yaml",
+]
+"share/kokoroarc/skills/testing-character-packs/references" = [
+  "skills/testing-character-packs/references/*.md",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

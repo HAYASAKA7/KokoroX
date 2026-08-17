@@ -73,6 +73,16 @@ aggregates an already prepared evaluator artifact; `promote` records explicit
 reviewed and verified transitions; and `publication-check` produces an advisory
 local readiness report.
 
+For agent-led validation, evaluation, review, promotion, or publication-
+readiness work, give the agent this repository and ask it to use
+`$testing-character-packs`, whose entry point is
+`skills/testing-character-packs/SKILL.md`. It does not trigger
+for ordinary character use, casual design discussion, authoring, or research.
+The workflow is private by default, does not install a pack, does not activate
+a character, and does not publish or perform network I/O. The archives carry
+the four Skill directories as inert package data; host installation, defaults,
+persistence, and memory remain gated by Milestone 9.
+
 ```text
 kokoro pack test <source-dir> --request <request.json> \
   [--research-bundle <published-bundle-dir>] \

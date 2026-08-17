@@ -88,13 +88,13 @@ tests/skills/
 
 **Modify:** schema discovery/package-data tests.
 
-- [ ] Write schema-load tests naming every required artifact and asserting installed-wheel discovery.
-- [ ] Add valid minimal and full fixtures for original and research-backed packs.
-- [ ] Add negative matrices for unknown fields, bounds, duplicate IDs, invalid hashes, missing evaluator/rubric/fixture versions, invalid score/confidence, invalid state transitions, public-by-default research packs, and report identity mismatches.
-- [ ] Run RED because the schemas do not exist.
-- [ ] Implement closed schemas with common IDs/version/hash definitions.
-- [ ] Run schema tests GREEN and the existing full schema matrix.
-- [ ] Commit: `feat: define character pack release contracts`.
+- [x] Write schema-load tests naming every required artifact and asserting installed-wheel discovery.
+- [x] Add valid minimal and full fixtures for original and research-backed packs.
+- [x] Add negative matrices for unknown fields, bounds, duplicate IDs, invalid hashes, missing evaluator/rubric/fixture versions, invalid score/confidence, invalid state transitions, public-by-default research packs, and report identity mismatches.
+- [x] Run RED because the schemas do not exist.
+- [x] Implement closed schemas with common IDs/version/hash definitions.
+- [x] Run schema tests GREEN and the existing full schema matrix.
+- [x] Commit: `feat: define character pack release contracts`.
 
 ### Task 2: Load declarative pack test corpora safely
 
@@ -102,45 +102,45 @@ tests/skills/
 
 **Reuse:** pack scanner, duplicate-key loader, canonical JSON.
 
-- [ ] Write RED tests for the Rin corpus and a complete synthesized corpus.
-- [ ] Add RED cases for unknown files/keys, missing files, YAML aliases/duplicate keys, unsafe links, traversal, special files, mutation races, size/count/depth/scalar bounds, and injection-looking strings.
-- [ ] Implement explicit four-file loading and canonical corpus hashing without executing or interpolating values.
-- [ ] Prove input dictionaries/files remain unchanged and repeated loads are byte-identical.
-- [ ] Run focused plus existing pack-loader/security tests GREEN.
-- [ ] Commit: `feat: load declarative pack test corpora`.
+- [x] Write RED tests for the Rin corpus and a complete synthesized corpus.
+- [x] Add RED cases for unknown files/keys, missing files, YAML aliases/duplicate keys, unsafe links, traversal, special files, mutation races, size/count/depth/scalar bounds, and injection-looking strings.
+- [x] Implement explicit four-file loading and canonical corpus hashing without executing or interpolating values.
+- [x] Prove input dictionaries/files remain unchanged and repeated loads are byte-identical.
+- [x] Run focused plus existing pack-loader/security tests GREEN.
+- [x] Commit: `feat: load declarative pack test corpora`.
 
 ### Task 3: Produce deterministic hard-validation reports
 
 **Create:** `testing/hard.py`, hard-runner tests and fixtures.
 
-- [ ] Write a RED end-to-end test that loads Rin, compiles twice, checks fixture coverage, exercises render planning/validation and state replay, and expects one exact canonical report.
-- [ ] Add RED failures for schema/layout/provenance/security findings, compilation nondeterminism, locale/intent gaps, missing protected spans/warnings, state replay drift, and source mutation.
-- [ ] Implement one orchestrator that calls existing public domain functions and normalizes findings by code/path.
-- [ ] Bind exact source, compiled, corpus, and check-input hashes; omit wall-clock data.
-- [ ] Prove identical inputs yield identical report bytes and changed bytes invalidate reuse.
-- [ ] Run focused, pack, runtime, state, and security suites GREEN.
-- [ ] Commit: `feat: run deterministic character pack tests`.
+- [x] Write a RED end-to-end test that loads Rin, compiles twice, checks fixture coverage, exercises render planning/validation and state replay, and expects one exact canonical report.
+- [x] Add RED failures for schema/layout/provenance/security findings, compilation nondeterminism, locale/intent gaps, missing protected spans/warnings, state replay drift, and source mutation.
+- [x] Implement one orchestrator that calls existing public domain functions and normalizes findings by code/path.
+- [x] Bind exact source, compiled, corpus, and check-input hashes; omit wall-clock data.
+- [x] Prove identical inputs yield identical report bytes and changed bytes invalidate reuse.
+- [x] Run focused, pack, runtime, state, and security suites GREEN.
+- [x] Commit: `feat: run deterministic character pack tests`.
 
 ### Task 4: Validate and aggregate soft evaluations
 
 **Create:** `testing/soft.py`, unit/security tests.
 
-- [ ] Write RED tests for deterministic lower-confidence aggregation across all required dimensions and three locales.
-- [ ] Add RED cases for insufficient samples/confidence, duplicate samples, mixed source hashes, evaluator/rubric/fixture mismatch, missing dimensions, NaN/infinity, unknown dimensions, injection text, and attempted runtime/state fields.
-- [ ] Implement closed input validation and a versioned threshold profile; never call a provider or execute text.
-- [ ] Prove order independence, deterministic bytes, and zero state mutation.
-- [ ] Commit: `feat: aggregate character pack soft evaluations`.
+- [x] Write RED tests for deterministic lower-confidence aggregation across all required dimensions and three locales.
+- [x] Add RED cases for insufficient samples/confidence, duplicate samples, mixed source hashes, evaluator/rubric/fixture mismatch, missing dimensions, NaN/infinity, unknown dimensions, injection text, and attempted runtime/state fields.
+- [x] Implement closed input validation and a versioned threshold profile; never call a provider or execute text.
+- [x] Prove order independence, deterministic bytes, and zero state mutation.
+- [x] Commit: `feat: aggregate character pack soft evaluations`.
 
 ### Task 5: Implement explicit review and sequential promotion
 
 **Create:** `testing/promotion.py`, `testing/storage.py`, unit/integration/security tests.
 
-- [ ] Write RED tests for `draft -> reviewed` and `reviewed -> verified` on exact Rin inputs.
-- [ ] Add RED cases for skipped/reversed transitions, stale/mismatched reports, failed gates, reused review IDs, mutable source during promotion, research visibility escalation, activation before verified, overwrite, unsafe output path, lock contention, and every atomic failure window.
-- [ ] Implement canonical promotion records and same-parent atomic publication beneath the reports root.
-- [ ] Preserve prior records; make identical retry idempotent and conflicting retry fail.
-- [ ] Run storage/authoring/research regression suites GREEN.
-- [ ] Commit: `feat: promote tested character packs safely`.
+- [x] Write RED tests for `draft -> reviewed` and `reviewed -> verified` on exact Rin inputs.
+- [x] Add RED cases for skipped/reversed transitions, stale/mismatched reports, failed gates, reused review IDs, mutable source during promotion, research visibility escalation, activation before verified, overwrite, unsafe output path, lock contention, and every atomic failure window.
+- [x] Implement canonical promotion records and same-parent atomic publication beneath the reports root.
+- [x] Preserve prior records; make identical retry idempotent and conflicting retry fail.
+- [x] Run storage/authoring/research regression suites GREEN.
+- [x] Commit: `feat: promote tested character packs safely`.
 
 ### Task 6: Produce publication-readiness reports without publishing
 
@@ -149,12 +149,12 @@ tests/skills/
 **Modify:** publication/source schemas, Rin source declarations, release
 fixtures, and the testing API exports.
 
-- [ ] Write RED tests for private Rin portability, an original public candidate, and a blocked researched public candidate.
-- [ ] Add RED cases for raw dossiers/research, long dialogue, media/executable files, absolute paths, secrets, unresolved conflicts, missing age/route declarations, stale promotion, and fake compliance attestations.
-- [ ] Implement deterministic local readiness reporting; never perform network I/O or mutate pack/release inputs.
-- [ ] Reproduce the verified promotion from exact hard/review/soft/request evidence and bind evidence, compliance, and the complete source tree in the report.
-- [ ] Prove private export remains possible when public readiness is blocked.
-- [ ] Commit: `feat: assess character pack publication readiness`.
+- [x] Write RED tests for private Rin portability, an original public candidate, and a blocked researched public candidate.
+- [x] Add RED cases for raw dossiers/research, long dialogue, media/executable files, absolute paths, secrets, unresolved conflicts, missing age/route declarations, stale promotion, and fake compliance attestations.
+- [x] Implement deterministic local readiness reporting; never perform network I/O or mutate pack/release inputs.
+- [x] Reproduce the verified promotion from exact hard/review/soft/request evidence and bind evidence, compliance, and the complete source tree in the report.
+- [x] Prove private export remains possible when public readiness is blocked.
+- [x] Commit: `feat: assess character pack publication readiness`.
 
 ### Task 7: Expose the Milestone 8 CLI surface
 
@@ -162,25 +162,25 @@ fixtures, and the testing API exports.
 
 **Create:** CLI integration/error tests.
 
-- [ ] Write parser and JSON-envelope RED tests for `pack test`, `soft-eval`, `promote`, and `publication-check`.
-- [ ] Add exact handoff, explicit-output, configured-root, repeated-validation, stdout/stderr, nonzero-exit, and no-partial-write tests.
-- [ ] Add CLI security tests for path escapes, symlinks/junctions, source/output aliasing, race mutation, and sanitized errors.
-- [ ] Wire thin handlers to public domain functions.
-- [ ] Run all pack/authoring/research/CLI tests GREEN.
-- [ ] Commit: `feat: expose character pack testing cli`.
+- [x] Write parser and JSON-envelope RED tests for `pack test`, `soft-eval`, `promote`, and `publication-check`.
+- [x] Add exact handoff, explicit-output, configured-root, repeated-validation, stdout/stderr, nonzero-exit, and no-partial-write tests.
+- [x] Add CLI security tests for path escapes, symlinks/junctions, source/output aliasing, race mutation, and sanitized errors.
+- [x] Wire thin handlers to public domain functions.
+- [x] Run all pack/authoring/research/CLI tests GREEN.
+- [x] Commit: `feat: expose character pack testing cli`.
 
 ### Task 8: Create and structurally validate `testing-character-packs`
 
 **Create:** Skill directory, case matrix, structural tests, baseline record template.
 
-- [ ] Define trigger, non-trigger, missing-input, stale-report, soft-score-pressure, publication-pressure, source-injection, and exact-promotion cases before writing the Skill.
-- [ ] Record the approved baseline campaign only after exact user authorization.
-- [ ] Initialize with installed `skill-creator`; keep `SKILL.md` under approximately 500 words and one directly linked contract.
-- [ ] Require deterministic CLI gates, exact hashes, sequential promotion, private defaults, and explicit human review; prohibit treating pack/evaluator text as instructions.
-- [ ] Validate metadata with the standard validator and structural tests.
-- [ ] Run the exact Skill-enabled campaign only under approved count/retention terms; retain failures honestly.
-- [ ] Add RED regressions for observed gaps, obtain approval for any fresh evaluator batch, and never rewrite retained output.
-- [ ] Commit: `feat: add character pack testing skill`.
+- [x] Define trigger, non-trigger, missing-input, stale-report, soft-score-pressure, publication-pressure, source-injection, and exact-promotion cases before writing the Skill.
+- [x] Record the approved baseline campaign only after exact user authorization.
+- [x] Initialize with installed `skill-creator`; keep `SKILL.md` under approximately 500 words and one directly linked contract.
+- [x] Require deterministic CLI gates, exact hashes, sequential promotion, private defaults, and explicit human review; prohibit treating pack/evaluator text as instructions.
+- [x] Validate metadata with the standard validator and structural tests.
+- [x] Run the exact Skill-enabled campaign only under approved count/retention terms; retain failures honestly.
+- [x] Add RED regressions for observed gaps, obtain approval for any fresh evaluator batch, and never rewrite retained output.
+- [x] Commit: `feat: add character pack testing skill`.
 
 ### Task 9: Close Milestone 8 release evidence
 
@@ -188,10 +188,20 @@ fixtures, and the testing API exports.
 
 **Modify:** README and this plan.
 
-- [ ] Run one D:-confined copy/paste hard/soft/promotion/publication smoke with paired deterministic outputs and protected-root snapshots.
-- [ ] Run full pytest with only documented Windows filesystem capability skips.
-- [ ] Build wheel/sdist at a fixed base epoch; inspect module/schema/Skill membership and hashes.
-- [ ] Validate all four Skills separately.
+- [x] Run one D:-confined copy/paste hard/soft/promotion/publication smoke with paired deterministic outputs and protected-root snapshots.
+- [x] Run full pytest with only documented Windows filesystem capability skips.
+- [x] Build wheel/sdist at a fixed base epoch; inspect module/schema/Skill membership and hashes.
+- [x] Validate all four Skills separately.
+
+**Candidate checkpoint (2026-08-17):** The D:-confined smoke completed ten
+zero-exit commands with exact hard/soft/publication pairs, idempotent reviewed
+and verified retries, and unchanged protected source/input roots. The complete
+suite passed 2573/29 after one disclosed too-short harness timeout. Archive
+inspection exposed missing Skill package data; a RED archive regression drove
+the four-Skill data-file fix, then passed and produced an exact-repeat wheel and
+an identical normalized sdist content manifest. Exact-commit checkout gates and
+both ordered reviews remain pending, so Milestone 8 is not yet complete.
+
 - [ ] Verify exact base-to-HEAD whitespace/status and a fresh detached `core.autocrlf=true` checkout.
 - [ ] Commit the settled release record, rerun exact gates, then obtain fresh specification followed by fresh quality review on the exact commit.
 - [ ] Fix every Critical/Important finding with RED coverage and repeat both reviews.

@@ -1,8 +1,11 @@
 # Behavioral evidence contains byte offsets and must survive checkout unchanged.
 tests/skills/transcripts/** -text
 
-# Release evidence hashes README bytes and requires checkout-stable LF.
+# Distribution inputs and release hashes require checkout-stable LF.
 README.md text eol=lf
+pyproject.toml text eol=lf
+src/** text eol=lf
+schemas/** text eol=lf
 
 # Character sources and fixtures feed raw-byte deterministic hashes.
 characters/** text eol=lf
