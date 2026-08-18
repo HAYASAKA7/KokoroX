@@ -1,0 +1,386 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kokoroarc.local/schemas/v1/persistent-state-event.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "artifact_id",
+    "created_by",
+    "scope",
+    "workspace_id",
+    "installation",
+    "consent",
+    "generation_id",
+    "state_contract_version",
+    "transition_algorithm",
+    "revision",
+    "operation_id",
+    "operation_kind",
+    "predecessor_event_sha256",
+    "predecessor_state_sha256",
+    "successor_state_sha256",
+    "payload"
+  ],
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "artifact_id": {"$ref": "#/$defs/artifact_id"},
+    "created_by": {"$ref": "#/$defs/created_by"},
+    "scope": {"$ref": "#/$defs/scope"},
+    "workspace_id": {"$ref": "#/$defs/nullable_sha256"},
+    "installation": {"$ref": "#/$defs/installation_binding"},
+    "consent": {"$ref": "#/$defs/consent_binding"},
+    "generation_id": {"$ref": "#/$defs/generation_id"},
+    "state_contract_version": {"const": "1.0.0"},
+    "transition_algorithm": {"const": "relationship-v1"},
+    "revision": {"type": "integer", "minimum": 1, "maximum": 10000},
+    "operation_id": {"$ref": "#/$defs/stable_id"},
+    "operation_kind": {
+      "enum": [
+        "relationship",
+        "mood_update",
+        "mood_advance",
+        "relationship_reset",
+        "mood_reset",
+        "migration_marker"
+      ]
+    },
+    "predecessor_event_sha256": {"$ref": "#/$defs/nullable_sha256"},
+    "predecessor_state_sha256": {"$ref": "#/$defs/sha256"},
+    "successor_state_sha256": {"$ref": "#/$defs/sha256"},
+    "payload": {"type": "object"}
+  },
+  "allOf": [
+    {"$ref": "#/$defs/scope_binding"},
+    {
+      "oneOf": [
+        {
+          "properties": {
+            "revision": {"const": 1},
+            "predecessor_event_sha256": {"type": "null"}
+          }
+        },
+        {
+          "properties": {
+            "revision": {"type": "integer", "minimum": 2},
+            "predecessor_event_sha256": {"$ref": "#/$defs/sha256"}
+          }
+        }
+      ]
+    },
+    {
+      "oneOf": [
+        {
+          "properties": {
+            "operation_kind": {"const": "relationship"},
+            "payload": {"$ref": "#/$defs/relationship_payload"}
+          }
+        },
+        {
+          "properties": {
+            "operation_kind": {"const": "mood_update"},
+            "payload": {"$ref": "#/$defs/mood_update_payload"}
+          }
+        },
+        {
+          "properties": {
+            "operation_kind": {"const": "mood_advance"},
+            "payload": {"$ref": "#/$defs/mood_advance_payload"}
+          }
+        },
+        {
+          "properties": {
+            "operation_kind": {"const": "relationship_reset"},
+            "payload": {"$ref": "#/$defs/relationship_reset_payload"}
+          }
+        },
+        {
+          "properties": {
+            "operation_kind": {"const": "mood_reset"},
+            "payload": {"$ref": "#/$defs/mood_reset_payload"}
+          }
+        },
+        {
+          "properties": {
+            "operation_kind": {"const": "migration_marker"},
+            "payload": {"$ref": "#/$defs/migration_marker_payload"}
+          }
+        }
+      ]
+    }
+  ],
+  "$defs": {
+    "artifact_id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9._/-]{0,191}(?![\\s\\S])"
+    },
+    "created_by": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["component", "version"],
+      "properties": {
+        "component": {"const": "kokoroarc"},
+        "version": {"type": "string", "minLength": 1, "maxLength": 64}
+      }
+    },
+    "slug_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*(?![\\s\\S])",
+      "not": {
+        "enum": [
+          "con", "prn", "aux", "nul",
+          "com1", "com2", "com3", "com4", "com5", "com6", "com7", "com8", "com9",
+          "lpt1", "lpt2", "lpt3", "lpt4", "lpt5", "lpt6", "lpt7", "lpt8", "lpt9"
+        ]
+      }
+    },
+    "semantic_version": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(?:-(?:0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*)(?:\\.(?:0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*))*)?(?:\\+[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)?(?![\\s\\S])"
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}(?![\\s\\S])"
+    },
+    "stable_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*(?![\\s\\S])"
+    },
+    "generation_id": {
+      "type": "string",
+      "pattern": "^generation-[a-f0-9]{32}(?![\\s\\S])"
+    },
+    "scope": {"enum": ["global", "workspace"]},
+    "nullable_sha256": {
+      "oneOf": [{"type": "null"}, {"$ref": "#/$defs/sha256"}]
+    },
+    "scope_binding": {
+      "oneOf": [
+        {
+          "properties": {
+            "scope": {"const": "global"},
+            "workspace_id": {"type": "null"}
+          }
+        },
+        {
+          "properties": {
+            "scope": {"const": "workspace"},
+            "workspace_id": {"$ref": "#/$defs/sha256"}
+          }
+        }
+      ]
+    },
+    "installation_binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "installation_id",
+        "namespace",
+        "character_id",
+        "character_version",
+        "archive_sha256",
+        "compiled_sha256"
+      ],
+      "properties": {
+        "installation_id": {"$ref": "#/$defs/stable_id"},
+        "namespace": {"$ref": "#/$defs/slug_id"},
+        "character_id": {"$ref": "#/$defs/slug_id"},
+        "character_version": {"$ref": "#/$defs/semantic_version"},
+        "archive_sha256": {"$ref": "#/$defs/sha256"},
+        "compiled_sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "consent_binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["consent_id", "grant_revision"],
+      "properties": {
+        "consent_id": {"$ref": "#/$defs/stable_id"},
+        "grant_revision": {"type": "integer", "minimum": 1}
+      }
+    },
+    "mood_name": {
+      "enum": [
+        "neutral",
+        "focused",
+        "curious",
+        "pleased",
+        "amused",
+        "concerned",
+        "embarrassed",
+        "irritated",
+        "disappointed",
+        "relieved",
+        "proud",
+        "tired"
+      ]
+    },
+    "nullable_mood_name": {
+      "oneOf": [{"type": "null"}, {"$ref": "#/$defs/mood_name"}]
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "reference"],
+      "properties": {
+        "kind": {
+          "enum": ["test_result", "user_feedback", "tool_result", "delivery_result"]
+        },
+        "reference": {"type": "string", "minLength": 1, "maxLength": 512}
+      }
+    },
+    "effects": {
+      "type": "object",
+      "additionalProperties": false,
+      "minProperties": 1,
+      "properties": {
+        "familiarity": {"type": "number", "minimum": -4, "maximum": 4},
+        "trust": {"type": "number", "minimum": -4, "maximum": 4},
+        "collaboration": {"type": "number", "minimum": -4, "maximum": 4},
+        "tension": {"type": "number", "minimum": -4, "maximum": 4}
+      }
+    },
+    "interaction_event": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "artifact_id",
+        "created_by",
+        "event_id",
+        "turn_id",
+        "origin",
+        "novelty_key",
+        "expected_state_revision",
+        "evaluator_version",
+        "evidence",
+        "confidence",
+        "effects"
+      ],
+      "properties": {
+        "schema_version": {"const": "1.0"},
+        "artifact_id": {"$ref": "#/$defs/artifact_id"},
+        "created_by": {"$ref": "#/$defs/created_by"},
+        "event_id": {"$ref": "#/$defs/stable_id"},
+        "turn_id": {"$ref": "#/$defs/stable_id"},
+        "origin": {"enum": ["verified_task_outcome", "explicit_user_feedback"]},
+        "novelty_key": {"$ref": "#/$defs/stable_id"},
+        "expected_state_revision": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10000
+        },
+        "evaluator_version": {"type": "string", "minLength": 1, "maxLength": 128},
+        "evidence": {"$ref": "#/$defs/evidence"},
+        "confidence": {"type": "number", "minimum": 0, "maximum": 1},
+        "effects": {"$ref": "#/$defs/effects"}
+      }
+    },
+    "relationship_payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["interaction_event", "max_delta", "repetition_window"],
+      "properties": {
+        "interaction_event": {"$ref": "#/$defs/interaction_event"},
+        "max_delta": {"type": "number", "minimum": 0, "maximum": 100},
+        "repetition_window": {"type": "integer", "minimum": 1, "maximum": 10000}
+      }
+    },
+    "mood_update_payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "event_id",
+        "expected_mood_revision",
+        "primary",
+        "secondary",
+        "arousal",
+        "valence",
+        "intensity",
+        "expires_after_turns",
+        "triggering_interaction_event_id"
+      ],
+      "properties": {
+        "event_id": {"$ref": "#/$defs/stable_id"},
+        "expected_mood_revision": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10000
+        },
+        "primary": {"$ref": "#/$defs/mood_name"},
+        "secondary": {"$ref": "#/$defs/nullable_mood_name"},
+        "arousal": {"type": "number", "minimum": -1, "maximum": 1},
+        "valence": {"type": "number", "minimum": -1, "maximum": 1},
+        "intensity": {"type": "number", "minimum": 0, "maximum": 1},
+        "expires_after_turns": {"type": "integer", "minimum": 0, "maximum": 1000},
+        "triggering_interaction_event_id": {"$ref": "#/$defs/stable_id"}
+      }
+    },
+    "mood_advance_payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["event_id", "expected_mood_revision", "turns"],
+      "properties": {
+        "event_id": {"$ref": "#/$defs/stable_id"},
+        "expected_mood_revision": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10000
+        },
+        "turns": {"type": "integer", "minimum": 1, "maximum": 1000}
+      }
+    },
+    "relationship_reset_payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["reset_id", "expected_relationship_revision"],
+      "properties": {
+        "reset_id": {"$ref": "#/$defs/stable_id"},
+        "expected_relationship_revision": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10000
+        }
+      }
+    },
+    "mood_reset_payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["reset_id", "expected_mood_revision"],
+      "properties": {
+        "reset_id": {"$ref": "#/$defs/stable_id"},
+        "expected_mood_revision": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10000
+        }
+      }
+    },
+    "migration_marker_payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "plan_sha256",
+        "source_generation_id",
+        "source_state_sha256",
+        "source_event_log_sha256",
+        "mood_strategy"
+      ],
+      "properties": {
+        "plan_sha256": {"$ref": "#/$defs/sha256"},
+        "source_generation_id": {"$ref": "#/$defs/generation_id"},
+        "source_state_sha256": {"$ref": "#/$defs/sha256"},
+        "source_event_log_sha256": {"$ref": "#/$defs/sha256"},
+        "mood_strategy": {
+          "enum": ["preserve_identical_contract", "reset_neutral"]
+        }
+      }
+    }
+  }
+}

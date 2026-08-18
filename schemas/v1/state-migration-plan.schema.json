@@ -1,0 +1,180 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kokoroarc.local/schemas/v1/state-migration-plan.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "artifact_id",
+    "created_by",
+    "migration_id",
+    "scope",
+    "workspace_id",
+    "namespace",
+    "character_id",
+    "source",
+    "target",
+    "relationship_strategy",
+    "mood_strategy",
+    "target_replay_hash",
+    "expected_target_state_hash",
+    "mode",
+    "executable_code_accepted"
+  ],
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "artifact_id": {"$ref": "#/$defs/artifact_id"},
+    "created_by": {"$ref": "#/$defs/created_by"},
+    "migration_id": {"$ref": "#/$defs/stable_id"},
+    "scope": {"$ref": "#/$defs/scope"},
+    "workspace_id": {"$ref": "#/$defs/nullable_sha256"},
+    "namespace": {"$ref": "#/$defs/slug_id"},
+    "character_id": {"$ref": "#/$defs/slug_id"},
+    "source": {"$ref": "#/$defs/source"},
+    "target": {"$ref": "#/$defs/target"},
+    "relationship_strategy": {"const": "replay_relationship_v1"},
+    "mood_strategy": {
+      "enum": ["preserve_identical_contract", "reset_neutral"]
+    },
+    "target_replay_hash": {"$ref": "#/$defs/sha256"},
+    "expected_target_state_hash": {"$ref": "#/$defs/sha256"},
+    "mode": {"const": "preview"},
+    "executable_code_accepted": {"const": false}
+  },
+  "allOf": [{"$ref": "#/$defs/scope_binding"}],
+  "$defs": {
+    "artifact_id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9._/-]{0,191}(?![\\s\\S])"
+    },
+    "created_by": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["component", "version"],
+      "properties": {
+        "component": {"const": "kokoroarc"},
+        "version": {"type": "string", "minLength": 1, "maxLength": 64}
+      }
+    },
+    "slug_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*(?![\\s\\S])",
+      "not": {
+        "enum": [
+          "con", "prn", "aux", "nul",
+          "com1", "com2", "com3", "com4", "com5", "com6", "com7", "com8", "com9",
+          "lpt1", "lpt2", "lpt3", "lpt4", "lpt5", "lpt6", "lpt7", "lpt8", "lpt9"
+        ]
+      }
+    },
+    "semantic_version": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(?:-(?:0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*)(?:\\.(?:0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*))*)?(?:\\+[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)?(?![\\s\\S])"
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}(?![\\s\\S])"
+    },
+    "stable_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*(?![\\s\\S])"
+    },
+    "generation_id": {
+      "type": "string",
+      "pattern": "^generation-[a-f0-9]{32}(?![\\s\\S])"
+    },
+    "scope": {"enum": ["global", "workspace"]},
+    "nullable_sha256": {
+      "oneOf": [{"type": "null"}, {"$ref": "#/$defs/sha256"}]
+    },
+    "scope_binding": {
+      "oneOf": [
+        {
+          "properties": {
+            "scope": {"const": "global"},
+            "workspace_id": {"type": "null"}
+          }
+        },
+        {
+          "properties": {
+            "scope": {"const": "workspace"},
+            "workspace_id": {"$ref": "#/$defs/sha256"}
+          }
+        }
+      ]
+    },
+    "installation_binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "installation_id",
+        "namespace",
+        "character_id",
+        "character_version",
+        "archive_sha256",
+        "compiled_sha256"
+      ],
+      "properties": {
+        "installation_id": {"$ref": "#/$defs/stable_id"},
+        "namespace": {"$ref": "#/$defs/slug_id"},
+        "character_id": {"$ref": "#/$defs/slug_id"},
+        "character_version": {"$ref": "#/$defs/semantic_version"},
+        "archive_sha256": {"$ref": "#/$defs/sha256"},
+        "compiled_sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "consent_binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["consent_id", "grant_revision"],
+      "properties": {
+        "consent_id": {"$ref": "#/$defs/stable_id"},
+        "grant_revision": {"type": "integer", "minimum": 1}
+      }
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "installation",
+        "consent",
+        "generation_id",
+        "state_sha256",
+        "event_log_sha256",
+        "state_contract_version",
+        "transition_algorithm"
+      ],
+      "properties": {
+        "installation": {"$ref": "#/$defs/installation_binding"},
+        "consent": {"$ref": "#/$defs/consent_binding"},
+        "generation_id": {"$ref": "#/$defs/generation_id"},
+        "state_sha256": {"$ref": "#/$defs/sha256"},
+        "event_log_sha256": {"$ref": "#/$defs/sha256"},
+        "state_contract_version": {"const": "1.0.0"},
+        "transition_algorithm": {"const": "relationship-v1"}
+      }
+    },
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "installation",
+        "consent",
+        "state_contract_version",
+        "transition_algorithm"
+      ],
+      "properties": {
+        "installation": {"$ref": "#/$defs/installation_binding"},
+        "consent": {"$ref": "#/$defs/consent_binding"},
+        "state_contract_version": {"const": "1.0.0"},
+        "transition_algorithm": {"const": "relationship-v1"}
+      }
+    }
+  }
+}

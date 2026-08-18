@@ -19,6 +19,10 @@ SCHEMA_BY_FIXTURE_KEY = {
     "default_config": "character-default-config",
     "persistence_consent": "persistence-consent",
     "memory_reference": "memory-reference",
+    "persistent_state": "persistent-character-state",
+    "persistent_event": "persistent-state-event",
+    "persistence_export": "persistence-export",
+    "state_migration_plan": "state-migration-plan",
 }
 STANDALONE_SCHEMA_NAMES = tuple(SCHEMA_BY_FIXTURE_KEY.values())
 
@@ -318,6 +322,22 @@ def test_registry_rejects_invalid_identity_keys(identity: str) -> None:
         ("private-global.json", "default_config", "character-default-config"),
         ("private-global.json", "persistence_consent", "persistence-consent"),
         ("private-global.json", "memory_reference", "memory-reference"),
+        (
+            "private-global.json",
+            "persistent_state",
+            "persistent-character-state",
+        ),
+        (
+            "private-global.json",
+            "persistent_event",
+            "persistent-state-event",
+        ),
+        ("private-global.json", "persistence_export", "persistence-export"),
+        (
+            "private-global.json",
+            "state_migration_plan",
+            "state-migration-plan",
+        ),
     ],
 )
 def test_global_artifacts_reject_workspace_bindings(
@@ -336,6 +356,10 @@ def test_global_artifacts_reject_workspace_bindings(
         ("default_config", "character-default-config"),
         ("persistence_consent", "persistence-consent"),
         ("memory_reference", "memory-reference"),
+        ("persistent_state", "persistent-character-state"),
+        ("persistent_event", "persistent-state-event"),
+        ("persistence_export", "persistence-export"),
+        ("state_migration_plan", "state-migration-plan"),
     ],
 )
 def test_workspace_artifacts_require_workspace_bindings(
@@ -381,6 +405,23 @@ def test_default_config_permits_an_explicitly_empty_binding() -> None:
     ],
 )
 def test_consent_rejects_empty_overbroad_or_duplicate_permissions(
+    permissions: list[str],
+) -> None:
+    invalid = deepcopy(_bundle("private-global.json")["persistence_consent"])
+    invalid["permissions"] = permissions
+
+    _assert_invalid("persistence-consent", invalid)
+
+
+@pytest.mark.parametrize(
+    "permissions",
+    [
+        ["mood_state", "relationship_state"],
+        ["memory_references", "mood_state"],
+        ["relationship_state", "memory_references", "mood_state"],
+    ],
+)
+def test_consent_requires_canonical_permission_order(
     permissions: list[str],
 ) -> None:
     invalid = deepcopy(_bundle("private-global.json")["persistence_consent"])
@@ -436,8 +477,291 @@ def test_memory_reference_requires_host_approval_and_no_fact_authority() -> None
     _assert_invalid("memory-reference", authoritative)
 
 
+def test_memory_reference_requires_exact_archive_and_compiled_hashes() -> None:
+    for field in ("archive_sha256", "compiled_sha256"):
+        invalid = deepcopy(_bundle("private-global.json")["memory_reference"])
+        del invalid[field]
+
+        _assert_invalid("memory-reference", invalid)
+
+
 def test_memory_reference_rejects_whitespace_only_summaries() -> None:
     invalid = deepcopy(_bundle("private-global.json")["memory_reference"])
     invalid["localized_summaries"]["en-US"] = " \t\r\n "
 
     _assert_invalid("memory-reference", invalid)
+
+
+@pytest.mark.parametrize(
+    "fixture_key,schema_name,path",
+    [
+        ("persistent_state", "persistent-character-state", ("installation",)),
+        ("persistent_event", "persistent-state-event", ("payload",)),
+        ("persistence_export", "persistence-export", ("state",)),
+        ("state_migration_plan", "state-migration-plan", ("source",)),
+    ],
+)
+def test_persistence_schemas_reject_unknown_nested_fields(
+    fixture_key: str,
+    schema_name: str,
+    path: tuple[str, ...],
+) -> None:
+    invalid = deepcopy(_bundle("private-global.json")[fixture_key])
+    target: dict[str, Any] = invalid
+    for segment in path:
+        target = target[segment]
+    target["unknown"] = True
+
+    _assert_invalid(schema_name, invalid)
+
+
+def _revision_zero_state() -> dict[str, Any]:
+    state = deepcopy(_bundle("private-global.json")["persistent_state"])
+    state["revision"] = 0
+    state["relationship"].update(
+        {
+            "revision": 0,
+            "turn_index": 0,
+            "dimensions": {
+                "familiarity": 0.0,
+                "trust": 0.0,
+                "collaboration": 0.0,
+                "tension": 0.0,
+            },
+            "stage": "unknown",
+            "applied_event_ids": [],
+            "recent_novelty": {},
+        }
+    )
+    state["applied_operation_ids"] = []
+    state["last_event_sha256"] = None
+    return state
+
+
+def test_persistent_state_revision_zero_has_no_event_binding() -> None:
+    valid = _revision_zero_state()
+    with_event_hash = deepcopy(valid)
+    with_event_hash["last_event_sha256"] = "a" * 64
+    with_operation = deepcopy(valid)
+    with_operation["applied_operation_ids"] = ["unexpected-operation"]
+
+    SCHEMAS.validate("persistent-character-state", valid)
+    _assert_invalid("persistent-character-state", with_event_hash)
+    _assert_invalid("persistent-character-state", with_operation)
+
+
+def test_positive_persistent_state_requires_event_binding() -> None:
+    without_hash = deepcopy(_bundle("private-global.json")["persistent_state"])
+    without_hash["last_event_sha256"] = None
+    without_operations = deepcopy(
+        _bundle("private-global.json")["persistent_state"]
+    )
+    without_operations["applied_operation_ids"] = []
+
+    _assert_invalid("persistent-character-state", without_hash)
+    _assert_invalid("persistent-character-state", without_operations)
+
+
+def test_relationship_revision_zero_is_the_canonical_empty_projection() -> None:
+    with_applied_event = _revision_zero_state()
+    with_applied_event["relationship"]["applied_event_ids"] = ["event-1"]
+    with_nonzero_dimension = _revision_zero_state()
+    with_nonzero_dimension["relationship"]["dimensions"]["trust"] = 1.0
+
+    _assert_invalid("persistent-character-state", with_applied_event)
+    _assert_invalid("persistent-character-state", with_nonzero_dimension)
+
+
+@pytest.mark.parametrize(
+    "projection,field,value",
+    [
+        ("relationship", "revision", 10_001),
+        ("relationship", "turn_index", 10_001),
+        ("mood", "revision", 10_001),
+        ("mood", "remaining_turns", 1_001),
+        ("mood", "expires_after_turns", 1_001),
+    ],
+)
+def test_persistent_state_projection_bounds(
+    projection: str, field: str, value: int
+) -> None:
+    invalid = deepcopy(_bundle("private-global.json")["persistent_state"])
+    invalid[projection][field] = value
+
+    _assert_invalid("persistent-character-state", invalid)
+
+
+def _event_payloads() -> dict[str, dict[str, Any]]:
+    return {
+        "relationship": deepcopy(
+            _bundle("private-global.json")["persistent_event"]["payload"]
+        ),
+        "mood_update": {
+            "event_id": "mood-event-1",
+            "expected_mood_revision": 0,
+            "primary": "pleased",
+            "secondary": None,
+            "arousal": 0.5,
+            "valence": 0.7,
+            "intensity": 0.6,
+            "expires_after_turns": 4,
+            "triggering_interaction_event_id": "interaction-event-1",
+        },
+        "mood_advance": {
+            "event_id": "mood-advance-1",
+            "expected_mood_revision": 1,
+            "turns": 1,
+        },
+        "relationship_reset": {
+            "reset_id": "relationship-reset-1",
+            "expected_relationship_revision": 1,
+        },
+        "mood_reset": {
+            "reset_id": "mood-reset-1",
+            "expected_mood_revision": 1,
+        },
+        "migration_marker": {
+            "plan_sha256": "1" * 64,
+            "source_generation_id": "generation-11111111111111111111111111111111",
+            "source_state_sha256": "2" * 64,
+            "source_event_log_sha256": "3" * 64,
+            "mood_strategy": "preserve_identical_contract",
+        },
+    }
+
+
+@pytest.mark.parametrize("operation_kind", tuple(_event_payloads()))
+def test_persistent_event_accepts_every_closed_operation_kind(
+    operation_kind: str,
+) -> None:
+    event = deepcopy(_bundle("private-global.json")["persistent_event"])
+    event["operation_kind"] = operation_kind
+    event["payload"] = _event_payloads()[operation_kind]
+
+    SCHEMAS.validate("persistent-state-event", event)
+
+
+def test_persistent_event_rejects_kind_payload_mismatch() -> None:
+    invalid = deepcopy(_bundle("private-global.json")["persistent_event"])
+    invalid["operation_kind"] = "mood_reset"
+
+    _assert_invalid("persistent-state-event", invalid)
+
+
+def test_persistent_event_requires_revision_linkage() -> None:
+    first_with_predecessor = deepcopy(
+        _bundle("private-global.json")["persistent_event"]
+    )
+    first_with_predecessor["predecessor_event_sha256"] = "1" * 64
+    later_without_predecessor = deepcopy(first_with_predecessor)
+    later_without_predecessor["revision"] = 2
+    later_without_predecessor["predecessor_event_sha256"] = None
+
+    _assert_invalid("persistent-state-event", first_with_predecessor)
+    _assert_invalid("persistent-state-event", later_without_predecessor)
+
+
+@pytest.mark.parametrize(
+    "field", ["predecessor_state_sha256", "successor_state_sha256"]
+)
+def test_persistent_event_requires_state_hashes(field: str) -> None:
+    invalid = deepcopy(_bundle("private-global.json")["persistent_event"])
+    del invalid[field]
+
+    _assert_invalid("persistent-state-event", invalid)
+
+
+@pytest.mark.parametrize(
+    "field", ["script", "command", "expression", "callback", "module", "executable"]
+)
+def test_persistent_event_rejects_executable_fields(field: str) -> None:
+    at_root = deepcopy(_bundle("private-global.json")["persistent_event"])
+    at_root[field] = "payload"
+    in_payload = deepcopy(_bundle("private-global.json")["persistent_event"])
+    in_payload["payload"][field] = "payload"
+
+    _assert_invalid("persistent-state-event", at_root)
+    _assert_invalid("persistent-state-event", in_payload)
+
+
+def test_persistence_export_rejects_duplicate_or_miscounted_memories() -> None:
+    fixture = _bundle("private-global.json")["persistence_export"]
+    duplicate = deepcopy(fixture)
+    duplicate["memory_references"].append(
+        deepcopy(duplicate["memory_references"][0])
+    )
+    duplicate["memory_count"] = 2
+    empty_but_counted = deepcopy(fixture)
+    empty_but_counted["memory_references"] = []
+    one_but_zero = deepcopy(fixture)
+    one_but_zero["memory_count"] = 0
+
+    _assert_invalid("persistence-export", duplicate)
+    _assert_invalid("persistence-export", empty_but_counted)
+    _assert_invalid("persistence-export", one_but_zero)
+
+
+def test_persistence_export_couples_state_and_event_digest() -> None:
+    valid = deepcopy(_bundle("private-global.json")["persistence_export"])
+    valid["state"] = None
+    valid["event_log_sha256"] = None
+    state_without_log = deepcopy(valid)
+    state_without_log["state"] = deepcopy(
+        _bundle("private-global.json")["persistence_export"]["state"]
+    )
+    log_without_state = deepcopy(valid)
+    log_without_state["event_log_sha256"] = "1" * 64
+
+    SCHEMAS.validate("persistence-export", valid)
+    _assert_invalid("persistence-export", state_without_log)
+    _assert_invalid("persistence-export", log_without_state)
+
+
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("relationship_strategy", "copy_relationship"),
+        ("mood_strategy", "execute_transform"),
+        ("mode", "apply"),
+        ("executable_code_accepted", True),
+    ],
+)
+def test_state_migration_plan_rejects_unsafe_strategy_values(
+    field: str, value: Any
+) -> None:
+    invalid = deepcopy(_bundle("private-global.json")["state_migration_plan"])
+    invalid[field] = value
+
+    _assert_invalid("state-migration-plan", invalid)
+
+
+@pytest.mark.parametrize("section", ["source", "target"])
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("state_contract_version", "2.0.0"),
+        ("transition_algorithm", "relationship-v2"),
+    ],
+)
+def test_state_migration_plan_requires_matching_frozen_contracts(
+    section: str, field: str, value: str
+) -> None:
+    invalid = deepcopy(_bundle("private-global.json")["state_migration_plan"])
+    invalid[section][field] = value
+
+    _assert_invalid("state-migration-plan", invalid)
+
+
+@pytest.mark.parametrize(
+    "field", ["script", "command", "expression", "callback", "module", "executable"]
+)
+def test_state_migration_plan_rejects_executable_fields(field: str) -> None:
+    at_root = deepcopy(_bundle("private-global.json")["state_migration_plan"])
+    at_root[field] = "payload"
+    in_target = deepcopy(
+        _bundle("private-global.json")["state_migration_plan"]
+    )
+    in_target["target"][field] = "payload"
+
+    _assert_invalid("state-migration-plan", at_root)
+    _assert_invalid("state-migration-plan", in_target)

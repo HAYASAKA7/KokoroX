@@ -262,6 +262,8 @@
     "namespace": "original",
     "character_id": "rin-aster",
     "character_version": "1.0.0",
+    "archive_sha256": "7777777777777777777777777777777777777777777777777777777777777777",
+    "compiled_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
     "consent_id": "rin-aster-consent-01",
     "consent_revision": 1,
     "permission": "memory_references",
@@ -274,5 +276,265 @@
     "content_hash": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
     "embedded_content": false,
     "canonical_fact_authority": false
+  },
+  "persistent_state": {
+    "schema_version": "1.0",
+    "artifact_id": "persistent-state/global/rin-aster/generation-11111111",
+    "created_by": {"component": "kokoroarc", "version": "0.0.0.dev0"},
+    "scope": "global",
+    "workspace_id": null,
+    "installation": {
+      "installation_id": "original.rin-aster.1.0.0.77777777",
+      "namespace": "original",
+      "character_id": "rin-aster",
+      "character_version": "1.0.0",
+      "archive_sha256": "7777777777777777777777777777777777777777777777777777777777777777",
+      "compiled_sha256": "2222222222222222222222222222222222222222222222222222222222222222"
+    },
+    "consent": {
+      "consent_id": "rin-aster-consent-01",
+      "grant_revision": 1
+    },
+    "generation_id": "generation-11111111111111111111111111111111",
+    "state_contract_version": "1.0.0",
+    "transition_algorithm": "relationship-v1",
+    "revision": 1,
+    "relationship": {
+      "schema_version": "1.0",
+      "artifact_id": "state/rin-aster/relationship",
+      "created_by": {"component": "kokoroarc", "version": "0.0.0.dev0"},
+      "revision": 1,
+      "turn_index": 1,
+      "dimensions": {
+        "familiarity": 0.0,
+        "trust": 2.0,
+        "collaboration": 0.0,
+        "tension": 0.0
+      },
+      "stage": "unknown",
+      "applied_event_ids": ["interaction-event-1"],
+      "recent_novelty": {"novelty-interaction-event-1": 1}
+    },
+    "mood": {
+      "revision": 0,
+      "primary": "neutral",
+      "secondary": null,
+      "arousal": 0.0,
+      "valence": 0.0,
+      "intensity": 0.0,
+      "remaining_turns": 0,
+      "expires_after_turns": 0,
+      "triggering_event_id": null,
+      "applied_event_ids": []
+    },
+    "applied_operation_ids": ["relationship-operation-1"],
+    "last_event_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  },
+  "persistent_event": {
+    "schema_version": "1.0",
+    "artifact_id": "persistent-events/global/rin-aster/relationship-operation-1",
+    "created_by": {"component": "kokoroarc", "version": "0.0.0.dev0"},
+    "scope": "global",
+    "workspace_id": null,
+    "installation": {
+      "installation_id": "original.rin-aster.1.0.0.77777777",
+      "namespace": "original",
+      "character_id": "rin-aster",
+      "character_version": "1.0.0",
+      "archive_sha256": "7777777777777777777777777777777777777777777777777777777777777777",
+      "compiled_sha256": "2222222222222222222222222222222222222222222222222222222222222222"
+    },
+    "consent": {
+      "consent_id": "rin-aster-consent-01",
+      "grant_revision": 1
+    },
+    "generation_id": "generation-11111111111111111111111111111111",
+    "state_contract_version": "1.0.0",
+    "transition_algorithm": "relationship-v1",
+    "revision": 1,
+    "operation_id": "relationship-operation-1",
+    "operation_kind": "relationship",
+    "predecessor_event_sha256": null,
+    "predecessor_state_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "successor_state_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "payload": {
+      "interaction_event": {
+        "schema_version": "1.0",
+        "artifact_id": "event/interaction-event-1",
+        "created_by": {"component": "kokoroarc", "version": "0.0.0.dev0"},
+        "event_id": "interaction-event-1",
+        "turn_id": "turn-1",
+        "origin": "explicit_user_feedback",
+        "novelty_key": "novelty-interaction-event-1",
+        "expected_state_revision": 0,
+        "evaluator_version": "interaction-v1",
+        "evidence": {"kind": "user_feedback", "reference": "approved-feedback-1"},
+        "confidence": 1.0,
+        "effects": {"trust": 2.0}
+      },
+      "max_delta": 4.0,
+      "repetition_window": 20
+    }
+  },
+  "persistence_export": {
+    "schema_version": "1.0",
+    "artifact_id": "persistence-exports/global/rin-aster/export-01",
+    "created_by": {"component": "kokoroarc", "version": "0.0.0.dev0"},
+    "scope": "global",
+    "workspace_id": null,
+    "namespace": "original",
+    "character_id": "rin-aster",
+    "consent": {
+      "schema_version": "1.0",
+      "artifact_id": "consents/global/rin-aster/consent-01",
+      "created_by": {"component": "kokoroarc", "version": "0.0.0.dev0"},
+      "consent_id": "rin-aster-consent-01",
+      "scope": "global",
+      "workspace_id": null,
+      "installation": {
+        "installation_id": "original.rin-aster.1.0.0.77777777",
+        "namespace": "original",
+        "character_id": "rin-aster",
+        "character_version": "1.0.0",
+        "archive_sha256": "7777777777777777777777777777777777777777777777777777777777777777",
+        "compiled_sha256": "2222222222222222222222222222222222222222222222222222222222222222"
+      },
+      "permissions": ["relationship_state", "mood_state", "memory_references"],
+      "status": "active",
+      "grant_revision": 1,
+      "revoked_revision": null,
+      "persistence_policy": "explicit_consent_only"
+    },
+    "state": {
+      "schema_version": "1.0",
+      "artifact_id": "persistent-state/global/rin-aster/generation-11111111",
+      "created_by": {"component": "kokoroarc", "version": "0.0.0.dev0"},
+      "scope": "global",
+      "workspace_id": null,
+      "installation": {
+        "installation_id": "original.rin-aster.1.0.0.77777777",
+        "namespace": "original",
+        "character_id": "rin-aster",
+        "character_version": "1.0.0",
+        "archive_sha256": "7777777777777777777777777777777777777777777777777777777777777777",
+        "compiled_sha256": "2222222222222222222222222222222222222222222222222222222222222222"
+      },
+      "consent": {
+        "consent_id": "rin-aster-consent-01",
+        "grant_revision": 1
+      },
+      "generation_id": "generation-11111111111111111111111111111111",
+      "state_contract_version": "1.0.0",
+      "transition_algorithm": "relationship-v1",
+      "revision": 1,
+      "relationship": {
+        "schema_version": "1.0",
+        "artifact_id": "state/rin-aster/relationship",
+        "created_by": {"component": "kokoroarc", "version": "0.0.0.dev0"},
+        "revision": 1,
+        "turn_index": 1,
+        "dimensions": {
+          "familiarity": 0.0,
+          "trust": 2.0,
+          "collaboration": 0.0,
+          "tension": 0.0
+        },
+        "stage": "unknown",
+        "applied_event_ids": ["interaction-event-1"],
+        "recent_novelty": {"novelty-interaction-event-1": 1}
+      },
+      "mood": {
+        "revision": 0,
+        "primary": "neutral",
+        "secondary": null,
+        "arousal": 0.0,
+        "valence": 0.0,
+        "intensity": 0.0,
+        "remaining_turns": 0,
+        "expires_after_turns": 0,
+        "triggering_event_id": null,
+        "applied_event_ids": []
+      },
+      "applied_operation_ids": ["relationship-operation-1"],
+      "last_event_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    "event_log_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "memory_references": [
+      {
+        "schema_version": "1.0",
+        "artifact_id": "memory-references/global/rin-aster/preference-01",
+        "created_by": {"component": "kokoroarc", "version": "0.0.0.dev0"},
+        "memory_reference_id": "rin-aster-preference-01",
+        "source_kind": "host_approved_reference",
+        "host_memory_id": "host-memory-preference-01",
+        "scope": "global",
+        "workspace_id": null,
+        "installation_id": "original.rin-aster.1.0.0.77777777",
+        "namespace": "original",
+        "character_id": "rin-aster",
+        "character_version": "1.0.0",
+        "archive_sha256": "7777777777777777777777777777777777777777777777777777777777777777",
+        "compiled_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+        "consent_id": "rin-aster-consent-01",
+        "consent_revision": 1,
+        "permission": "memory_references",
+        "summary": "The user approved a preference for concise technical explanations.",
+        "localized_summaries": {
+          "zh-CN": "用户已批准偏好简洁的技术说明。",
+          "en-US": "The user approved concise technical explanations.",
+          "ja-JP": "ユーザーは簡潔な技術説明の設定を承認しました。"
+        },
+        "content_hash": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "embedded_content": false,
+        "canonical_fact_authority": false
+      }
+    ],
+    "memory_count": 1,
+    "export_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+  },
+  "state_migration_plan": {
+    "schema_version": "1.0",
+    "artifact_id": "state-migrations/global/rin-aster/preview-01",
+    "created_by": {"component": "kokoroarc", "version": "0.0.0.dev0"},
+    "migration_id": "state-migration-01",
+    "scope": "global",
+    "workspace_id": null,
+    "namespace": "original",
+    "character_id": "rin-aster",
+    "source": {
+      "installation": {
+        "installation_id": "original.rin-aster.1.0.0.77777777",
+        "namespace": "original",
+        "character_id": "rin-aster",
+        "character_version": "1.0.0",
+        "archive_sha256": "7777777777777777777777777777777777777777777777777777777777777777",
+        "compiled_sha256": "2222222222222222222222222222222222222222222222222222222222222222"
+      },
+      "consent": {"consent_id": "rin-aster-consent-01", "grant_revision": 1},
+      "generation_id": "generation-11111111111111111111111111111111",
+      "state_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "event_log_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "state_contract_version": "1.0.0",
+      "transition_algorithm": "relationship-v1"
+    },
+    "target": {
+      "installation": {
+        "installation_id": "original.rin-aster.1.1.0.88888888",
+        "namespace": "original",
+        "character_id": "rin-aster",
+        "character_version": "1.1.0",
+        "archive_sha256": "8888888888888888888888888888888888888888888888888888888888888888",
+        "compiled_sha256": "9999999999999999999999999999999999999999999999999999999999999999"
+      },
+      "consent": {"consent_id": "rin-aster-consent-01", "grant_revision": 2},
+      "state_contract_version": "1.0.0",
+      "transition_algorithm": "relationship-v1"
+    },
+    "relationship_strategy": "replay_relationship_v1",
+    "mood_strategy": "preserve_identical_contract",
+    "target_replay_hash": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+    "expected_target_state_hash": "1111111111111111111111111111111111111111111111111111111111111111",
+    "mode": "preview",
+    "executable_code_accepted": false
   }
 }
