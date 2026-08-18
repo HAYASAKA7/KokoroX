@@ -7,6 +7,7 @@ from typing import Any, cast
 
 import pytest
 
+from kokoroarc import __version__
 from kokoroarc.distribution.installer import install_karc_archive
 from kokoroarc.packs.compiler import canonical_bytes
 from kokoroarc.persistence.consent import grant_consent
@@ -16,6 +17,28 @@ from karc_test_support import build_private_archive
 
 
 SCHEMAS = SchemaRegistry(Path("schemas/v1"))
+
+
+def interaction_event(
+    event_id: str,
+    relationship_revision: int,
+    *,
+    trust: float = 2.0,
+) -> dict[str, Any]:
+    return {
+        "schema_version": "1.0",
+        "artifact_id": f"event/{event_id}",
+        "created_by": {"component": "kokoroarc", "version": __version__},
+        "event_id": event_id,
+        "turn_id": f"turn-{relationship_revision + 1}",
+        "origin": "verified_task_outcome",
+        "novelty_key": f"novelty-{event_id}",
+        "expected_state_revision": relationship_revision,
+        "evaluator_version": "interaction-v1",
+        "evidence": {"kind": "test_result", "reference": "pytest"},
+        "confidence": 1.0,
+        "effects": {"trust": trust},
+    }
 
 
 def install_rin(

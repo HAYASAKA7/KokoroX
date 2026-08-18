@@ -1,3 +1,4 @@
+import json
 import os
 from pathlib import Path
 import stat
@@ -10,9 +11,18 @@ from kokoroarc.errors import KokoroError
 from kokoroarc.packs.compiler import canonical_bytes
 import kokoroarc.persistence._storage as storage
 from kokoroarc.persistence.consent import grant_consent, load_consent
+from kokoroarc.persistence.state import (
+    apply_persistent_relationship_event,
+    replay_persistent_state,
+)
 from kokoroarc.schemas import SchemaRegistry
 
-from persistence_support import install_rin
+from persistence_support import (
+    ConsentedRin,
+    consented_rin,
+    install_rin,
+    interaction_event,
+)
 
 
 SCHEMAS = SchemaRegistry(Path("schemas/v1"))
@@ -55,6 +65,16 @@ def _assert_code(code: str, action: Any) -> KokoroError:
         action()
     assert caught.value.code == code
     return caught.value
+
+
+def _persistent_state_root(consented: ConsentedRin) -> Path:
+    return (
+        consented.data_root
+        / "persistent-state"
+        / "global"
+        / "original"
+        / "rin-aster"
+    )
 
 
 def test_storage_rejects_symlinked_canonical_file(tmp_path: Path) -> None:
@@ -570,6 +590,173 @@ def test_consent_captures_relative_workspace_before_schema_callback(
 
     assert changed
     assert loaded == granted
+
+
+def test_relationship_rejects_caller_event_aba_across_consent_callbacks(
+    consented_rin: ConsentedRin,
+) -> None:
+    event = interaction_event("event-1", 0)
+    original = canonical_bytes(event)
+    phase = 0
+
+    class AbaSchemas:
+        def validate(self, name: str, instance: Any) -> None:
+            nonlocal phase
+            SCHEMAS.validate(name, instance)
+            if name != "persistence-consent":
+                return
+            phase += 1
+            if phase == 1:
+                event["effects"]["trust"] = 3.0
+            elif phase == 2:
+                event.clear()
+                event.update(json.loads(original))
+
+    _assert_code(
+        "PERSISTENCE_INPUT_MUTATION",
+        lambda: apply_persistent_relationship_event(
+            consented_rin.data_root,
+            "rin-aster",
+            event,
+            consented_rin.consent["consent_id"],
+            consented_rin.consent["grant_revision"],
+            AbaSchemas(),
+            expected_state_revision=0,
+            operation_id="relationship-operation-1",
+        ),
+    )
+    assert phase == 1
+    assert not _persistent_state_root(consented_rin).exists()
+
+
+def test_relationship_replay_rejects_canonical_event_hash_tampering(
+    consented_rin: ConsentedRin,
+) -> None:
+    apply_persistent_relationship_event(
+        consented_rin.data_root,
+        "rin-aster",
+        interaction_event("event-1", 0),
+        consented_rin.consent["consent_id"],
+        consented_rin.consent["grant_revision"],
+        SCHEMAS,
+        expected_state_revision=0,
+        operation_id="relationship-operation-1",
+    )
+    state_root = _persistent_state_root(consented_rin)
+    pointer = json.loads(state_root.joinpath("current.json").read_bytes())
+    events = (
+        state_root
+        / "generations"
+        / pointer["generation_id"]
+        / "events"
+    )
+    event_path = next(events.iterdir())
+    record = json.loads(event_path.read_bytes())
+    record["payload"]["max_delta"] = 1.0
+    event_path.write_bytes(canonical_bytes(record))
+
+    _assert_code(
+        "PERSISTENCE_STATE_JOURNAL_INVALID",
+        lambda: replay_persistent_state(
+            consented_rin.data_root,
+            "rin-aster",
+            SCHEMAS,
+        ),
+    )
+
+
+def test_relationship_repair_never_overwrites_symlinked_projection(
+    consented_rin: ConsentedRin,
+) -> None:
+    apply_persistent_relationship_event(
+        consented_rin.data_root,
+        "rin-aster",
+        interaction_event("event-1", 0),
+        consented_rin.consent["consent_id"],
+        consented_rin.consent["grant_revision"],
+        SCHEMAS,
+        expected_state_revision=0,
+        operation_id="relationship-operation-1",
+    )
+    state_root = _persistent_state_root(consented_rin)
+    pointer = json.loads(state_root.joinpath("current.json").read_bytes())
+    projection = (
+        state_root
+        / "generations"
+        / pointer["generation_id"]
+        / "state.json"
+    )
+    outside = consented_rin.data_root.parent / "outside-state.json"
+    projection.replace(outside)
+    try:
+        projection.symlink_to(outside)
+    except OSError:
+        outside.replace(projection)
+        pytest.skip("file symlinks are unavailable on this platform")
+
+    _assert_code(
+        "PERSISTENCE_PATH_UNSAFE",
+        lambda: apply_persistent_relationship_event(
+            consented_rin.data_root,
+            "rin-aster",
+            interaction_event("event-2", 1),
+            consented_rin.consent["consent_id"],
+            consented_rin.consent["grant_revision"],
+            SCHEMAS,
+            expected_state_revision=1,
+            operation_id="relationship-operation-2",
+        ),
+    )
+    assert outside.exists()
+
+
+def test_relationship_captures_relative_data_root_before_schema_callback(
+    rin_verified_release: dict[str, Any],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    data_root = tmp_path / "data"
+    rebound = tmp_path / "rebound"
+    rebound.mkdir()
+    install_rin(data_root, rin_verified_release)
+    consent = grant_consent(
+        data_root,
+        "rin-aster",
+        ["relationship_state"],
+        SCHEMAS,
+        expected_revision=0,
+    )
+    changed = False
+
+    class CwdChangingSchemas:
+        def validate(self, name: str, instance: Any) -> None:
+            nonlocal changed
+            SCHEMAS.validate(name, instance)
+            if name == "interaction-event" and not changed:
+                monkeypatch.chdir(rebound)
+                changed = True
+
+    monkeypatch.chdir(tmp_path)
+    state = apply_persistent_relationship_event(
+        Path("data"),
+        "rin-aster",
+        interaction_event("event-1", 0),
+        consent["consent_id"],
+        consent["grant_revision"],
+        CwdChangingSchemas(),
+        expected_state_revision=0,
+        operation_id="relationship-operation-1",
+    )
+
+    assert changed
+    assert state["revision"] == 1
+    assert data_root.joinpath(
+        "persistent-state",
+        "global",
+        "original",
+        "rin-aster",
+    ).exists()
+    assert not rebound.joinpath("data").exists()
 
 
 def _consent_history(data_root: Path) -> Path:
