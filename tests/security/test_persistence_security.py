@@ -9,7 +9,10 @@ import pytest
 from kokoroarc.errors import KokoroError
 from kokoroarc.packs.compiler import canonical_bytes
 import kokoroarc.persistence._storage as storage
+from kokoroarc.persistence.consent import grant_consent, load_consent
 from kokoroarc.schemas import SchemaRegistry
+
+from persistence_support import install_rin
 
 
 SCHEMAS = SchemaRegistry(Path("schemas/v1"))
@@ -405,4 +408,176 @@ def test_storage_rejects_executable_file_mode_when_observable(
             schema_name="persistence-consent",
             boundary=scope.boundary,
         ),
+    )
+
+
+def test_consent_rejects_retained_schema_instance_mutation_without_history(
+    rin_verified_release: dict[str, Any],
+    tmp_path: Path,
+) -> None:
+    data_root = tmp_path / "data"
+    install_rin(data_root, rin_verified_release)
+
+    class MutatingSchemas:
+        def validate(self, name: str, instance: Any) -> None:
+            SCHEMAS.validate(name, instance)
+            if name == "persistence-consent":
+                instance["permissions"] = ["memory_references"]
+
+    _assert_code(
+        "PERSISTENCE_INPUT_MUTATION",
+        lambda: grant_consent(
+            data_root,
+            "rin-aster",
+            ["relationship_state"],
+            MutatingSchemas(),
+            expected_revision=0,
+        ),
+    )
+    assert not _consent_history(data_root).exists()
+
+
+def test_consent_rejects_caller_permission_mutation_without_history(
+    rin_verified_release: dict[str, Any],
+    tmp_path: Path,
+) -> None:
+    data_root = tmp_path / "data"
+    install_rin(data_root, rin_verified_release)
+    permissions = ["relationship_state"]
+    mutated = False
+
+    class MutatingSchemas:
+        def validate(self, name: str, instance: Any) -> None:
+            nonlocal mutated
+            SCHEMAS.validate(name, instance)
+            if not mutated:
+                permissions.append("mood_state")
+                mutated = True
+
+    _assert_code(
+        "PERSISTENCE_INPUT_MUTATION",
+        lambda: grant_consent(
+            data_root,
+            "rin-aster",
+            permissions,
+            MutatingSchemas(),
+            expected_revision=0,
+        ),
+    )
+    assert not _consent_history(data_root).exists()
+
+
+def test_consent_rejects_aba_before_caller_input_can_be_restored(
+    rin_verified_release: dict[str, Any],
+    tmp_path: Path,
+) -> None:
+    data_root = tmp_path / "data"
+    install_rin(data_root, rin_verified_release)
+    permissions = ["relationship_state"]
+    phase = 0
+
+    class AbaSchemas:
+        def validate(self, name: str, instance: Any) -> None:
+            nonlocal phase
+            SCHEMAS.validate(name, instance)
+            if phase == 0:
+                permissions.append("mood_state")
+                phase = 1
+            elif phase == 1:
+                permissions.pop()
+                phase = 2
+
+    _assert_code(
+        "PERSISTENCE_INPUT_MUTATION",
+        lambda: grant_consent(
+            data_root,
+            "rin-aster",
+            permissions,
+            AbaSchemas(),
+            expected_revision=0,
+        ),
+    )
+    assert phase == 1
+    assert not _consent_history(data_root).exists()
+
+
+def test_consent_rejects_registry_change_during_callback_without_history(
+    rin_verified_release: dict[str, Any],
+    tmp_path: Path,
+) -> None:
+    data_root = tmp_path / "data"
+    install_rin(data_root, rin_verified_release)
+    registry = data_root / "registry" / "global.json"
+    changed = False
+
+    class ReplacingSchemas:
+        def validate(self, name: str, instance: Any) -> None:
+            nonlocal changed
+            SCHEMAS.validate(name, instance)
+            if not changed:
+                registry.write_bytes(registry.read_bytes() + b"\n")
+                changed = True
+
+    _assert_code(
+        "PERSISTENCE_INSTALLATION_STALE",
+        lambda: grant_consent(
+            data_root,
+            "rin-aster",
+            ["relationship_state"],
+            ReplacingSchemas(),
+            expected_revision=0,
+        ),
+    )
+    assert not _consent_history(data_root).exists()
+
+
+def test_consent_captures_relative_workspace_before_schema_callback(
+    rin_verified_release: dict[str, Any],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    data_root = tmp_path / "data"
+    workspace = tmp_path / "workspace"
+    rebound = tmp_path / "rebound"
+    workspace.mkdir()
+    rebound.mkdir()
+    install_rin(data_root, rin_verified_release, workspace_root=workspace)
+    granted = grant_consent(
+        data_root,
+        "rin-aster",
+        ["relationship_state"],
+        SCHEMAS,
+        workspace_root=workspace,
+        expected_revision=0,
+    )
+    changed = False
+
+    class CwdChangingSchemas:
+        def validate(self, name: str, instance: Any) -> None:
+            nonlocal changed
+            SCHEMAS.validate(name, instance)
+            if name == "persistence-consent" and not changed:
+                monkeypatch.chdir(rebound)
+                changed = True
+
+    monkeypatch.chdir(tmp_path)
+    loaded = load_consent(
+        data_root,
+        "rin-aster",
+        CwdChangingSchemas(),
+        workspace_root=Path("workspace"),
+    )
+
+    assert changed
+    assert loaded == granted
+
+
+def _consent_history(data_root: Path) -> Path:
+    return (
+        data_root
+        / "consents"
+        / "global"
+        / "original"
+        / "rin-aster"
+        / "history"
     )
