@@ -16,6 +16,12 @@ from kokoroarc.persistence.memory import (
     list_memory_references,
     remove_memory_reference,
 )
+from kokoroarc.persistence.state import (
+    apply_persistent_relationship_event,
+    preview_persistent_reset,
+    replay_persistent_state,
+    reset_persistent_data,
+)
 
 from persistence_support import (
     ConsentedRin,
@@ -23,6 +29,7 @@ from persistence_support import (
     approved_memory_inputs,
     consented_rin,
     install_rin,
+    interaction_event,
 )
 
 
@@ -403,3 +410,118 @@ def test_global_and_workspace_memory_references_are_isolated(
         SCHEMAS,
         workspace_root=workspace_root,
     )] == [workspace_reference]
+
+
+def test_memory_reset_preserves_state_and_removes_captured_entries(
+    consented_rin: ConsentedRin,
+) -> None:
+    state = apply_persistent_relationship_event(
+        consented_rin.data_root,
+        "rin-aster",
+        interaction_event("event-1", 0),
+        consented_rin.consent["consent_id"],
+        consented_rin.consent["grant_revision"],
+        SCHEMAS,
+        expected_state_revision=0,
+        operation_id="relationship-operation-1",
+    )
+    reference = _add(consented_rin)
+    preview = preview_persistent_reset(
+        consented_rin.data_root,
+        "rin-aster",
+        consented_rin.consent["consent_id"],
+        SCHEMAS,
+        target="memory",
+        reset_id="reset-memory-01",
+    )
+
+    result = reset_persistent_data(
+        consented_rin.data_root,
+        "rin-aster",
+        preview,
+        consented_rin.consent["consent_id"],
+        SCHEMAS,
+    )
+
+    assert result["record_state"] == "committed"
+    assert result["removed_memory_reference_ids"] == [
+        reference["memory_reference_id"]
+    ]
+    assert list_memory_references(
+        consented_rin.data_root,
+        "rin-aster",
+        SCHEMAS,
+    ) == ()
+    assert replay_persistent_state(
+        consented_rin.data_root,
+        "rin-aster",
+        SCHEMAS,
+    ) == state
+
+
+def test_memory_reset_preview_fails_when_membership_changes(
+    consented_rin: ConsentedRin,
+) -> None:
+    _add(consented_rin)
+    preview = preview_persistent_reset(
+        consented_rin.data_root,
+        "rin-aster",
+        consented_rin.consent["consent_id"],
+        SCHEMAS,
+        target="memory",
+        reset_id="reset-memory-01",
+    )
+    _add(
+        consented_rin,
+        host_memory_id="host-memory-preference-02",
+    )
+
+    _assert_code(
+        "PERSISTENCE_RESET_STALE",
+        lambda: reset_persistent_data(
+            consented_rin.data_root,
+            "rin-aster",
+            preview,
+            consented_rin.consent["consent_id"],
+            SCHEMAS,
+        ),
+    )
+
+
+def test_reset_requires_the_exact_consent_and_scope(
+    consented_rin: ConsentedRin,
+    tmp_path: Path,
+) -> None:
+    _add(consented_rin)
+    preview = preview_persistent_reset(
+        consented_rin.data_root,
+        "rin-aster",
+        consented_rin.consent["consent_id"],
+        SCHEMAS,
+        target="memory",
+        reset_id="reset-memory-01",
+    )
+
+    _assert_code(
+        "PERSISTENCE_RESET_STALE",
+        lambda: reset_persistent_data(
+            consented_rin.data_root,
+            "rin-aster",
+            preview,
+            "consent-wrong",
+            SCHEMAS,
+        ),
+    )
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    _assert_code(
+        "PERSISTENCE_RESET_STALE",
+        lambda: reset_persistent_data(
+            consented_rin.data_root,
+            "rin-aster",
+            preview,
+            consented_rin.consent["consent_id"],
+            SCHEMAS,
+            workspace_root=workspace,
+        ),
+    )

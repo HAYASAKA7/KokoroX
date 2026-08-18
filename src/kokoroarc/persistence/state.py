@@ -11,7 +11,7 @@ import os
 from pathlib import Path
 import re
 import stat
-from typing import Any, Callable, Iterator, Mapping, cast
+from typing import Any, Callable, Iterator, Literal, Mapping, cast
 
 from kokoroarc import __version__
 from kokoroarc.errors import KokoroError
@@ -27,19 +27,37 @@ from kokoroarc.persistence._storage import (
     _absent_file_audit,
     _acquire_character_lock,
     _assert_directory_chain,
+    _capture_directory_identity,
     _capture_directory_chain,
     _decode_canonical_object,
     _file_audit,
+    _fsync_directory,
     _is_redirect,
     _lstat,
     _publish_new_file,
     _read_regular_file,
+    _remove_transaction_marker,
     _replace_file,
+    _require_safe_regular_file,
+    _snapshot_canonical_file,
+    _write_transaction_marker,
     open_persistence_scope,
     read_canonical_object,
     scan_canonical_directory,
 )
-from kokoroarc.persistence.consent import ActiveConsent, _require_active_consent
+from kokoroarc.persistence.consent import (
+    ActiveConsent,
+    _load_consent_state,
+    _require_active_consent,
+)
+from kokoroarc.persistence.memory import (
+    _cleanup_memory_reset,
+    _cutover_memory_reset,
+    _memory_collection_sha256,
+    _memory_root,
+    _memory_reset_cleanup_path,
+    _scan_memory_references,
+)
 from kokoroarc.state.transitions import apply_event_v1
 
 
@@ -82,6 +100,32 @@ _MOOD_UPDATE_KEYS = frozenset(
 _MOOD_ADVANCE_KEYS = frozenset(
     {"event_id", "expected_mood_revision", "turns"}
 )
+_RESET_TARGETS = frozenset({"relationship", "mood", "memory", "all"})
+_RESET_PREVIEW_KEYS = frozenset(
+    {
+        "schema_version",
+        "artifact_id",
+        "created_by",
+        "reset_id",
+        "target",
+        "scope",
+        "workspace_id",
+        "namespace",
+        "character_id",
+        "consent_id",
+        "installation",
+        "state_generation_id",
+        "state_sha256",
+        "event_log_sha256",
+        "expected_state_revision",
+        "expected_relationship_revision",
+        "expected_mood_revision",
+        "memory_root_present",
+        "memory_reference_ids",
+        "memory_references_sha256",
+        "preview_sha256",
+    }
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -91,6 +135,39 @@ class _ReplayResult:
     boundary: PersistenceBoundary
     projection_present: bool
     projection_matches: bool
+
+
+@dataclass(frozen=True, slots=True)
+class PersistentResetPreview:
+    """Detached canonical preview required by an explicit reset."""
+
+    payload: bytes
+
+    @property
+    def document(self) -> dict[str, Any]:
+        return cast(dict[str, Any], json.loads(self.payload))
+
+
+@dataclass(frozen=True, slots=True)
+class _PersistenceCapture:
+    scope: PersistenceScope
+    consent_state: Any
+    state_result: _ReplayResult | None
+    memories: tuple[ArtifactSnapshot, ...]
+    memory_root_present: bool
+    schemas: SchemaValidator
+    workspace_root: Path | None
+
+    def assert_clean(self) -> None:
+        self.scope.boundary.assert_clean()
+        if self.state_result is not None:
+            self.state_result.boundary.assert_clean()
+
+
+@dataclass(frozen=True, slots=True)
+class _NoCallbackSchemas:
+    def validate(self, _name: str, _instance: Any) -> None:
+        return None
 
 
 @dataclass(frozen=True, slots=True)
@@ -257,6 +334,1341 @@ def advance_persistent_mood_turn(
             limits=limits,
         )
     )
+
+
+def export_persistent_data(
+    data_root: Path,
+    character_id: str,
+    schemas: SchemaValidator,
+    *,
+    namespace: str = "original",
+    workspace_root: Path | None = None,
+    limits: PersistenceLimits = PersistenceLimits(),
+) -> dict[str, Any]:
+    """Return one canonical path-free snapshot of retained persistence."""
+
+    return _state_domain(
+        lambda: _export_persistent_data(
+            data_root,
+            character_id,
+            schemas,
+            namespace=namespace,
+            workspace_root=workspace_root,
+            limits=limits,
+        )
+    )
+
+
+def preview_persistent_reset(
+    data_root: Path,
+    character_id: str,
+    consent_id: str,
+    schemas: SchemaValidator,
+    *,
+    target: Literal["relationship", "mood", "memory", "all"],
+    reset_id: str,
+    namespace: str = "original",
+    workspace_root: Path | None = None,
+    limits: PersistenceLimits = PersistenceLimits(),
+) -> PersistentResetPreview:
+    """Capture the exact state and membership an explicit reset would alter."""
+
+    return _state_domain(
+        lambda: _preview_persistent_reset(
+            data_root,
+            character_id,
+            consent_id,
+            schemas,
+            target=target,
+            reset_id=reset_id,
+            namespace=namespace,
+            workspace_root=workspace_root,
+            limits=limits,
+        )
+    )
+
+
+def reset_persistent_data(
+    data_root: Path,
+    character_id: str,
+    preview: PersistentResetPreview,
+    consent_id: str,
+    schemas: SchemaValidator,
+    *,
+    namespace: str = "original",
+    workspace_root: Path | None = None,
+    limits: PersistenceLimits = PersistenceLimits(),
+) -> dict[str, Any]:
+    """Apply one exact previewed scoped reset under a transaction marker."""
+
+    return _state_domain(
+        lambda: _reset_persistent_data(
+            data_root,
+            character_id,
+            preview,
+            consent_id,
+            schemas,
+            namespace=namespace,
+            workspace_root=workspace_root,
+            limits=limits,
+        )
+    )
+
+
+def _export_persistent_data(
+    data_root: Path,
+    character_id: str,
+    schemas: SchemaValidator,
+    *,
+    namespace: str,
+    workspace_root: Path | None,
+    limits: PersistenceLimits,
+) -> dict[str, Any]:
+    captured = _capture_persistence_data(
+        data_root,
+        character_id,
+        schemas,
+        namespace=namespace,
+        workspace_root=workspace_root,
+        limits=limits,
+    )
+    consent = captured.consent_state.current.value
+    state = (
+        None
+        if captured.state_result is None
+        else captured.state_result.state
+    )
+    event_digest = (
+        None
+        if captured.state_result is None
+        else _event_log_sha256(captured.state_result.events)
+    )
+    memories = [snapshot.value for snapshot in captured.memories]
+    exported: dict[str, Any] = {
+        "schema_version": "1.0",
+        "artifact_id": (
+            f"persistence-exports/{captured.scope.key.scope}/"
+            f"{captured.scope.key.namespace}/"
+            f"{captured.scope.key.character_id}"
+        ),
+        "created_by": {"component": "kokoroarc", "version": __version__},
+        "scope": captured.scope.key.scope,
+        "workspace_id": captured.scope.key.workspace_id,
+        "namespace": captured.scope.key.namespace,
+        "character_id": captured.scope.key.character_id,
+        "consent": _detached(consent),
+        "state": None if state is None else _detached(state),
+        "event_log_sha256": event_digest,
+        "memory_references": [_detached(item) for item in memories],
+        "memory_count": len(memories),
+        "export_sha256": None,
+    }
+    exported["export_sha256"] = sha256(canonical_bytes(exported)).hexdigest()
+    payload = canonical_bytes(exported)
+    _validate_captured_payload(captured, "persistence-export", payload)
+    captured.assert_clean()
+    return cast(dict[str, Any], json.loads(payload))
+
+
+def _preview_persistent_reset(
+    data_root: Path,
+    character_id: str,
+    consent_id: str,
+    schemas: SchemaValidator,
+    *,
+    target: str,
+    reset_id: str,
+    namespace: str,
+    workspace_root: Path | None,
+    limits: PersistenceLimits,
+) -> PersistentResetPreview:
+    _require_reset_request(target, reset_id, consent_id)
+    captured = _capture_persistence_data(
+        data_root,
+        character_id,
+        schemas,
+        namespace=namespace,
+        workspace_root=workspace_root,
+        limits=limits,
+    )
+    document = _assemble_reset_preview(
+        captured,
+        target=target,
+        reset_id=reset_id,
+        consent_id=consent_id,
+    )
+    payload = canonical_bytes(document)
+    captured.assert_clean()
+    return PersistentResetPreview(payload)
+
+
+def _capture_persistence_data(
+    data_root: Path,
+    character_id: str,
+    schemas: SchemaValidator,
+    *,
+    namespace: str,
+    workspace_root: Path | None,
+    limits: PersistenceLimits,
+) -> _PersistenceCapture:
+    captured_workspace = _capture_workspace_root(workspace_root)
+    scope = open_persistence_scope(
+        data_root,
+        _NoCallbackSchemas(),
+        namespace=namespace,
+        character_id=character_id,
+        workspace_root=captured_workspace,
+        limits=limits,
+    )
+    return _capture_persistence_scope(
+        scope,
+        schemas,
+        captured_workspace,
+    )
+
+
+def _capture_persistence_scope(
+    scope: PersistenceScope,
+    schemas: SchemaValidator,
+    workspace_root: Path | None,
+) -> _PersistenceCapture:
+    consent_state = _load_consent_state(scope)
+    if consent_state is None:
+        raise _journal_invalid("consent_absent")
+    state_result = _read_current(scope, workspace_root)
+    memories = _scan_memory_references(scope)
+    memory_root_present = _lstat(_memory_root(scope)) is not None
+    captured = _PersistenceCapture(
+        scope=scope,
+        consent_state=consent_state,
+        state_result=state_result,
+        memories=memories,
+        memory_root_present=memory_root_present,
+        schemas=schemas,
+        workspace_root=workspace_root,
+    )
+    captured.assert_clean()
+    _validate_captured_payload(
+        captured,
+        "persistence-consent",
+        consent_state.current.payload,
+    )
+    for history in consent_state.history:
+        _validate_captured_payload(
+            captured,
+            "persistence-consent",
+            history.payload,
+        )
+    if state_result is not None:
+        for event in state_result.events:
+            _validate_captured_payload(
+                captured,
+                "persistent-state-event",
+                event.payload,
+            )
+        _validate_captured_payload(
+            captured,
+            "persistent-character-state",
+            canonical_bytes(state_result.state),
+        )
+    for memory in memories:
+        _validate_captured_payload(
+            captured,
+            "memory-reference",
+            memory.payload,
+        )
+    captured.assert_clean()
+    return captured
+
+
+def _validate_captured_payload(
+    captured: _PersistenceCapture,
+    schema_name: str,
+    payload: bytes,
+) -> None:
+    probe = _decode_canonical_object(payload)
+    schema_error: Exception | None = None
+    try:
+        captured.schemas.validate(schema_name, probe)
+    except Exception as error:
+        schema_error = error
+    finally:
+        try:
+            if canonical_bytes(probe) != payload:
+                captured.scope.boundary.fail("schema_input")
+        finally:
+            captured.assert_clean()
+    if schema_error is not None:
+        raise _journal_invalid("stored_schema") from schema_error
+
+
+def _assemble_reset_preview(
+    captured: _PersistenceCapture,
+    *,
+    target: str,
+    reset_id: str,
+    consent_id: str,
+) -> dict[str, Any]:
+    consent = captured.consent_state.current.value
+    if consent["consent_id"] != consent_id:
+        raise _reset_stale("consent_id")
+    state = (
+        None
+        if captured.state_result is None
+        else captured.state_result.state
+    )
+    memory_values = [item.value for item in captured.memories]
+    if any(item["consent_id"] != consent_id for item in memory_values):
+        raise _reset_stale("memory_consent")
+    document: dict[str, Any] = {
+        "schema_version": "1.0",
+        "artifact_id": (
+            f"persistence-resets/{captured.scope.key.scope}/"
+            + sha256(canonical_bytes(reset_id)).hexdigest()[:32]
+        ),
+        "created_by": {"component": "kokoroarc", "version": __version__},
+        "reset_id": reset_id,
+        "target": target,
+        "scope": captured.scope.key.scope,
+        "workspace_id": captured.scope.key.workspace_id,
+        "namespace": captured.scope.key.namespace,
+        "character_id": captured.scope.key.character_id,
+        "consent_id": consent_id,
+        "installation": _detached(consent["installation"]),
+        "state_generation_id": (
+            None if state is None else state["generation_id"]
+        ),
+        "state_sha256": (
+            None if state is None else _state_sha256(state)
+        ),
+        "event_log_sha256": (
+            None
+            if captured.state_result is None
+            else _event_log_sha256(captured.state_result.events)
+        ),
+        "expected_state_revision": 0 if state is None else state["revision"],
+        "expected_relationship_revision": (
+            0 if state is None else state["relationship"]["revision"]
+        ),
+        "expected_mood_revision": (
+            0 if state is None else state["mood"]["revision"]
+        ),
+        "memory_root_present": captured.memory_root_present,
+        "memory_reference_ids": [
+            item["memory_reference_id"] for item in memory_values
+        ],
+        "memory_references_sha256": _memory_references_sha256(
+            captured.memories
+        ),
+        "preview_sha256": None,
+    }
+    document["preview_sha256"] = sha256(
+        canonical_bytes(document)
+    ).hexdigest()
+    return document
+
+
+def _event_log_sha256(events: tuple[ArtifactSnapshot, ...]) -> str:
+    event_hashes = [sha256(event.payload).hexdigest() for event in events]
+    return sha256(canonical_bytes(event_hashes)).hexdigest()
+
+
+def _memory_references_sha256(
+    memories: tuple[ArtifactSnapshot, ...],
+) -> str:
+    return _memory_collection_sha256(memories)
+
+
+def _require_reset_request(
+    target: Any,
+    reset_id: Any,
+    consent_id: Any,
+) -> None:
+    if target not in _RESET_TARGETS:
+        raise _reset_stale("target")
+    try:
+        _require_stable_id(reset_id, "reset_id")
+    except KokoroError as error:
+        raise _reset_stale("reset_id") from error
+    if not isinstance(consent_id, str):
+        raise _reset_stale("consent_id")
+
+
+def _reset_persistent_data(
+    data_root: Path,
+    character_id: str,
+    preview: PersistentResetPreview,
+    consent_id: str,
+    schemas: SchemaValidator,
+    *,
+    namespace: str,
+    workspace_root: Path | None,
+    limits: PersistenceLimits,
+) -> dict[str, Any]:
+    if not isinstance(preview, PersistentResetPreview):
+        raise _reset_stale("preview_type")
+    preview_payload = preview.payload
+    if not isinstance(preview_payload, bytes):
+        raise _reset_stale("preview_type")
+    document = _decode_reset_preview(preview_payload)
+    _require_reset_request(
+        document["target"],
+        document["reset_id"],
+        consent_id,
+    )
+    if document["consent_id"] != consent_id:
+        raise _reset_stale("consent_id")
+    captured_workspace = _capture_workspace_root(workspace_root)
+    scope = open_persistence_scope(
+        data_root,
+        _NoCallbackSchemas(),
+        namespace=namespace,
+        character_id=character_id,
+        workspace_root=captured_workspace,
+        limits=limits,
+    )
+    _require_reset_scope(scope, document)
+    _audit_preview(scope.boundary, preview, preview_payload)
+
+    with _acquire_character_lock(scope) as lock, _audit_failures(
+        scope.boundary
+    ):
+        receipt = _read_reset_receipt(scope, document["reset_id"])
+        marker = _read_reset_marker(scope)
+        _confirm_reset_durability(scope, receipt, marker)
+        if receipt is not None:
+            result = _validate_reset_receipt(
+                receipt,
+                document,
+                preview_payload,
+            )
+            if marker is not None:
+                _require_reset_marker(marker.value, document, preview_payload)
+                _remove_reset_marker(scope, marker, lock)
+            scope.boundary.assert_clean()
+            return result
+
+        if marker is None:
+            captured = _capture_persistence_scope(
+                scope,
+                schemas,
+                captured_workspace,
+            )
+            expected = _assemble_reset_preview(
+                captured,
+                target=cast(str, document["target"]),
+                reset_id=cast(str, document["reset_id"]),
+                consent_id=consent_id,
+            )
+            if canonical_bytes(expected) != preview_payload:
+                raise _reset_stale("preview_changed")
+            captured.assert_clean()
+            marker_value = _reset_marker_document(
+                document,
+                phase="prepared",
+                memory_directory_identity=_reset_memory_directory_identity(
+                    scope,
+                    document,
+                ),
+                memory_reference_sha256s=_reset_memory_reference_sha256s(
+                    captured,
+                    document,
+                ),
+            )
+            captured.assert_clean()
+            marker = _write_transaction_marker(
+                scope,
+                canonical_bytes(marker_value),
+                lock,
+            )
+            _retain_reset_marker(scope, marker)
+        else:
+            _require_reset_marker(marker.value, document, preview_payload)
+            _recover_locked_state(scope, lock, captured_workspace)
+            _confirm_reset_state_durability(scope, document)
+            captured = _capture_persistence_scope(
+                scope,
+                schemas,
+                captured_workspace,
+            )
+            _require_reset_resume_binding(captured, document)
+
+        result, marker = _complete_reset_transaction(
+            captured,
+            document,
+            marker,
+            preview_payload,
+            lock,
+        )
+        captured.assert_clean()
+        return result
+
+
+def _decode_reset_preview(payload: bytes) -> dict[str, Any]:
+    try:
+        document = _decode_canonical_object(payload)
+    except KokoroError as error:
+        raise _reset_stale("preview_bytes") from error
+    if set(document) != _RESET_PREVIEW_KEYS:
+        raise _reset_stale("preview_shape")
+    if document.get("schema_version") != "1.0":
+        raise _reset_stale("preview_version")
+    expected_hash = document.get("preview_sha256")
+    unhashed = _detached(document)
+    unhashed["preview_sha256"] = None
+    if (
+        not isinstance(expected_hash, str)
+        or re.fullmatch(r"[a-f0-9]{64}", expected_hash) is None
+        or sha256(canonical_bytes(unhashed)).hexdigest() != expected_hash
+    ):
+        raise _reset_stale("preview_hash")
+    _require_reset_request(
+        document.get("target"),
+        document.get("reset_id"),
+        document.get("consent_id"),
+    )
+    if (
+        not isinstance(document.get("expected_state_revision"), int)
+        or isinstance(document["expected_state_revision"], bool)
+        or document["expected_state_revision"] < 0
+        or not isinstance(document.get("expected_relationship_revision"), int)
+        or isinstance(document["expected_relationship_revision"], bool)
+        or document["expected_relationship_revision"] < 0
+        or not isinstance(document.get("expected_mood_revision"), int)
+        or isinstance(document["expected_mood_revision"], bool)
+        or document["expected_mood_revision"] < 0
+    ):
+        raise _reset_stale("preview_revision")
+    memory_ids = document.get("memory_reference_ids")
+    if (
+        not isinstance(memory_ids, list)
+        or len(memory_ids) > 1024
+        or memory_ids != sorted(memory_ids)
+        or len(set(memory_ids)) != len(memory_ids)
+        or any(
+            not isinstance(item, str)
+            or re.fullmatch(r"memory-[a-f0-9]{32}", item) is None
+            for item in memory_ids
+        )
+        or not isinstance(document.get("memory_root_present"), bool)
+    ):
+        raise _reset_stale("preview_memory")
+    for field in (
+        "state_sha256",
+        "event_log_sha256",
+        "memory_references_sha256",
+    ):
+        value = document.get(field)
+        if (
+            value is not None
+            and (
+                not isinstance(value, str)
+                or re.fullmatch(r"[a-f0-9]{64}", value) is None
+            )
+        ):
+            raise _reset_stale("preview_hash_field")
+    return document
+
+
+def _require_reset_scope(
+    scope: PersistenceScope,
+    document: dict[str, Any],
+) -> None:
+    actual = {
+        "scope": scope.key.scope,
+        "workspace_id": scope.key.workspace_id,
+        "namespace": scope.key.namespace,
+        "character_id": scope.key.character_id,
+    }
+    expected = {field: document.get(field) for field in actual}
+    if actual != expected:
+        raise _reset_stale("scope")
+
+
+def _audit_preview(
+    boundary: PersistenceBoundary,
+    preview: PersistentResetPreview,
+    payload: bytes,
+) -> None:
+    def audit() -> None:
+        if preview.payload != payload:
+            boundary.fail("reset_preview")
+
+    boundary.audits["input:reset_preview"] = audit
+
+
+def _reset_receipt_path(scope: PersistenceScope, reset_id: str) -> Path:
+    digest = sha256(canonical_bytes(reset_id)).hexdigest()
+    return _state_root(scope) / "resets" / f"{digest}.json"
+
+
+def _read_reset_receipt(
+    scope: PersistenceScope,
+    reset_id: str,
+) -> ArtifactSnapshot | None:
+    path = _reset_receipt_path(scope, reset_id)
+    if _lstat(path) is None:
+        return None
+    snapshot = _snapshot_canonical_file(
+        path,
+        scope.limits.max_transaction_bytes,
+    )
+    scope.boundary.audits[f"reset-receipt:{path}"] = _file_audit(
+        path,
+        snapshot.payload,
+        snapshot.identity,
+    )
+    return snapshot
+
+
+def _read_reset_marker(scope: PersistenceScope) -> ArtifactSnapshot | None:
+    if _lstat(scope.transaction_path) is None:
+        return None
+    snapshot = _snapshot_canonical_file(
+        scope.transaction_path,
+        scope.limits.max_transaction_bytes,
+    )
+    _retain_reset_marker(scope, snapshot)
+    return snapshot
+
+
+def _retain_reset_marker(
+    scope: PersistenceScope,
+    snapshot: ArtifactSnapshot,
+) -> None:
+    scope.boundary.audits["reset-transaction-marker"] = _file_audit(
+        snapshot.path,
+        snapshot.payload,
+        snapshot.identity,
+    )
+
+
+def _release_reset_marker(scope: PersistenceScope) -> None:
+    scope.boundary.assert_clean()
+    scope.boundary.audits.pop("reset-transaction-marker", None)
+
+
+def _remove_reset_marker(
+    scope: PersistenceScope,
+    marker: ArtifactSnapshot,
+    lock: PersistenceLock,
+) -> None:
+    _release_reset_marker(scope)
+    _remove_transaction_marker(scope, marker, lock)
+
+
+def _confirm_reset_durability(
+    scope: PersistenceScope,
+    receipt: ArtifactSnapshot | None,
+    marker: ArtifactSnapshot | None,
+) -> None:
+    directories = {
+        snapshot.path.parent
+        for snapshot in (receipt, marker)
+        if snapshot is not None
+    }
+    transaction_parent = scope.transaction_path.parent
+    if _lstat(transaction_parent) is not None:
+        directories.add(transaction_parent)
+    try:
+        for directory in sorted(directories, key=os.fspath):
+            _fsync_directory(directory)
+    except (KokoroError, OSError) as error:
+        raise _reset_durability_failed("recovery_fsync") from error
+
+
+def _confirm_reset_state_durability(
+    scope: PersistenceScope,
+    preview: dict[str, Any],
+) -> None:
+    generation_id = preview["state_generation_id"]
+    if generation_id is None:
+        return
+    if (
+        not isinstance(generation_id, str)
+        or _GENERATION_PATTERN.fullmatch(generation_id) is None
+    ):
+        raise _reset_stale("state_generation")
+    generation_root = _generation_root(scope, generation_id)
+    directories = (
+        generation_root / "events",
+        generation_root,
+        _state_root(scope),
+    )
+    try:
+        for directory in directories:
+            if _lstat(directory) is not None:
+                _fsync_directory(directory)
+    except (KokoroError, OSError) as error:
+        raise _reset_durability_failed("state_recovery_fsync") from error
+
+
+def _reset_memory_directory_identity(
+    scope: PersistenceScope,
+    preview: dict[str, Any],
+) -> dict[str, int] | None:
+    if preview["target"] not in {"memory", "all"}:
+        return None
+    root = _memory_root(scope)
+    if not preview["memory_root_present"]:
+        if _lstat(root) is not None:
+            raise _reset_stale("memory_membership")
+        return None
+    identity = _capture_directory_identity(root)
+    return {
+        "device": identity.device,
+        "inode": identity.inode,
+        "file_type": identity.file_type,
+    }
+
+
+def _reset_memory_reference_sha256s(
+    captured: _PersistenceCapture,
+    preview: dict[str, Any],
+) -> list[str]:
+    if preview["target"] not in {"memory", "all"}:
+        return []
+    reference_ids = [
+        cast(str, snapshot.value["memory_reference_id"])
+        for snapshot in captured.memories
+    ]
+    if reference_ids != preview["memory_reference_ids"]:
+        raise _reset_stale("memory_membership")
+    return [sha256(snapshot.payload).hexdigest() for snapshot in captured.memories]
+
+
+def _reset_marker_document(
+    preview: dict[str, Any],
+    *,
+    phase: str,
+    memory_directory_identity: dict[str, int] | None,
+    memory_reference_sha256s: list[str],
+) -> dict[str, Any]:
+    return {
+        "schema_version": "1.0",
+        "kind": "persistent_reset",
+        "reset_id": preview["reset_id"],
+        "target": preview["target"],
+        "scope": preview["scope"],
+        "workspace_id": preview["workspace_id"],
+        "namespace": preview["namespace"],
+        "character_id": preview["character_id"],
+        "consent_id": preview["consent_id"],
+        "preview": _detached(preview),
+        "phase": phase,
+        "memory_directory_identity": (
+            None
+            if memory_directory_identity is None
+            else _detached(memory_directory_identity)
+        ),
+        "memory_reference_sha256s": list(memory_reference_sha256s),
+    }
+
+
+def _require_reset_marker(
+    marker: dict[str, Any],
+    preview: dict[str, Any],
+    preview_payload: bytes,
+) -> None:
+    expected_keys = {
+        "schema_version",
+        "kind",
+        "reset_id",
+        "target",
+        "scope",
+        "workspace_id",
+        "namespace",
+        "character_id",
+        "consent_id",
+        "preview",
+        "phase",
+        "memory_directory_identity",
+        "memory_reference_sha256s",
+    }
+    if (
+        set(marker) != expected_keys
+        or marker.get("schema_version") != "1.0"
+        or marker.get("kind") != "persistent_reset"
+        or marker.get("phase") not in {"prepared", "memory_committed"}
+        or canonical_bytes(marker.get("preview")) != preview_payload
+    ):
+        raise _reset_stale("transaction_marker")
+    for field in (
+        "reset_id",
+        "target",
+        "scope",
+        "workspace_id",
+        "namespace",
+        "character_id",
+        "consent_id",
+    ):
+        if marker.get(field) != preview.get(field):
+            raise _reset_stale("transaction_binding")
+    identity = marker.get("memory_directory_identity")
+    reference_sha256s = marker.get("memory_reference_sha256s")
+    if identity is not None and (
+        not isinstance(identity, dict)
+        or set(identity) != {"device", "inode", "file_type"}
+        or any(
+            isinstance(value, bool) or not isinstance(value, int) or value < 0
+            for value in identity.values()
+        )
+    ):
+        raise _reset_stale("transaction_memory_identity")
+    if not isinstance(reference_sha256s, list) or any(
+        not isinstance(value, str)
+        or re.fullmatch(r"[a-f0-9]{64}", value) is None
+        for value in reference_sha256s
+    ):
+        raise _reset_stale("transaction_memory_references")
+    expected_ids = (
+        preview["memory_reference_ids"]
+        if preview["target"] in {"memory", "all"}
+        else []
+    )
+    identity_required = (
+        preview["target"] in {"memory", "all"}
+        and preview["memory_root_present"]
+    )
+    if (
+        len(reference_sha256s) != len(expected_ids)
+        or (identity is not None) != identity_required
+        or (
+            marker["phase"] == "memory_committed"
+            and preview["target"] not in {"memory", "all"}
+        )
+    ):
+        raise _reset_stale("transaction_memory_binding")
+
+
+def _validate_reset_receipt(
+    snapshot: ArtifactSnapshot,
+    preview: dict[str, Any],
+    preview_payload: bytes,
+) -> dict[str, Any]:
+    receipt = snapshot.value
+    expected_state_revision = _expected_reset_state_revision(preview)
+    expected_removed_ids = (
+        preview["memory_reference_ids"]
+        if preview["target"] in {"memory", "all"}
+        else []
+    )
+    expected_artifact_id = (
+        f"persistence-reset-receipts/{preview['scope']}/"
+        + sha256(canonical_bytes(preview["reset_id"])).hexdigest()[:32]
+    )
+    created_by = receipt.get("created_by")
+    expected_keys = {
+        "schema_version",
+        "artifact_id",
+        "created_by",
+        "reset_id",
+        "target",
+        "scope",
+        "workspace_id",
+        "namespace",
+        "character_id",
+        "consent_id",
+        "preview_sha256",
+        "preview_payload_sha256",
+        "record_state",
+        "state_revision",
+        "removed_memory_reference_ids",
+    }
+    if (
+        set(receipt) != expected_keys
+        or receipt.get("schema_version") != "1.0"
+        or receipt.get("record_state") != "committed"
+        or receipt.get("artifact_id") != expected_artifact_id
+        or not isinstance(created_by, dict)
+        or set(created_by) != {"component", "version"}
+        or created_by.get("component") != "kokoroarc"
+        or not isinstance(created_by.get("version"), str)
+        or not 1 <= len(created_by["version"]) <= 64
+        or receipt.get("preview_sha256") != preview["preview_sha256"]
+        or receipt.get("preview_payload_sha256")
+        != sha256(preview_payload).hexdigest()
+        or receipt.get("state_revision") != expected_state_revision
+        or receipt.get("removed_memory_reference_ids")
+        != expected_removed_ids
+    ):
+        raise _reset_stale("reset_receipt")
+    for field in (
+        "reset_id",
+        "target",
+        "scope",
+        "workspace_id",
+        "namespace",
+        "character_id",
+        "consent_id",
+    ):
+        if receipt.get(field) != preview.get(field):
+            raise _reset_stale("reset_receipt_binding")
+    return _detached(receipt)
+
+
+def _expected_reset_state_revision(preview: dict[str, Any]) -> int | None:
+    if preview["state_generation_id"] is None:
+        return None
+    target = preview["target"]
+    increments = int(target in {"relationship", "all"}) + int(
+        target in {"mood", "all"}
+    )
+    return cast(int, preview["expected_state_revision"]) + increments
+
+
+def _require_reset_resume_binding(
+    captured: _PersistenceCapture,
+    preview: dict[str, Any],
+) -> None:
+    current = captured.consent_state.current.value
+    if (
+        current["consent_id"] != preview["consent_id"]
+        or current["installation"] != preview["installation"]
+    ):
+        raise _reset_stale("consent_changed")
+    state = (
+        None
+        if captured.state_result is None
+        else captured.state_result.state
+    )
+    expected_generation = preview["state_generation_id"]
+    if (
+        (state is None) != (expected_generation is None)
+        or (
+            state is not None
+            and state["generation_id"] != expected_generation
+        )
+    ):
+        raise _reset_stale("state_generation")
+
+
+def _complete_reset_transaction(
+    captured: _PersistenceCapture,
+    preview: dict[str, Any],
+    marker: ArtifactSnapshot,
+    preview_payload: bytes,
+    lock: PersistenceLock,
+) -> tuple[dict[str, Any], ArtifactSnapshot]:
+    scope = captured.scope
+    target = cast(str, preview["target"])
+    state = (
+        None
+        if captured.state_result is None
+        else captured.state_result.state
+    )
+    state_reset_count = 0
+    if state is not None and target in {"relationship", "all"}:
+        _drop_capture_store_audits(captured, _state_root(scope))
+        state = _append_reset_state_event(
+            captured,
+            operation_kind="relationship_reset",
+            reset_id=cast(str, preview["reset_id"]),
+            expected_outer_revision=cast(
+                int,
+                preview["expected_state_revision"],
+            ),
+            expected_component_revision=cast(
+                int,
+                preview["expected_relationship_revision"],
+            ),
+            lock=lock,
+        )
+        state_reset_count += 1
+    if state is not None and target in {"mood", "all"}:
+        _drop_capture_store_audits(captured, _state_root(scope))
+        state = _append_reset_state_event(
+            captured,
+            operation_kind="mood_reset",
+            reset_id=cast(str, preview["reset_id"]),
+            expected_outer_revision=(
+                cast(int, preview["expected_state_revision"])
+                + state_reset_count
+            ),
+            expected_component_revision=cast(
+                int,
+                preview["expected_mood_revision"],
+            ),
+            lock=lock,
+        )
+        state_reset_count += 1
+
+    if state is not None:
+        expected_final_revision = (
+            cast(int, preview["expected_state_revision"])
+            + state_reset_count
+        )
+        if state["revision"] != expected_final_revision:
+            raise _reset_stale("state_revision")
+    elif preview["state_generation_id"] is not None:
+        raise _reset_stale("state_missing")
+
+    if target in {"memory", "all"}:
+        _drop_capture_store_audits(captured, _memory_root(scope))
+        directory_identity = cast(
+            dict[str, int] | None,
+            marker.value["memory_directory_identity"],
+        )
+        reference_bindings = tuple(
+            zip(
+                preview["memory_reference_ids"],
+                marker.value["memory_reference_sha256s"],
+                strict=True,
+            )
+        )
+        memory_scope = PersistenceScope(
+            root=scope.root,
+            key=scope.key,
+            boundary=PersistenceBoundary(
+                _AuditedSchemas(captured.schemas, scope.boundary)
+            ),
+            limits=scope.limits,
+        )
+        if marker.value["phase"] == "prepared":
+            cleanup = _cutover_memory_reset(
+                memory_scope,
+                reset_id=cast(str, preview["reset_id"]),
+                expected_root_present=cast(
+                    bool,
+                    preview["memory_root_present"],
+                ),
+                expected_ids=tuple(preview["memory_reference_ids"]),
+                expected_sha256=cast(
+                    str,
+                    preview["memory_references_sha256"],
+                ),
+                expected_directory_identity=directory_identity,
+                expected_references=reference_bindings,
+                lock=lock,
+            )
+            marker = _update_reset_marker(
+                scope,
+                marker,
+                preview,
+                phase="memory_committed",
+                lock=lock,
+            )
+        else:
+            cleanup = _memory_reset_cleanup_path(
+                memory_scope,
+                cast(str, preview["reset_id"]),
+            )
+        if cleanup is not None:
+            _cleanup_memory_reset(
+                memory_scope,
+                reset_id=cast(str, preview["reset_id"]),
+                expected_ids=tuple(preview["memory_reference_ids"]),
+                expected_sha256=cast(
+                    str,
+                    preview["memory_references_sha256"],
+                ),
+                expected_directory_identity=directory_identity,
+                expected_references=reference_bindings,
+                lock=lock,
+            )
+
+    confirmed = _read_current(scope, captured.workspace_root)
+    confirmed_state = None if confirmed is None else confirmed.state
+    if confirmed_state is not None and state is not None:
+        if canonical_bytes(confirmed_state) != canonical_bytes(state):
+            raise _reset_stale("state_confirmation")
+    result = _reset_receipt_document(
+        scope,
+        preview,
+        preview_payload,
+        confirmed_state,
+    )
+    receipt_payload = canonical_bytes(result)
+    existing = _read_reset_receipt(scope, cast(str, preview["reset_id"]))
+    if existing is None:
+        receipt = _publish_new_file(
+            scope,
+            _reset_receipt_path(scope, cast(str, preview["reset_id"])),
+            receipt_payload,
+            lock,
+        )
+        scope.boundary.audits[f"reset-receipt:{receipt.path}"] = _file_audit(
+            receipt.path,
+            receipt.payload,
+            receipt.identity,
+        )
+    else:
+        if existing.payload != receipt_payload:
+            raise _reset_stale("reset_id_reused")
+        receipt = existing
+    _remove_reset_marker(scope, marker, lock)
+    lock.assert_owned()
+    scope.boundary.assert_clean()
+    return _detached(result), marker
+
+
+def _append_reset_state_event(
+    captured: _PersistenceCapture,
+    *,
+    operation_kind: str,
+    reset_id: str,
+    expected_outer_revision: int,
+    expected_component_revision: int,
+    lock: PersistenceLock,
+) -> dict[str, Any]:
+    scope = captured.scope
+    current = _read_current(scope, captured.workspace_root)
+    if current is None:
+        raise _reset_stale("state_missing")
+    operation_id = _reset_operation_id(reset_id, operation_kind)
+    existing = _find_operation(current.events, operation_id)
+    payload_key = (
+        "expected_relationship_revision"
+        if operation_kind == "relationship_reset"
+        else "expected_mood_revision"
+    )
+    payload = {
+        "reset_id": reset_id,
+        payload_key: expected_component_revision,
+    }
+    if existing is not None:
+        if (
+            existing.value["operation_kind"] != operation_kind
+            or existing.value["payload"] != payload
+        ):
+            raise _reset_stale("reset_id_reused")
+        current.boundary.assert_clean()
+        return _detached(current.state)
+    if current.state["revision"] != expected_outer_revision:
+        raise _reset_stale("state_revision")
+    if len(current.events) >= scope.limits.max_state_events:
+        raise _event_limit(scope.limits.max_state_events)
+    if operation_kind == "relationship_reset":
+        successor = _relationship_reset_successor(
+            current.state,
+            payload,
+            operation_id,
+        )
+    elif operation_kind == "mood_reset":
+        successor = _mood_reset_successor(
+            current.state,
+            payload,
+            operation_id,
+        )
+    else:
+        raise _reset_stale("operation_kind")
+    record = _reset_operation_record(
+        scope,
+        current.state,
+        successor,
+        operation_kind,
+        payload,
+        operation_id,
+    )
+    record_payload = canonical_bytes(record)
+    if len(record_payload) > scope.limits.max_event_bytes:
+        raise _event_limit(scope.limits.max_event_bytes, reason="event_bytes")
+    _validate_reset_generated_payload(
+        captured,
+        current.boundary,
+        "persistent-state-event",
+        record_payload,
+    )
+    successor["last_event_sha256"] = sha256(record_payload).hexdigest()
+    state_payload = canonical_bytes(successor)
+    if len(state_payload) > scope.limits.max_state_bytes:
+        raise _event_limit(scope.limits.max_state_bytes, reason="state_bytes")
+    _validate_reset_generated_payload(
+        captured,
+        current.boundary,
+        "persistent-character-state",
+        state_payload,
+    )
+    current.boundary.assert_clean()
+    captured.assert_clean()
+    lock.assert_owned()
+    _publish_new_file(
+        scope,
+        _event_path(
+            scope,
+            cast(str, current.state["generation_id"]),
+            cast(int, record["revision"]),
+            operation_id,
+        ),
+        record_payload,
+        lock,
+    )
+    try:
+        _write_projection(
+            scope,
+            cast(str, current.state["generation_id"]),
+            successor,
+            lock,
+        )
+        _write_pointer(
+            scope,
+            cast(str, current.state["generation_id"]),
+            lock,
+        )
+    except KokoroError as error:
+        raise _state_write_failed("reset_projection", error) from error
+    confirmed = _read_current(scope, captured.workspace_root)
+    if (
+        confirmed is None
+        or canonical_bytes(confirmed.state) != state_payload
+    ):
+        raise _state_write_failed(
+            "reset_confirmation",
+            _journal_invalid("publication_confirmation"),
+        )
+    confirmed.boundary.assert_clean()
+    lock.assert_owned()
+    return _detached(successor)
+
+
+def _drop_capture_store_audits(
+    captured: _PersistenceCapture,
+    store_root: Path,
+) -> None:
+    root_text = os.path.normcase(os.fspath(_absolute_path(store_root)))
+    boundaries = [captured.scope.boundary]
+    if captured.state_result is not None:
+        boundaries.append(captured.state_result.boundary)
+    for boundary in boundaries:
+        for name in tuple(boundary.audits):
+            normalized = os.path.normcase(name)
+            if root_text in normalized or (
+                store_root == _state_root(captured.scope)
+                and name.startswith("generation:")
+            ):
+                boundary.audits.pop(name, None)
+
+
+def _reset_operation_id(reset_id: str, operation_kind: str) -> str:
+    identity = {
+        "operation_kind": operation_kind,
+        "reset_id": reset_id,
+    }
+    return "reset-" + sha256(canonical_bytes(identity)).hexdigest()[:32]
+
+
+def _reset_operation_record(
+    scope: PersistenceScope,
+    state: dict[str, Any],
+    successor: dict[str, Any],
+    operation_kind: str,
+    payload: dict[str, Any],
+    operation_id: str,
+) -> dict[str, Any]:
+    return {
+        "schema_version": "1.0",
+        "artifact_id": _event_artifact_id(
+            scope,
+            state["revision"] + 1,
+            operation_id,
+        ),
+        "created_by": {"component": "kokoroarc", "version": __version__},
+        "scope": scope.key.scope,
+        "workspace_id": scope.key.workspace_id,
+        "installation": _detached(state["installation"]),
+        "consent": _detached(state["consent"]),
+        "generation_id": state["generation_id"],
+        "state_contract_version": _STATE_CONTRACT_VERSION,
+        "transition_algorithm": _TRANSITION_ALGORITHM,
+        "revision": state["revision"] + 1,
+        "operation_id": operation_id,
+        "operation_kind": operation_kind,
+        "predecessor_event_sha256": state["last_event_sha256"],
+        "predecessor_state_sha256": _state_sha256(state),
+        "successor_state_sha256": _state_sha256(successor),
+        "payload": _detached(payload),
+    }
+
+
+def _validate_reset_generated_payload(
+    captured: _PersistenceCapture,
+    current_boundary: PersistenceBoundary,
+    schema_name: str,
+    payload: bytes,
+) -> None:
+    probe = _decode_canonical_object(payload)
+    schema_error: Exception | None = None
+    try:
+        captured.schemas.validate(schema_name, probe)
+    except Exception as error:
+        schema_error = error
+    finally:
+        try:
+            if canonical_bytes(probe) != payload:
+                captured.scope.boundary.fail("schema_input")
+        finally:
+            current_boundary.assert_clean()
+            captured.assert_clean()
+    if schema_error is not None:
+        raise _journal_invalid("generated_schema") from schema_error
+
+
+def _update_reset_marker(
+    scope: PersistenceScope,
+    current: ArtifactSnapshot,
+    preview: dict[str, Any],
+    *,
+    phase: str,
+    lock: PersistenceLock,
+) -> ArtifactSnapshot:
+    observed = _snapshot_canonical_file(
+        scope.transaction_path,
+        scope.limits.max_transaction_bytes,
+    )
+    if observed.payload != current.payload or observed.identity != current.identity:
+        raise _reset_stale("transaction_changed")
+    payload = canonical_bytes(
+        _reset_marker_document(
+            preview,
+            phase=phase,
+            memory_directory_identity=cast(
+                dict[str, int] | None,
+                current.value["memory_directory_identity"],
+            ),
+            memory_reference_sha256s=cast(
+                list[str],
+                current.value["memory_reference_sha256s"],
+            ),
+        )
+    )
+    _release_reset_marker(scope)
+    updated = _replace_file(scope, scope.transaction_path, payload, lock)
+    _retain_reset_marker(scope, updated)
+    return updated
+
+
+def _reset_receipt_document(
+    scope: PersistenceScope,
+    preview: dict[str, Any],
+    preview_payload: bytes,
+    state: dict[str, Any] | None,
+) -> dict[str, Any]:
+    target = cast(str, preview["target"])
+    removed = (
+        list(preview["memory_reference_ids"])
+        if target in {"memory", "all"}
+        else []
+    )
+    return {
+        "schema_version": "1.0",
+        "artifact_id": (
+            f"persistence-reset-receipts/{scope.key.scope}/"
+            + sha256(canonical_bytes(preview["reset_id"])).hexdigest()[:32]
+        ),
+        "created_by": {"component": "kokoroarc", "version": __version__},
+        "reset_id": preview["reset_id"],
+        "target": target,
+        "scope": scope.key.scope,
+        "workspace_id": scope.key.workspace_id,
+        "namespace": scope.key.namespace,
+        "character_id": scope.key.character_id,
+        "consent_id": preview["consent_id"],
+        "preview_sha256": preview["preview_sha256"],
+        "preview_payload_sha256": sha256(preview_payload).hexdigest(),
+        "record_state": "committed",
+        "state_revision": None if state is None else state["revision"],
+        "removed_memory_reference_ids": removed,
+    }
 
 
 def _load_or_replay(
@@ -634,6 +2046,18 @@ def _replay_generation(
                     raise _journal_invalid("mood_event") from error
                 raise
             mood_event_ids.add(mood_event_id)
+        elif operation_kind == "relationship_reset":
+            successor = _relationship_reset_successor(
+                state,
+                payload,
+                operation_id,
+            )
+        elif operation_kind == "mood_reset":
+            successor = _mood_reset_successor(
+                state,
+                payload,
+                operation_id,
+            )
         else:
             raise _contract_unsupported("operation_kind")
         if record["successor_state_sha256"] != _state_sha256(successor):
@@ -852,6 +2276,72 @@ def _mood_successor(
         else:
             next_mood["remaining_turns"] = remaining - turns
     successor["mood"] = next_mood
+    successor["applied_operation_ids"].append(operation_id)
+    return successor
+
+
+def _relationship_reset_successor(
+    state: dict[str, Any],
+    payload: dict[str, Any],
+    operation_id: str,
+) -> dict[str, Any]:
+    if set(payload) != {"reset_id", "expected_relationship_revision"}:
+        raise _journal_invalid("relationship_reset_payload")
+    _require_stable_id(payload.get("reset_id"), "reset_id")
+    relationship = cast(dict[str, Any], state["relationship"])
+    if payload["expected_relationship_revision"] != relationship["revision"]:
+        raise _revision_conflict("relationship_revision")
+    if len(state["applied_operation_ids"]) >= 10_000:
+        raise _event_limit(10_000)
+    successor = _detached(state)
+    successor["revision"] += 1
+    successor["relationship"] = {
+        "schema_version": relationship["schema_version"],
+        "artifact_id": relationship["artifact_id"],
+        "created_by": _detached(relationship["created_by"]),
+        "revision": 0,
+        "turn_index": 0,
+        "dimensions": {
+            "familiarity": 0.0,
+            "trust": 0.0,
+            "collaboration": 0.0,
+            "tension": 0.0,
+        },
+        "stage": "unknown",
+        "applied_event_ids": [],
+        "recent_novelty": {},
+    }
+    successor["applied_operation_ids"].append(operation_id)
+    return successor
+
+
+def _mood_reset_successor(
+    state: dict[str, Any],
+    payload: dict[str, Any],
+    operation_id: str,
+) -> dict[str, Any]:
+    if set(payload) != {"reset_id", "expected_mood_revision"}:
+        raise _journal_invalid("mood_reset_payload")
+    _require_stable_id(payload.get("reset_id"), "reset_id")
+    mood = cast(dict[str, Any], state["mood"])
+    if payload["expected_mood_revision"] != mood["revision"]:
+        raise _revision_conflict("mood_revision")
+    if len(state["applied_operation_ids"]) >= 10_000:
+        raise _event_limit(10_000)
+    successor = _detached(state)
+    successor["revision"] += 1
+    successor["mood"] = {
+        "revision": 0,
+        "primary": "neutral",
+        "secondary": None,
+        "arousal": 0.0,
+        "valence": 0.0,
+        "intensity": 0.0,
+        "remaining_turns": 0,
+        "expires_after_turns": 0,
+        "triggering_event_id": None,
+        "applied_event_ids": [],
+    }
     successor["applied_operation_ids"].append(operation_id)
     return successor
 
@@ -1552,6 +3042,27 @@ def _revision_conflict(reason: str) -> KokoroError:
     )
 
 
+def _reset_stale(reason: str) -> KokoroError:
+    return KokoroError(
+        "PERSISTENCE_RESET_STALE",
+        "Persistent reset preview is stale.",
+        retryable=True,
+        details={"reason": reason},
+    )
+
+
+def _reset_durability_failed(reason: str) -> KokoroError:
+    return KokoroError(
+        "PERSISTENCE_DURABILITY_FAILED",
+        "Persistent reset durability could not be confirmed.",
+        details={
+            "operation": "reset_recovery",
+            "reason": reason,
+            "record_state": "unknown",
+        },
+    )
+
+
 def _journal_invalid(reason: str) -> KokoroError:
     return KokoroError(
         "PERSISTENCE_STATE_JOURNAL_INVALID",
@@ -1614,9 +3125,13 @@ def _state_write_failed(phase: str, error: KokoroError) -> KokoroError:
 
 
 __all__ = [
+    "PersistentResetPreview",
     "advance_persistent_mood_turn",
     "apply_persistent_mood_event",
     "apply_persistent_relationship_event",
+    "export_persistent_data",
     "load_persistent_state",
+    "preview_persistent_reset",
     "replay_persistent_state",
+    "reset_persistent_data",
 ]

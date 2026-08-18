@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from concurrent.futures import ProcessPoolExecutor
 from copy import deepcopy
+from hashlib import sha256
 import json
 from pathlib import Path
 import re
@@ -14,12 +15,20 @@ from kokoroarc.errors import KokoroError
 from kokoroarc.packs.compiler import canonical_bytes
 from kokoroarc.persistence._storage import PersistenceLimits
 from kokoroarc.persistence.consent import grant_consent, revoke_consent
+from kokoroarc.persistence.memory import (
+    add_memory_reference,
+    list_memory_references,
+)
 from kokoroarc.persistence.state import (
+    PersistentResetPreview,
     advance_persistent_mood_turn,
     apply_persistent_mood_event,
     apply_persistent_relationship_event,
+    export_persistent_data,
     load_persistent_state,
+    preview_persistent_reset,
     replay_persistent_state,
+    reset_persistent_data,
 )
 from kokoroarc.state import transitions
 import kokoroarc.persistence.state as persistent_state_module
@@ -27,6 +36,7 @@ import kokoroarc.persistence.state as persistent_state_module
 from persistence_support import (
     ConsentedRin,
     SCHEMAS,
+    approved_memory_inputs,
     consented_rin,
     install_rin,
     interaction_event,
@@ -926,3 +936,263 @@ def test_mood_advance_rejects_numeric_bounds(
                 turns=turns,
             ),
         )
+
+
+def _populate_all_persistent_data(
+    consented: ConsentedRin,
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    relationship = _apply(consented, "event-1", 0)
+    mood = mood_event("mood-event-1", 0)
+    mood["trigger_strength"] = "strong"
+    state = _apply_mood(
+        consented,
+        mood,
+        relationship["revision"],
+        operation_id="mood-operation-1",
+    )
+    host_id, summary, localized = approved_memory_inputs()
+    memory = add_memory_reference(
+        consented.data_root,
+        "rin-aster",
+        host_id,
+        summary,
+        localized,
+        consented.consent["consent_id"],
+        consented.consent["grant_revision"],
+        SCHEMAS,
+    )
+    return state, memory
+
+
+def _preview_hash(document: dict[str, Any]) -> str:
+    unhashed = deepcopy(document)
+    unhashed["preview_sha256"] = None
+    return sha256(canonical_bytes(unhashed)).hexdigest()
+
+
+def test_export_is_canonical_path_free_and_available_after_revoke(
+    consented_rin: ConsentedRin,
+    tmp_path: Path,
+) -> None:
+    expected_state, expected_memory = _populate_all_persistent_data(
+        consented_rin
+    )
+    consent = consented_rin.consent
+    revoked = revoke_consent(
+        consented_rin.data_root,
+        "rin-aster",
+        consent["consent_id"],
+        SCHEMAS,
+        expected_revision=consent["grant_revision"],
+    )
+    host_body = tmp_path / expected_memory["host_memory_id"]
+    host_body.write_text("host-owned body must never be read", encoding="utf-8")
+
+    exported = export_persistent_data(
+        consented_rin.data_root,
+        "rin-aster",
+        SCHEMAS,
+    )
+    repeated = export_persistent_data(
+        consented_rin.data_root,
+        "rin-aster",
+        SCHEMAS,
+    )
+
+    SCHEMAS.validate("persistence-export", exported)
+    assert canonical_bytes(repeated) == canonical_bytes(exported)
+    assert exported["consent"] == revoked
+    assert exported["state"] == expected_state
+    assert exported["state"]["revision"] == 2
+    assert exported["memory_references"] == [expected_memory]
+    assert exported["memory_count"] == 1
+    assert exported["export_sha256"] == sha256(
+        canonical_bytes({**exported, "export_sha256": None})
+    ).hexdigest()
+    assert "path" not in canonical_bytes(exported).decode("utf-8").lower()
+    assert b"host-owned body must never be read" not in canonical_bytes(exported)
+
+
+def test_relationship_reset_preserves_mood_and_memory(
+    consented_rin: ConsentedRin,
+) -> None:
+    before, memory = _populate_all_persistent_data(consented_rin)
+    preview = preview_persistent_reset(
+        consented_rin.data_root,
+        "rin-aster",
+        consented_rin.consent["consent_id"],
+        SCHEMAS,
+        target="relationship",
+        reset_id="reset-relationship-01",
+    )
+    document = preview.document
+    assert document["preview_sha256"] == _preview_hash(document)
+
+    result = reset_persistent_data(
+        consented_rin.data_root,
+        "rin-aster",
+        preview,
+        consented_rin.consent["consent_id"],
+        SCHEMAS,
+    )
+    after = replay_persistent_state(
+        consented_rin.data_root,
+        "rin-aster",
+        SCHEMAS,
+    )
+
+    assert result["record_state"] == "committed"
+    assert after is not None
+    assert after["revision"] == before["revision"] + 1
+    assert after["relationship"]["revision"] == 0
+    assert after["relationship"]["stage"] == "unknown"
+    assert after["relationship"]["applied_event_ids"] == []
+    assert after["mood"] == before["mood"]
+    assert [view.reference for view in list_memory_references(
+        consented_rin.data_root,
+        "rin-aster",
+        SCHEMAS,
+    )] == [memory]
+    assert len(list(_generation_root(consented_rin).joinpath("events").iterdir())) == 3
+
+
+def test_mood_reset_preserves_relationship_and_returns_exact_neutral_mood(
+    consented_rin: ConsentedRin,
+) -> None:
+    before, memory = _populate_all_persistent_data(consented_rin)
+    preview = preview_persistent_reset(
+        consented_rin.data_root,
+        "rin-aster",
+        consented_rin.consent["consent_id"],
+        SCHEMAS,
+        target="mood",
+        reset_id="reset-mood-01",
+    )
+
+    reset_persistent_data(
+        consented_rin.data_root,
+        "rin-aster",
+        preview,
+        consented_rin.consent["consent_id"],
+        SCHEMAS,
+    )
+    after = replay_persistent_state(
+        consented_rin.data_root,
+        "rin-aster",
+        SCHEMAS,
+    )
+
+    assert after is not None
+    assert after["revision"] == before["revision"] + 1
+    assert after["relationship"] == before["relationship"]
+    assert after["mood"] == {
+        "revision": 0,
+        "primary": "neutral",
+        "secondary": None,
+        "arousal": 0.0,
+        "valence": 0.0,
+        "intensity": 0.0,
+        "remaining_turns": 0,
+        "expires_after_turns": 0,
+        "triggering_event_id": None,
+        "applied_event_ids": [],
+    }
+    assert [view.reference for view in list_memory_references(
+        consented_rin.data_root,
+        "rin-aster",
+        SCHEMAS,
+    )] == [memory]
+
+
+def test_all_reset_after_revoke_is_exactly_idempotent(
+    consented_rin: ConsentedRin,
+) -> None:
+    before, _memory = _populate_all_persistent_data(consented_rin)
+    consent = consented_rin.consent
+    revoke_consent(
+        consented_rin.data_root,
+        "rin-aster",
+        consent["consent_id"],
+        SCHEMAS,
+        expected_revision=consent["grant_revision"],
+    )
+    preview = preview_persistent_reset(
+        consented_rin.data_root,
+        "rin-aster",
+        consent["consent_id"],
+        SCHEMAS,
+        target="all",
+        reset_id="reset-all-01",
+    )
+
+    first = reset_persistent_data(
+        consented_rin.data_root,
+        "rin-aster",
+        preview,
+        consent["consent_id"],
+        SCHEMAS,
+    )
+    repeated = reset_persistent_data(
+        consented_rin.data_root,
+        "rin-aster",
+        preview,
+        consent["consent_id"],
+        SCHEMAS,
+    )
+    after = replay_persistent_state(
+        consented_rin.data_root,
+        "rin-aster",
+        SCHEMAS,
+    )
+
+    assert canonical_bytes(repeated) == canonical_bytes(first)
+    assert after is not None
+    assert after["revision"] == before["revision"] + 2
+    assert after["relationship"]["revision"] == 0
+    assert after["mood"]["revision"] == 0
+    assert list_memory_references(
+        consented_rin.data_root,
+        "rin-aster",
+        SCHEMAS,
+    ) == ()
+    transactions = consented_rin.data_root / "persistence-transactions"
+    assert not transactions.exists() or not list(transactions.rglob("*.json"))
+
+
+def test_reset_rejects_changed_preview_and_changed_source_state(
+    consented_rin: ConsentedRin,
+) -> None:
+    _apply(consented_rin, "event-1", 0)
+    preview = preview_persistent_reset(
+        consented_rin.data_root,
+        "rin-aster",
+        consented_rin.consent["consent_id"],
+        SCHEMAS,
+        target="relationship",
+        reset_id="reset-relationship-01",
+    )
+    changed = preview.document
+    changed["expected_state_revision"] += 1
+    changed_preview = PersistentResetPreview(canonical_bytes(changed))
+
+    _assert_code(
+        "PERSISTENCE_RESET_STALE",
+        lambda: reset_persistent_data(
+            consented_rin.data_root,
+            "rin-aster",
+            changed_preview,
+            consented_rin.consent["consent_id"],
+            SCHEMAS,
+        ),
+    )
+    _apply(consented_rin, "event-2", 1)
+    _assert_code(
+        "PERSISTENCE_RESET_STALE",
+        lambda: reset_persistent_data(
+            consented_rin.data_root,
+            "rin-aster",
+            preview,
+            consented_rin.consent["consent_id"],
+            SCHEMAS,
+        ),
+    )

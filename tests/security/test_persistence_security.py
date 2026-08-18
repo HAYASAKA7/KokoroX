@@ -11,6 +11,7 @@ from kokoroarc.errors import KokoroError
 from kokoroarc.packs.compiler import canonical_bytes
 import kokoroarc.persistence._storage as storage
 from kokoroarc.persistence.consent import grant_consent, load_consent
+import kokoroarc.persistence.memory as persistent_memory_module
 from kokoroarc.persistence.memory import (
     add_memory_reference,
     list_memory_references,
@@ -19,8 +20,12 @@ from kokoroarc.persistence.memory import (
 from kokoroarc.persistence.state import (
     apply_persistent_mood_event,
     apply_persistent_relationship_event,
+    export_persistent_data,
+    preview_persistent_reset,
     replay_persistent_state,
+    reset_persistent_data,
 )
+import kokoroarc.persistence.state as persistent_state_module
 from kokoroarc.schemas import SchemaRegistry
 
 from persistence_support import (
@@ -1030,3 +1035,852 @@ def _consent_history(data_root: Path) -> Path:
         / "rin-aster"
         / "history"
     )
+
+
+def _persistent_export_mutation_target(
+    consented: ConsentedRin,
+    target_kind: str,
+) -> Path:
+    if target_kind == "consent":
+        return (
+            consented.data_root
+            / "consents"
+            / "global"
+            / "original"
+            / "rin-aster"
+            / "current.json"
+        )
+    if target_kind == "memory":
+        root = (
+            consented.data_root
+            / "memory-references"
+            / "global"
+            / "original"
+            / "rin-aster"
+        )
+        return next(root.iterdir())
+    state_root = (
+        consented.data_root
+        / "persistent-state"
+        / "global"
+        / "original"
+        / "rin-aster"
+    )
+    pointer = json.loads(state_root.joinpath("current.json").read_bytes())
+    generation = state_root / "generations" / pointer["generation_id"]
+    if target_kind == "projection":
+        return generation / "state.json"
+    return next(generation.joinpath("events").iterdir())
+
+
+@pytest.mark.parametrize(
+    "target_kind",
+    ["consent", "event", "projection", "memory"],
+)
+def test_export_rejects_store_rebase_during_first_schema_callback(
+    consented_rin: ConsentedRin,
+    target_kind: str,
+) -> None:
+    apply_persistent_relationship_event(
+        consented_rin.data_root,
+        "rin-aster",
+        interaction_event("event-1", 0),
+        consented_rin.consent["consent_id"],
+        consented_rin.consent["grant_revision"],
+        SCHEMAS,
+        expected_state_revision=0,
+        operation_id="relationship-operation-1",
+    )
+    host_id, summary, localized = approved_memory_inputs()
+    add_memory_reference(
+        consented_rin.data_root,
+        "rin-aster",
+        host_id,
+        summary,
+        localized,
+        consented_rin.consent["consent_id"],
+        consented_rin.consent["grant_revision"],
+        SCHEMAS,
+    )
+    target = _persistent_export_mutation_target(consented_rin, target_kind)
+    mutated = False
+
+    class MutatingSchemas:
+        def validate(self, name: str, instance: Any) -> None:
+            nonlocal mutated
+            SCHEMAS.validate(name, instance)
+            if not mutated:
+                target.write_bytes(target.read_bytes() + b" ")
+                mutated = True
+
+    with pytest.raises(KokoroError):
+        export_persistent_data(
+            consented_rin.data_root,
+            "rin-aster",
+            MutatingSchemas(),
+        )
+    assert mutated
+
+
+def test_export_rejects_mutated_detached_schema_input(
+    consented_rin: ConsentedRin,
+) -> None:
+    apply_persistent_relationship_event(
+        consented_rin.data_root,
+        "rin-aster",
+        interaction_event("event-1", 0),
+        consented_rin.consent["consent_id"],
+        consented_rin.consent["grant_revision"],
+        SCHEMAS,
+        expected_state_revision=0,
+        operation_id="relationship-operation-1",
+    )
+
+    class MutatingSchemas:
+        def validate(self, name: str, instance: Any) -> None:
+            SCHEMAS.validate(name, instance)
+            if name == "persistence-export":
+                instance["artifact_id"] = "mutated/export"
+
+    error = _assert_code(
+        "PERSISTENCE_INPUT_MUTATION",
+        lambda: export_persistent_data(
+            consented_rin.data_root,
+            "rin-aster",
+            MutatingSchemas(),
+        ),
+    )
+    assert "mutated/export" not in canonical_bytes(error.envelope()).decode()
+
+
+def test_reset_marker_failure_is_not_reported_as_success(
+    consented_rin: ConsentedRin,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    apply_persistent_relationship_event(
+        consented_rin.data_root,
+        "rin-aster",
+        interaction_event("event-1", 0),
+        consented_rin.consent["consent_id"],
+        consented_rin.consent["grant_revision"],
+        SCHEMAS,
+        expected_state_revision=0,
+        operation_id="relationship-operation-1",
+    )
+    preview = preview_persistent_reset(
+        consented_rin.data_root,
+        "rin-aster",
+        consented_rin.consent["consent_id"],
+        SCHEMAS,
+        target="relationship",
+        reset_id="reset-relationship-01",
+    )
+
+    def fail_marker(*_args: Any, **_kwargs: Any) -> Any:
+        raise KokoroError(
+            "PERSISTENCE_WRITE_FAILED",
+            "Persistent storage write failed.",
+            details={
+                "operation": "transaction",
+                "reason": "injected",
+                "record_state": "not_visible",
+            },
+        )
+
+    monkeypatch.setattr(
+        persistent_state_module,
+        "_write_transaction_marker",
+        fail_marker,
+    )
+    error = _assert_code(
+        "PERSISTENCE_WRITE_FAILED",
+        lambda: reset_persistent_data(
+            consented_rin.data_root,
+            "rin-aster",
+            preview,
+            consented_rin.consent["consent_id"],
+            SCHEMAS,
+        ),
+    )
+    assert error.details["record_state"] == "not_visible"
+    assert replay_persistent_state(
+        consented_rin.data_root,
+        "rin-aster",
+        SCHEMAS,
+    )["relationship"]["revision"] == 1
+
+
+def test_all_reset_resumes_after_the_first_state_event(
+    consented_rin: ConsentedRin,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    before = apply_persistent_relationship_event(
+        consented_rin.data_root,
+        "rin-aster",
+        interaction_event("event-1", 0),
+        consented_rin.consent["consent_id"],
+        consented_rin.consent["grant_revision"],
+        SCHEMAS,
+        expected_state_revision=0,
+        operation_id="relationship-operation-1",
+    )
+    host_id, summary, localized = approved_memory_inputs()
+    add_memory_reference(
+        consented_rin.data_root,
+        "rin-aster",
+        host_id,
+        summary,
+        localized,
+        consented_rin.consent["consent_id"],
+        consented_rin.consent["grant_revision"],
+        SCHEMAS,
+    )
+    preview = preview_persistent_reset(
+        consented_rin.data_root,
+        "rin-aster",
+        consented_rin.consent["consent_id"],
+        SCHEMAS,
+        target="all",
+        reset_id="reset-all-interrupted-01",
+    )
+    original_append = persistent_state_module._append_reset_state_event
+
+    def interrupt_after_relationship(*args: Any, **kwargs: Any) -> Any:
+        result = original_append(*args, **kwargs)
+        if kwargs["operation_kind"] == "relationship_reset":
+            raise KokoroError(
+                "PERSISTENCE_WRITE_FAILED",
+                "Persistent storage write failed.",
+                details={
+                    "operation": "reset",
+                    "reason": "injected",
+                    "record_state": "committed",
+                },
+            )
+        return result
+
+    monkeypatch.setattr(
+        persistent_state_module,
+        "_append_reset_state_event",
+        interrupt_after_relationship,
+    )
+    error = _assert_code(
+        "PERSISTENCE_WRITE_FAILED",
+        lambda: reset_persistent_data(
+            consented_rin.data_root,
+            "rin-aster",
+            preview,
+            consented_rin.consent["consent_id"],
+            SCHEMAS,
+        ),
+    )
+    assert error.details["record_state"] == "committed"
+    interrupted = replay_persistent_state(
+        consented_rin.data_root,
+        "rin-aster",
+        SCHEMAS,
+    )
+    assert interrupted is not None
+    assert interrupted["revision"] == before["revision"] + 1
+    assert interrupted["relationship"]["revision"] == 0
+    assert len(list_memory_references(
+        consented_rin.data_root,
+        "rin-aster",
+        SCHEMAS,
+    )) == 1
+
+    monkeypatch.setattr(
+        persistent_state_module,
+        "_append_reset_state_event",
+        original_append,
+    )
+    result = reset_persistent_data(
+        consented_rin.data_root,
+        "rin-aster",
+        preview,
+        consented_rin.consent["consent_id"],
+        SCHEMAS,
+    )
+    after = replay_persistent_state(
+        consented_rin.data_root,
+        "rin-aster",
+        SCHEMAS,
+    )
+    assert result["record_state"] == "committed"
+    assert after is not None
+    assert after["revision"] == before["revision"] + 2
+    assert after["mood"]["revision"] == 0
+    assert list_memory_references(
+        consented_rin.data_root,
+        "rin-aster",
+        SCHEMAS,
+    ) == ()
+
+
+@pytest.mark.parametrize("durability_phase", ["event", "projection"])
+def test_reset_retries_committed_state_directory_fsync(
+    consented_rin: ConsentedRin,
+    monkeypatch: pytest.MonkeyPatch,
+    durability_phase: str,
+) -> None:
+    before = apply_persistent_relationship_event(
+        consented_rin.data_root,
+        "rin-aster",
+        interaction_event("event-1", 0),
+        consented_rin.consent["consent_id"],
+        consented_rin.consent["grant_revision"],
+        SCHEMAS,
+        expected_state_revision=0,
+        operation_id="relationship-operation-1",
+    )
+    preview = preview_persistent_reset(
+        consented_rin.data_root,
+        "rin-aster",
+        consented_rin.consent["consent_id"],
+        SCHEMAS,
+        target="relationship",
+        reset_id=f"reset-relationship-{durability_phase}-fsync-01",
+    )
+    generation_root = (
+        _persistent_state_root(consented_rin)
+        / "generations"
+        / before["generation_id"]
+    )
+    target = (
+        generation_root / "events"
+        if durability_phase == "event"
+        else generation_root
+    )
+    original_fsync = storage._fsync_directory
+    target_calls = 0
+
+    def fail_target_once(path: Path) -> None:
+        nonlocal target_calls
+        if path == target:
+            target_calls += 1
+            if target_calls == 1:
+                raise OSError("injected")
+        original_fsync(path)
+
+    monkeypatch.setattr(
+        persistent_state_module,
+        "_fsync_directory",
+        fail_target_once,
+    )
+    monkeypatch.setattr(storage, "_fsync_directory", fail_target_once)
+    expected_code = (
+        "PERSISTENCE_DURABILITY_FAILED"
+        if durability_phase == "event"
+        else "PERSISTENCE_STATE_WRITE_FAILED"
+    )
+    error = _assert_code(
+        expected_code,
+        lambda: reset_persistent_data(
+            consented_rin.data_root,
+            "rin-aster",
+            preview,
+            consented_rin.consent["consent_id"],
+            SCHEMAS,
+        ),
+    )
+    assert error.details["record_state"] == "committed"
+
+    result = reset_persistent_data(
+        consented_rin.data_root,
+        "rin-aster",
+        preview,
+        consented_rin.consent["consent_id"],
+        SCHEMAS,
+    )
+    assert result["record_state"] == "committed"
+    assert target_calls >= 2
+    after = replay_persistent_state(
+        consented_rin.data_root,
+        "rin-aster",
+        SCHEMAS,
+    )
+    assert after is not None
+    assert after["revision"] == before["revision"] + 1
+    assert after["relationship"]["revision"] == 0
+
+
+@pytest.mark.parametrize(
+    ("failure_phase", "expected_marker_phase"),
+    [("marker_update", "prepared"), ("cleanup", "memory_committed")],
+)
+def test_memory_reset_recovers_across_committed_cutover_phases(
+    consented_rin: ConsentedRin,
+    monkeypatch: pytest.MonkeyPatch,
+    failure_phase: str,
+    expected_marker_phase: str,
+) -> None:
+    host_id, summary, localized = approved_memory_inputs()
+    add_memory_reference(
+        consented_rin.data_root,
+        "rin-aster",
+        host_id,
+        summary,
+        localized,
+        consented_rin.consent["consent_id"],
+        consented_rin.consent["grant_revision"],
+        SCHEMAS,
+    )
+    preview = preview_persistent_reset(
+        consented_rin.data_root,
+        "rin-aster",
+        consented_rin.consent["consent_id"],
+        SCHEMAS,
+        target="memory",
+        reset_id=f"reset-memory-{failure_phase}-01",
+    )
+    attribute = (
+        "_update_reset_marker"
+        if failure_phase == "marker_update"
+        else "_cleanup_memory_reset"
+    )
+    original = getattr(persistent_state_module, attribute)
+
+    def interrupt(*_args: Any, **_kwargs: Any) -> Any:
+        code = (
+            "PERSISTENCE_WRITE_FAILED"
+            if failure_phase == "marker_update"
+            else "PERSISTENCE_CLEANUP_FAILED"
+        )
+        raise KokoroError(
+            code,
+            "Persistent reset was interrupted.",
+            details={"reason": "injected", "record_state": "committed"},
+        )
+
+    monkeypatch.setattr(persistent_state_module, attribute, interrupt)
+    _assert_code(
+        (
+            "PERSISTENCE_WRITE_FAILED"
+            if failure_phase == "marker_update"
+            else "PERSISTENCE_CLEANUP_FAILED"
+        ),
+        lambda: reset_persistent_data(
+            consented_rin.data_root,
+            "rin-aster",
+            preview,
+            consented_rin.consent["consent_id"],
+            SCHEMAS,
+        ),
+    )
+    markers = list(
+        consented_rin.data_root.joinpath("persistence-transactions").rglob(
+            "*.json"
+        )
+    )
+    assert len(markers) == 1
+    assert json.loads(markers[0].read_bytes())["phase"] == expected_marker_phase
+    assert list_memory_references(
+        consented_rin.data_root,
+        "rin-aster",
+        SCHEMAS,
+    ) == ()
+
+    monkeypatch.setattr(persistent_state_module, attribute, original)
+    result = reset_persistent_data(
+        consented_rin.data_root,
+        "rin-aster",
+        preview,
+        consented_rin.consent["consent_id"],
+        SCHEMAS,
+    )
+    assert result["record_state"] == "committed"
+    assert not list(
+        consented_rin.data_root.joinpath("persistence-transactions").rglob(
+            "*.json"
+        )
+    )
+    assert list_memory_references(
+        consented_rin.data_root,
+        "rin-aster",
+        SCHEMAS,
+    ) == ()
+
+
+def test_memory_reset_retries_cutover_directory_fsync(
+    consented_rin: ConsentedRin,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    host_id, summary, localized = approved_memory_inputs()
+    add_memory_reference(
+        consented_rin.data_root,
+        "rin-aster",
+        host_id,
+        summary,
+        localized,
+        consented_rin.consent["consent_id"],
+        consented_rin.consent["grant_revision"],
+        SCHEMAS,
+    )
+    preview = preview_persistent_reset(
+        consented_rin.data_root,
+        "rin-aster",
+        consented_rin.consent["consent_id"],
+        SCHEMAS,
+        target="memory",
+        reset_id="reset-memory-fsync-01",
+    )
+    original_fsync = persistent_memory_module._fsync_directory
+    calls = 0
+
+    def fail_once(path: Path) -> None:
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            raise OSError("injected")
+        original_fsync(path)
+
+    monkeypatch.setattr(
+        persistent_memory_module,
+        "_fsync_directory",
+        fail_once,
+    )
+    error = _assert_code(
+        "PERSISTENCE_DURABILITY_FAILED",
+        lambda: reset_persistent_data(
+            consented_rin.data_root,
+            "rin-aster",
+            preview,
+            consented_rin.consent["consent_id"],
+            SCHEMAS,
+        ),
+    )
+    assert error.details["record_state"] == "committed"
+
+    result = reset_persistent_data(
+        consented_rin.data_root,
+        "rin-aster",
+        preview,
+        consented_rin.consent["consent_id"],
+        SCHEMAS,
+    )
+    assert result["record_state"] == "committed"
+    assert calls >= 2
+    assert list_memory_references(
+        consented_rin.data_root,
+        "rin-aster",
+        SCHEMAS,
+    ) == ()
+
+
+def test_memory_reset_recovers_after_partial_identity_bound_cleanup(
+    consented_rin: ConsentedRin,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    host_id, summary, localized = approved_memory_inputs()
+    for current_host_id in (host_id, "host-memory-preference-02"):
+        add_memory_reference(
+            consented_rin.data_root,
+            "rin-aster",
+            current_host_id,
+            summary,
+            localized,
+            consented_rin.consent["consent_id"],
+            consented_rin.consent["grant_revision"],
+            SCHEMAS,
+        )
+    preview = preview_persistent_reset(
+        consented_rin.data_root,
+        "rin-aster",
+        consented_rin.consent["consent_id"],
+        SCHEMAS,
+        target="memory",
+        reset_id="reset-memory-partial-cleanup-01",
+    )
+    original_unlink = Path.unlink
+    cleanup_unlinks = 0
+
+    def interrupt_second_cleanup_unlink(
+        path: Path,
+        *args: Any,
+        **kwargs: Any,
+    ) -> None:
+        nonlocal cleanup_unlinks
+        if ".reset-" in path.parent.name:
+            cleanup_unlinks += 1
+            if cleanup_unlinks == 2:
+                raise OSError("injected")
+        original_unlink(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "unlink", interrupt_second_cleanup_unlink)
+    error = _assert_code(
+        "PERSISTENCE_CLEANUP_FAILED",
+        lambda: reset_persistent_data(
+            consented_rin.data_root,
+            "rin-aster",
+            preview,
+            consented_rin.consent["consent_id"],
+            SCHEMAS,
+        ),
+    )
+    assert error.details["record_state"] == "committed"
+    assert cleanup_unlinks == 2
+    assert list_memory_references(
+        consented_rin.data_root,
+        "rin-aster",
+        SCHEMAS,
+    ) == ()
+
+    result = reset_persistent_data(
+        consented_rin.data_root,
+        "rin-aster",
+        preview,
+        consented_rin.consent["consent_id"],
+        SCHEMAS,
+    )
+    assert result["record_state"] == "committed"
+    assert cleanup_unlinks == 3
+
+
+def test_reset_rejects_marker_rebase_during_generated_event_validation(
+    consented_rin: ConsentedRin,
+) -> None:
+    before = apply_persistent_relationship_event(
+        consented_rin.data_root,
+        "rin-aster",
+        interaction_event("event-1", 0),
+        consented_rin.consent["consent_id"],
+        consented_rin.consent["grant_revision"],
+        SCHEMAS,
+        expected_state_revision=0,
+        operation_id="relationship-operation-1",
+    )
+    preview = preview_persistent_reset(
+        consented_rin.data_root,
+        "rin-aster",
+        consented_rin.consent["consent_id"],
+        SCHEMAS,
+        target="relationship",
+        reset_id="reset-marker-rebase-01",
+    )
+    mutated = False
+
+    class MutatingSchemas:
+        def validate(self, name: str, instance: Any) -> None:
+            nonlocal mutated
+            SCHEMAS.validate(name, instance)
+            markers = list(
+                consented_rin.data_root.joinpath(
+                    "persistence-transactions"
+                ).rglob("*.json")
+            )
+            if name == "persistent-state-event" and markers and not mutated:
+                markers[0].write_bytes(markers[0].read_bytes() + b" ")
+                mutated = True
+
+    with pytest.raises(KokoroError):
+        reset_persistent_data(
+            consented_rin.data_root,
+            "rin-aster",
+            preview,
+            consented_rin.consent["consent_id"],
+            MutatingSchemas(),
+        )
+    assert mutated
+    assert replay_persistent_state(
+        consented_rin.data_root,
+        "rin-aster",
+        SCHEMAS,
+    ) == before
+
+
+def test_memory_reset_refuses_to_delete_replacement_cleanup_directory(
+    consented_rin: ConsentedRin,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    host_id, summary, localized = approved_memory_inputs()
+    add_memory_reference(
+        consented_rin.data_root,
+        "rin-aster",
+        host_id,
+        summary,
+        localized,
+        consented_rin.consent["consent_id"],
+        consented_rin.consent["grant_revision"],
+        SCHEMAS,
+    )
+    preview = preview_persistent_reset(
+        consented_rin.data_root,
+        "rin-aster",
+        consented_rin.consent["consent_id"],
+        SCHEMAS,
+        target="memory",
+        reset_id="reset-memory-replacement-01",
+    )
+    original_cleanup = persistent_state_module._cleanup_memory_reset
+
+    def interrupt(*_args: Any, **_kwargs: Any) -> None:
+        raise KokoroError(
+            "PERSISTENCE_CLEANUP_FAILED",
+            "Persistent reset cleanup failed.",
+            details={"reason": "injected", "record_state": "committed"},
+        )
+
+    monkeypatch.setattr(
+        persistent_state_module,
+        "_cleanup_memory_reset",
+        interrupt,
+    )
+    _assert_code(
+        "PERSISTENCE_CLEANUP_FAILED",
+        lambda: reset_persistent_data(
+            consented_rin.data_root,
+            "rin-aster",
+            preview,
+            consented_rin.consent["consent_id"],
+            SCHEMAS,
+        ),
+    )
+    monkeypatch.setattr(
+        persistent_state_module,
+        "_cleanup_memory_reset",
+        original_cleanup,
+    )
+    parent = consented_rin.data_root.joinpath(
+        "memory-references",
+        "global",
+        "original",
+    )
+    cleanup = next(path for path in parent.iterdir() if ".reset-" in path.name)
+    displaced = cleanup.with_name(cleanup.name + ".displaced")
+    cleanup.rename(displaced)
+    cleanup.mkdir()
+    sentinel = cleanup / "unrelated-sentinel.txt"
+    sentinel.write_text("unrelated", encoding="utf-8")
+
+    error = _assert_code(
+        "PERSISTENCE_CLEANUP_FAILED",
+        lambda: reset_persistent_data(
+            consented_rin.data_root,
+            "rin-aster",
+            preview,
+            consented_rin.consent["consent_id"],
+            SCHEMAS,
+        ),
+    )
+    assert error.details["record_state"] == "unknown"
+    assert sentinel.read_text(encoding="utf-8") == "unrelated"
+    assert displaced.exists()
+
+
+def test_reset_rejects_forged_receipt_with_wrong_post_reset_revision(
+    consented_rin: ConsentedRin,
+) -> None:
+    before = apply_persistent_relationship_event(
+        consented_rin.data_root,
+        "rin-aster",
+        interaction_event("event-1", 0),
+        consented_rin.consent["consent_id"],
+        consented_rin.consent["grant_revision"],
+        SCHEMAS,
+        expected_state_revision=0,
+        operation_id="relationship-operation-1",
+    )
+    preview = preview_persistent_reset(
+        consented_rin.data_root,
+        "rin-aster",
+        consented_rin.consent["consent_id"],
+        SCHEMAS,
+        target="relationship",
+        reset_id="reset-forged-receipt-01",
+    )
+    scope = storage.open_persistence_scope(
+        consented_rin.data_root,
+        SCHEMAS,
+        character_id="rin-aster",
+    )
+    forged = persistent_state_module._reset_receipt_document(
+        scope,
+        preview.document,
+        preview.payload,
+        before,
+    )
+    receipt_path = persistent_state_module._reset_receipt_path(
+        scope,
+        "reset-forged-receipt-01",
+    )
+    receipt_path.parent.mkdir(parents=True)
+    receipt_path.write_bytes(canonical_bytes(forged))
+
+    _assert_code(
+        "PERSISTENCE_RESET_STALE",
+        lambda: reset_persistent_data(
+            consented_rin.data_root,
+            "rin-aster",
+            preview,
+            consented_rin.consent["consent_id"],
+            SCHEMAS,
+        ),
+    )
+    assert replay_persistent_state(
+        consented_rin.data_root,
+        "rin-aster",
+        SCHEMAS,
+    ) == before
+
+
+def test_reset_retries_committed_receipt_directory_fsync(
+    consented_rin: ConsentedRin,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    apply_persistent_relationship_event(
+        consented_rin.data_root,
+        "rin-aster",
+        interaction_event("event-1", 0),
+        consented_rin.consent["consent_id"],
+        consented_rin.consent["grant_revision"],
+        SCHEMAS,
+        expected_state_revision=0,
+        operation_id="relationship-operation-1",
+    )
+    preview = preview_persistent_reset(
+        consented_rin.data_root,
+        "rin-aster",
+        consented_rin.consent["consent_id"],
+        SCHEMAS,
+        target="relationship",
+        reset_id="reset-receipt-fsync-01",
+    )
+    receipt_parent = _persistent_state_root(consented_rin) / "resets"
+    original_fsync = storage._fsync_directory
+    receipt_calls = 0
+
+    def fail_receipt_once(path: Path) -> None:
+        nonlocal receipt_calls
+        if path == receipt_parent:
+            receipt_calls += 1
+            if receipt_calls == 1:
+                raise OSError("injected")
+        original_fsync(path)
+
+    monkeypatch.setattr(
+        persistent_state_module,
+        "_fsync_directory",
+        fail_receipt_once,
+    )
+    monkeypatch.setattr(storage, "_fsync_directory", fail_receipt_once)
+    error = _assert_code(
+        "PERSISTENCE_DURABILITY_FAILED",
+        lambda: reset_persistent_data(
+            consented_rin.data_root,
+            "rin-aster",
+            preview,
+            consented_rin.consent["consent_id"],
+            SCHEMAS,
+        ),
+    )
+    assert error.details["record_state"] == "committed"
+
+    result = reset_persistent_data(
+        consented_rin.data_root,
+        "rin-aster",
+        preview,
+        consented_rin.consent["consent_id"],
+        SCHEMAS,
+    )
+    assert result["record_state"] == "committed"
+    assert receipt_calls >= 2

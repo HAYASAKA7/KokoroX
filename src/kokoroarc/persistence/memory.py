@@ -24,7 +24,12 @@ from kokoroarc.persistence._storage import (
     _absent_file_audit,
     _acquire_character_lock,
     _assert_directory_chain,
+    _atomic_rename_noreplace,
+    _bounded_cleanup_entries,
     _capture_directory_chain,
+    _capture_directory_identity,
+    _cleanup_failed,
+    _directory_identity_matches,
     _file_identity,
     _fsync_directory,
     _lstat,
@@ -695,6 +700,326 @@ def _artifact_id(reference_id: str) -> str:
 
 def _memory_root(scope: PersistenceScope) -> Path:
     return scope.character_root("memory-references")
+
+
+def _memory_collection_sha256(
+    references: tuple[ArtifactSnapshot, ...],
+) -> str:
+    return sha256(
+        canonical_bytes([reference.value for reference in references])
+    ).hexdigest()
+
+
+def _memory_reset_cleanup_path(
+    scope: PersistenceScope,
+    reset_id: str,
+) -> Path:
+    digest = sha256(canonical_bytes(reset_id)).hexdigest()[:32]
+    root = _memory_root(scope)
+    return root.with_name(f".{scope.key.character_id}.reset-{digest}")
+
+
+def _cutover_memory_reset(
+    scope: PersistenceScope,
+    *,
+    reset_id: str,
+    expected_root_present: bool,
+    expected_ids: tuple[str, ...],
+    expected_sha256: str,
+    expected_directory_identity: Mapping[str, int] | None,
+    expected_references: tuple[tuple[str, str], ...],
+    lock: PersistenceLock,
+) -> Path | None:
+    root = _memory_root(scope)
+    cleanup = _memory_reset_cleanup_path(scope, reset_id)
+    root_present = _lstat(root) is not None
+    cleanup_present = _lstat(cleanup) is not None
+    if not expected_root_present:
+        if (
+            root_present
+            or cleanup_present
+            or expected_directory_identity is not None
+            or expected_references
+        ):
+            raise _memory_reset_stale("memory_membership")
+        return None
+    if expected_directory_identity is None:
+        raise _memory_reset_stale("memory_directory_identity")
+    if root_present and cleanup_present:
+        raise _memory_reset_stale("memory_cutover_ambiguous")
+    if not root_present and not cleanup_present:
+        raise _memory_reset_stale("memory_collection_missing")
+    if cleanup_present:
+        _require_memory_directory_identity(
+            cleanup,
+            expected_directory_identity,
+        )
+        _validate_reset_memory_directory(
+            scope,
+            cleanup,
+            expected_ids,
+            expected_sha256,
+            expected_references=expected_references,
+            allow_subset=False,
+        )
+        try:
+            _fsync_directory(root.parent)
+        except OSError as error:
+            raise _memory_reset_durability_failed() from error
+        return cleanup
+
+    _require_memory_directory_identity(root, expected_directory_identity)
+    references = _validate_reset_memory_directory(
+        scope,
+        root,
+        expected_ids,
+        expected_sha256,
+        expected_references=expected_references,
+        allow_subset=False,
+    )
+    identity = _capture_directory_identity(root)
+    ancestry = _capture_directory_chain(root.parent)
+    lock.assert_owned()
+    _assert_directory_chain(ancestry, "memory_parent_changed")
+    try:
+        _atomic_rename_noreplace(root, cleanup)
+    except KokoroError:
+        raise
+    except OSError as error:
+        raise _memory_reset_stale("memory_cutover") from error
+    try:
+        _fsync_directory(root.parent)
+    except OSError as error:
+        raise _memory_reset_durability_failed() from error
+    renamed = _capture_directory_identity(cleanup)
+    if (
+        _lstat(root) is not None
+        or (
+            renamed.device,
+            renamed.inode,
+            renamed.file_type,
+        )
+        != (
+            identity.device,
+            identity.inode,
+            identity.file_type,
+        )
+    ):
+        raise _memory_reset_stale("memory_cutover_confirmation")
+    _require_memory_directory_identity(cleanup, expected_directory_identity)
+    _assert_directory_chain(ancestry, "memory_parent_changed")
+    _validate_reset_memory_directory(
+        scope,
+        cleanup,
+        tuple(
+            cast(str, reference.value["memory_reference_id"])
+            for reference in references
+        ),
+        expected_sha256,
+        expected_references=expected_references,
+        allow_subset=False,
+    )
+    lock.assert_owned()
+    return cleanup
+
+
+def _cleanup_memory_reset(
+    scope: PersistenceScope,
+    *,
+    reset_id: str,
+    expected_ids: tuple[str, ...],
+    expected_sha256: str,
+    expected_directory_identity: Mapping[str, int] | None,
+    expected_references: tuple[tuple[str, str], ...],
+    lock: PersistenceLock,
+) -> None:
+    root = _memory_root(scope)
+    cleanup = _memory_reset_cleanup_path(scope, reset_id)
+    if _lstat(cleanup) is None:
+        if _lstat(root) is None:
+            try:
+                _fsync_directory(cleanup.parent)
+            except OSError as error:
+                raise _memory_reset_durability_failed() from error
+            return
+        raise _cleanup_failed(
+            "memory_cleanup_missing",
+            record_state="unknown",
+        )
+    if expected_directory_identity is None:
+        raise _cleanup_failed(
+            "memory_cleanup_identity",
+            record_state="unknown",
+        )
+    _require_memory_directory_identity(
+        cleanup,
+        expected_directory_identity,
+        cleanup=True,
+    )
+    references = _validate_reset_memory_directory(
+        scope,
+        cleanup,
+        expected_ids,
+        expected_sha256,
+        expected_references=expected_references,
+        allow_subset=True,
+    )
+    identity = _capture_directory_identity(cleanup)
+    ancestry = _capture_directory_chain(cleanup.parent)
+    entries = _bounded_cleanup_entries(
+        cleanup,
+        scope.limits.max_memory_references,
+    )
+    by_name = {reference.path.name: reference for reference in references}
+    try:
+        for entry in entries:
+            reference = by_name.get(entry.name)
+            if reference is None:
+                raise _cleanup_failed(
+                    "memory_cleanup_membership",
+                    record_state="committed",
+                )
+            linked = _require_safe_regular_file(entry)
+            if (
+                _file_identity(linked) != reference.identity
+                or not _directory_identity_matches(identity)
+            ):
+                raise _cleanup_failed(
+                    "memory_cleanup_identity",
+                    record_state="committed",
+                )
+            lock.assert_owned()
+            entry.unlink()
+        if not _directory_identity_matches(identity):
+            raise _cleanup_failed(
+                "memory_cleanup_identity",
+                record_state="committed",
+            )
+        _fsync_directory(cleanup)
+        cleanup.rmdir()
+        _fsync_directory(cleanup.parent)
+    except KokoroError:
+        raise
+    except OSError as error:
+        raise _cleanup_failed(
+            "memory_cleanup_io",
+            record_state="committed",
+        ) from error
+    _assert_directory_chain(ancestry, "memory_parent_changed")
+    if _lstat(root) is not None or _lstat(cleanup) is not None:
+        raise _cleanup_failed(
+            "memory_cleanup_confirmation",
+            record_state="unknown",
+        )
+    lock.assert_owned()
+
+
+def _validate_reset_memory_directory(
+    scope: PersistenceScope,
+    root: Path,
+    expected_ids: tuple[str, ...],
+    expected_sha256: str,
+    *,
+    expected_references: tuple[tuple[str, str], ...],
+    allow_subset: bool,
+) -> tuple[ArtifactSnapshot, ...]:
+    boundary = PersistenceBoundary(scope.boundary.schemas)
+    snapshots = tuple(
+        scan_canonical_directory(
+            root,
+            entry_limit=scope.limits.max_memory_references,
+            aggregate_limit=scope.limits.max_journal_bytes,
+            file_limit=scope.limits.max_memory_bytes,
+            schema_name="memory-reference",
+            boundary=boundary,
+        )
+    )
+    local_scope = PersistenceScope(
+        root=scope.root,
+        key=scope.key,
+        boundary=boundary,
+        limits=scope.limits,
+    )
+    for snapshot in snapshots:
+        _require_reference_binding(local_scope, snapshot)
+    actual_ids = tuple(
+        cast(str, snapshot.value["memory_reference_id"])
+        for snapshot in snapshots
+    )
+    expected_by_id = dict(expected_references)
+    actual_bindings = tuple(
+        (
+            cast(str, snapshot.value["memory_reference_id"]),
+            sha256(snapshot.payload).hexdigest(),
+        )
+        for snapshot in snapshots
+    )
+    if allow_subset:
+        matches = all(
+            expected_by_id.get(reference_id) == payload_sha256
+            for reference_id, payload_sha256 in actual_bindings
+        )
+    else:
+        matches = (
+            actual_ids == expected_ids
+            and actual_bindings == expected_references
+            and _memory_collection_sha256(snapshots) == expected_sha256
+        )
+    if not matches:
+        raise _memory_reset_stale("memory_membership")
+    boundary.assert_clean()
+    return snapshots
+
+
+def _require_memory_directory_identity(
+    path: Path,
+    expected: Mapping[str, int],
+    *,
+    cleanup: bool = False,
+) -> None:
+    try:
+        actual = _capture_directory_identity(path)
+    except KokoroError as error:
+        if cleanup:
+            raise _cleanup_failed(
+                "memory_cleanup_identity",
+                record_state="unknown",
+            ) from error
+        raise _memory_reset_stale("memory_directory_identity") from error
+    matches = (
+        actual.device == expected.get("device")
+        and actual.inode == expected.get("inode")
+        and actual.file_type == expected.get("file_type")
+    )
+    if matches:
+        return
+    if cleanup:
+        raise _cleanup_failed(
+            "memory_cleanup_identity",
+            record_state="unknown",
+        )
+    raise _memory_reset_stale("memory_directory_identity")
+
+
+def _memory_reset_stale(reason: str) -> KokoroError:
+    return KokoroError(
+        "PERSISTENCE_RESET_STALE",
+        "Persistent reset preview is stale.",
+        retryable=True,
+        details={"reason": reason},
+    )
+
+
+def _memory_reset_durability_failed() -> KokoroError:
+    return KokoroError(
+        "PERSISTENCE_DURABILITY_FAILED",
+        "Persistent memory reset durability could not be confirmed.",
+        details={
+            "operation": "memory_cutover",
+            "reason": "fsync_failed",
+            "record_state": "committed",
+        },
+    )
 
 
 def _fresh_scope(
