@@ -606,6 +606,7 @@ def _event_payloads() -> dict[str, dict[str, Any]]:
             "intensity": 0.6,
             "expires_after_turns": 4,
             "triggering_interaction_event_id": "interaction-event-1",
+            "trigger_strength": "strong",
         },
         "mood_advance": {
             "event_id": "mood-advance-1",
@@ -644,6 +645,21 @@ def test_persistent_event_accepts_every_closed_operation_kind(
 def test_persistent_event_rejects_kind_payload_mismatch() -> None:
     invalid = deepcopy(_bundle("private-global.json")["persistent_event"])
     invalid["operation_kind"] = "mood_reset"
+
+    _assert_invalid("persistent-state-event", invalid)
+
+
+@pytest.mark.parametrize("trigger_strength", [None, "inferred"])
+def test_persistent_mood_event_requires_closed_trigger_strength(
+    trigger_strength: str | None,
+) -> None:
+    invalid = deepcopy(_bundle("private-global.json")["persistent_event"])
+    invalid["operation_kind"] = "mood_update"
+    invalid["payload"] = _event_payloads()["mood_update"]
+    if trigger_strength is None:
+        del invalid["payload"]["trigger_strength"]
+    else:
+        invalid["payload"]["trigger_strength"] = trigger_strength
 
     _assert_invalid("persistent-state-event", invalid)
 

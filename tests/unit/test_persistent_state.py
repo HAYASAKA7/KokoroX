@@ -6,7 +6,7 @@ import json
 from pathlib import Path
 import re
 from types import MappingProxyType
-from typing import Any, Callable
+from typing import Any, Callable, Mapping
 
 import pytest
 
@@ -15,6 +15,8 @@ from kokoroarc.packs.compiler import canonical_bytes
 from kokoroarc.persistence._storage import PersistenceLimits
 from kokoroarc.persistence.consent import grant_consent, revoke_consent
 from kokoroarc.persistence.state import (
+    advance_persistent_mood_turn,
+    apply_persistent_mood_event,
     apply_persistent_relationship_event,
     load_persistent_state,
     replay_persistent_state,
@@ -28,6 +30,7 @@ from persistence_support import (
     consented_rin,
     install_rin,
     interaction_event,
+    mood_event,
 )
 
 
@@ -94,6 +97,25 @@ def _process_relationship_apply(
         return "ok", result["revision"]
     except KokoroError as error:
         return "error", error.code
+
+
+def _apply_mood(
+    consented: ConsentedRin,
+    event: Mapping[str, Any],
+    outer_revision: int,
+    *,
+    operation_id: str,
+) -> dict[str, Any]:
+    return apply_persistent_mood_event(
+        consented.data_root,
+        "rin-aster",
+        event,
+        consented.consent["consent_id"],
+        consented.consent["grant_revision"],
+        SCHEMAS,
+        expected_state_revision=outer_revision,
+        operation_id=operation_id,
+    )
 
 
 def test_absent_persistent_state_load_and_replay_are_read_only(
@@ -508,3 +530,399 @@ def test_concurrent_process_relationship_cas_allows_only_one_revision(
         "rin-aster",
         SCHEMAS,
     )["revision"] == 1
+
+
+def test_mood_and_relationship_revisions_advance_independently_and_replay(
+    consented_rin: ConsentedRin,
+) -> None:
+    relationship = _apply(consented_rin, "event-1", 0)
+    event = mood_event("mood-event-1", 0)
+    event["trigger_strength"] = "strong"
+    mood = _apply_mood(
+        consented_rin,
+        event,
+        1,
+        operation_id="mood-operation-1",
+    )
+
+    assert relationship["relationship"]["revision"] == 1
+    assert relationship["mood"]["revision"] == 0
+    assert mood["revision"] == 2
+    assert mood["relationship"]["revision"] == 1
+    assert mood["mood"]["revision"] == 1
+    assert mood["mood"]["remaining_turns"] == 3
+
+    advanced = advance_persistent_mood_turn(
+        consented_rin.data_root,
+        "rin-aster",
+        consented_rin.consent["consent_id"],
+        consented_rin.consent["grant_revision"],
+        SCHEMAS,
+        expected_state_revision=2,
+        expected_mood_revision=1,
+        operation_id="mood-advance-1",
+    )
+    assert advanced["revision"] == 3
+    assert advanced["relationship"]["revision"] == 1
+    assert advanced["mood"]["revision"] == 2
+    assert advanced["mood"]["remaining_turns"] == 2
+
+    neutral = advance_persistent_mood_turn(
+        consented_rin.data_root,
+        "rin-aster",
+        consented_rin.consent["consent_id"],
+        consented_rin.consent["grant_revision"],
+        SCHEMAS,
+        expected_state_revision=3,
+        expected_mood_revision=2,
+        operation_id="mood-advance-2",
+        turns=2,
+    )
+    assert neutral["revision"] == 4
+    assert neutral["relationship"]["revision"] == 1
+    assert neutral["mood"] == {
+        "revision": 3,
+        "primary": "neutral",
+        "secondary": None,
+        "arousal": 0.0,
+        "valence": 0.0,
+        "intensity": 0.0,
+        "remaining_turns": 0,
+        "expires_after_turns": 0,
+        "triggering_event_id": None,
+        "applied_event_ids": [
+            "mood-event-1",
+            "mood-advance-1",
+            "mood-advance-2",
+        ],
+    }
+    assert neutral["applied_operation_ids"] == [
+        "relationship-operation-1",
+        "mood-operation-1",
+        "mood-advance-1",
+        "mood-advance-2",
+    ]
+    assert replay_persistent_state(
+        consented_rin.data_root,
+        "rin-aster",
+        SCHEMAS,
+    ) == neutral
+
+
+@pytest.mark.parametrize(
+    "primary",
+    [
+        "neutral",
+        "focused",
+        "curious",
+        "pleased",
+        "amused",
+        "concerned",
+        "embarrassed",
+        "irritated",
+        "disappointed",
+        "relieved",
+        "proud",
+        "tired",
+    ],
+)
+def test_mood_accepts_every_closed_primary(
+    consented_rin: ConsentedRin,
+    primary: str,
+) -> None:
+    event = mood_event("mood-event-1", 0)
+    event["primary"] = primary
+    event["secondary"] = None
+    event["trigger_strength"] = "strong"
+    if primary == "neutral":
+        event.update(
+            arousal=0.0,
+            valence=0.0,
+            intensity=0.0,
+            expires_after_turns=0,
+        )
+
+    state = _apply_mood(
+        consented_rin,
+        event,
+        0,
+        operation_id="mood-operation-1",
+    )
+
+    assert state["mood"]["primary"] == primary
+    assert state["mood"]["revision"] == 1
+
+
+def test_relationship_and_mood_permissions_are_independent(
+    rin_verified_release: dict[str, Any],
+    tmp_path: Path,
+) -> None:
+    mood_root = tmp_path / "mood-data"
+    install_rin(mood_root, rin_verified_release)
+    mood_consent = grant_consent(
+        mood_root,
+        "rin-aster",
+        ["mood_state"],
+        SCHEMAS,
+        expected_revision=0,
+    )
+    event = mood_event("mood-event-1", 0)
+    event["trigger_strength"] = "strong"
+    mood_state = apply_persistent_mood_event(
+        mood_root,
+        "rin-aster",
+        event,
+        mood_consent["consent_id"],
+        mood_consent["grant_revision"],
+        SCHEMAS,
+        expected_state_revision=0,
+        operation_id="mood-operation-1",
+    )
+    assert mood_state["mood"]["revision"] == 1
+    _assert_code(
+        "PERSISTENCE_PERMISSION_DENIED",
+        lambda: apply_persistent_relationship_event(
+            mood_root,
+            "rin-aster",
+            interaction_event("event-1", 0),
+            mood_consent["consent_id"],
+            mood_consent["grant_revision"],
+            SCHEMAS,
+            expected_state_revision=1,
+            operation_id="relationship-operation-1",
+        ),
+    )
+
+    relationship_root = tmp_path / "relationship-data"
+    install_rin(relationship_root, rin_verified_release)
+    relationship_consent = grant_consent(
+        relationship_root,
+        "rin-aster",
+        ["relationship_state"],
+        SCHEMAS,
+        expected_revision=0,
+    )
+    def apply_without_mood_permission() -> dict[str, Any]:
+        return apply_persistent_mood_event(
+            relationship_root,
+            "rin-aster",
+            event,
+            relationship_consent["consent_id"],
+            relationship_consent["grant_revision"],
+            SCHEMAS,
+            expected_state_revision=0,
+            operation_id="mood-operation-1",
+        )
+
+    _assert_code("PERSISTENCE_PERMISSION_DENIED", apply_without_mood_permission)
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    [
+        lambda event: event.update(secondary=event["primary"]),
+        lambda event: event.pop("triggering_interaction_event_id"),
+        lambda event: event.update(arousal=1.01),
+        lambda event: event.update(valence=-1.01),
+        lambda event: event.update(intensity=1.01),
+        lambda event: event.update(expires_after_turns=1001),
+        lambda event: event.update(trigger_strength=["strong"]),
+    ],
+)
+def test_mood_rejects_invalid_closed_values(
+    consented_rin: ConsentedRin,
+    mutation: Callable[[dict[str, Any]], Any],
+) -> None:
+    event = mood_event("mood-event-1", 0)
+    event["trigger_strength"] = "strong"
+    mutation(event)
+
+    _assert_code(
+        "PERSISTENCE_MOOD_INVALID",
+        lambda: _apply_mood(
+            consented_rin,
+            event,
+            0,
+            operation_id="mood-operation-1",
+        ),
+    )
+
+
+def test_ordinary_mood_rejects_large_jump_and_strong_accepts_it(
+    consented_rin: ConsentedRin,
+) -> None:
+    ordinary = mood_event("mood-event-1", 0)
+    _assert_code(
+        "PERSISTENCE_MOOD_INVALID",
+        lambda: _apply_mood(
+            consented_rin,
+            ordinary,
+            0,
+            operation_id="mood-operation-1",
+        ),
+    )
+
+    strong = deepcopy(ordinary)
+    strong["trigger_strength"] = "strong"
+    state = _apply_mood(
+        consented_rin,
+        strong,
+        0,
+        operation_id="mood-operation-1",
+    )
+    assert state["mood"]["intensity"] == 0.42
+
+
+def test_mood_accepts_exact_ordinary_boundary_mapping_and_exact_retry(
+    consented_rin: ConsentedRin,
+) -> None:
+    event = mood_event("mood-event-1", 0)
+    event["intensity"] = 0.35
+    read_only_event = MappingProxyType(event)
+
+    first = _apply_mood(
+        consented_rin,
+        read_only_event,
+        0,
+        operation_id="mood-operation-1",
+    )
+    duplicate = _apply_mood(
+        consented_rin,
+        read_only_event,
+        0,
+        operation_id="mood-operation-1",
+    )
+
+    assert duplicate == first
+    assert duplicate is not first
+    assert len(list(_generation_root(consented_rin).joinpath("events").iterdir())) == 1
+
+
+def test_ordinary_mood_rejects_strong_valence_reversal(
+    consented_rin: ConsentedRin,
+) -> None:
+    first = mood_event("mood-event-1", 0)
+    first.update(
+        valence=-0.6,
+        intensity=0.3,
+        trigger_strength="strong",
+    )
+    _apply_mood(
+        consented_rin,
+        first,
+        0,
+        operation_id="mood-operation-1",
+    )
+    reversal = mood_event("mood-event-2", 1)
+    reversal.update(valence=0.6, intensity=0.3)
+
+    _assert_code(
+        "PERSISTENCE_MOOD_INVALID",
+        lambda: _apply_mood(
+            consented_rin,
+            reversal,
+            1,
+            operation_id="mood-operation-2",
+        ),
+    )
+    reversal["trigger_strength"] = "strong"
+    state = _apply_mood(
+        consented_rin,
+        reversal,
+        1,
+        operation_id="mood-operation-2",
+    )
+    assert state["mood"]["valence"] == 0.6
+
+
+def test_mood_requires_exact_revision_and_unique_event_bytes(
+    consented_rin: ConsentedRin,
+) -> None:
+    wrong_revision = mood_event("mood-event-1", 1)
+    wrong_revision["trigger_strength"] = "strong"
+    _assert_code(
+        "PERSISTENCE_STATE_REVISION_CONFLICT",
+        lambda: _apply_mood(
+            consented_rin,
+            wrong_revision,
+            0,
+            operation_id="mood-operation-1",
+        ),
+    )
+
+    first = mood_event("mood-event-1", 0)
+    first["trigger_strength"] = "strong"
+    _apply_mood(
+        consented_rin,
+        first,
+        0,
+        operation_id="mood-operation-1",
+    )
+    changed = mood_event("mood-event-1", 1)
+    changed.update(primary="curious", trigger_strength="strong")
+    _assert_code(
+        "PERSISTENCE_STATE_REVISION_CONFLICT",
+        lambda: _apply_mood(
+            consented_rin,
+            changed,
+            1,
+            operation_id="mood-operation-2",
+        ),
+    )
+
+
+def test_mood_advance_rejects_past_expiry(
+    consented_rin: ConsentedRin,
+) -> None:
+    event = mood_event("mood-event-1", 0)
+    event["trigger_strength"] = "strong"
+    _apply_mood(
+        consented_rin,
+        event,
+        0,
+        operation_id="mood-operation-1",
+    )
+
+    _assert_code(
+        "PERSISTENCE_MOOD_INVALID",
+        lambda: advance_persistent_mood_turn(
+            consented_rin.data_root,
+            "rin-aster",
+            consented_rin.consent["consent_id"],
+            consented_rin.consent["grant_revision"],
+            SCHEMAS,
+            expected_state_revision=1,
+            expected_mood_revision=1,
+            operation_id="mood-advance-1",
+            turns=4,
+        ),
+    )
+
+
+def test_mood_advance_rejects_numeric_bounds(
+    consented_rin: ConsentedRin,
+) -> None:
+    event = mood_event("mood-event-1", 0)
+    event["trigger_strength"] = "strong"
+    _apply_mood(
+        consented_rin,
+        event,
+        0,
+        operation_id="mood-operation-1",
+    )
+
+    for turns in (0, 1001):
+        _assert_code(
+            "PERSISTENCE_MOOD_INVALID",
+            lambda turns=turns: advance_persistent_mood_turn(
+                consented_rin.data_root,
+                "rin-aster",
+                consented_rin.consent["consent_id"],
+                consented_rin.consent["grant_revision"],
+                SCHEMAS,
+                expected_state_revision=1,
+                expected_mood_revision=1,
+                operation_id=f"mood-advance-{turns}",
+                turns=turns,
+            ),
+        )

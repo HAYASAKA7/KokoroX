@@ -12,6 +12,7 @@ from kokoroarc.packs.compiler import canonical_bytes
 import kokoroarc.persistence._storage as storage
 from kokoroarc.persistence.consent import grant_consent, load_consent
 from kokoroarc.persistence.state import (
+    apply_persistent_mood_event,
     apply_persistent_relationship_event,
     replay_persistent_state,
 )
@@ -22,6 +23,7 @@ from persistence_support import (
     consented_rin,
     install_rin,
     interaction_event,
+    mood_event,
 )
 
 
@@ -623,6 +625,44 @@ def test_relationship_rejects_caller_event_aba_across_consent_callbacks(
             AbaSchemas(),
             expected_state_revision=0,
             operation_id="relationship-operation-1",
+        ),
+    )
+    assert phase == 1
+    assert not _persistent_state_root(consented_rin).exists()
+
+
+def test_mood_rejects_caller_event_aba_across_consent_callbacks(
+    consented_rin: ConsentedRin,
+) -> None:
+    event = mood_event("mood-event-1", 0)
+    event["trigger_strength"] = "strong"
+    original = canonical_bytes(event)
+    phase = 0
+
+    class AbaSchemas:
+        def validate(self, name: str, instance: Any) -> None:
+            nonlocal phase
+            SCHEMAS.validate(name, instance)
+            if name != "persistence-consent":
+                return
+            phase += 1
+            if phase == 1:
+                event["intensity"] = 0.2
+            elif phase == 2:
+                event.clear()
+                event.update(json.loads(original))
+
+    _assert_code(
+        "PERSISTENCE_INPUT_MUTATION",
+        lambda: apply_persistent_mood_event(
+            consented_rin.data_root,
+            "rin-aster",
+            event,
+            consented_rin.consent["consent_id"],
+            consented_rin.consent["grant_revision"],
+            AbaSchemas(),
+            expected_state_revision=0,
+            operation_id="mood-operation-1",
         ),
     )
     assert phase == 1

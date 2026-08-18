@@ -41,6 +41,21 @@ def interaction_event(
     }
 
 
+def mood_event(event_id: str, mood_revision: int) -> dict[str, Any]:
+    return {
+        "event_id": event_id,
+        "expected_mood_revision": mood_revision,
+        "primary": "pleased",
+        "secondary": "focused",
+        "arousal": 0.35,
+        "valence": 0.4,
+        "intensity": 0.42,
+        "expires_after_turns": 3,
+        "triggering_interaction_event_id": "event-1",
+        "trigger_strength": "ordinary",
+    }
+
+
 def install_rin(
     data_root: Path,
     release: dict[str, Any],

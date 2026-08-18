@@ -49,6 +49,39 @@ _GENERATION_PATTERN = re.compile(r"generation-[a-f0-9]{32}\Z")
 _STABLE_ID_PATTERN = re.compile(
     r"[a-z0-9]+(?:[._-][a-z0-9]+)*\Z"
 )
+_MOODS = frozenset(
+    {
+        "neutral",
+        "focused",
+        "curious",
+        "pleased",
+        "amused",
+        "concerned",
+        "embarrassed",
+        "irritated",
+        "disappointed",
+        "relieved",
+        "proud",
+        "tired",
+    }
+)
+_MOOD_UPDATE_KEYS = frozenset(
+    {
+        "event_id",
+        "expected_mood_revision",
+        "primary",
+        "secondary",
+        "arousal",
+        "valence",
+        "intensity",
+        "expires_after_turns",
+        "triggering_interaction_event_id",
+        "trigger_strength",
+    }
+)
+_MOOD_ADVANCE_KEYS = frozenset(
+    {"event_id", "expected_mood_revision", "turns"}
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -153,6 +186,79 @@ def apply_persistent_relationship_event(
     )
 
 
+def apply_persistent_mood_event(
+    data_root: Path,
+    character_id: str,
+    event: Mapping[str, Any],
+    consent_id: str,
+    consent_revision: int,
+    schemas: SchemaValidator,
+    *,
+    expected_state_revision: int,
+    operation_id: str,
+    namespace: str = "original",
+    workspace_root: Path | None = None,
+    limits: PersistenceLimits = PersistenceLimits(),
+) -> dict[str, Any]:
+    """Apply one explicit bounded mood event to durable state."""
+
+    return _state_domain(
+        lambda: _apply_state_operation(
+            data_root=data_root,
+            character_id=character_id,
+            operation_kind="mood_update",
+            operation_payload=event,
+            consent_id=consent_id,
+            consent_revision=consent_revision,
+            schemas=schemas,
+            expected_state_revision=expected_state_revision,
+            operation_id=operation_id,
+            namespace=namespace,
+            workspace_root=workspace_root,
+            limits=limits,
+        )
+    )
+
+
+def advance_persistent_mood_turn(
+    data_root: Path,
+    character_id: str,
+    consent_id: str,
+    consent_revision: int,
+    schemas: SchemaValidator,
+    *,
+    expected_state_revision: int,
+    expected_mood_revision: int,
+    operation_id: str,
+    turns: int = 1,
+    namespace: str = "original",
+    workspace_root: Path | None = None,
+    limits: PersistenceLimits = PersistenceLimits(),
+) -> dict[str, Any]:
+    """Advance a durable mood by an explicit number of turns."""
+
+    return _state_domain(
+        lambda: _apply_state_operation(
+            data_root=data_root,
+            character_id=character_id,
+            operation_kind="mood_advance",
+            operation_payload={
+                "event_id": operation_id,
+                "expected_mood_revision": expected_mood_revision,
+                "turns": turns,
+            },
+            consent_id=consent_id,
+            consent_revision=consent_revision,
+            schemas=schemas,
+            expected_state_revision=expected_state_revision,
+            operation_id=operation_id,
+            namespace=namespace,
+            workspace_root=workspace_root,
+            limits=limits,
+        )
+    )
+
+
 def _load_or_replay(
     data_root: Path,
     character_id: str,
@@ -221,7 +327,7 @@ def _apply_state_operation(
     workspace_root: Path | None,
     limits: PersistenceLimits,
 ) -> dict[str, Any]:
-    if operation_kind != "relationship":
+    if operation_kind not in {"relationship", "mood_update", "mood_advance"}:
         raise _contract_unsupported("operation_kind")
     _require_revision(expected_state_revision, "expected_state_revision")
     _require_revision(consent_revision, "consent_revision", minimum=1)
@@ -244,8 +350,17 @@ def _apply_state_operation(
         operation_payload,
     )
     event = _decode_mapping(operation_payload_bytes, "operation_payload")
-    scope.boundary.validate("interaction-event", operation_payload_bytes)
-    _require_stable_id(cast(str, event.get("event_id")), "event_id")
+    _validate_operation_payload(
+        scope.boundary,
+        operation_kind,
+        operation_payload_bytes,
+        event,
+    )
+    permission = (
+        "relationship_state"
+        if operation_kind == "relationship"
+        else "mood_state"
+    )
 
     with _acquire_character_lock(scope) as lock, _audit_failures(
         scope.boundary
@@ -256,7 +371,7 @@ def _apply_state_operation(
             character_id,
             consent_id,
             consent_revision,
-            "relationship_state",
+            permission,
             _AuditedSchemas(schemas, scope.boundary),
             namespace=namespace,
             workspace_root=captured_workspace,
@@ -288,11 +403,16 @@ def _apply_state_operation(
             generation_id = cast(str, state["generation_id"])
             _require_active_generation(state, active)
 
-        growth = _growth_config(active.compiled)
+        growth = (
+            _growth_config(active.compiled)
+            if operation_kind == "relationship"
+            else None
+        )
         duplicate = _find_operation(records, operation_id)
         if duplicate is not None:
-            if not _exact_relationship_retry(
+            if not _exact_operation_retry(
                 duplicate.value,
+                operation_kind,
                 event,
                 growth,
                 expected_state_revision,
@@ -305,27 +425,34 @@ def _apply_state_operation(
                 replay_boundary,
             )
             return _detached(state)
-        if _find_relationship_event(records, cast(str, event["event_id"])):
+        if _find_operation_event(
+            records,
+            operation_kind,
+            cast(str, event["event_id"]),
+        ):
             raise _revision_conflict("event_id_reused")
         if state["revision"] != expected_state_revision:
             raise _revision_conflict("outer_revision")
-        if (
-            event["expected_state_revision"]
-            != state["relationship"]["revision"]
-        ):
-            raise _revision_conflict("relationship_revision")
+        _require_operation_revision(state, operation_kind, event)
         if len(records) >= limits.max_state_events:
             raise _event_limit(limits.max_state_events)
         if len(state["applied_operation_ids"]) >= limits.max_state_events:
             raise _event_limit(limits.max_state_events)
 
-        successor = _relationship_successor(state, event, growth, operation_id)
-        record = _relationship_record(
+        successor = _operation_successor(
+            state,
+            operation_kind,
+            event,
+            growth,
+            operation_id,
+        )
+        record = _operation_record(
             scope,
             active,
             generation_id,
             state,
             successor,
+            operation_kind,
             event,
             growth,
             operation_id,
@@ -447,6 +574,7 @@ def _replay_generation(
     state = _initial_state_from_event(scope, first)
     operation_ids: set[str] = set()
     interaction_ids: set[str] = set()
+    mood_event_ids: set[str] = set()
     predecessor_event_sha256: str | None = None
     for expected_revision, snapshot in enumerate(events, start=1):
         record = snapshot.value
@@ -467,22 +595,47 @@ def _replay_generation(
             raise _journal_invalid("predecessor_event")
         if record["predecessor_state_sha256"] != _state_sha256(state):
             raise _journal_invalid("predecessor_state")
-        if record["operation_kind"] != "relationship":
-            raise _contract_unsupported("operation_kind")
+        operation_kind = cast(str, record["operation_kind"])
         payload = cast(dict[str, Any], record["payload"])
-        interaction = cast(dict[str, Any], payload["interaction_event"])
-        interaction_id = cast(str, interaction["event_id"])
-        if interaction_id in interaction_ids:
-            raise _journal_invalid("duplicate_event_id")
-        if interaction["expected_state_revision"] != state["relationship"]["revision"]:
-            raise _journal_invalid("relationship_revision")
-        growth = _recorded_growth(payload)
-        successor = _relationship_successor(
-            state,
-            interaction,
-            growth,
-            operation_id,
-        )
+        if operation_kind == "relationship":
+            interaction = cast(dict[str, Any], payload["interaction_event"])
+            interaction_id = cast(str, interaction["event_id"])
+            if interaction_id in interaction_ids:
+                raise _journal_invalid("duplicate_event_id")
+            if (
+                interaction["expected_state_revision"]
+                != state["relationship"]["revision"]
+            ):
+                raise _journal_invalid("relationship_revision")
+            growth = _recorded_growth(payload)
+            successor = _relationship_successor(
+                state,
+                interaction,
+                growth,
+                operation_id,
+            )
+            interaction_ids.add(interaction_id)
+        elif operation_kind in {"mood_update", "mood_advance"}:
+            mood_event_id = cast(str, payload["event_id"])
+            if mood_event_id in mood_event_ids:
+                raise _journal_invalid("duplicate_mood_event_id")
+            try:
+                successor = _mood_successor(
+                    state,
+                    operation_kind,
+                    payload,
+                    operation_id,
+                )
+            except KokoroError as error:
+                if error.code in {
+                    "PERSISTENCE_MOOD_INVALID",
+                    "PERSISTENCE_STATE_REVISION_CONFLICT",
+                }:
+                    raise _journal_invalid("mood_event") from error
+                raise
+            mood_event_ids.add(mood_event_id)
+        else:
+            raise _contract_unsupported("operation_kind")
         if record["successor_state_sha256"] != _state_sha256(successor):
             raise _journal_invalid("successor_state")
         event_sha256 = sha256(snapshot.payload).hexdigest()
@@ -494,7 +647,6 @@ def _replay_generation(
         state = successor
         predecessor_event_sha256 = event_sha256
         operation_ids.add(operation_id)
-        interaction_ids.add(interaction_id)
 
     projection_present = True
     projection_matches = False
@@ -613,6 +765,20 @@ def _initial_state_values(
     }
 
 
+def _operation_successor(
+    state: dict[str, Any],
+    operation_kind: str,
+    event: dict[str, Any],
+    growth: tuple[float, int] | None,
+    operation_id: str,
+) -> dict[str, Any]:
+    if operation_kind == "relationship":
+        if growth is None:
+            raise _contract_unsupported("growth")
+        return _relationship_successor(state, event, growth, operation_id)
+    return _mood_successor(state, operation_kind, event, operation_id)
+
+
 def _relationship_successor(
     state: dict[str, Any],
     event: dict[str, Any],
@@ -637,17 +803,94 @@ def _relationship_successor(
     return successor
 
 
-def _relationship_record(
+def _mood_successor(
+    state: dict[str, Any],
+    operation_kind: str,
+    event: dict[str, Any],
+    operation_id: str,
+) -> dict[str, Any]:
+    mood = cast(dict[str, Any], state["mood"])
+    if operation_kind == "mood_update":
+        _validate_mood_update(event, mood)
+    elif operation_kind == "mood_advance":
+        _validate_mood_advance(event)
+    else:
+        raise _contract_unsupported("operation_kind")
+    if event["expected_mood_revision"] != mood["revision"]:
+        raise _revision_conflict("mood_revision")
+    if len(mood["applied_event_ids"]) >= 10_000:
+        raise _event_limit(10_000)
+
+    successor = _detached(state)
+    successor["revision"] += 1
+    next_mood = _detached(mood)
+    next_mood["revision"] += 1
+    next_mood["applied_event_ids"].append(event["event_id"])
+    if operation_kind == "mood_update":
+        if event["primary"] == "neutral":
+            _set_neutral_mood(next_mood)
+        else:
+            next_mood.update(
+                primary=event["primary"],
+                secondary=event["secondary"],
+                arousal=event["arousal"],
+                valence=event["valence"],
+                intensity=event["intensity"],
+                remaining_turns=event["expires_after_turns"],
+                expires_after_turns=event["expires_after_turns"],
+                triggering_event_id=event[
+                    "triggering_interaction_event_id"
+                ],
+            )
+    else:
+        remaining = cast(int, next_mood["remaining_turns"])
+        turns = cast(int, event["turns"])
+        if remaining == 0 or turns > remaining:
+            raise _mood_invalid("advance_past_expiry")
+        if turns == remaining:
+            _set_neutral_mood(next_mood)
+        else:
+            next_mood["remaining_turns"] = remaining - turns
+    successor["mood"] = next_mood
+    successor["applied_operation_ids"].append(operation_id)
+    return successor
+
+
+def _set_neutral_mood(mood: dict[str, Any]) -> None:
+    mood.update(
+        primary="neutral",
+        secondary=None,
+        arousal=0.0,
+        valence=0.0,
+        intensity=0.0,
+        remaining_turns=0,
+        expires_after_turns=0,
+        triggering_event_id=None,
+    )
+
+
+def _operation_record(
     scope: PersistenceScope,
     active: ActiveConsent,
     generation_id: str,
     state: dict[str, Any],
     successor: dict[str, Any],
+    operation_kind: str,
     event: dict[str, Any],
-    growth: tuple[float, int],
+    growth: tuple[float, int] | None,
     operation_id: str,
 ) -> dict[str, Any]:
     consent = active.consent
+    if operation_kind == "relationship":
+        if growth is None:
+            raise _contract_unsupported("growth")
+        payload = {
+            "interaction_event": _detached(event),
+            "max_delta": growth[0],
+            "repetition_window": growth[1],
+        }
+    else:
+        payload = _detached(event)
     return {
         "schema_version": "1.0",
         "artifact_id": _event_artifact_id(
@@ -668,17 +911,13 @@ def _relationship_record(
         "transition_algorithm": _TRANSITION_ALGORITHM,
         "revision": state["revision"] + 1,
         "operation_id": operation_id,
-        "operation_kind": "relationship",
+        "operation_kind": operation_kind,
         "predecessor_event_sha256": state["last_event_sha256"],
         "predecessor_state_sha256": _state_sha256(state),
         # The successor is hashed before its event hash is linked, avoiding a
         # circular event/state digest while retaining the predecessor link.
         "successor_state_sha256": _state_sha256(successor),
-        "payload": {
-            "interaction_event": _detached(event),
-            "max_delta": growth[0],
-            "repetition_window": growth[1],
-        },
+        "payload": payload,
     }
 
 
@@ -908,6 +1147,153 @@ def _recorded_growth(payload: dict[str, Any]) -> tuple[float, int]:
     return float(max_delta), repetition_window
 
 
+def _validate_operation_payload(
+    boundary: PersistenceBoundary,
+    operation_kind: str,
+    payload: bytes,
+    event: dict[str, Any],
+) -> None:
+    if operation_kind == "relationship":
+        boundary.validate("interaction-event", payload)
+        _require_stable_id(event.get("event_id"), "event_id")
+    elif operation_kind == "mood_update":
+        _validate_mood_update(event)
+    elif operation_kind == "mood_advance":
+        _validate_mood_advance(event)
+    else:
+        raise _contract_unsupported("operation_kind")
+
+
+def _validate_mood_update(
+    event: dict[str, Any],
+    current: dict[str, Any] | None = None,
+) -> None:
+    if set(event) != _MOOD_UPDATE_KEYS:
+        raise _mood_invalid("event_shape")
+    if not _is_stable_id(event.get("event_id")):
+        raise _mood_invalid("event_id")
+    if not _is_revision(event.get("expected_mood_revision")):
+        raise _mood_invalid("expected_mood_revision")
+    primary = event.get("primary")
+    secondary = event.get("secondary")
+    if not isinstance(primary, str) or primary not in _MOODS:
+        raise _mood_invalid("primary")
+    if (
+        secondary is not None
+        and (not isinstance(secondary, str) or secondary not in _MOODS)
+    ):
+        raise _mood_invalid("secondary")
+    if secondary == primary:
+        raise _mood_invalid("secondary_equals_primary")
+    if not _bounded_number(event.get("arousal"), -1.0, 1.0):
+        raise _mood_invalid("arousal")
+    if not _bounded_number(event.get("valence"), -1.0, 1.0):
+        raise _mood_invalid("valence")
+    if not _bounded_number(event.get("intensity"), 0.0, 1.0):
+        raise _mood_invalid("intensity")
+    expiry = event.get("expires_after_turns")
+    if (
+        isinstance(expiry, bool)
+        or not isinstance(expiry, int)
+        or not 0 <= expiry <= 1_000
+    ):
+        raise _mood_invalid("expires_after_turns")
+    if not _is_stable_id(event.get("triggering_interaction_event_id")):
+        raise _mood_invalid("triggering_interaction_event_id")
+    trigger_strength = event.get("trigger_strength")
+    if (
+        not isinstance(trigger_strength, str)
+        or trigger_strength not in {"ordinary", "strong"}
+    ):
+        raise _mood_invalid("trigger_strength")
+    if primary == "neutral":
+        if (
+            secondary is not None
+            or event["arousal"] != 0
+            or event["valence"] != 0
+            or event["intensity"] != 0
+            or expiry != 0
+        ):
+            raise _mood_invalid("neutral_values")
+    elif expiry == 0:
+        raise _mood_invalid("non_neutral_expiry")
+    if current is None or event["trigger_strength"] == "strong":
+        return
+    old_intensity = float(current["intensity"])
+    target_intensity = float(event["intensity"])
+    if abs(target_intensity - old_intensity) > 0.35:
+        raise _mood_invalid("ordinary_intensity_delta")
+    old_valence = float(current["valence"])
+    target_valence = float(event["valence"])
+    if (
+        old_valence * target_valence < 0
+        and abs(old_valence) >= 0.5
+        and abs(target_valence) >= 0.5
+    ):
+        raise _mood_invalid("ordinary_valence_reversal")
+
+
+def _validate_mood_advance(event: dict[str, Any]) -> None:
+    if set(event) != _MOOD_ADVANCE_KEYS:
+        raise _mood_invalid("advance_shape")
+    if not _is_stable_id(event.get("event_id")):
+        raise _mood_invalid("event_id")
+    if not _is_revision(event.get("expected_mood_revision")):
+        raise _mood_invalid("expected_mood_revision")
+    turns = event.get("turns")
+    if (
+        isinstance(turns, bool)
+        or not isinstance(turns, int)
+        or not 1 <= turns <= 1_000
+    ):
+        raise _mood_invalid("turns")
+
+
+def _bounded_number(value: Any, minimum: float, maximum: float) -> bool:
+    return (
+        not isinstance(value, bool)
+        and isinstance(value, (int, float))
+        and minimum <= value <= maximum
+    )
+
+
+def _is_revision(value: Any) -> bool:
+    return (
+        not isinstance(value, bool)
+        and isinstance(value, int)
+        and 0 <= value <= 10_000
+    )
+
+
+def _is_stable_id(value: Any) -> bool:
+    return (
+        isinstance(value, str)
+        and 1 <= len(value) <= 128
+        and _STABLE_ID_PATTERN.fullmatch(value) is not None
+    )
+
+
+def _exact_operation_retry(
+    record: dict[str, Any],
+    operation_kind: str,
+    event: dict[str, Any],
+    growth: tuple[float, int] | None,
+    expected_state_revision: int,
+) -> bool:
+    if operation_kind == "relationship":
+        return growth is not None and _exact_relationship_retry(
+            record,
+            event,
+            growth,
+            expected_state_revision,
+        )
+    return (
+        record.get("operation_kind") == operation_kind
+        and record.get("revision") == expected_state_revision + 1
+        and record.get("payload") == event
+    )
+
+
 def _exact_relationship_retry(
     record: dict[str, Any],
     event: dict[str, Any],
@@ -949,6 +1335,36 @@ def _find_relationship_event(
         == event_id
         for record in records
     )
+
+
+def _find_operation_event(
+    records: tuple[ArtifactSnapshot, ...],
+    operation_kind: str,
+    event_id: str,
+) -> bool:
+    if operation_kind == "relationship":
+        return _find_relationship_event(records, event_id)
+    return any(
+        record.value["operation_kind"] in {"mood_update", "mood_advance"}
+        and record.value["payload"]["event_id"] == event_id
+        for record in records
+    )
+
+
+def _require_operation_revision(
+    state: dict[str, Any],
+    operation_kind: str,
+    event: dict[str, Any],
+) -> None:
+    if operation_kind == "relationship":
+        if (
+            event["expected_state_revision"]
+            != state["relationship"]["revision"]
+        ):
+            raise _revision_conflict("relationship_revision")
+        return
+    if event["expected_mood_revision"] != state["mood"]["revision"]:
+        raise _revision_conflict("mood_revision")
 
 
 def _generation_id(
@@ -1144,6 +1560,14 @@ def _journal_invalid(reason: str) -> KokoroError:
     )
 
 
+def _mood_invalid(reason: str) -> KokoroError:
+    return KokoroError(
+        "PERSISTENCE_MOOD_INVALID",
+        "Persistent mood event is invalid.",
+        details={"reason": reason},
+    )
+
+
 def _contract_unsupported(reason: str) -> KokoroError:
     return KokoroError(
         "PERSISTENCE_STATE_CONTRACT_UNSUPPORTED",
@@ -1190,6 +1614,8 @@ def _state_write_failed(phase: str, error: KokoroError) -> KokoroError:
 
 
 __all__ = [
+    "advance_persistent_mood_turn",
+    "apply_persistent_mood_event",
     "apply_persistent_relationship_event",
     "load_persistent_state",
     "replay_persistent_state",

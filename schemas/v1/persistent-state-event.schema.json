@@ -304,7 +304,8 @@
         "valence",
         "intensity",
         "expires_after_turns",
-        "triggering_interaction_event_id"
+        "triggering_interaction_event_id",
+        "trigger_strength"
       ],
       "properties": {
         "event_id": {"$ref": "#/$defs/stable_id"},
@@ -319,7 +320,8 @@
         "valence": {"type": "number", "minimum": -1, "maximum": 1},
         "intensity": {"type": "number", "minimum": 0, "maximum": 1},
         "expires_after_turns": {"type": "integer", "minimum": 0, "maximum": 1000},
-        "triggering_interaction_event_id": {"$ref": "#/$defs/stable_id"}
+        "triggering_interaction_event_id": {"$ref": "#/$defs/stable_id"},
+        "trigger_strength": {"enum": ["ordinary", "strong"]}
       }
     },
     "mood_advance_payload": {
