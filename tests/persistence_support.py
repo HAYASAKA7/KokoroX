@@ -56,6 +56,15 @@ def mood_event(event_id: str, mood_revision: int) -> dict[str, Any]:
     }
 
 
+def approved_memory_inputs() -> tuple[str, str, dict[str, str]]:
+    summary = "The user approved concise technical explanations."
+    return (
+        "host-memory-preference-01",
+        summary,
+        {"en-US": summary},
+    )
+
+
 def install_rin(
     data_root: Path,
     release: dict[str, Any],
