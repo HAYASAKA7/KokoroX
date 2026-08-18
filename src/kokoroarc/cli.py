@@ -10,6 +10,7 @@ import os
 from pathlib import Path
 import re
 import stat
+import tempfile
 from typing import Any, Callable, cast
 
 from kokoroarc import __version__
@@ -18,6 +19,15 @@ from kokoroarc.authoring.requests import normalize_build_request
 from kokoroarc.authoring.storage import publish_draft_bundle
 from kokoroarc.authoring.validation import validate_authoring_pack
 from kokoroarc.config import Settings, resolve_schema_dir
+from kokoroarc.distribution.defaults import (
+    CharacterSelection,
+    _load_selected_compiled_snapshot,
+    clear_character_default,
+    load_character_default,
+    load_selected_compiled,
+    resolve_character_selection,
+    set_character_default,
+)
 from kokoroarc.errors import KokoroError
 from kokoroarc.json_compat import find_json_incompatibility
 from kokoroarc.packs.compiler import (
@@ -80,6 +90,25 @@ _PUBLIC_MESSAGES = {
     "INPUT_TOO_LARGE": "Input file exceeds the size limit.",
     "INPUT_INVALID_JSON": "Input file contains invalid JSON.",
     "INVALID_PACK_DATA": "Character pack data is invalid.",
+    "KARC_DEFAULT_AMBIGUOUS": "Character default selection is ambiguous.",
+    "KARC_DEFAULT_BINDING_INVALID": "Character default selection is invalid.",
+    "KARC_DEFAULT_CLEANUP_FAILED": "Character default cleanup failed.",
+    "KARC_DEFAULT_CONFIG_INVALID": "Character default configuration is invalid.",
+    "KARC_DEFAULT_CONFLICT": "Character default configuration conflicted.",
+    "KARC_DEFAULT_DURABILITY_FAILED": (
+        "Character default durability could not be confirmed."
+    ),
+    "KARC_DEFAULT_INPUT_MUTATION": "Character default input changed.",
+    "KARC_DEFAULT_LIMIT_EXCEEDED": "Character default data exceeds its limit.",
+    "KARC_DEFAULT_LOCK_UNSAFE": "Character default lock is unsafe.",
+    "KARC_DEFAULT_LOCKED": "Character default configuration is busy.",
+    "KARC_DEFAULT_NOT_INSTALLED": "Character is not installed in this scope.",
+    "KARC_DEFAULT_NOT_CONFIGURED": "No character default is configured.",
+    "KARC_DEFAULT_PATH_UNSAFE": "Character default path is unsafe.",
+    "KARC_DEFAULT_SELECTION_INVALID": "Character default selection is invalid.",
+    "KARC_DEFAULT_SCOPE_MISMATCH": "Character default scope does not match.",
+    "KARC_DEFAULT_STALE": "Character default binding is stale.",
+    "KARC_DEFAULT_WRITE_FAILED": "Character default configuration write failed.",
     "PACK_NOT_FOUND": "Character pack was not found.",
     "RESEARCH_BUNDLE_INVALID": (
         "Published Research Bundle validation failed."
@@ -275,11 +304,37 @@ def build_parser() -> argparse.ArgumentParser:
     research_bundle_validate.add_argument("--bundle", required=True)
     _leaf_json(research_bundle_validate)
 
+    config = commands.add_parser("config")
+    config_commands = config.add_subparsers(
+        dest="config_command", required=True
+    )
+    config_default = config_commands.add_parser("default")
+    default_commands = config_default.add_subparsers(
+        dest="default_command", required=True
+    )
+    default_set = default_commands.add_parser("set")
+    default_set.add_argument("--character", required=True)
+    default_set.add_argument("--namespace", default="original")
+    default_set.add_argument("--version")
+    for default_command in (
+        default_set,
+        default_commands.add_parser("show"),
+        default_commands.add_parser("clear"),
+    ):
+        default_command.add_argument(
+            "--scope",
+            choices=("global", "workspace"),
+            default="global",
+        )
+        default_command.add_argument("--workspace")
+        _leaf_json(default_command)
+
     session = commands.add_parser("session")
     session_commands = session.add_subparsers(dest="session_command", required=True)
     session_start = session_commands.add_parser("start")
-    session_start.add_argument("--character", required=True)
+    session_start.add_argument("--character")
     session_start.add_argument("--session", required=True)
+    session_start.add_argument("--workspace")
     _leaf_json(session_start)
     session_show = session_commands.add_parser("show")
     session_show.add_argument("--session")
@@ -1481,8 +1536,29 @@ def _handle_character_draft_compile(
 def _handle_session_start(
     args: argparse.Namespace, settings: Settings, schemas: SchemaRegistry
 ) -> dict[str, Any]:
-    path = _compiled_file(settings, args.character)
-    compiled = _validated_compiled(path, schemas)
+    if args.character is not None:
+        path = _compiled_file(settings, args.character)
+        compiled = _validated_compiled(path, schemas)
+    else:
+        workspace_root = (
+            Path(args.workspace) if args.workspace is not None else None
+        )
+        selection = resolve_character_selection(
+            settings.data_dir,
+            schemas,
+            workspace_root=workspace_root,
+        )
+        if selection.source == "none":
+            raise KokoroError(
+                "KARC_DEFAULT_NOT_CONFIGURED",
+                "No character default is configured.",
+            )
+        compiled = _publish_selected_compiled_projection(
+            settings,
+            selection,
+            schemas,
+            workspace_root=workspace_root,
+        )
     session = SessionStore(settings.data_dir).start(
         args.session,
         compiled["character_id"],
@@ -1490,6 +1566,356 @@ def _handle_session_start(
         compiled["source_hash"],
     )
     return {"ok": True, "session": session}
+
+
+def _publish_selected_compiled_projection(
+    settings: Settings,
+    selection: CharacterSelection,
+    schemas: SchemaRegistry,
+    *,
+    workspace_root: Path | None,
+) -> dict[str, Any]:
+    source_snapshot = _load_selected_compiled_snapshot(
+        settings.data_dir,
+        selection,
+        schemas,
+        workspace_root=workspace_root,
+    )
+    compiled = source_snapshot.compiled
+    payload = canonical_bytes(compiled)
+    directory = _compiled_directory(settings, create=True)
+    directory_identity = _compiled_directory_identity(directory)
+    filename = (
+        f"{compiled['character_id']}-"
+        f"{compiled['source_hash'][:SOURCE_HASH_PREFIX_LENGTH]}.json"
+    )
+    target = directory / filename
+    expected = payload + b"\n"
+    projection_identity = _publish_compiled_projection(
+        directory,
+        directory_identity,
+        target,
+        compiled,
+        expected,
+    )
+    _require_projection_current(
+        directory,
+        directory_identity,
+        target,
+        projection_identity,
+        expected,
+    )
+    source_snapshot.audit()
+    projected = _validated_compiled(target, schemas)
+    _require_projection_current(
+        directory,
+        directory_identity,
+        target,
+        projection_identity,
+        expected,
+    )
+    source_snapshot.audit()
+    refreshed = load_selected_compiled(
+        settings.data_dir,
+        selection,
+        schemas,
+        workspace_root=workspace_root,
+    )
+    _require_projection_current(
+        directory,
+        directory_identity,
+        target,
+        projection_identity,
+        expected,
+    )
+    source_snapshot.audit()
+    if (
+        canonical_bytes(projected) != payload
+        or canonical_bytes(refreshed) != payload
+    ):
+        raise KokoroError(
+            "KARC_DEFAULT_INPUT_MUTATION",
+            "Character default input changed during projection.",
+        )
+    _require_projection_current(
+        directory,
+        directory_identity,
+        target,
+        projection_identity,
+        expected,
+    )
+    source_snapshot.audit()
+    return projected
+
+
+def _require_projection_current(
+    directory: Path,
+    directory_identity: _DirectoryIdentity,
+    target: Path,
+    target_identity: _PathIdentity,
+    expected: bytes,
+) -> None:
+    if _compiled_directory_identity(directory) != directory_identity:
+        raise KokoroError(
+            "COMPILED_PATH_UNSAFE",
+            "Compiled artifact path is unsafe.",
+        )
+    try:
+        payload = target.read_bytes()
+    except OSError as error:
+        raise KokoroError(
+            "COMPILED_WRITE_FAILED",
+            "Compiled artifact could not be read.",
+        ) from error
+    if _compiled_path_identity(target) != target_identity or payload != expected:
+        raise KokoroError(
+            "KARC_DEFAULT_INPUT_MUTATION",
+            "Character default projection changed during validation.",
+        )
+
+
+def _compiled_directory_identity(path: Path) -> _DirectoryIdentity:
+    try:
+        return _directory_identity(path)
+    except KokoroError as error:
+        raise KokoroError(
+            "COMPILED_PATH_UNSAFE",
+            "Compiled artifact path is unsafe.",
+        ) from error
+
+
+def _compiled_path_identity(path: Path) -> _PathIdentity | None:
+    try:
+        return _path_identity(path)
+    except KokoroError as error:
+        raise KokoroError(
+            "COMPILED_PATH_UNSAFE",
+            "Compiled artifact path is unsafe.",
+        ) from error
+
+
+def _projection_node(identity: _PathIdentity) -> tuple[int, int, int]:
+    return identity.device, identity.inode, identity.file_type
+
+
+def _publish_compiled_projection(
+    directory: Path,
+    directory_identity: _DirectoryIdentity,
+    target: Path,
+    compiled: dict[str, Any],
+    expected: bytes,
+) -> _PathIdentity:
+    existing = _compiled_path_identity(target)
+    if existing is not None:
+        _require_projection_current(
+            directory,
+            directory_identity,
+            target,
+            existing,
+            expected,
+        )
+        return existing
+    descriptor = -1
+    staging: Path | None = None
+    staging_node: tuple[int, int, int] | None = None
+    try:
+        descriptor, raw_staging = tempfile.mkstemp(
+            prefix=f".{target.name}.staging-",
+            dir=directory,
+        )
+        staging = Path(raw_staging)
+        initial = _compiled_path_identity(staging)
+        if initial is None:
+            raise KokoroError(
+                "COMPILED_PATH_UNSAFE",
+                "Compiled artifact path is unsafe.",
+            )
+        staging_node = _projection_node(initial)
+        os.close(descriptor)
+        descriptor = -1
+        _write_projection_staging(staging, expected, staging_node)
+        written = _compiled_path_identity(staging)
+        if (
+            written is None
+            or _projection_node(written) != staging_node
+            or staging.read_bytes() != expected
+        ):
+            raise KokoroError(
+                "KARC_DEFAULT_INPUT_MUTATION",
+                "Character default projection changed during publication.",
+            )
+        if _compiled_directory_identity(directory) != directory_identity:
+            raise KokoroError(
+                "COMPILED_PATH_UNSAFE",
+                "Compiled artifact path is unsafe.",
+            )
+        if _compiled_path_identity(target) is not None:
+            raise KokoroError(
+                "KARC_DEFAULT_INPUT_MUTATION",
+                "Character default projection appeared concurrently.",
+            )
+        os.link(staging, target)
+        staging.unlink()
+        staging = None
+        published = _compiled_path_identity(target)
+        if published is None:
+            raise KokoroError(
+                "COMPILED_WRITE_FAILED",
+                "Compiled artifact could not be written.",
+            )
+        _require_projection_current(
+            directory,
+            directory_identity,
+            target,
+            published,
+            expected,
+        )
+        return published
+    except KokoroError:
+        raise
+    except OSError as error:
+        raise KokoroError(
+            "COMPILED_WRITE_FAILED",
+            "Compiled artifact could not be written.",
+        ) from error
+    finally:
+        if descriptor >= 0:
+            try:
+                os.close(descriptor)
+            except OSError:
+                pass
+        if staging is not None:
+            _cleanup_projection_staging(staging, staging_node)
+
+
+def _write_projection_staging(
+    path: Path,
+    payload: bytes,
+    node: tuple[int, int, int],
+) -> None:
+    flags = os.O_WRONLY | os.O_TRUNC | getattr(os, "O_BINARY", 0)
+    flags |= getattr(os, "O_NOFOLLOW", 0)
+    descriptor = -1
+    try:
+        descriptor = os.open(path, flags)
+        opened = os.fstat(descriptor)
+        opened_node = (
+            int(opened.st_dev),
+            int(opened.st_ino),
+            stat.S_IFMT(opened.st_mode),
+        )
+        if opened_node != node or int(opened.st_nlink) != 1:
+            raise KokoroError(
+                "KARC_DEFAULT_INPUT_MUTATION",
+                "Character default projection staging changed.",
+            )
+        remaining = memoryview(payload)
+        while remaining:
+            written = os.write(descriptor, remaining)
+            if written <= 0:
+                raise OSError("projection write made no progress")
+            remaining = remaining[written:]
+        os.fsync(descriptor)
+    except KokoroError:
+        raise
+    except OSError as error:
+        raise KokoroError(
+            "COMPILED_WRITE_FAILED",
+            "Compiled artifact could not be made durable.",
+        ) from error
+    finally:
+        if descriptor >= 0:
+            try:
+                os.close(descriptor)
+            except OSError:
+                pass
+
+
+def _cleanup_projection_staging(
+    path: Path,
+    node: tuple[int, int, int] | None,
+) -> None:
+    current = _compiled_path_identity(path)
+    if current is None:
+        return
+    if node is None or _projection_node(current) != node:
+        raise KokoroError(
+            "COMPILED_WRITE_FAILED",
+            "Compiled artifact staging cleanup failed.",
+        )
+    try:
+        path.unlink()
+    except OSError as error:
+        raise KokoroError(
+            "COMPILED_WRITE_FAILED",
+            "Compiled artifact staging cleanup failed.",
+        ) from error
+
+
+def _workspace_argument(args: argparse.Namespace) -> Path | None:
+    if args.scope == "workspace":
+        if args.workspace is None:
+            raise KokoroError(
+                "ARGUMENT_INVALID",
+                "Command arguments are invalid.",
+            )
+        return Path(args.workspace)
+    if args.workspace is not None:
+        raise KokoroError(
+            "ARGUMENT_INVALID",
+            "Command arguments are invalid.",
+        )
+    return None
+
+
+def _default_response(config: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "ok": True,
+        "default": config,
+        "activates_character": False,
+    }
+
+
+def _handle_default_set(
+    args: argparse.Namespace,
+    settings: Settings,
+    schemas: SchemaRegistry,
+) -> dict[str, Any]:
+    config = set_character_default(
+        settings.data_dir,
+        args.character,
+        schemas,
+        namespace=args.namespace,
+        version=args.version,
+        workspace_root=_workspace_argument(args),
+    )
+    return _default_response(config)
+
+
+def _handle_default_show(
+    args: argparse.Namespace,
+    settings: Settings,
+    schemas: SchemaRegistry,
+) -> dict[str, Any]:
+    config = load_character_default(
+        settings.data_dir,
+        schemas,
+        workspace_root=_workspace_argument(args),
+    )
+    return _default_response(config)
+
+
+def _handle_default_clear(
+    args: argparse.Namespace,
+    settings: Settings,
+    schemas: SchemaRegistry,
+) -> dict[str, Any]:
+    config = clear_character_default(
+        settings.data_dir,
+        schemas,
+        workspace_root=_workspace_argument(args),
+    )
+    return _default_response(config)
 
 
 def _handle_session_show(
@@ -1717,6 +2143,14 @@ _RESEARCH_HANDLERS: dict[
     ("bundle", "validate"): _handle_research_bundle_validate,
 }
 
+_CONFIG_HANDLERS: dict[
+    tuple[str, str], Callable[..., dict[str, Any]]
+] = {
+    ("default", "set"): _handle_default_set,
+    ("default", "show"): _handle_default_show,
+    ("default", "clear"): _handle_default_clear,
+}
+
 
 def main(argv: list[str] | None = None) -> int:
     try:
@@ -1766,6 +2200,12 @@ def main(argv: list[str] | None = None) -> int:
             result = _RESEARCH_HANDLERS[(group, subcommand)](
                 args, settings, schemas
             )
+        elif args.command == "config":
+            settings = Settings.from_env(os.environ)
+            schemas = SchemaRegistry(settings.schema_dir)
+            result = _CONFIG_HANDLERS[
+                (args.config_command, args.default_command)
+            ](args, settings, schemas)
         else:
             settings = Settings.from_env(os.environ)
             schemas = SchemaRegistry(settings.schema_dir)

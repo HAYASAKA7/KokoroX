@@ -285,12 +285,12 @@ metadata remains canonical LF.
 
 **Modify:** session-start resolution and CLI only after RED integration coverage.
 
-- [ ] Write RED tests for explicit > session > workspace > global > none precedence.
-- [ ] Add RED cases for stale/uninstalled bindings, hash/version mismatch, unsafe workspace roots, registry mutation, ambiguous versions, and default-setting without verified activation eligibility.
-- [ ] Implement global-default CLI behavior and explicit workspace override.
-- [ ] Allow `session start` to omit `--character` only when resolving a valid default; it must still be explicitly invoked.
-- [ ] Prove no ordinary runtime or Skill request auto-starts a session.
-- [ ] Commit: `feat: resolve scoped character defaults`.
+- [x] Write RED tests for explicit > session > workspace > global > none precedence.
+- [x] Add RED cases for stale/uninstalled bindings, hash/version mismatch, unsafe workspace roots, registry mutation, ambiguous versions, and default-setting without verified activation eligibility.
+- [x] Implement global-default CLI behavior and explicit workspace override.
+- [x] Allow `session start` to omit `--character` only when resolving a valid default; it must still be explicitly invoked.
+- [x] Prove no ordinary runtime or Skill request auto-starts a session.
+- [x] Commit: `feat: resolve scoped character defaults`.
 
 ### Task 15: Add consented persistent state, export/reset, and memory references
 

@@ -9,6 +9,15 @@ from kokoroarc.distribution.archive import (
     load_karc_archive,
 )
 from kokoroarc.distribution.compatibility import inspect_karc_compatibility
+from kokoroarc.distribution.defaults import (
+    CharacterSelection,
+    clear_character_default,
+    empty_character_default,
+    load_character_default,
+    load_selected_compiled,
+    resolve_character_selection,
+    set_character_default,
+)
 from kokoroarc.distribution.installer import (
     install_karc_archive,
     preview_karc_install,
@@ -32,6 +41,7 @@ from kokoroarc.distribution.registry import (
 )
 
 __all__ = [
+    "CharacterSelection",
     "DEFAULT_MIGRATIONS",
     "InstallScope",
     "InspectedKarcContainer",
@@ -42,16 +52,22 @@ __all__ = [
     "MigrationStep",
     "apply_karc_migration",
     "build_karc_archive",
+    "clear_character_default",
+    "empty_character_default",
     "empty_installed_registry",
     "install_karc_archive",
     "inspect_karc_compatibility",
     "inspect_karc_container",
     "list_installed_packs",
+    "load_character_default",
     "load_karc_archive",
     "load_installed_registry",
+    "load_selected_compiled",
     "preview_karc_install",
     "preview_karc_migration",
     "recover_karc_installations",
     "remove_installed_pack",
+    "resolve_character_selection",
     "resolve_install_scope",
+    "set_character_default",
 ]

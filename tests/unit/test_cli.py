@@ -8,6 +8,185 @@ import pytest
 from kokoroarc.cli import build_parser
 
 
+@pytest.mark.parametrize(
+    ("arguments", "expected"),
+    [
+        (
+            [
+                "config",
+                "default",
+                "set",
+                "--character",
+                "rin-aster",
+                "--json",
+            ],
+            {
+                "command": "config",
+                "config_command": "default",
+                "default_command": "set",
+                "character": "rin-aster",
+                "namespace": "original",
+                "version": None,
+                "scope": "global",
+                "workspace": None,
+                "json": True,
+            },
+        ),
+        (
+            [
+                "config",
+                "default",
+                "set",
+                "--character",
+                "rin-aster",
+                "--namespace",
+                "original",
+                "--version",
+                "1.0.0",
+                "--scope",
+                "workspace",
+                "--workspace",
+                "D:/workspace",
+                "--json",
+            ],
+            {
+                "command": "config",
+                "config_command": "default",
+                "default_command": "set",
+                "character": "rin-aster",
+                "namespace": "original",
+                "version": "1.0.0",
+                "scope": "workspace",
+                "workspace": "D:/workspace",
+                "json": True,
+            },
+        ),
+        (
+            ["config", "default", "show", "--json"],
+            {
+                "command": "config",
+                "config_command": "default",
+                "default_command": "show",
+                "scope": "global",
+                "workspace": None,
+                "json": True,
+            },
+        ),
+        (
+            ["config", "default", "clear", "--json"],
+            {
+                "command": "config",
+                "config_command": "default",
+                "default_command": "clear",
+                "scope": "global",
+                "workspace": None,
+                "json": True,
+            },
+        ),
+    ],
+)
+def test_config_default_parser_leaves(
+    arguments: list[str],
+    expected: dict[str, object],
+) -> None:
+    assert vars(build_parser().parse_args(arguments)) == expected
+
+
+@pytest.mark.parametrize(
+    "arguments",
+    [
+        [
+            "config",
+            "default",
+            "show",
+            "--scope",
+            "global",
+            "--workspace",
+            r"D:\PRIVATE\workspace",
+            "--json",
+        ],
+        [
+            "config",
+            "default",
+            "clear",
+            "--scope",
+            "workspace",
+            "--json",
+        ],
+    ],
+)
+def test_invalid_config_default_scope_arguments_are_sanitized(
+    arguments: list[str],
+    tmp_path,
+) -> None:
+    data_root = tmp_path / "must-not-be-created"
+    environment = os.environ.copy()
+    environment["KOKOROARC_DATA_DIR"] = str(data_root)
+    completed = subprocess.run(
+        [sys.executable, "-m", "kokoroarc.cli", *arguments],
+        check=False,
+        capture_output=True,
+        text=True,
+        env=environment,
+    )
+
+    assert completed.returncode == 2
+    assert json.loads(completed.stdout) == {
+        "ok": False,
+        "error": {
+            "code": "ARGUMENT_INVALID",
+            "message": "Command arguments are invalid.",
+            "retryable": False,
+            "details": {},
+        },
+    }
+    assert "PRIVATE" not in completed.stdout
+    assert completed.stderr == ""
+    assert not data_root.exists()
+
+
+@pytest.mark.parametrize(
+    ("arguments", "expected"),
+    [
+        (
+            ["session", "start", "--session", "s-global", "--json"],
+            {
+                "command": "session",
+                "session_command": "start",
+                "character": None,
+                "session": "s-global",
+                "workspace": None,
+                "json": True,
+            },
+        ),
+        (
+            [
+                "session",
+                "start",
+                "--session",
+                "s-workspace",
+                "--workspace",
+                "D:/workspace",
+                "--json",
+            ],
+            {
+                "command": "session",
+                "session_command": "start",
+                "character": None,
+                "session": "s-workspace",
+                "workspace": "D:/workspace",
+                "json": True,
+            },
+        ),
+    ],
+)
+def test_session_start_parser_supports_default_resolution(
+    arguments: list[str],
+    expected: dict[str, object],
+) -> None:
+    assert vars(build_parser().parse_args(arguments)) == expected
+
+
 def test_module_version_command() -> None:
     completed = subprocess.run(
         [sys.executable, "-m", "kokoroarc.cli", "--version"],

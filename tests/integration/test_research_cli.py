@@ -39,6 +39,7 @@ REQUIRED_DISTRIBUTION_MODULES = {
         "__init__",
         "archive",
         "compatibility",
+        "defaults",
         "installer",
         "migrations",
         "registry",
@@ -597,31 +598,45 @@ def test_built_archives_and_installed_research_cli_are_complete(
             "-c",
             (
                 "from kokoroarc.distribution import (\n"
+                "    CharacterSelection,\n"
                 "    InstallScope,\n"
                 "    apply_karc_migration,\n"
+                "    clear_character_default,\n"
+                "    empty_character_default,\n"
                 "    empty_installed_registry,\n"
                 "    install_karc_archive,\n"
                 "    inspect_karc_compatibility,\n"
                 "    list_installed_packs,\n"
+                "    load_character_default,\n"
                 "    load_installed_registry,\n"
+                "    load_selected_compiled,\n"
                 "    preview_karc_migration,\n"
                 "    preview_karc_install,\n"
                 "    recover_karc_installations,\n"
                 "    remove_installed_pack,\n"
+                "    resolve_character_selection,\n"
                 "    resolve_install_scope,\n"
+                "    set_character_default,\n"
                 ")\n"
+                "assert callable(CharacterSelection)\n"
                 "assert callable(InstallScope)\n"
                 "assert callable(apply_karc_migration)\n"
+                "assert callable(clear_character_default)\n"
+                "assert callable(empty_character_default)\n"
                 "assert callable(empty_installed_registry)\n"
                 "assert callable(install_karc_archive)\n"
                 "assert callable(inspect_karc_compatibility)\n"
                 "assert callable(list_installed_packs)\n"
+                "assert callable(load_character_default)\n"
                 "assert callable(load_installed_registry)\n"
+                "assert callable(load_selected_compiled)\n"
                 "assert callable(preview_karc_migration)\n"
                 "assert callable(preview_karc_install)\n"
                 "assert callable(recover_karc_installations)\n"
                 "assert callable(remove_installed_pack)\n"
+                "assert callable(resolve_character_selection)\n"
                 "assert callable(resolve_install_scope)\n"
+                "assert callable(set_character_default)\n"
             ),
         ],
         check=False,
