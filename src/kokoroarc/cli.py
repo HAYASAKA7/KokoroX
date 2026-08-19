@@ -49,6 +49,12 @@ from kokoroarc.runtime.context import build_runtime_context
 from kokoroarc.runtime.planning import build_render_plan
 from kokoroarc.runtime.validation import validate_rendered_output
 from kokoroarc.schemas import SchemaRegistry
+from kokoroarc.standalone_cli import (
+    add_standalone_parsers,
+    handle_standalone,
+    standalone_requires_data_root,
+    standalone_route,
+)
 from kokoroarc.state.store import SessionStore
 from kokoroarc.state.transitions import apply_event
 from kokoroarc.testing.hard import run_hard_validation
@@ -374,6 +380,12 @@ def build_parser() -> argparse.ArgumentParser:
         state_command.add_argument("--session", required=True)
         state_command.add_argument("--event", required=True)
         _leaf_json(state_command)
+    add_standalone_parsers(
+        commands,
+        pack_commands,
+        state_commands,
+        _leaf_json,
+    )
     return parser
 
 
@@ -2172,7 +2184,22 @@ def main(argv: list[str] | None = None) -> int:
         )
         return 2
     try:
-        if args.command == "character":
+        route = standalone_route(args)
+        if route is not None:
+            settings = (
+                Settings.from_env(os.environ)
+                if standalone_requires_data_root(args)
+                else None
+            )
+            schemas = SchemaRegistry(
+                settings.schema_dir if settings is not None else resolve_schema_dir()
+            )
+            result = handle_standalone(
+                args,
+                settings.data_dir if settings is not None else None,
+                schemas,
+            )
+        elif args.command == "character":
             group = args.character_command
             subcommand = getattr(args, f"{group}_command")
             settings = (
