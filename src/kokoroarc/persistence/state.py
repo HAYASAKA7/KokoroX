@@ -2058,6 +2058,12 @@ def _replay_generation(
                 payload,
                 operation_id,
             )
+        elif operation_kind == "migration_marker":
+            successor = _migration_marker_successor(
+                state,
+                payload,
+                operation_id,
+            )
         else:
             raise _contract_unsupported("operation_kind")
         if record["successor_state_sha256"] != _state_sha256(successor):
@@ -2342,6 +2348,47 @@ def _mood_reset_successor(
         "triggering_event_id": None,
         "applied_event_ids": [],
     }
+    successor["applied_operation_ids"].append(operation_id)
+    return successor
+
+
+def _migration_marker_successor(
+    state: dict[str, Any],
+    payload: dict[str, Any],
+    operation_id: str,
+) -> dict[str, Any]:
+    expected_keys = {
+        "plan_sha256",
+        "source_generation_id",
+        "source_state_sha256",
+        "source_event_log_sha256",
+        "mood_strategy",
+    }
+    if set(payload) != expected_keys:
+        raise _journal_invalid("migration_marker_payload")
+    if (
+        not isinstance(payload.get("plan_sha256"), str)
+        or re.fullmatch(r"[a-f0-9]{64}", payload["plan_sha256"]) is None
+        or not isinstance(payload.get("source_generation_id"), str)
+        or _GENERATION_PATTERN.fullmatch(payload["source_generation_id"])
+        is None
+        or not isinstance(payload.get("source_state_sha256"), str)
+        or re.fullmatch(r"[a-f0-9]{64}", payload["source_state_sha256"])
+        is None
+        or not isinstance(payload.get("source_event_log_sha256"), str)
+        or re.fullmatch(
+            r"[a-f0-9]{64}",
+            payload["source_event_log_sha256"],
+        )
+        is None
+        or payload.get("mood_strategy")
+        not in {"preserve_identical_contract", "reset_neutral"}
+    ):
+        raise _journal_invalid("migration_marker_payload")
+    if len(state["applied_operation_ids"]) >= 10_000:
+        raise _event_limit(10_000)
+    successor = _detached(state)
+    successor["revision"] += 1
     successor["applied_operation_ids"].append(operation_id)
     return successor
 

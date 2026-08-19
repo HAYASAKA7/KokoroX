@@ -1,6 +1,7 @@
 import json
 import os
 from pathlib import Path
+import shutil
 import stat
 import subprocess
 from typing import Any
@@ -16,6 +17,11 @@ from kokoroarc.persistence.memory import (
     add_memory_reference,
     list_memory_references,
     remove_memory_reference,
+)
+import kokoroarc.persistence.migrations as persistent_migrations_module
+from kokoroarc.persistence.migrations import (
+    apply_state_migration,
+    preview_state_migration,
 )
 from kokoroarc.persistence.state import (
     apply_persistent_mood_event,
@@ -33,6 +39,7 @@ from persistence_support import (
     approved_memory_inputs,
     consented_rin,
     install_rin,
+    install_rin_successor,
     interaction_event,
     mood_event,
 )
@@ -88,6 +95,37 @@ def _persistent_state_root(consented: ConsentedRin) -> Path:
         / "original"
         / "rin-aster"
     )
+
+
+def _migration_case(
+    consented: ConsentedRin,
+    tmp_path: Path,
+    verified_release_factory: Any,
+) -> tuple[dict[str, Any], Any, dict[str, Any]]:
+    source = apply_persistent_relationship_event(
+        consented.data_root,
+        "rin-aster",
+        interaction_event("migration-source-event-1", 0),
+        consented.consent["consent_id"],
+        consented.consent["grant_revision"],
+        SCHEMAS,
+        expected_state_revision=0,
+        operation_id="migration-source-operation-1",
+    )
+    target = install_rin_successor(
+        consented,
+        tmp_path,
+        verified_release_factory,
+    )
+    plan = preview_state_migration(
+        consented.data_root,
+        "rin-aster",
+        target.consent["consent_id"],
+        target.consent["grant_revision"],
+        SCHEMAS,
+        mood_strategy="preserve_identical_contract",
+    )
+    return source, target, plan
 
 
 def test_storage_rejects_symlinked_canonical_file(tmp_path: Path) -> None:
@@ -1884,3 +1922,1029 @@ def test_reset_retries_committed_receipt_directory_fsync(
     )
     assert result["record_state"] == "committed"
     assert receipt_calls >= 2
+
+
+def test_migration_rejects_changed_plan_and_never_dispatches_plan_values(
+    consented_rin: ConsentedRin,
+    tmp_path: Path,
+    verified_release_factory: Any,
+) -> None:
+    source, target, plan = _migration_case(
+        consented_rin,
+        tmp_path,
+        verified_release_factory,
+    )
+    changed = json.loads(canonical_bytes(plan))
+    changed["expected_target_state_hash"] = "0" * 64
+    _assert_code(
+        "PERSISTENCE_MIGRATION_STALE",
+        lambda: apply_state_migration(
+            consented_rin.data_root,
+            "rin-aster",
+            target.consent["consent_id"],
+            target.consent["grant_revision"],
+            changed,
+            SCHEMAS,
+            mood_strategy="preserve_identical_contract",
+        ),
+    )
+
+    dispatched = False
+
+    def executable_value() -> None:
+        nonlocal dispatched
+        dispatched = True
+
+    hostile = dict(plan)
+    hostile["callable"] = executable_value
+    _assert_code(
+        "PERSISTENCE_MIGRATION_INVALID",
+        lambda: apply_state_migration(
+            consented_rin.data_root,
+            "rin-aster",
+            target.consent["consent_id"],
+            target.consent["grant_revision"],
+            hostile,
+            SCHEMAS,
+            mood_strategy="preserve_identical_contract",
+        ),
+    )
+    assert dispatched is False
+    assert replay_persistent_state(
+        consented_rin.data_root,
+        "rin-aster",
+        SCHEMAS,
+    ) == source
+
+
+def test_migration_rejects_changed_source_and_target_consent(
+    consented_rin: ConsentedRin,
+    tmp_path: Path,
+    verified_release_factory: Any,
+) -> None:
+    source, target, plan = _migration_case(
+        consented_rin,
+        tmp_path,
+        verified_release_factory,
+    )
+    source_generation = (
+        _persistent_state_root(consented_rin)
+        / "generations"
+        / source["generation_id"]
+    )
+    event_path = next((source_generation / "events").iterdir())
+    original_event = event_path.read_bytes()
+    changed_event = json.loads(original_event)
+    changed_event["created_by"]["version"] = "tampered"
+    event_path.write_bytes(canonical_bytes(changed_event))
+    _assert_code(
+        "PERSISTENCE_MIGRATION_UNREPLAYABLE",
+        lambda: apply_state_migration(
+            consented_rin.data_root,
+            "rin-aster",
+            target.consent["consent_id"],
+            target.consent["grant_revision"],
+            plan,
+            SCHEMAS,
+            mood_strategy="preserve_identical_contract",
+        ),
+    )
+    event_path.write_bytes(original_event)
+
+    changed_consent = grant_consent(
+        consented_rin.data_root,
+        "rin-aster",
+        ["relationship_state"],
+        SCHEMAS,
+        version="1.1.0",
+        expected_revision=target.consent["grant_revision"],
+    )
+    assert changed_consent["grant_revision"] > target.consent["grant_revision"]
+    _assert_code(
+        "PERSISTENCE_MIGRATION_STALE",
+        lambda: apply_state_migration(
+            consented_rin.data_root,
+            "rin-aster",
+            target.consent["consent_id"],
+            target.consent["grant_revision"],
+            plan,
+            SCHEMAS,
+            mood_strategy="preserve_identical_contract",
+        ),
+    )
+
+
+def test_migration_generation_capacity_blocks_before_publication(
+    consented_rin: ConsentedRin,
+    tmp_path: Path,
+    verified_release_factory: Any,
+) -> None:
+    source, target, plan = _migration_case(
+        consented_rin,
+        tmp_path,
+        verified_release_factory,
+    )
+    _assert_code(
+        "PERSISTENCE_LIMIT_EXCEEDED",
+        lambda: apply_state_migration(
+            consented_rin.data_root,
+            "rin-aster",
+            target.consent["consent_id"],
+            target.consent["grant_revision"],
+            plan,
+            SCHEMAS,
+            mood_strategy="preserve_identical_contract",
+            limits=storage.PersistenceLimits(max_state_generations=1),
+        ),
+    )
+    assert replay_persistent_state(
+        consented_rin.data_root,
+        "rin-aster",
+        SCHEMAS,
+    ) == source
+    scope = storage.open_persistence_scope(
+        consented_rin.data_root,
+        SCHEMAS,
+        character_id="rin-aster",
+    )
+    assert not scope.transaction_path.exists()
+
+
+def test_migration_pointer_failure_is_recoverable_and_rejects_replacement(
+    consented_rin: ConsentedRin,
+    tmp_path: Path,
+    verified_release_factory: Any,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source, target, plan = _migration_case(
+        consented_rin,
+        tmp_path,
+        verified_release_factory,
+    )
+    original_cutover = (
+        persistent_migrations_module._replace_current_generation_pointer
+    )
+
+    def fail_pointer(*_args: Any, **_kwargs: Any) -> Any:
+        raise OSError("injected")
+
+    monkeypatch.setattr(
+        persistent_migrations_module,
+        "_replace_current_generation_pointer",
+        fail_pointer,
+    )
+    error = _assert_code(
+        "PERSISTENCE_MIGRATION_WRITE_FAILED",
+        lambda: apply_state_migration(
+            consented_rin.data_root,
+            "rin-aster",
+            target.consent["consent_id"],
+            target.consent["grant_revision"],
+            plan,
+            SCHEMAS,
+            mood_strategy="preserve_identical_contract",
+        ),
+    )
+    assert error.details["record_state"] == "not_visible"
+    scope = storage.open_persistence_scope(
+        consented_rin.data_root,
+        SCHEMAS,
+        character_id="rin-aster",
+    )
+    marker_payload = scope.transaction_path.read_bytes()
+    marker = json.loads(marker_payload)
+    target_generation = (
+        _persistent_state_root(consented_rin)
+        / "generations"
+        / marker["target_generation_id"]
+    )
+    assert not target_generation.exists()
+    assert replay_persistent_state(
+        consented_rin.data_root,
+        "rin-aster",
+        SCHEMAS,
+    ) == source
+
+    changed_marker = dict(marker)
+    changed_marker["migration_id"] = "migration-tampered"
+    scope.transaction_path.write_bytes(canonical_bytes(changed_marker))
+    monkeypatch.setattr(
+        persistent_migrations_module,
+        "_replace_current_generation_pointer",
+        original_cutover,
+    )
+    _assert_code(
+        "PERSISTENCE_MIGRATION_STALE",
+        lambda: apply_state_migration(
+            consented_rin.data_root,
+            "rin-aster",
+            target.consent["consent_id"],
+            target.consent["grant_revision"],
+            plan,
+            SCHEMAS,
+            mood_strategy="preserve_identical_contract",
+        ),
+    )
+    scope.transaction_path.write_bytes(marker_payload)
+
+    target_generation.mkdir()
+    sentinel = target_generation / "unrelated-sentinel.txt"
+    sentinel.write_text("unrelated", encoding="utf-8")
+    _assert_code(
+        "PERSISTENCE_MIGRATION_CONFLICT",
+        lambda: apply_state_migration(
+            consented_rin.data_root,
+            "rin-aster",
+            target.consent["consent_id"],
+            target.consent["grant_revision"],
+            plan,
+            SCHEMAS,
+            mood_strategy="preserve_identical_contract",
+        ),
+    )
+    assert sentinel.read_text(encoding="utf-8") == "unrelated"
+    sentinel.unlink()
+    target_generation.rmdir()
+
+    migrated = apply_state_migration(
+        consented_rin.data_root,
+        "rin-aster",
+        target.consent["consent_id"],
+        target.consent["grant_revision"],
+        plan,
+        SCHEMAS,
+        mood_strategy="preserve_identical_contract",
+    )
+    assert migrated["installation"] == target.installation_binding
+    assert not scope.transaction_path.exists()
+
+
+def test_migration_retries_pointer_parent_fsync_after_committed_cutover(
+    consented_rin: ConsentedRin,
+    tmp_path: Path,
+    verified_release_factory: Any,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _source, target, plan = _migration_case(
+        consented_rin,
+        tmp_path,
+        verified_release_factory,
+    )
+    original = persistent_migrations_module._confirm_directory_durability
+    pointer_calls = 0
+
+    def fail_pointer_parent_once(
+        path: Path,
+        reason: str,
+        *,
+        record_state: str,
+    ) -> None:
+        nonlocal pointer_calls
+        if reason == "pointer_fsync":
+            pointer_calls += 1
+            if pointer_calls == 1:
+                raise KokoroError(
+                    "PERSISTENCE_MIGRATION_WRITE_FAILED",
+                    "injected",
+                    details={
+                        "phase": reason,
+                        "record_state": record_state,
+                    },
+                )
+        original(path, reason, record_state=record_state)
+
+    monkeypatch.setattr(
+        persistent_migrations_module,
+        "_confirm_directory_durability",
+        fail_pointer_parent_once,
+    )
+    error = _assert_code(
+        "PERSISTENCE_MIGRATION_WRITE_FAILED",
+        lambda: apply_state_migration(
+            consented_rin.data_root,
+            "rin-aster",
+            target.consent["consent_id"],
+            target.consent["grant_revision"],
+            plan,
+            SCHEMAS,
+            mood_strategy="preserve_identical_contract",
+        ),
+    )
+    assert error.details["record_state"] == "committed"
+
+    migrated = apply_state_migration(
+        consented_rin.data_root,
+        "rin-aster",
+        target.consent["consent_id"],
+        target.consent["grant_revision"],
+        plan,
+        SCHEMAS,
+        mood_strategy="preserve_identical_contract",
+    )
+    assert migrated["installation"] == target.installation_binding
+    assert pointer_calls >= 2
+
+
+def test_migration_rejects_missing_history_unsupported_contract_and_install_drift(
+    consented_rin: ConsentedRin,
+    tmp_path: Path,
+    verified_release_factory: Any,
+) -> None:
+    source, target, plan = _migration_case(
+        consented_rin,
+        tmp_path,
+        verified_release_factory,
+    )
+    source_generation = (
+        _persistent_state_root(consented_rin)
+        / "generations"
+        / source["generation_id"]
+    )
+    event_path = next((source_generation / "events").iterdir())
+    event_payload = event_path.read_bytes()
+    unsupported = json.loads(event_payload)
+    unsupported["transition_algorithm"] = "relationship-v2"
+    event_path.write_bytes(canonical_bytes(unsupported))
+    _assert_code(
+        "PERSISTENCE_MIGRATION_UNREPLAYABLE",
+        lambda: apply_state_migration(
+            consented_rin.data_root,
+            "rin-aster",
+            target.consent["consent_id"],
+            target.consent["grant_revision"],
+            plan,
+            SCHEMAS,
+            mood_strategy="preserve_identical_contract",
+        ),
+    )
+    event_path.write_bytes(event_payload)
+
+    source_history = (
+        consented_rin.data_root
+        / "consents"
+        / "global"
+        / "original"
+        / "rin-aster"
+        / "history"
+        / "00000000000000000001.json"
+    )
+    history_payload = source_history.read_bytes()
+    source_history.unlink()
+    _assert_code(
+        "PERSISTENCE_MIGRATION_INVALID",
+        lambda: apply_state_migration(
+            consented_rin.data_root,
+            "rin-aster",
+            target.consent["consent_id"],
+            target.consent["grant_revision"],
+            plan,
+            SCHEMAS,
+            mood_strategy="preserve_identical_contract",
+        ),
+    )
+    source_history.write_bytes(history_payload)
+
+    target_compiled = (
+        consented_rin.data_root
+        / "installed"
+        / target.installation["relative_path"]
+        / "pack"
+        / "compiled.json"
+    )
+    compiled_payload = target_compiled.read_bytes()
+    changed_compiled = json.loads(compiled_payload)
+    changed_compiled["behavior"]["correction_style"] = "tampered"
+    target_compiled.write_bytes(canonical_bytes(changed_compiled))
+    _assert_code(
+        "PERSISTENCE_MIGRATION_STALE",
+        lambda: apply_state_migration(
+            consented_rin.data_root,
+            "rin-aster",
+            target.consent["consent_id"],
+            target.consent["grant_revision"],
+            plan,
+            SCHEMAS,
+            mood_strategy="preserve_identical_contract",
+        ),
+    )
+    target_compiled.write_bytes(compiled_payload)
+
+
+def test_migration_replay_mismatch_cleans_only_identified_target_and_retries(
+    consented_rin: ConsentedRin,
+    tmp_path: Path,
+    verified_release_factory: Any,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source, target, plan = _migration_case(
+        consented_rin,
+        tmp_path,
+        verified_release_factory,
+    )
+    original = persistent_migrations_module._require_target_state
+    checks = 0
+
+    def fail_first_target_check(state: Any, built: Any) -> None:
+        nonlocal checks
+        checks += 1
+        if checks == 1:
+            raise KokoroError(
+                "PERSISTENCE_MIGRATION_UNREPLAYABLE",
+                "injected",
+                details={"reason": "target_state_hash"},
+            )
+        original(state, built)
+
+    monkeypatch.setattr(
+        persistent_migrations_module,
+        "_require_target_state",
+        fail_first_target_check,
+    )
+    _assert_code(
+        "PERSISTENCE_MIGRATION_UNREPLAYABLE",
+        lambda: apply_state_migration(
+            consented_rin.data_root,
+            "rin-aster",
+            target.consent["consent_id"],
+            target.consent["grant_revision"],
+            plan,
+            SCHEMAS,
+            mood_strategy="preserve_identical_contract",
+        ),
+    )
+    scope = storage.open_persistence_scope(
+        consented_rin.data_root,
+        SCHEMAS,
+        character_id="rin-aster",
+    )
+    marker = json.loads(scope.transaction_path.read_bytes())
+    target_generation = (
+        _persistent_state_root(consented_rin)
+        / "generations"
+        / marker["target_generation_id"]
+    )
+    assert marker["target_directory_identity"] is None
+    assert not target_generation.exists()
+    assert replay_persistent_state(
+        consented_rin.data_root,
+        "rin-aster",
+        SCHEMAS,
+    ) == source
+
+    migrated = apply_state_migration(
+        consented_rin.data_root,
+        "rin-aster",
+        target.consent["consent_id"],
+        target.consent["grant_revision"],
+        plan,
+        SCHEMAS,
+        mood_strategy="preserve_identical_contract",
+    )
+    assert migrated["installation"] == target.installation_binding
+
+
+def test_migration_rejects_target_installation_swap_during_schema_callback(
+    consented_rin: ConsentedRin,
+    tmp_path: Path,
+    verified_release_factory: Any,
+) -> None:
+    source, target, plan = _migration_case(
+        consented_rin,
+        tmp_path,
+        verified_release_factory,
+    )
+    target_root = (
+        consented_rin.data_root
+        / "installed"
+        / target.installation["relative_path"]
+    )
+    displaced = target_root.with_name(target_root.name + ".displaced")
+
+    class SwappingSchemas:
+        swapped = False
+
+        def validate(self, name: str, instance: Any) -> None:
+            SCHEMAS.validate(name, instance)
+            if not self.swapped:
+                target_root.rename(displaced)
+                shutil.copytree(displaced, target_root)
+                self.swapped = True
+
+    _assert_code(
+        "PERSISTENCE_MIGRATION_STALE",
+        lambda: apply_state_migration(
+            consented_rin.data_root,
+            "rin-aster",
+            target.consent["consent_id"],
+            target.consent["grant_revision"],
+            plan,
+            SwappingSchemas(),
+            mood_strategy="preserve_identical_contract",
+        ),
+    )
+    assert displaced.is_dir()
+    assert target_root.is_dir()
+    assert replay_persistent_state(
+        consented_rin.data_root,
+        "rin-aster",
+        SCHEMAS,
+    ) == source
+
+
+def test_migration_rejects_caller_plan_aba_across_schema_callbacks(
+    consented_rin: ConsentedRin,
+    tmp_path: Path,
+    verified_release_factory: Any,
+) -> None:
+    source, target, plan = _migration_case(
+        consented_rin,
+        tmp_path,
+        verified_release_factory,
+    )
+    original_hash = plan["expected_target_state_hash"]
+
+    class AbaSchemas:
+        phase = 0
+
+        def validate(self, name: str, instance: Any) -> None:
+            SCHEMAS.validate(name, instance)
+            if self.phase == 0:
+                plan["expected_target_state_hash"] = "0" * 64
+                self.phase = 1
+            elif self.phase == 1:
+                plan["expected_target_state_hash"] = original_hash
+                self.phase = 2
+
+    schemas = AbaSchemas()
+    _assert_code(
+        "PERSISTENCE_MIGRATION_STALE",
+        lambda: apply_state_migration(
+            consented_rin.data_root,
+            "rin-aster",
+            target.consent["consent_id"],
+            target.consent["grant_revision"],
+            plan,
+            schemas,
+            mood_strategy="preserve_identical_contract",
+        ),
+    )
+    assert schemas.phase == 1
+    plan["expected_target_state_hash"] = original_hash
+    assert replay_persistent_state(
+        consented_rin.data_root,
+        "rin-aster",
+        SCHEMAS,
+    ) == source
+
+
+def test_migration_cleanup_refuses_replacement_generation(
+    consented_rin: ConsentedRin,
+    tmp_path: Path,
+    verified_release_factory: Any,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source, target, plan = _migration_case(
+        consented_rin,
+        tmp_path,
+        verified_release_factory,
+    )
+    displaced: Path | None = None
+    replacement: Path | None = None
+
+    def replace_then_fail(
+        scope: Any,
+        generation_id: str,
+        _lock: Any,
+    ) -> Any:
+        nonlocal displaced, replacement
+        generated = (
+            persistent_state_module._state_root(scope)
+            / "generations"
+            / generation_id
+        )
+        displaced = generated.with_name(generated.name + ".displaced")
+        generated.rename(displaced)
+        generated.mkdir()
+        replacement = generated
+        (generated / "unrelated-sentinel.txt").write_text(
+            "unrelated",
+            encoding="utf-8",
+        )
+        raise OSError("injected")
+
+    monkeypatch.setattr(
+        persistent_migrations_module,
+        "_replace_current_generation_pointer",
+        replace_then_fail,
+    )
+    error = _assert_code(
+        "PERSISTENCE_CLEANUP_FAILED",
+        lambda: apply_state_migration(
+            consented_rin.data_root,
+            "rin-aster",
+            target.consent["consent_id"],
+            target.consent["grant_revision"],
+            plan,
+            SCHEMAS,
+            mood_strategy="preserve_identical_contract",
+        ),
+    )
+    assert error.details["record_state"] == "not_visible"
+    assert displaced is not None and displaced.is_dir()
+    assert replacement is not None
+    assert (replacement / "unrelated-sentinel.txt").read_text(
+        encoding="utf-8"
+    ) == "unrelated"
+    assert replay_persistent_state(
+        consented_rin.data_root,
+        "rin-aster",
+        SCHEMAS,
+    ) == source
+
+
+def test_migration_reports_unavailable_identity_after_generation_creation(
+    consented_rin: ConsentedRin,
+    tmp_path: Path,
+    verified_release_factory: Any,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source, target, plan = _migration_case(
+        consented_rin,
+        tmp_path,
+        verified_release_factory,
+    )
+    original = persistent_migrations_module._capture_directory_identity
+
+    def fail_target_identity(path: Path) -> Any:
+        if (
+            path.parent.name == "generations"
+            and path.name.startswith("generation-")
+        ):
+            raise OSError("injected")
+        return original(path)
+
+    monkeypatch.setattr(
+        persistent_migrations_module,
+        "_capture_directory_identity",
+        fail_target_identity,
+    )
+    error = _assert_code(
+        "PERSISTENCE_CLEANUP_FAILED",
+        lambda: apply_state_migration(
+            consented_rin.data_root,
+            "rin-aster",
+            target.consent["consent_id"],
+            target.consent["grant_revision"],
+            plan,
+            SCHEMAS,
+            mood_strategy="preserve_identical_contract",
+        ),
+    )
+    assert error.details == {
+        "reason": "target_identity_unavailable",
+        "record_state": "not_visible",
+    }
+    scope = storage.open_persistence_scope(
+        consented_rin.data_root,
+        SCHEMAS,
+        character_id="rin-aster",
+    )
+    marker = json.loads(scope.transaction_path.read_bytes())
+    assert marker["target_directory_identity"] is None
+    generated = (
+        _persistent_state_root(consented_rin)
+        / "generations"
+        / marker["target_generation_id"]
+    )
+    assert generated.is_dir()
+    assert tuple(generated.iterdir()) == ()
+    assert replay_persistent_state(
+        consented_rin.data_root,
+        "rin-aster",
+        SCHEMAS,
+    ) == source
+
+
+def test_migration_cleans_identified_generation_before_marker_update(
+    consented_rin: ConsentedRin,
+    tmp_path: Path,
+    verified_release_factory: Any,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source, target, plan = _migration_case(
+        consented_rin,
+        tmp_path,
+        verified_release_factory,
+    )
+    original = persistent_migrations_module._confirm_directory_durability
+    create_calls = 0
+
+    def fail_generation_parent_once(
+        path: Path,
+        reason: str,
+        *,
+        record_state: str,
+    ) -> None:
+        nonlocal create_calls
+        if reason == "generation_create_fsync":
+            create_calls += 1
+            if create_calls == 1:
+                raise KokoroError(
+                    "PERSISTENCE_MIGRATION_WRITE_FAILED",
+                    "injected",
+                    details={
+                        "phase": reason,
+                        "record_state": record_state,
+                    },
+                )
+        original(path, reason, record_state=record_state)
+
+    monkeypatch.setattr(
+        persistent_migrations_module,
+        "_confirm_directory_durability",
+        fail_generation_parent_once,
+    )
+    error = _assert_code(
+        "PERSISTENCE_MIGRATION_WRITE_FAILED",
+        lambda: apply_state_migration(
+            consented_rin.data_root,
+            "rin-aster",
+            target.consent["consent_id"],
+            target.consent["grant_revision"],
+            plan,
+            SCHEMAS,
+            mood_strategy="preserve_identical_contract",
+        ),
+    )
+    assert error.details == {
+        "phase": "generation_create_fsync",
+        "record_state": "not_visible",
+    }
+    scope = storage.open_persistence_scope(
+        consented_rin.data_root,
+        SCHEMAS,
+        character_id="rin-aster",
+    )
+    marker = json.loads(scope.transaction_path.read_bytes())
+    assert marker["target_directory_identity"] is None
+    generated = (
+        _persistent_state_root(consented_rin)
+        / "generations"
+        / marker["target_generation_id"]
+    )
+    assert not generated.exists()
+    assert replay_persistent_state(
+        consented_rin.data_root,
+        "rin-aster",
+        SCHEMAS,
+    ) == source
+
+    migrated = apply_state_migration(
+        consented_rin.data_root,
+        "rin-aster",
+        target.consent["consent_id"],
+        target.consent["grant_revision"],
+        plan,
+        SCHEMAS,
+        mood_strategy="preserve_identical_contract",
+    )
+    assert migrated["installation"] == target.installation_binding
+    assert create_calls == 2
+
+
+def test_migration_pre_marker_cleanup_refuses_replacement_generation(
+    consented_rin: ConsentedRin,
+    tmp_path: Path,
+    verified_release_factory: Any,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source, target, plan = _migration_case(
+        consented_rin,
+        tmp_path,
+        verified_release_factory,
+    )
+    scope = storage.open_persistence_scope(
+        consented_rin.data_root,
+        SCHEMAS,
+        character_id="rin-aster",
+    )
+    original = persistent_migrations_module._confirm_directory_durability
+    displaced: Path | None = None
+    replacement: Path | None = None
+
+    def replace_before_parent_fsync(
+        path: Path,
+        reason: str,
+        *,
+        record_state: str,
+    ) -> None:
+        nonlocal displaced, replacement
+        if reason == "generation_create_fsync":
+            marker = json.loads(scope.transaction_path.read_bytes())
+            generated = path / marker["target_generation_id"]
+            displaced = generated.with_name(generated.name + ".displaced")
+            generated.rename(displaced)
+            generated.mkdir()
+            replacement = generated
+            (replacement / "unrelated-sentinel.txt").write_text(
+                "unrelated",
+                encoding="utf-8",
+            )
+            raise KokoroError(
+                "PERSISTENCE_MIGRATION_WRITE_FAILED",
+                "injected",
+                details={
+                    "phase": reason,
+                    "record_state": record_state,
+                },
+            )
+        original(path, reason, record_state=record_state)
+
+    monkeypatch.setattr(
+        persistent_migrations_module,
+        "_confirm_directory_durability",
+        replace_before_parent_fsync,
+    )
+    error = _assert_code(
+        "PERSISTENCE_CLEANUP_FAILED",
+        lambda: apply_state_migration(
+            consented_rin.data_root,
+            "rin-aster",
+            target.consent["consent_id"],
+            target.consent["grant_revision"],
+            plan,
+            SCHEMAS,
+            mood_strategy="preserve_identical_contract",
+        ),
+    )
+    assert error.details == {
+        "reason": "target_changed",
+        "record_state": "not_visible",
+    }
+    assert displaced is not None and displaced.is_dir()
+    assert tuple(displaced.iterdir()) == ()
+    assert replacement is not None
+    assert (replacement / "unrelated-sentinel.txt").read_text(
+        encoding="utf-8",
+    ) == "unrelated"
+    assert replay_persistent_state(
+        consented_rin.data_root,
+        "rin-aster",
+        SCHEMAS,
+    ) == source
+
+
+def test_migration_cleans_generation_when_marker_update_is_not_visible(
+    consented_rin: ConsentedRin,
+    tmp_path: Path,
+    verified_release_factory: Any,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source, target, plan = _migration_case(
+        consented_rin,
+        tmp_path,
+        verified_release_factory,
+    )
+    original = persistent_migrations_module._update_migration_marker
+    identity_updates = 0
+
+    def fail_marker_update_once(*args: Any, **kwargs: Any) -> Any:
+        nonlocal identity_updates
+        if isinstance(kwargs.get("target_directory_identity"), dict):
+            identity_updates += 1
+            if identity_updates == 1:
+                raise KokoroError(
+                    "PERSISTENCE_MIGRATION_WRITE_FAILED",
+                    "injected",
+                    details={
+                        "phase": "transaction_marker",
+                        "record_state": "not_visible",
+                    },
+                )
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(
+        persistent_migrations_module,
+        "_update_migration_marker",
+        fail_marker_update_once,
+    )
+    error = _assert_code(
+        "PERSISTENCE_MIGRATION_WRITE_FAILED",
+        lambda: apply_state_migration(
+            consented_rin.data_root,
+            "rin-aster",
+            target.consent["consent_id"],
+            target.consent["grant_revision"],
+            plan,
+            SCHEMAS,
+            mood_strategy="preserve_identical_contract",
+        ),
+    )
+    assert error.details["record_state"] == "not_visible"
+    scope = storage.open_persistence_scope(
+        consented_rin.data_root,
+        SCHEMAS,
+        character_id="rin-aster",
+    )
+    marker = json.loads(scope.transaction_path.read_bytes())
+    assert marker["target_directory_identity"] is None
+    generated = (
+        _persistent_state_root(consented_rin)
+        / "generations"
+        / marker["target_generation_id"]
+    )
+    assert not generated.exists()
+    assert replay_persistent_state(
+        consented_rin.data_root,
+        "rin-aster",
+        SCHEMAS,
+    ) == source
+
+    migrated = apply_state_migration(
+        consented_rin.data_root,
+        "rin-aster",
+        target.consent["consent_id"],
+        target.consent["grant_revision"],
+        plan,
+        SCHEMAS,
+        mood_strategy="preserve_identical_contract",
+    )
+    assert migrated["installation"] == target.installation_binding
+    assert identity_updates == 2
+
+
+def test_migration_recovers_when_marker_update_is_already_visible(
+    consented_rin: ConsentedRin,
+    tmp_path: Path,
+    verified_release_factory: Any,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _source, target, plan = _migration_case(
+        consented_rin,
+        tmp_path,
+        verified_release_factory,
+    )
+    original = persistent_migrations_module._update_migration_marker
+    injected = False
+
+    def fail_after_marker_update(*args: Any, **kwargs: Any) -> Any:
+        nonlocal injected
+        updated = original(*args, **kwargs)
+        if (
+            isinstance(kwargs.get("target_directory_identity"), dict)
+            and not injected
+        ):
+            injected = True
+            raise KokoroError(
+                "PERSISTENCE_MIGRATION_WRITE_FAILED",
+                "injected",
+                details={
+                    "phase": "transaction_marker",
+                    "record_state": "committed",
+                },
+            )
+        return updated
+
+    monkeypatch.setattr(
+        persistent_migrations_module,
+        "_update_migration_marker",
+        fail_after_marker_update,
+    )
+    error = _assert_code(
+        "PERSISTENCE_MIGRATION_WRITE_FAILED",
+        lambda: apply_state_migration(
+            consented_rin.data_root,
+            "rin-aster",
+            target.consent["consent_id"],
+            target.consent["grant_revision"],
+            plan,
+            SCHEMAS,
+            mood_strategy="preserve_identical_contract",
+        ),
+    )
+    assert error.details["record_state"] == "committed"
+    scope = storage.open_persistence_scope(
+        consented_rin.data_root,
+        SCHEMAS,
+        character_id="rin-aster",
+    )
+    marker = json.loads(scope.transaction_path.read_bytes())
+    assert isinstance(marker["target_directory_identity"], dict)
+    generated = (
+        _persistent_state_root(consented_rin)
+        / "generations"
+        / marker["target_generation_id"]
+    )
+    assert generated.is_dir()
+
+    migrated = apply_state_migration(
+        consented_rin.data_root,
+        "rin-aster",
+        target.consent["consent_id"],
+        target.consent["grant_revision"],
+        plan,
+        SCHEMAS,
+        mood_strategy="preserve_identical_contract",
+    )
+    assert migrated["installation"] == target.installation_binding
+    assert not scope.transaction_path.exists()
