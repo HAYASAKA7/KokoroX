@@ -346,7 +346,7 @@ are not claimed by this closure.
 - [x] Add a clean-wheel workflow: install suite, test/promote/export/install Rin globally, set default, explicitly start session, grant consent, persist/replay/export/reset, and remove after clearing references.
 - [x] Document global-first versus workspace override, explicit activation, memory ownership, privacy, recovery, archive/publication limits, and D:-based configuration.
 - [x] Build and test from wheel and sdist with repository source unavailable.
-- [ ] Commit: `feat: expose standalone suite workflows`.
+- [x] Commit: `feat: expose standalone suite workflows`.
 
 **Task 17 pre-commit checkpoint (2026-08-20):** The exact 3,388-test working
 tree passed with 3,347 passes and 41 documented Windows capability skips. The
@@ -359,6 +359,15 @@ validator and all twelve source/wheel/sdist Skill-validator runs passed. Task
 18 remains unchecked: approved external behavioral evidence, the settled
 complete-suite release record, and fresh independent reviews are not part of
 this Task 17 checkpoint.
+
+**Exact Task 17 feature checkpoint:** Commit
+`0f88b0cae6e3b185ca0e99649210b35c58ca8135` (tree
+`289484e584152ea954db956ec1067cfb4c5f999b`, parent
+`1c6efd17c2e84e88e8dfaadbdfcc2572a647f3ac`) had a clean worktree and clean
+parent/base diff checks. Its focused installed-workflow/README gate passed all
+84 tests; the official plugin validator and all four source Skill validators
+also passed. Task 17 is closed at that feature identity. Task 18 remains the
+separate complete-suite behavioral evidence and independent-review boundary.
 
 ### Task 18: Complete-suite behavioral and release closure
 

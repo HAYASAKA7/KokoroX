@@ -695,7 +695,7 @@ audits, and installed package-data discovery confused by a prefix sibling
 evidence, the settled complete-suite release record, and fresh independent
 final reviews.
 
-- [ ] **Step 6: Stage and commit the exact Task 17 slice**
+- [x] **Step 6: Stage and commit the exact Task 17 slice**
 
 ```powershell
 git add src/kokoroarc/cli.py src/kokoroarc/standalone_cli.py README.md \
@@ -710,9 +710,22 @@ git diff --cached --name-status
 git commit -m "feat: expose standalone suite workflows"
 ```
 
-- [ ] **Step 7: Verify the exact committed tree**
+- [x] **Step 7: Verify the exact committed tree**
 
 Record commit/tree/parent, clean status, parent-to-HEAD diff check, focused
 tests, installed wheel/sdist workflow, plugin validator, four Skill validators,
 and README contract on the committed tree. Do not claim complete-suite release;
 Task 18 remains the final approval/evidence boundary.
+
+**Exact Task 17 feature checkpoint (2026-08-20):** Commit
+`0f88b0cae6e3b185ca0e99649210b35c58ca8135`, tree
+`289484e584152ea954db956ec1067cfb4c5f999b`, and parent
+`1c6efd17c2e84e88e8dfaadbdfcc2572a647f3ac` were independently re-read from
+Git. The worktree was clean, and both parent-to-HEAD and Task-17-base-to-HEAD
+`git diff --check` runs had empty output. The exact committed tree passed the
+84-test focused CLI/README/installed-workflow gate in 128.79 seconds, the
+official plugin validator, and all four official source Skill validators. The
+fixed-epoch wheel/sdist identities and the installed-wheel/installed-sdist
+reinstall checks above bind the same staged file bytes committed in this tree.
+This is Task 17 closure only; no Task 18 behavioral or release-review claim is
+made.
