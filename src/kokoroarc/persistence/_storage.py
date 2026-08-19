@@ -34,6 +34,7 @@ _JSON_NAME_PATTERN = re.compile(r"[a-z0-9][a-z0-9._-]{0,127}\.json\Z")
 _SHA256_PATTERN = re.compile(r"[a-f0-9]{64}\Z")
 _GENERATION_PATTERN = re.compile(r"generation-[a-f0-9]{32}\Z")
 _MIGRATION_ID_PATTERN = re.compile(r"migration-[a-f0-9]{32}\Z")
+_DETAIL_ENUM_PATTERN = re.compile(r"[a-z][a-z0-9_]{0,63}\Z")
 _WINDOWS_RESERVED_DEVICE_BASENAMES = frozenset(
     {
         "con",
@@ -178,7 +179,13 @@ class PersistenceBoundary:
         except (KokoroError, TypeError, ValueError, UnicodeError) as error:
             raise _changed("invalid_canonical_input") from error
         probe = _MutationProbe(name=name, value=value, payload=payload)
-        self.audits[f"input:{name}"] = probe.audit
+        audit_name = f"input:{name}"
+        if audit_name in self.audits:
+            index = 2
+            while f"{audit_name}:{index}" in self.audits:
+                index += 1
+            audit_name = f"{audit_name}:{index}"
+        self.audits[audit_name] = probe.audit
         return payload
 
     def validate(self, schema_name: str, payload: bytes) -> None:
@@ -226,6 +233,20 @@ class PersistenceBoundary:
     def authorize_root_creation(self) -> None:
         self.assert_clean()
         self.audits.pop("scope:root_absent", None)
+
+
+def validate_and_finalize(
+    schema_name: str,
+    value: Mapping[str, Any],
+    boundary: PersistenceBoundary,
+) -> dict[str, Any]:
+    """Validate detached canonical bytes and audit once more before return."""
+
+    payload = canonical_bytes(dict(value))
+    boundary.validate(schema_name, payload)
+    result = cast(dict[str, Any], json.loads(payload))
+    boundary.assert_clean()
+    return result
 
 
 @dataclass(frozen=True, slots=True)
@@ -1723,8 +1744,17 @@ def _fsync_directory(path: Path) -> None:
 
 def _error_reason(error: BaseException) -> str:
     if isinstance(error, KokoroError):
-        return str(error.details.get("reason", error.code))
-    return type(error).__name__
+        reason = error.details.get("reason")
+        if isinstance(reason, str) and _DETAIL_ENUM_PATTERN.fullmatch(reason):
+            return reason
+        return "operation_failed"
+    if isinstance(error, PermissionError):
+        return "permission_error"
+    if isinstance(error, FileExistsError):
+        return "file_exists"
+    if isinstance(error, OSError):
+        return "os_error"
+    return "operation_failed"
 
 
 def _mutation_error(reason: str) -> KokoroError:

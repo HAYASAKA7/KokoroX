@@ -720,6 +720,7 @@ def _append_target_event(
                 cast(int, payload["repetition_window"]),
             ),
             operation_id,
+            captured.scope.boundary,
         )
     elif operation_kind in {"mood_update", "mood_advance"}:
         successor = persistent_state._mood_successor(
@@ -1418,10 +1419,9 @@ def _migration_domain(action: Callable[[], Any]) -> Any:
     try:
         return action()
     except KokoroError as error:
-        if error.code in {
-            "PERSISTENCE_CHANGED",
-            "PERSISTENCE_INPUT_MUTATION",
-        }:
+        if error.code == "PERSISTENCE_INPUT_MUTATION":
+            raise
+        if error.code == "PERSISTENCE_CHANGED":
             raise _migration_stale("stored_artifact") from error
         if error.code == "PERSISTENCE_CONSENT_INVALID":
             raise _migration_invalid("consent_history") from error

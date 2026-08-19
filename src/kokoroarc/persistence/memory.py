@@ -38,6 +38,7 @@ from kokoroarc.persistence._storage import (
     _require_safe_regular_file,
     open_persistence_scope,
     scan_canonical_directory,
+    validate_and_finalize,
 )
 from kokoroarc.persistence.consent import (
     ActiveConsent,
@@ -254,6 +255,14 @@ def _add_memory_reference(
             localized,
         )
         payload = canonical_bytes(expected)
+        if len(payload) > limits.max_memory_bytes:
+            raise _memory_invalid("memory_bytes")
+        expected = validate_and_finalize(
+            "memory-reference",
+            expected,
+            scope.boundary,
+        )
+        payload = canonical_bytes(expected)
         existing = _find_host_reference(references, host_memory_id)
         if existing is not None:
             if existing.payload != payload:
@@ -264,9 +273,6 @@ def _add_memory_reference(
             return cast(dict[str, Any], json.loads(payload))
         if len(references) >= limits.max_memory_references:
             raise _memory_limit(limits.max_memory_references)
-        if len(payload) > limits.max_memory_bytes:
-            raise _memory_invalid("memory_bytes")
-        scope.boundary.validate("memory-reference", payload)
         active.assert_clean()
         lock.assert_owned()
         _drop_memory_audits(scope)

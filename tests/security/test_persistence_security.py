@@ -1,9 +1,12 @@
 import json
 import os
 from pathlib import Path
+import re
 import shutil
+import socket
 import stat
 import subprocess
+import threading
 from typing import Any
 
 import pytest
@@ -11,7 +14,12 @@ import pytest
 from kokoroarc.errors import KokoroError
 from kokoroarc.packs.compiler import canonical_bytes
 import kokoroarc.persistence._storage as storage
-from kokoroarc.persistence.consent import grant_consent, load_consent
+import kokoroarc.persistence.consent as persistent_consent_module
+from kokoroarc.persistence.consent import (
+    grant_consent,
+    load_consent,
+    revoke_consent,
+)
 import kokoroarc.persistence.memory as persistent_memory_module
 from kokoroarc.persistence.memory import (
     add_memory_reference,
@@ -46,6 +54,41 @@ from persistence_support import (
 
 
 SCHEMAS = SchemaRegistry(Path("schemas/v1"))
+
+MUTATION_CASES = (
+    "caller_permissions",
+    "caller_interaction_event",
+    "caller_mood_event",
+    "caller_summaries",
+    "caller_reset_preview",
+    "caller_migration_plan",
+    "consent_schema_input",
+    "state_schema_input",
+    "event_schema_input",
+    "memory_schema_input",
+    "export_schema_input",
+    "migration_schema_input",
+    "compiled_installation_input",
+    "transition_state_input",
+    "transition_event_input",
+    "transition_output",
+    "migration_replay_output",
+)
+
+FILESYSTEM_ATTACKS = (
+    "symlink",
+    "junction",
+    "reparse_point",
+    "hardlink",
+    "fifo_or_special_file",
+    "ancestor_swap",
+    "same_name_replacement",
+    "case_collision",
+    "membership_insert",
+    "membership_remove",
+    "scan_then_grow",
+    "scan_then_chmod_executable",
+)
 
 
 def _consent() -> dict[str, Any]:
@@ -87,6 +130,148 @@ def _assert_code(code: str, action: Any) -> KokoroError:
     return caught.value
 
 
+def _tree_inventory(
+    root: Path,
+    *,
+    excluded: Path | None = None,
+) -> tuple[tuple[str, str, bytes | int | None], ...]:
+    if not root.exists():
+        return ()
+    entries: list[tuple[str, str, bytes | int | None]] = []
+    for path in sorted(root.rglob("*"), key=lambda item: str(item).casefold()):
+        if excluded is not None and (path == excluded or excluded in path.parents):
+            continue
+        relative = path.relative_to(root).as_posix()
+        value = path.lstat()
+        if path.is_symlink():
+            entries.append((relative, "redirect", stat.S_IFMT(value.st_mode)))
+        elif stat.S_ISDIR(value.st_mode):
+            entries.append((relative, "directory", None))
+        elif stat.S_ISREG(value.st_mode):
+            entries.append((relative, "file", path.read_bytes()))
+        else:
+            entries.append((relative, "special", stat.S_IFMT(value.st_mode)))
+    return tuple(entries)
+
+
+def test_persistence_error_reasons_are_bounded_enums_and_non_echoing() -> None:
+    probes = (
+        r"C:\Users\alice\private\consent.json",
+        "API_KEY=sk-proj-abcdefghijklmnopqrstuvwxyz123456",
+    )
+    reasons = (
+        storage._error_reason(OSError(probes[0])),
+        storage._error_reason(PermissionError(probes[1])),
+        storage._error_reason(
+            KokoroError(
+                "INJECTED",
+                "injected",
+                details={"reason": probes[0]},
+            )
+        ),
+    )
+    assert reasons == ("os_error", "permission_error", "operation_failed")
+    for reason in reasons:
+        assert re.fullmatch(r"[a-z][a-z0-9_]{0,63}", reason)
+    envelope = canonical_bytes(
+        storage._write_failed("publish", reasons[-1]).envelope()
+    ).decode("utf-8")
+    assert all(probe not in envelope for probe in probes)
+
+
+def test_every_stable_persistence_error_has_a_bounded_non_echoing_envelope(
+) -> None:
+    probes = (
+        r"C:\Users\alice\private\consent.json",
+        "consent-private-identifier",
+        "interaction-private-evidence",
+        "memory-private-identifier",
+        "summary private content",
+        "API_KEY=sk-proj-abcdefghijklmnopqrstuvwxyz123456",
+    )
+    errors = (
+        persistent_consent_module._consent_invalid("invalid_input"),
+        persistent_consent_module._consent_not_found(),
+        persistent_consent_module._consent_conflict("revision"),
+        persistent_consent_module._consent_revoked(),
+        persistent_consent_module._permission_denied(),
+        persistent_consent_module._installation_stale("installation_changed"),
+        storage._mutation_error("input_mutation"),
+        KokoroError(
+            "PERSISTENCE_STATE_NOT_FOUND",
+            "Persistent state was not found.",
+            details={"reason": "absent"},
+        ),
+        persistent_state_module._revision_conflict("revision"),
+        persistent_state_module._journal_invalid("stored_artifact"),
+        persistent_state_module._contract_unsupported("contract_version"),
+        persistent_state_module._migration_required("contract_version"),
+        persistent_state_module._state_write_failed(
+            "projection",
+            storage._write_failed("projection", "os_error"),
+        ),
+        persistent_state_module._mood_invalid("event_shape"),
+        persistent_memory_module._memory_invalid("invalid_input"),
+        persistent_memory_module._memory_content_rejected("private_key"),
+        persistent_memory_module._memory_conflict("host_memory_id_reused"),
+        persistent_memory_module._memory_not_found("host_memory_id"),
+        persistent_state_module._reset_stale("preview_changed"),
+        persistent_migrations_module._migration_invalid("invalid_input"),
+        persistent_migrations_module._migration_stale("stored_artifact"),
+        persistent_migrations_module._migration_unreplayable("source_replay"),
+        storage._path_unsafe("unsafe_path"),
+        storage._limit_error("entry_count", 1),
+        storage._locked(),
+        storage._write_failed("publish", "os_error"),
+        storage._durability_failed("publish", "fsync_failed"),
+        storage._cleanup_failed("identity_changed"),
+        storage._changed("file_changed"),
+    )
+    expected_codes = {
+        "PERSISTENCE_CONSENT_INVALID",
+        "PERSISTENCE_CONSENT_NOT_FOUND",
+        "PERSISTENCE_CONSENT_CONFLICT",
+        "PERSISTENCE_CONSENT_REVOKED",
+        "PERSISTENCE_PERMISSION_DENIED",
+        "PERSISTENCE_INSTALLATION_STALE",
+        "PERSISTENCE_INPUT_MUTATION",
+        "PERSISTENCE_STATE_NOT_FOUND",
+        "PERSISTENCE_STATE_REVISION_CONFLICT",
+        "PERSISTENCE_STATE_JOURNAL_INVALID",
+        "PERSISTENCE_STATE_CONTRACT_UNSUPPORTED",
+        "PERSISTENCE_STATE_MIGRATION_REQUIRED",
+        "PERSISTENCE_STATE_WRITE_FAILED",
+        "PERSISTENCE_MOOD_INVALID",
+        "PERSISTENCE_MEMORY_INVALID",
+        "PERSISTENCE_MEMORY_CONTENT_REJECTED",
+        "PERSISTENCE_MEMORY_CONFLICT",
+        "PERSISTENCE_MEMORY_NOT_FOUND",
+        "PERSISTENCE_RESET_STALE",
+        "PERSISTENCE_MIGRATION_INVALID",
+        "PERSISTENCE_MIGRATION_STALE",
+        "PERSISTENCE_MIGRATION_UNREPLAYABLE",
+        "PERSISTENCE_PATH_UNSAFE",
+        "PERSISTENCE_LIMIT_EXCEEDED",
+        "PERSISTENCE_LOCKED",
+        "PERSISTENCE_WRITE_FAILED",
+        "PERSISTENCE_DURABILITY_FAILED",
+        "PERSISTENCE_CLEANUP_FAILED",
+        "PERSISTENCE_CHANGED",
+    }
+    assert {error.code for error in errors} == expected_codes
+    allowed_details = {"phase", "reason", "limit", "operation", "record_state"}
+    for error in errors:
+        assert set(error.details) <= allowed_details
+        for value in error.details.values():
+            if isinstance(value, str):
+                assert re.fullmatch(r"[a-z][a-z0-9_]{0,63}", value)
+            else:
+                assert isinstance(value, int) and not isinstance(value, bool)
+                assert value >= 0
+        envelope = canonical_bytes(error.envelope()).decode("utf-8")
+        assert all(probe not in envelope for probe in probes)
+
+
 def _persistent_state_root(consented: ConsentedRin) -> Path:
     return (
         consented.data_root
@@ -126,6 +311,208 @@ def _migration_case(
         mood_strategy="preserve_identical_contract",
     )
     return source, target, plan
+
+
+def test_persistence_domains_use_no_external_capabilities(
+    consented_rin: ConsentedRin,
+    tmp_path: Path,
+    verified_release_factory: Any,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def forbidden(*_args: Any, **_kwargs: Any) -> Any:
+        raise AssertionError("persistence attempted an external capability")
+
+    monkeypatch.setattr(socket, "create_connection", forbidden)
+    monkeypatch.setattr(subprocess, "Popen", forbidden)
+    monkeypatch.setattr(threading.Thread, "start", forbidden)
+
+    loaded = load_consent(
+        consented_rin.data_root,
+        "rin-aster",
+        SCHEMAS,
+    )
+    assert loaded == consented_rin.consent
+    repeated = grant_consent(
+        consented_rin.data_root,
+        "rin-aster",
+        ["relationship_state", "mood_state", "memory_references"],
+        SCHEMAS,
+        expected_revision=consented_rin.consent["grant_revision"],
+    )
+    assert repeated == consented_rin.consent
+
+    relationship = apply_persistent_relationship_event(
+        consented_rin.data_root,
+        "rin-aster",
+        interaction_event("event-1", 0),
+        consented_rin.consent["consent_id"],
+        consented_rin.consent["grant_revision"],
+        SCHEMAS,
+        expected_state_revision=0,
+        operation_id="no-capability-relationship-1",
+    )
+    mood_input = mood_event("no-capability-mood-1", 0)
+    mood_input["trigger_strength"] = "strong"
+    mood = apply_persistent_mood_event(
+        consented_rin.data_root,
+        "rin-aster",
+        mood_input,
+        consented_rin.consent["consent_id"],
+        consented_rin.consent["grant_revision"],
+        SCHEMAS,
+        expected_state_revision=relationship["revision"],
+        operation_id="no-capability-mood-operation-1",
+    )
+    host_id, summary, localized = approved_memory_inputs()
+    memory = add_memory_reference(
+        consented_rin.data_root,
+        "rin-aster",
+        host_id,
+        summary,
+        localized,
+        consented_rin.consent["consent_id"],
+        consented_rin.consent["grant_revision"],
+        SCHEMAS,
+    )
+    listed = list_memory_references(
+        consented_rin.data_root,
+        "rin-aster",
+        SCHEMAS,
+    )
+    assert [item.reference for item in listed] == [memory]
+    removed = remove_memory_reference(
+        consented_rin.data_root,
+        "rin-aster",
+        host_id,
+        consented_rin.consent["consent_id"],
+        SCHEMAS,
+        identifier_kind="host_memory_id",
+    )
+    assert removed.removed
+    assert export_persistent_data(
+        consented_rin.data_root,
+        "rin-aster",
+        SCHEMAS,
+    )["state"] == mood
+
+    preview = preview_persistent_reset(
+        consented_rin.data_root,
+        "rin-aster",
+        consented_rin.consent["consent_id"],
+        SCHEMAS,
+        target="mood",
+        reset_id="no-capability-reset-1",
+    )
+    reset = reset_persistent_data(
+        consented_rin.data_root,
+        "rin-aster",
+        preview,
+        consented_rin.consent["consent_id"],
+        SCHEMAS,
+    )
+    assert reset["target"] == "mood"
+
+    target = install_rin_successor(
+        consented_rin,
+        tmp_path,
+        verified_release_factory,
+    )
+    plan = preview_state_migration(
+        consented_rin.data_root,
+        "rin-aster",
+        target.consent["consent_id"],
+        target.consent["grant_revision"],
+        SCHEMAS,
+        mood_strategy="preserve_identical_contract",
+    )
+    migrated = apply_state_migration(
+        consented_rin.data_root,
+        "rin-aster",
+        target.consent["consent_id"],
+        target.consent["grant_revision"],
+        plan,
+        SCHEMAS,
+        mood_strategy="preserve_identical_contract",
+    )
+    assert migrated["installation"] == target.installation_binding
+    revoked = revoke_consent(
+        consented_rin.data_root,
+        "rin-aster",
+        target.consent["consent_id"],
+        SCHEMAS,
+        expected_revision=target.consent["grant_revision"],
+    )
+    assert revoked["status"] == "revoked"
+    assert load_consent(
+        consented_rin.data_root,
+        "rin-aster",
+        SCHEMAS,
+    ) == revoked
+
+
+def test_persistence_operations_change_only_the_declared_data_root(
+    consented_rin: ConsentedRin,
+    tmp_path: Path,
+) -> None:
+    sentinel = tmp_path / "sentinel"
+    sentinel.mkdir()
+    (sentinel / "unchanged.txt").write_text("unchanged", encoding="utf-8")
+    outside_before = _tree_inventory(
+        tmp_path,
+        excluded=consented_rin.data_root,
+    )
+    sentinel_before = _tree_inventory(sentinel)
+    data_before = {
+        path: (kind, value)
+        for path, kind, value in _tree_inventory(consented_rin.data_root)
+    }
+
+    apply_persistent_relationship_event(
+        consented_rin.data_root,
+        "rin-aster",
+        interaction_event("inventory-event-01", 0),
+        consented_rin.consent["consent_id"],
+        consented_rin.consent["grant_revision"],
+        SCHEMAS,
+        expected_state_revision=0,
+        operation_id="inventory-operation-01",
+    )
+
+    data_after_success = {
+        path: (kind, value)
+        for path, kind, value in _tree_inventory(consented_rin.data_root)
+    }
+    changed = {
+        path
+        for path in set(data_before) | set(data_after_success)
+        if data_before.get(path) != data_after_success.get(path)
+    }
+    assert changed
+    assert all(
+        path == "persistent-state" or path.startswith("persistent-state/")
+        for path in changed
+    )
+    assert _tree_inventory(tmp_path, excluded=consented_rin.data_root) == outside_before
+    assert _tree_inventory(sentinel) == sentinel_before
+
+    failed_before = _tree_inventory(consented_rin.data_root)
+    secret = "API_KEY=sk-proj-abcdefghijklmnopqrstuvwxyz123456"
+    _assert_code(
+        "PERSISTENCE_MEMORY_CONTENT_REJECTED",
+        lambda: add_memory_reference(
+            consented_rin.data_root,
+            "rin-aster",
+            "host-memory-inventory-failure-01",
+            secret,
+            {"en-US": secret},
+            consented_rin.consent["consent_id"],
+            consented_rin.consent["grant_revision"],
+            SCHEMAS,
+        ),
+    )
+    assert _tree_inventory(consented_rin.data_root) == failed_before
+    assert _tree_inventory(tmp_path, excluded=consented_rin.data_root) == outside_before
+    assert _tree_inventory(sentinel) == sentinel_before
 
 
 def test_storage_rejects_symlinked_canonical_file(tmp_path: Path) -> None:
@@ -226,6 +613,30 @@ def test_storage_rejects_real_windows_junction_when_supported(
     )
 
 
+def test_storage_rejects_file_reported_as_reparse_point(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    path = tmp_path / "consent.json"
+    path.write_bytes(canonical_bytes(_consent()))
+    original = storage._is_redirect
+
+    def marked(candidate: Path, value: os.stat_result) -> bool:
+        return candidate == path or original(candidate, value)
+
+    monkeypatch.setattr(storage, "_is_redirect", marked)
+    scope = _scope(tmp_path)
+    _assert_code(
+        "PERSISTENCE_PATH_UNSAFE",
+        lambda: storage.read_canonical_object(
+            path,
+            limit=64 * 1024,
+            schema_name="persistence-consent",
+            boundary=scope.boundary,
+        ),
+    )
+
+
 def test_storage_rejects_special_file_when_supported(tmp_path: Path) -> None:
     if not hasattr(os, "mkfifo"):
         pytest.skip("FIFO creation is unavailable on this platform")
@@ -274,7 +685,12 @@ def test_storage_direct_scandir_stops_at_limit_plus_one(
             if consumed >= 10_000:
                 raise StopIteration
             consumed += 1
-            return Entry(f"{consumed:05d}.json")
+            names = (
+                f"{consumed:05d}.json",
+                f".hidden-{consumed:05d}",
+                f"unknown-{consumed:05d}.bin",
+            )
+            return Entry(names[(consumed - 1) % len(names)])
 
     monkeypatch.setattr(storage.os, "scandir", lambda _path: Iterator())
 
@@ -283,6 +699,84 @@ def test_storage_direct_scandir_stops_at_limit_plus_one(
         lambda: storage._bounded_regular_json_entries(tmp_path, 3),
     )
     assert consumed == 4
+
+
+def test_storage_file_bytes_rejects_limit_plus_one(tmp_path: Path) -> None:
+    path = tmp_path / "oversized.json"
+    path.write_bytes(b"{}")
+    scope = _scope(tmp_path)
+
+    error = _assert_code(
+        "PERSISTENCE_LIMIT_EXCEEDED",
+        lambda: storage.read_canonical_object(
+            path,
+            limit=1,
+            schema_name="persistence-consent",
+            boundary=scope.boundary,
+        ),
+    )
+    assert error.details == {"reason": "file_bytes", "limit": 1}
+
+
+def test_storage_aggregate_bytes_rejects_limit_plus_one(tmp_path: Path) -> None:
+    directory = tmp_path / "history"
+    directory.mkdir()
+    payload = canonical_bytes(_consent())
+    (directory / "00000000000000000001.json").write_bytes(payload)
+    (directory / "00000000000000000002.json").write_bytes(payload)
+    aggregate_limit = len(payload) * 2 - 1
+    scope = _scope(tmp_path)
+
+    error = _assert_code(
+        "PERSISTENCE_LIMIT_EXCEEDED",
+        lambda: storage.scan_canonical_directory(
+            directory,
+            entry_limit=2,
+            aggregate_limit=aggregate_limit,
+            file_limit=len(payload),
+            schema_name="persistence-consent",
+            boundary=scope.boundary,
+        ),
+    )
+    assert error.details == {
+        "reason": "aggregate_bytes",
+        "limit": aggregate_limit,
+    }
+
+
+def test_storage_transaction_bytes_rejects_limit_plus_one_before_write(
+    tmp_path: Path,
+) -> None:
+    scope = storage.open_persistence_scope(
+        tmp_path / "data",
+        SCHEMAS,
+        character_id="rin-aster",
+        limits=storage.PersistenceLimits(max_transaction_bytes=1),
+    )
+    with storage._acquire_character_lock(scope) as lock:
+        error = _assert_code(
+            "PERSISTENCE_LIMIT_EXCEEDED",
+            lambda: storage._write_transaction_marker(scope, b"{}", lock),
+        )
+
+    assert error.details == {"reason": "transaction_bytes", "limit": 1}
+    assert not scope.transaction_path.exists()
+
+
+def test_storage_json_depth_rejects_limit_plus_one() -> None:
+    value: dict[str, Any] = {}
+    cursor = value
+    for _ in range(64):
+        child: dict[str, Any] = {}
+        cursor["nested"] = child
+        cursor = child
+    boundary = storage.PersistenceBoundary(SCHEMAS)
+
+    error = _assert_code(
+        "PERSISTENCE_CHANGED",
+        lambda: boundary.capture("nested_input", value),
+    )
+    assert error.details == {"reason": "invalid_canonical_input"}
 
 
 def test_storage_rejects_case_colliding_membership(
@@ -337,6 +831,62 @@ def test_storage_detects_file_change_during_schema_callback(
             boundary=scope.boundary,
         ),
     )
+
+
+@pytest.mark.parametrize(
+    ("attack", "expected_code"),
+    [
+        ("membership_insert", "PERSISTENCE_LIMIT_EXCEEDED"),
+        ("membership_remove", "PERSISTENCE_CHANGED"),
+        ("scan_then_grow", "PERSISTENCE_CHANGED"),
+        ("scan_then_chmod_executable", "PERSISTENCE_PATH_UNSAFE"),
+    ],
+)
+def test_storage_rejects_directory_snapshot_races(
+    tmp_path: Path,
+    attack: str,
+    expected_code: str,
+) -> None:
+    if attack == "scan_then_chmod_executable" and os.name == "nt":
+        pytest.skip("POSIX executable mode mutation is unavailable on Windows")
+    directory = tmp_path / "history"
+    directory.mkdir()
+    first = directory / "00000000000000000001.json"
+    second = directory / "00000000000000000002.json"
+    payload = canonical_bytes(_consent())
+    first.write_bytes(payload)
+    second.write_bytes(payload)
+    attacked = False
+
+    class MutatingSchemas:
+        def validate(self, name: str, instance: Any) -> None:
+            nonlocal attacked
+            SCHEMAS.validate(name, instance)
+            if attacked:
+                return
+            attacked = True
+            if attack == "membership_insert":
+                (directory / "00000000000000000003.json").write_bytes(payload)
+            elif attack == "membership_remove":
+                second.unlink()
+            elif attack == "scan_then_grow":
+                second.write_bytes(payload + b" ")
+            else:
+                second.chmod(second.stat().st_mode | stat.S_IXUSR)
+
+    scope = _scope(tmp_path, MutatingSchemas())
+    _assert_code(
+        expected_code,
+        lambda: storage.scan_canonical_directory(
+            directory,
+            entry_limit=2,
+            aggregate_limit=128 * 1024,
+            file_limit=64 * 1024,
+            schema_name="persistence-consent",
+            boundary=scope.boundary,
+        ),
+    )
+    assert attacked
 
 
 def test_storage_detects_ancestor_replacement_during_callback(
@@ -602,6 +1152,71 @@ def test_consent_rejects_registry_change_during_callback_without_history(
     assert not _consent_history(data_root).exists()
 
 
+def test_consent_rejects_retained_compiled_installation_mutation(
+    rin_verified_release: dict[str, Any],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    data_root = tmp_path / "data"
+    install_rin(data_root, rin_verified_release)
+    retained: dict[str, dict[str, Any]] = {}
+    original = persistent_consent_module._resolve_installed_binding
+
+    def retaining_resolver(*args: Any, **kwargs: Any) -> dict[str, str]:
+        result = original(*args, **kwargs)
+        compiled_results = kwargs["compiled_results"]
+        retained["compiled"] = compiled_results[0]
+        return result
+
+    class LaterMutatingSchemas:
+        def validate(self, name: str, instance: Any) -> None:
+            SCHEMAS.validate(name, instance)
+            if name == "persistence-consent" and "compiled" in retained:
+                retained["compiled"]["artifact_id"] = "compiled/mutated"
+
+    monkeypatch.setattr(
+        persistent_consent_module,
+        "_resolve_installed_binding",
+        retaining_resolver,
+    )
+    _assert_code(
+        "PERSISTENCE_INPUT_MUTATION",
+        lambda: grant_consent(
+            data_root,
+            "rin-aster",
+            ["relationship_state"],
+            LaterMutatingSchemas(),
+            expected_revision=0,
+        ),
+    )
+    assert not _consent_history(data_root).exists()
+
+
+def test_consent_history_limit_blocks_limit_plus_one_before_write(
+    consented_rin: ConsentedRin,
+) -> None:
+    history = _consent_history(consented_rin.data_root)
+    before = {path.name: path.read_bytes() for path in history.iterdir()}
+
+    _assert_code(
+        "PERSISTENCE_LIMIT_EXCEEDED",
+        lambda: grant_consent(
+            consented_rin.data_root,
+            "rin-aster",
+            ["relationship_state"],
+            SCHEMAS,
+            expected_revision=consented_rin.consent["grant_revision"],
+            limits=storage.PersistenceLimits(max_consent_history=1),
+        ),
+    )
+    assert {path.name: path.read_bytes() for path in history.iterdir()} == before
+    assert load_consent(
+        consented_rin.data_root,
+        "rin-aster",
+        SCHEMAS,
+    ) == consented_rin.consent
+
+
 def test_consent_captures_relative_workspace_before_schema_callback(
     rin_verified_release: dict[str, Any],
     tmp_path: Path,
@@ -716,6 +1331,256 @@ def test_mood_rejects_caller_event_aba_across_consent_callbacks(
     )
     assert phase == 1
     assert not _persistent_state_root(consented_rin).exists()
+
+
+@pytest.mark.parametrize("target", ["state", "event"])
+def test_relationship_rejects_transition_input_mutation(
+    consented_rin: ConsentedRin,
+    monkeypatch: pytest.MonkeyPatch,
+    target: str,
+) -> None:
+    original = persistent_state_module.apply_event_v1
+
+    def mutating_transition(
+        state: dict[str, Any],
+        event: dict[str, Any],
+        **kwargs: Any,
+    ) -> dict[str, Any]:
+        result = original(state, event, **kwargs)
+        if target == "state":
+            state["recent_novelty"]["mutated-input"] = 1
+        else:
+            event["evidence"]["reference"] = "mutated-input"
+        return result
+
+    monkeypatch.setattr(
+        persistent_state_module,
+        "apply_event_v1",
+        mutating_transition,
+    )
+    _assert_code(
+        "PERSISTENCE_INPUT_MUTATION",
+        lambda: apply_persistent_relationship_event(
+            consented_rin.data_root,
+            "rin-aster",
+            interaction_event("transition-input-event-1", 0),
+            consented_rin.consent["consent_id"],
+            consented_rin.consent["grant_revision"],
+            SCHEMAS,
+            expected_state_revision=0,
+            operation_id="transition-input-operation-1",
+        ),
+    )
+
+
+def test_relationship_rejects_transition_output_mutated_during_schema_callback(
+    consented_rin: ConsentedRin,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    retained: list[dict[str, Any]] = []
+    original = persistent_state_module.apply_event_v1
+
+    def retaining_transition(
+        state: dict[str, Any],
+        event: dict[str, Any],
+        **kwargs: Any,
+    ) -> dict[str, Any]:
+        result = original(state, event, **kwargs)
+        retained.append(result)
+        return result
+
+    class LaterMutatingSchemas:
+        def validate(self, name: str, instance: Any) -> None:
+            SCHEMAS.validate(name, instance)
+            if name == "persistent-state-event" and retained:
+                retained[-1]["stage"] = "acquainted"
+
+    monkeypatch.setattr(
+        persistent_state_module,
+        "apply_event_v1",
+        retaining_transition,
+    )
+    _assert_code(
+        "PERSISTENCE_INPUT_MUTATION",
+        lambda: apply_persistent_relationship_event(
+            consented_rin.data_root,
+            "rin-aster",
+            interaction_event("transition-output-event-1", 0),
+            consented_rin.consent["consent_id"],
+            consented_rin.consent["grant_revision"],
+            LaterMutatingSchemas(),
+            expected_state_revision=0,
+            operation_id="transition-output-operation-1",
+        ),
+    )
+
+
+def test_state_event_limit_blocks_limit_plus_one_before_write(
+    consented_rin: ConsentedRin,
+) -> None:
+    limits = storage.PersistenceLimits(max_state_events=1)
+    first = apply_persistent_relationship_event(
+        consented_rin.data_root,
+        "rin-aster",
+        interaction_event("event-limit-01", 0),
+        consented_rin.consent["consent_id"],
+        consented_rin.consent["grant_revision"],
+        SCHEMAS,
+        expected_state_revision=0,
+        operation_id="event-limit-operation-01",
+        limits=limits,
+    )
+    events_root = (
+        _persistent_state_root(consented_rin)
+        / "generations"
+        / first["generation_id"]
+        / "events"
+    )
+    before = tuple(sorted(path.name for path in events_root.iterdir()))
+
+    error = _assert_code(
+        "PERSISTENCE_LIMIT_EXCEEDED",
+        lambda: apply_persistent_relationship_event(
+            consented_rin.data_root,
+            "rin-aster",
+            interaction_event("event-limit-02", 1),
+            consented_rin.consent["consent_id"],
+            consented_rin.consent["grant_revision"],
+            SCHEMAS,
+            expected_state_revision=1,
+            operation_id="event-limit-operation-02",
+            limits=limits,
+        ),
+    )
+    assert error.details == {"reason": "state_events", "limit": 1}
+    assert tuple(sorted(path.name for path in events_root.iterdir())) == before
+
+
+@pytest.mark.parametrize(
+    "schema_name",
+    ["persistent-state-event", "persistent-character-state"],
+)
+def test_relationship_rejects_mutated_state_schema_inputs(
+    consented_rin: ConsentedRin,
+    schema_name: str,
+) -> None:
+    class MutatingSchemas:
+        def validate(self, name: str, instance: Any) -> None:
+            SCHEMAS.validate(name, instance)
+            if name == schema_name:
+                instance["artifact_id"] = "mutated/schema-input"
+
+    _assert_code(
+        "PERSISTENCE_INPUT_MUTATION",
+        lambda: apply_persistent_relationship_event(
+            consented_rin.data_root,
+            "rin-aster",
+            interaction_event(f"{schema_name}-event-1", 0),
+            consented_rin.consent["consent_id"],
+            consented_rin.consent["grant_revision"],
+            MutatingSchemas(),
+            expected_state_revision=0,
+            operation_id=f"{schema_name}-operation-1",
+        ),
+    )
+
+
+def test_memory_rejects_mutated_schema_input_without_write(
+    consented_rin: ConsentedRin,
+) -> None:
+    host_id, summary, localized = approved_memory_inputs()
+
+    class MutatingSchemas:
+        def validate(self, name: str, instance: Any) -> None:
+            SCHEMAS.validate(name, instance)
+            if name == "memory-reference":
+                instance["summary"] = "mutated schema input"
+
+    _assert_code(
+        "PERSISTENCE_INPUT_MUTATION",
+        lambda: add_memory_reference(
+            consented_rin.data_root,
+            "rin-aster",
+            host_id,
+            summary,
+            localized,
+            consented_rin.consent["consent_id"],
+            consented_rin.consent["grant_revision"],
+            MutatingSchemas(),
+        ),
+    )
+    assert not (
+        consented_rin.data_root
+        / "memory-references"
+        / "global"
+        / "original"
+        / "rin-aster"
+    ).exists()
+
+
+def test_memory_entry_limit_blocks_limit_plus_one_before_write(
+    consented_rin: ConsentedRin,
+) -> None:
+    limits = storage.PersistenceLimits(max_memory_references=1)
+    _host_id, summary, localized = approved_memory_inputs()
+    add_memory_reference(
+        consented_rin.data_root,
+        "rin-aster",
+        "host-memory-capacity-01",
+        summary,
+        localized,
+        consented_rin.consent["consent_id"],
+        consented_rin.consent["grant_revision"],
+        SCHEMAS,
+        limits=limits,
+    )
+    memory_root = (
+        consented_rin.data_root
+        / "memory-references"
+        / "global"
+        / "original"
+        / "rin-aster"
+    )
+    before = tuple(sorted(path.name for path in memory_root.iterdir()))
+
+    error = _assert_code(
+        "PERSISTENCE_LIMIT_EXCEEDED",
+        lambda: add_memory_reference(
+            consented_rin.data_root,
+            "rin-aster",
+            "host-memory-capacity-02",
+            summary,
+            localized,
+            consented_rin.consent["consent_id"],
+            consented_rin.consent["grant_revision"],
+            SCHEMAS,
+            limits=limits,
+        ),
+    )
+    assert error.details == {"reason": "memory_references", "limit": 1}
+    assert tuple(sorted(path.name for path in memory_root.iterdir())) == before
+
+
+def test_memory_summary_rejects_limit_plus_one_without_write(
+    consented_rin: ConsentedRin,
+) -> None:
+    oversized = "a" * 2_001
+
+    error = _assert_code(
+        "PERSISTENCE_MEMORY_INVALID",
+        lambda: add_memory_reference(
+            consented_rin.data_root,
+            "rin-aster",
+            "host-memory-summary-limit-01",
+            oversized,
+            {"en-US": oversized},
+            consented_rin.consent["consent_id"],
+            consented_rin.consent["grant_revision"],
+            SCHEMAS,
+        ),
+    )
+    assert error.details == {"reason": "summary"}
+    assert not (consented_rin.data_root / "memory-references").exists()
 
 
 @pytest.mark.parametrize(
@@ -1189,6 +2054,50 @@ def test_export_rejects_mutated_detached_schema_input(
         ),
     )
     assert "mutated/export" not in canonical_bytes(error.envelope()).decode()
+
+
+def test_reset_rejects_caller_preview_mutation_during_schema_callback(
+    consented_rin: ConsentedRin,
+) -> None:
+    apply_persistent_relationship_event(
+        consented_rin.data_root,
+        "rin-aster",
+        interaction_event("reset-preview-event-1", 0),
+        consented_rin.consent["consent_id"],
+        consented_rin.consent["grant_revision"],
+        SCHEMAS,
+        expected_state_revision=0,
+        operation_id="reset-preview-operation-1",
+    )
+    preview = preview_persistent_reset(
+        consented_rin.data_root,
+        "rin-aster",
+        consented_rin.consent["consent_id"],
+        SCHEMAS,
+        target="relationship",
+        reset_id="reset-preview-mutation-01",
+    )
+    mutated = False
+
+    class MutatingSchemas:
+        def validate(self, name: str, instance: Any) -> None:
+            nonlocal mutated
+            SCHEMAS.validate(name, instance)
+            if not mutated:
+                object.__setattr__(preview, "payload", preview.payload + b" ")
+                mutated = True
+
+    _assert_code(
+        "PERSISTENCE_INPUT_MUTATION",
+        lambda: reset_persistent_data(
+            consented_rin.data_root,
+            "rin-aster",
+            preview,
+            consented_rin.consent["consent_id"],
+            MutatingSchemas(),
+        ),
+    )
+    assert mutated
 
 
 def test_reset_marker_failure_is_not_reported_as_success(
@@ -2477,7 +3386,7 @@ def test_migration_rejects_caller_plan_aba_across_schema_callbacks(
 
     schemas = AbaSchemas()
     _assert_code(
-        "PERSISTENCE_MIGRATION_STALE",
+        "PERSISTENCE_INPUT_MUTATION",
         lambda: apply_state_migration(
             consented_rin.data_root,
             "rin-aster",
@@ -2490,6 +3399,42 @@ def test_migration_rejects_caller_plan_aba_across_schema_callbacks(
     )
     assert schemas.phase == 1
     plan["expected_target_state_hash"] = original_hash
+    assert replay_persistent_state(
+        consented_rin.data_root,
+        "rin-aster",
+        SCHEMAS,
+    ) == source
+
+
+def test_migration_rejects_mutated_plan_schema_input(
+    consented_rin: ConsentedRin,
+    tmp_path: Path,
+    verified_release_factory: Any,
+) -> None:
+    source, target, plan = _migration_case(
+        consented_rin,
+        tmp_path,
+        verified_release_factory,
+    )
+
+    class MutatingSchemas:
+        def validate(self, name: str, instance: Any) -> None:
+            SCHEMAS.validate(name, instance)
+            if name == "state-migration-plan":
+                instance["expected_target_state_hash"] = "0" * 64
+
+    _assert_code(
+        "PERSISTENCE_INPUT_MUTATION",
+        lambda: apply_state_migration(
+            consented_rin.data_root,
+            "rin-aster",
+            target.consent["consent_id"],
+            target.consent["grant_revision"],
+            plan,
+            MutatingSchemas(),
+            mood_strategy="preserve_identical_contract",
+        ),
+    )
     assert replay_persistent_state(
         consented_rin.data_root,
         "rin-aster",
@@ -2948,3 +3893,44 @@ def test_migration_recovers_when_marker_update_is_already_visible(
     )
     assert migrated["installation"] == target.installation_binding
     assert not scope.transaction_path.exists()
+
+
+def test_migration_rejects_retained_replay_output_mutation(
+    consented_rin: ConsentedRin,
+    tmp_path: Path,
+    verified_release_factory: Any,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _source, target, plan = _migration_case(
+        consented_rin,
+        tmp_path,
+        verified_release_factory,
+    )
+    original = persistent_migrations_module._require_target_state
+    mutated = False
+
+    def mutate_after_validation(state: Any, built: Any) -> None:
+        nonlocal mutated
+        original(state, built)
+        if not mutated:
+            state["mood"]["primary"] = "curious"
+            mutated = True
+
+    monkeypatch.setattr(
+        persistent_migrations_module,
+        "_require_target_state",
+        mutate_after_validation,
+    )
+    _assert_code(
+        "PERSISTENCE_INPUT_MUTATION",
+        lambda: apply_state_migration(
+            consented_rin.data_root,
+            "rin-aster",
+            target.consent["consent_id"],
+            target.consent["grant_revision"],
+            plan,
+            SCHEMAS,
+            mood_strategy="preserve_identical_contract",
+        ),
+    )
+    assert mutated

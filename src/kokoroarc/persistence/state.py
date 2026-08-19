@@ -44,6 +44,7 @@ from kokoroarc.persistence._storage import (
     open_persistence_scope,
     read_canonical_object,
     scan_canonical_directory,
+    validate_and_finalize,
 )
 from kokoroarc.persistence.consent import (
     ActiveConsent,
@@ -1857,6 +1858,7 @@ def _apply_state_operation(
             event,
             growth,
             operation_id,
+            scope.boundary,
         )
         record = _operation_record(
             scope,
@@ -1872,13 +1874,23 @@ def _apply_state_operation(
         record_payload = canonical_bytes(record)
         if len(record_payload) > limits.max_event_bytes:
             raise _event_limit(limits.max_event_bytes, reason="event_bytes")
-        scope.boundary.validate("persistent-state-event", record_payload)
+        record = validate_and_finalize(
+            "persistent-state-event",
+            record,
+            scope.boundary,
+        )
+        record_payload = canonical_bytes(record)
         event_sha256 = sha256(record_payload).hexdigest()
         successor["last_event_sha256"] = event_sha256
         successor_payload = canonical_bytes(successor)
         if len(successor_payload) > limits.max_state_bytes:
             raise _event_limit(limits.max_state_bytes, reason="state_bytes")
-        scope.boundary.validate("persistent-character-state", successor_payload)
+        successor = validate_and_finalize(
+            "persistent-character-state",
+            successor,
+            scope.boundary,
+        )
+        successor_payload = canonical_bytes(successor)
 
         if replay_boundary is not None:
             replay_boundary.assert_clean()
@@ -2025,6 +2037,7 @@ def _replay_generation(
                 interaction,
                 growth,
                 operation_id,
+                scope.boundary,
             )
             interaction_ids.add(interaction_id)
         elif operation_kind in {"mood_update", "mood_advance"}:
@@ -2098,9 +2111,11 @@ def _replay_generation(
         projection_matches = projection.payload == canonical_bytes(state)
         if not projection_matches and not allow_projection_mismatch:
             raise _journal_invalid("projection_mismatch")
+    replay_state = _detached(state)
+    scope.boundary.capture("replay_output", replay_state)
     scope.boundary.assert_clean()
     return _ReplayResult(
-        state=state,
+        state=replay_state,
         events=events,
         boundary=scope.boundary,
         projection_present=projection_present,
@@ -2201,11 +2216,18 @@ def _operation_successor(
     event: dict[str, Any],
     growth: tuple[float, int] | None,
     operation_id: str,
+    boundary: PersistenceBoundary,
 ) -> dict[str, Any]:
     if operation_kind == "relationship":
         if growth is None:
             raise _contract_unsupported("growth")
-        return _relationship_successor(state, event, growth, operation_id)
+        return _relationship_successor(
+            state,
+            event,
+            growth,
+            operation_id,
+            boundary,
+        )
     return _mood_successor(state, operation_kind, event, operation_id)
 
 
@@ -2214,21 +2236,30 @@ def _relationship_successor(
     event: dict[str, Any],
     growth: tuple[float, int],
     operation_id: str,
+    boundary: PersistenceBoundary,
 ) -> dict[str, Any]:
+    transition_state = _detached(cast(dict[str, Any], state["relationship"]))
+    transition_event = _detached(event)
+    boundary.capture("transition_state_input", transition_state)
+    boundary.capture("transition_event_input", transition_event)
     try:
         relationship = apply_event_v1(
-            cast(dict[str, Any], state["relationship"]),
-            event,
+            transition_state,
+            transition_event,
             max_delta=growth[0],
             repetition_window=growth[1],
         )
     except KokoroError as error:
+        boundary.assert_clean()
         if error.code == "STATE_CAPACITY_EXCEEDED":
             raise _event_limit(10_000) from error
         raise _journal_invalid("relationship_event") from error
+    boundary.assert_clean()
+    relationship_payload = boundary.capture("transition_output", relationship)
+    relationship_value = cast(dict[str, Any], json.loads(relationship_payload))
     successor = _detached(state)
     successor["revision"] += 1
-    successor["relationship"] = relationship
+    successor["relationship"] = relationship_value
     successor["applied_operation_ids"].append(operation_id)
     return successor
 

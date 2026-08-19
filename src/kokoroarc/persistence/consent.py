@@ -20,12 +20,14 @@ from kokoroarc.persistence._storage import (
     SchemaValidator,
     _absolute_path,
     _acquire_character_lock,
+    _limit_error,
     _lstat,
     _publish_new_file,
     _replace_file,
     open_persistence_scope,
     read_canonical_object,
     scan_canonical_directory,
+    validate_and_finalize,
 )
 
 
@@ -322,6 +324,11 @@ def _change_consent(
                 lock.assert_owned()
                 scope.boundary.assert_clean()
                 return _detached(current)
+            if len(state.history) >= limits.max_consent_history:
+                raise _limit_error(
+                    "consent_history",
+                    limits.max_consent_history,
+                )
             successor = _revoked_successor(
                 scope,
                 current,
@@ -337,6 +344,14 @@ def _change_consent(
                 lock.assert_owned()
                 scope.boundary.assert_clean()
                 return _detached(current)
+            if (
+                state is not None
+                and len(state.history) >= limits.max_consent_history
+            ):
+                raise _limit_error(
+                    "consent_history",
+                    limits.max_consent_history,
+                )
             successor = _active_successor(
                 scope,
                 normalized_permissions,
@@ -346,7 +361,12 @@ def _change_consent(
         payload = canonical_bytes(successor)
         if len(payload) > limits.max_consent_bytes:
             raise _consent_invalid("consent_bytes")
-        scope.boundary.validate("persistence-consent", payload)
+        successor = validate_and_finalize(
+            "persistence-consent",
+            successor,
+            scope.boundary,
+        )
+        payload = canonical_bytes(successor)
         lock.assert_owned()
         _drop_consent_audits(scope)
         consent_root = scope.character_root("consents")
@@ -497,13 +517,21 @@ def _resolve_installation(
             raise _installation_stale("installation_changed") from error
 
     scope.boundary.audits["installation:binding"] = installation_audit
-    binding_value = _detached(binding)
-    compiled_value = _detached(compiled_results[0])
+    binding_payload = scope.boundary.capture(
+        "installed_binding_output",
+        binding,
+    )
+    compiled_payload = scope.boundary.capture(
+        "compiled_installation_input",
+        compiled_results[0],
+    )
+    binding_value = cast(dict[str, Any], json.loads(binding_payload))
+    compiled_value = cast(dict[str, Any], json.loads(compiled_payload))
     resolved = _ResolvedInstallation(
         binding=binding_value,
-        binding_payload=canonical_bytes(binding_value),
+        binding_payload=binding_payload,
         compiled=compiled_value,
-        compiled_payload=canonical_bytes(compiled_value),
+        compiled_payload=compiled_payload,
     )
     scope.boundary.assert_clean()
     return resolved
