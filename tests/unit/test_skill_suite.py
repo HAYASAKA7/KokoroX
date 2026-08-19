@@ -192,19 +192,30 @@ def test_installed_share_source_is_discovered_without_repository_source(
     assert suite.resolve_skill_suite_source() == installed_skills.resolve(strict=True)
 
 
+def test_installed_source_ignores_prefix_sibling_skills(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    suite = _suite_module()
+    site_packages = tmp_path / "environment" / "site-packages"
+    installed_module = site_packages / "kokoroarc" / "distribution" / "suite.py"
+    installed_module.parent.mkdir(parents=True)
+    installed_module.write_text("# location marker\n", encoding="utf-8")
+    installed_skills = site_packages / "share" / "kokoroarc" / "skills"
+    prefix_sibling_skills = installed_module.parents[3] / "skills"
+    shutil.copytree(SOURCE_SKILLS, installed_skills)
+    shutil.copytree(SOURCE_SKILLS, prefix_sibling_skills)
+    monkeypatch.setattr(suite, "__file__", str(installed_module))
+
+    assert suite.resolve_skill_suite_source() == installed_skills.resolve(strict=True)
+
+
 def test_automatic_source_discovery_rejects_two_complete_candidates(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     suite = _suite_module()
-    module = (
-        tmp_path
-        / "environment"
-        / "lib"
-        / "kokoroarc"
-        / "distribution"
-        / "suite.py"
-    )
+    module = tmp_path / "repository" / "src" / "kokoroarc" / "distribution" / "suite.py"
     module.parent.mkdir(parents=True)
     module.write_text("# location marker\n", encoding="utf-8")
     checkout_skills = module.parents[3] / "skills"

@@ -242,7 +242,9 @@ def test_clean_installed_artifact_standalone_workflow(
     assert sdist.is_file()
     working = tmp_path / "outside-checkout"
     working.mkdir()
-    skills_root = tmp_path / "fake-home" / ".agents" / "skills"
+    # This path is intentionally a sibling of the installation prefix. Installed
+    # package discovery must never mistake the target for a checkout source.
+    skills_root = tmp_path / "skills"
     data_root = tmp_path / "data"
     archive = tmp_path / "rin-aster.karc"
 

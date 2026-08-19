@@ -341,12 +341,24 @@ are not claimed by this closure.
 
 **Create:** installed-artifact and complete workflow tests.
 
-- [ ] Write parser/JSON RED tests for archive, compatibility, migration, install/list/remove, default config, consent, state export/reset, memory, and suite install commands.
-- [ ] Wire thin handlers with dry-run and stable errors; verify destructive targets in outputs before mutation.
-- [ ] Add a clean-wheel workflow: install suite, test/promote/export/install Rin globally, set default, explicitly start session, grant consent, persist/replay/export/reset, and remove after clearing references.
-- [ ] Document global-first versus workspace override, explicit activation, memory ownership, privacy, recovery, archive/publication limits, and D:-based configuration.
-- [ ] Build and test from wheel and sdist with repository source unavailable.
+- [x] Write parser/JSON RED tests for archive, compatibility, migration, install/list/remove, default config, consent, state export/reset, memory, and suite install commands.
+- [x] Wire thin handlers with dry-run and stable errors; verify destructive targets in outputs before mutation.
+- [x] Add a clean-wheel workflow: install suite, test/promote/export/install Rin globally, set default, explicitly start session, grant consent, persist/replay/export/reset, and remove after clearing references.
+- [x] Document global-first versus workspace override, explicit activation, memory ownership, privacy, recovery, archive/publication limits, and D:-based configuration.
+- [x] Build and test from wheel and sdist with repository source unavailable.
 - [ ] Commit: `feat: expose standalone suite workflows`.
+
+**Task 17 pre-commit checkpoint (2026-08-20):** The exact 3,388-test working
+tree passed with 3,347 passes and 41 documented Windows capability skips. The
+84-test focused CLI/workflow gate and 148-pass/4-skip adjacent Skill-suite gate
+also passed. Fixed-epoch builds produced a byte-identical 109-member wheel and
+content-identical 116-file normalized sdists; clean wheel and sdist installs
+resolved only installed modules, schemas, and packaged Skills, including an
+idempotent reinstall at the former source-collision path. The official plugin
+validator and all twelve source/wheel/sdist Skill-validator runs passed. Task
+18 remains unchecked: approved external behavioral evidence, the settled
+complete-suite release record, and fresh independent reviews are not part of
+this Task 17 checkpoint.
 
 ### Task 18: Complete-suite behavioral and release closure
 

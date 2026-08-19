@@ -500,6 +500,111 @@ def test_session_start_rejects_projection_replacement_during_validation(
     assert not (data_root / "sessions").exists()
 
 
+def test_default_set_captures_relative_workspace_before_schema_callbacks(
+    rin_verified_release: dict[str, Any],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    entry = tmp_path / "entry"
+    rebound = tmp_path / "rebound"
+    workspace = entry / "workspace"
+    workspace.mkdir(parents=True)
+    (rebound / "workspace").mkdir(parents=True)
+    source = tmp_path / "rin.karc"
+    source.write_bytes(build_private_archive(rin_verified_release))
+    data_root = tmp_path / "data"
+    install_karc_archive(
+        source,
+        data_root,
+        SCHEMAS,
+        workspace_root=workspace,
+    )
+    expected_scope = resolve_install_scope(workspace)
+    monkeypatch.chdir(entry)
+
+    class ChangingDirectorySchemas:
+        def __init__(self) -> None:
+            self.called = False
+
+        def validate(self, name: str, instance: Any) -> None:
+            SCHEMAS.validate(name, instance)
+            if not self.called:
+                self.called = True
+                os.chdir(rebound)
+
+    settings = Settings(data_dir=data_root, schema_dir=Path("schemas/v1"))
+    arguments = argparse.Namespace(
+        character="rin-aster",
+        namespace="original",
+        version=None,
+        scope="workspace",
+        workspace="workspace",
+    )
+
+    result = cli_module._handle_default_set(
+        arguments,
+        settings,
+        ChangingDirectorySchemas(),  # type: ignore[arg-type]
+    )
+
+    assert result["default"]["workspace_id"] == expected_scope.workspace_id
+    assert result["default"]["binding"]["character_id"] == "rin-aster"
+
+
+def test_session_start_captures_relative_workspace_before_schema_callbacks(
+    rin_verified_release: dict[str, Any],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    entry = tmp_path / "entry"
+    rebound = tmp_path / "rebound"
+    workspace = entry / "workspace"
+    workspace.mkdir(parents=True)
+    (rebound / "workspace").mkdir(parents=True)
+    source = tmp_path / "rin.karc"
+    source.write_bytes(build_private_archive(rin_verified_release))
+    data_root = tmp_path / "data"
+    install_karc_archive(
+        source,
+        data_root,
+        SCHEMAS,
+        workspace_root=workspace,
+    )
+    set_character_default(
+        data_root,
+        "rin-aster",
+        SCHEMAS,
+        workspace_root=workspace,
+    )
+    monkeypatch.chdir(entry)
+
+    class ChangingDirectorySchemas:
+        def __init__(self) -> None:
+            self.called = False
+
+        def validate(self, name: str, instance: Any) -> None:
+            SCHEMAS.validate(name, instance)
+            if not self.called:
+                self.called = True
+                os.chdir(rebound)
+
+    settings = Settings(data_dir=data_root, schema_dir=Path("schemas/v1"))
+    arguments = argparse.Namespace(
+        character=None,
+        session="relative-workspace",
+        workspace="workspace",
+    )
+
+    result = cli_module._handle_session_start(
+        arguments,
+        settings,
+        ChangingDirectorySchemas(),  # type: ignore[arg-type]
+    )
+
+    assert result["session"]["character_id"] == "rin-aster"
+    assert result["session"]["session_id"] == "relative-workspace"
+
+
 def test_session_start_rejects_source_replacement_during_projection_write(
     rin_verified_release: dict[str, Any],
     tmp_path: Path,

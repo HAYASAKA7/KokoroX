@@ -1553,7 +1553,9 @@ def _handle_session_start(
         compiled = _validated_compiled(path, schemas)
     else:
         workspace_root = (
-            Path(args.workspace) if args.workspace is not None else None
+            _argument_path(args.workspace)
+            if args.workspace is not None
+            else None
         )
         selection = resolve_character_selection(
             settings.data_dir,
@@ -1871,7 +1873,7 @@ def _workspace_argument(args: argparse.Namespace) -> Path | None:
                 "ARGUMENT_INVALID",
                 "Command arguments are invalid.",
             )
-        return Path(args.workspace)
+        return _argument_path(args.workspace)
     if args.workspace is not None:
         raise KokoroError(
             "ARGUMENT_INVALID",

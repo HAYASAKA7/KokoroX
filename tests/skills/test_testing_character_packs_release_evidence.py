@@ -48,7 +48,7 @@ def test_readme_routes_agent_led_testing_through_repository_skill() -> None:
         "does not install",
         "does not activate",
         "does not publish",
-        "Milestone 9",
+        "separate explicit administration commands",
     ):
         assert text in section
 

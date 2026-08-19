@@ -41,11 +41,12 @@ def test_readme_documents_repository_local_research_boundary() -> None:
         "artifact ID",
         "SHA-256",
         "$authoring-character-packs",
-        "Milestones 8 and 9",
-        "global installation",
-        "default bindings",
-        "memory",
-        "publication",
+        "Testing, promotion",
+        "archive export",
+        "installation",
+        "defaults",
+        "consented persistence",
+        "completing research does not imply",
     ):
         assert text in section
 

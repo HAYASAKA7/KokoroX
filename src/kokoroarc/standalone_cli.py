@@ -167,12 +167,22 @@ class _AuditedSchemas:
     ) -> None:
         self._delegate = delegate
         self._audit = audit
+        self._violation: KokoroError | None = None
 
     def validate(self, name: str, instance: Any) -> None:
         try:
             self._delegate.validate(name, instance)
         finally:
-            self._audit()
+            try:
+                self._audit()
+            except KokoroError as error:
+                if self._violation is None:
+                    self._violation = error
+                raise
+
+    def raise_if_failed(self) -> None:
+        if self._violation is not None:
+            raise self._violation
 
 
 def _add_json(
@@ -830,14 +840,16 @@ def _handle_pack_compatibility(
         max_bytes=limits.max_archive_bytes,
     )
     audit = lambda: _audit_capture(captured)
+    audited = _AuditedSchemas(schemas, audit)
     try:
         report = inspect_karc_compatibility(
             captured.payload,
-            _AuditedSchemas(schemas, audit),
+            audited,
             limits=limits,
         )
         return {"ok": True, "compatibility": report}
     finally:
+        audited.raise_if_failed()
         audit()
 
 
@@ -868,6 +880,7 @@ def _handle_pack_export(
         _audit_captures(files)
         _audit_new_output(output)
 
+    audited = _AuditedSchemas(schemas, audit)
     audit()
     try:
         try:
@@ -882,14 +895,17 @@ def _handle_pack_export(
                     if "publication" in captured
                     else None
                 ),
-                schemas=_AuditedSchemas(schemas, audit),
+                schemas=audited,
             )
         except Exception:
+            audited.raise_if_failed()
             audit()
             raise
+        audited.raise_if_failed()
         audit()
         target = _publish_new_bytes(output, archive)
     finally:
+        audited.raise_if_failed()
         _audit_captures(files)
     return {
         "ok": True,
@@ -926,17 +942,20 @@ def _handle_pack_migrate(
         _audit_capture(source)
         _audit_new_output(output)
 
+    audited = _AuditedSchemas(schemas, audit_pending)
     audit_pending()
     try:
         preview = preview_karc_migration(
             source.payload,
             args.to_format,
-            _AuditedSchemas(schemas, audit_pending),
+            audited,
             limits=limits,
         )
     except Exception:
+        audited.raise_if_failed()
         audit_pending()
         raise
+    audited.raise_if_failed()
     audit_pending()
     if args.dry_run:
         return {
@@ -951,12 +970,14 @@ def _handle_pack_migrate(
             input_path=source.path,
             output_path=output.target,
             target_format_version=args.to_format,
-            schemas=_AuditedSchemas(schemas, audit_pending),
+            schemas=audited,
             limits=limits,
         )
     except Exception:
+        audited.raise_if_failed()
         audit_pending()
         raise
+    audited.raise_if_failed()
     _audit_capture(source)
     published = _capture_binary(
         output.target,
@@ -998,7 +1019,7 @@ def _workspace_root(args: argparse.Namespace) -> Path | None:
                 "ARGUMENT_INVALID",
                 "Command arguments are invalid.",
             )
-        return Path(workspace)
+        return _argument_path(workspace)
     if scope != "global" or workspace is not None:
         raise KokoroError(
             "ARGUMENT_INVALID",
@@ -1214,18 +1235,21 @@ def _handle_state_export(
 ) -> dict[str, Any]:
     output = _persistence_output(args.out)
     audit = lambda: _audit_new_output(output)
+    audited = _AuditedSchemas(schemas, audit)
     audit()
     try:
         exported = export_persistent_data(
             _require_data_root(data_root),
             args.character,
-            _AuditedSchemas(schemas, audit),
+            audited,
             namespace=args.namespace,
             workspace_root=_workspace_root(args),
         )
     except Exception:
+        audited.raise_if_failed()
         audit()
         raise
+    audited.raise_if_failed()
     audit()
     payload = canonical_bytes(exported)
     _publish_new_bytes(output, payload)
@@ -1355,13 +1379,14 @@ def _handle_memory_add(
     root = _require_data_root(data_root)
     workspace = _workspace_root(args)
     audit = lambda: _audit_capture(captured.file)
+    audited = _AuditedSchemas(schemas, audit)
     audit()
     try:
         consent = _require_current_consent(
             load_consent(
                 root,
                 args.character,
-                _AuditedSchemas(schemas, audit),
+                audited,
                 namespace=args.namespace,
                 workspace_root=workspace,
             )
@@ -1374,12 +1399,13 @@ def _handle_memory_add(
             localized,
             consent["consent_id"],
             _consent_revision(consent),
-            _AuditedSchemas(schemas, audit),
+            audited,
             namespace=args.namespace,
             workspace_root=workspace,
         )
         return {"ok": True, "memory_reference": reference}
     finally:
+        audited.raise_if_failed()
         audit()
 
 

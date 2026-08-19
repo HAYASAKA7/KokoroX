@@ -11,6 +11,10 @@ import pytest
 import kokoroarc.cli as cli
 from kokoroarc.cli import build_parser
 from kokoroarc.distribution.installer import install_karc_archive
+from kokoroarc.distribution.registry import (
+    empty_installed_registry,
+    resolve_install_scope,
+)
 from kokoroarc.errors import KokoroError
 from kokoroarc.packs.compiler import canonical_bytes
 from kokoroarc.persistence.consent import grant_consent
@@ -255,6 +259,108 @@ def test_compatibility_rejects_archive_changed_during_schema_callback(
         )
 
     assert caught.value.code == "INPUT_PATH_UNSAFE"
+
+
+def test_compatibility_rejects_archive_aba_across_schema_callbacks(
+    rin_verified_release: dict[str, Any],
+    tmp_path: Path,
+) -> None:
+    archive_path = tmp_path / "rin.karc"
+    original = build_private_archive(rin_verified_release)
+    archive_path.write_bytes(original)
+    original_stat = archive_path.stat()
+
+    class MutatingSchemas:
+        def __init__(self) -> None:
+            self.calls = 0
+
+        def validate(self, name: str, instance: Any) -> None:
+            self.calls += 1
+            if self.calls == 2:
+                archive_path.write_bytes(original)
+                os.utime(
+                    archive_path,
+                    ns=(original_stat.st_atime_ns, original_stat.st_mtime_ns),
+                )
+            SCHEMAS.validate(name, instance)
+            if self.calls == 1:
+                archive_path.write_bytes(b"changed")
+
+    mutating = MutatingSchemas()
+    with pytest.raises(KokoroError) as caught:
+        handle_standalone(
+            build_parser().parse_args(
+                ["pack", "compatibility", str(archive_path), "--json"]
+            ),
+            None,
+            mutating,  # type: ignore[arg-type]
+        )
+
+    assert caught.value.code == "INPUT_PATH_UNSAFE"
+    assert mutating.calls >= 2
+    assert archive_path.read_bytes() == original
+    restored_stat = archive_path.stat()
+    assert restored_stat.st_ino == original_stat.st_ino
+    assert restored_stat.st_size == original_stat.st_size
+    assert restored_stat.st_mtime_ns == original_stat.st_mtime_ns
+
+
+def test_install_captures_relative_workspace_before_schema_callbacks(
+    rin_verified_release: dict[str, Any],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    entry = tmp_path / "entry"
+    rebound = tmp_path / "rebound"
+    original_workspace = entry / "workspace"
+    rebound_workspace = rebound / "workspace"
+    original_workspace.mkdir(parents=True)
+    rebound_workspace.mkdir(parents=True)
+    archive_path = tmp_path / "rin.karc"
+    archive_path.write_bytes(build_private_archive(rin_verified_release))
+    data_root = tmp_path / "data"
+
+    rebound_scope = resolve_install_scope(rebound_workspace)
+    rebound_registry = empty_installed_registry(rebound_scope)
+    rebound_registry["revision"] = 7
+    rebound_registry_path = data_root.joinpath(
+        *rebound_scope.registry_relative_path.split("/")
+    )
+    rebound_registry_path.parent.mkdir(parents=True)
+    rebound_registry_path.write_bytes(canonical_bytes(rebound_registry))
+    original_scope = resolve_install_scope(original_workspace)
+    monkeypatch.chdir(entry)
+
+    class MutatingSchemas:
+        def __init__(self) -> None:
+            self.called = False
+
+        def validate(self, name: str, instance: Any) -> None:
+            SCHEMAS.validate(name, instance)
+            if not self.called:
+                self.called = True
+                os.chdir(rebound)
+
+    result = handle_standalone(
+        build_parser().parse_args(
+            [
+                "pack",
+                "install",
+                str(archive_path),
+                "--scope",
+                "workspace",
+                "--workspace",
+                "workspace",
+                "--dry-run",
+                "--json",
+            ]
+        ),
+        data_root,
+        MutatingSchemas(),  # type: ignore[arg-type]
+    )
+
+    assert result["plan"]["workspace_id"] == original_scope.workspace_id
+    assert result["plan"]["registry_revision_before"] == 0
 
 
 def test_migration_never_overwrites_existing_output(

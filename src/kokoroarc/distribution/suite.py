@@ -412,10 +412,10 @@ def _source_candidates(source_root: Path | None) -> tuple[Path, ...]:
     if source_root is not None:
         return (Path(source_root),)
     module = Path(__file__).absolute()
-    return (
-        module.parents[3] / "skills",
-        module.parents[2] / "share" / "kokoroarc" / "skills",
-    )
+    candidates = [module.parents[2] / "share" / "kokoroarc" / "skills"]
+    if module.parents[2].name.casefold() == "src":
+        candidates.insert(0, module.parents[3] / "skills")
+    return tuple(candidates)
 
 
 def _capture_suite_source(

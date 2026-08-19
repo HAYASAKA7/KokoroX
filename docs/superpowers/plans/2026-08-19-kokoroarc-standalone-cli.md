@@ -129,7 +129,7 @@ docs/superpowers/plans/2026-08-14-kokoroarc-completion.md
 - Create: `tests/unit/test_standalone_cli.py`
 - Modify: `src/kokoroarc/cli.py`
 
-- [ ] **Step 1: Write parser RED tests for every frozen command**
+- [x] **Step 1: Write parser RED tests for every frozen command**
 
 Create table-driven tests that call `build_parser().parse_args(...)` for every
 command above and assert its route fields, default scope, namespace, dry-run,
@@ -153,7 +153,7 @@ def test_parses_standalone_routes(argv: list[str], route: tuple[str, str]):
     assert standalone_route(args) == route
 ```
 
-- [ ] **Step 2: Run parser tests and observe RED**
+- [x] **Step 2: Run parser tests and observe RED**
 
 ```powershell
 $env:PYTHONPATH='src'
@@ -165,7 +165,7 @@ python -m pytest tests/unit/test_standalone_cli.py -q -p no:cacheprovider
 Expected: collection or parser failures because `standalone_cli` and the new
 subcommands do not exist.
 
-- [ ] **Step 3: Add the focused parser adapter**
+- [x] **Step 3: Add the focused parser adapter**
 
 Define these internal entry points in `standalone_cli.py`:
 
@@ -196,7 +196,7 @@ pack commands to the existing `pack_commands`; add `consent`, `memory`, and
 `suite` at the top level; add `export` and `reset` to the existing
 `state_commands`. Do not add a second default-config parser.
 
-- [ ] **Step 4: Make core CLI dispatch data-root-aware**
+- [x] **Step 4: Make core CLI dispatch data-root-aware**
 
 Call `add_standalone_parsers` while constructing the existing parser. In
 `main`, check `standalone_route(args)` before generic `_HANDLERS`. Build
@@ -204,14 +204,14 @@ Call `add_standalone_parsers` while constructing the existing parser. In
 construct `SchemaRegistry(resolve_schema_dir())` and pass `data_root=None`.
 Keep stdout as one sorted JSON document and stderr empty.
 
-- [ ] **Step 5: Run parser GREEN and existing CLI regressions**
+- [x] **Step 5: Run parser GREEN and existing CLI regressions**
 
 ```powershell
 python -m pytest tests/unit/test_standalone_cli.py tests/unit/test_cli.py \
   tests/integration/test_pack_testing_cli.py -q -p no:cacheprovider
 ```
 
-- [ ] **Step 6: Commit parser/routing slice**
+- [x] **Step 6: Commit parser/routing slice**
 
 ```powershell
 git add src/kokoroarc/cli.py src/kokoroarc/standalone_cli.py \
@@ -228,7 +228,7 @@ git commit -m "feat: expose standalone command routes"
 - Modify: `tests/unit/test_standalone_cli.py`
 - Create: `tests/security/test_standalone_cli_security.py`
 
-- [ ] **Step 1: Write archive-command RED tests**
+- [x] **Step 1: Write archive-command RED tests**
 
 Build a verified Rin release with existing fixtures. Assert:
 
@@ -249,7 +249,7 @@ assert json.loads(completed.stdout)["compatibility"]["compatible"] is True
 assert completed.stderr == ""
 ```
 
-- [ ] **Step 2: Run the archive selection RED**
+- [x] **Step 2: Run the archive selection RED**
 
 ```powershell
 python -m pytest tests/unit/test_standalone_cli.py \
@@ -257,7 +257,7 @@ python -m pytest tests/unit/test_standalone_cli.py \
   -q -p no:cacheprovider
 ```
 
-- [ ] **Step 3: Implement bounded input and no-replace output capture**
+- [x] **Step 3: Implement bounded input and no-replace output capture**
 
 Add private immutable snapshots that retain lexical absolute path, parent
 directory identities, file identity, and bytes. JSON capture must reject
@@ -271,7 +271,7 @@ an absent final path, exclusive same-parent staging, file fsync, identity/byte
 recheck, atomic no-replace cutover, parent fsync, and identity-bound cleanup.
 It never overwrites and never creates arbitrary missing parent hierarchies.
 
-- [ ] **Step 4: Implement the three archive handlers**
+- [x] **Step 4: Implement the three archive handlers**
 
 `pack export` captures compiled, hard, soft, promotion, sibling review, and
 optional publication JSON before the first schema callback, passes detached
@@ -281,7 +281,7 @@ returned bytes once. `compatibility` passes captured bytes to
 `preview_karc_migration`; apply calls `apply_karc_migration` after an explicit
 preview and returns both the plan and output identity.
 
-- [ ] **Step 5: Run GREEN plus domain regressions**
+- [x] **Step 5: Run GREEN plus domain regressions**
 
 ```powershell
 python -m pytest tests/unit/test_standalone_cli.py \
@@ -291,7 +291,7 @@ python -m pytest tests/unit/test_standalone_cli.py \
   tests/security/test_karc_migrations_security.py -q -p no:cacheprovider
 ```
 
-- [ ] **Step 6: Commit archive CLI slice**
+- [x] **Step 6: Commit archive CLI slice**
 
 ```powershell
 git add src/kokoroarc/standalone_cli.py tests/unit/test_standalone_cli.py \
@@ -308,7 +308,7 @@ git commit -m "feat: expose karc archive commands"
 - Modify: `tests/unit/test_standalone_cli.py`
 - Modify: `tests/security/test_standalone_cli_security.py`
 
-- [ ] **Step 1: Write scoped distribution RED tests**
+- [x] **Step 1: Write scoped distribution RED tests**
 
 Cover global default, explicit workspace, missing/extra workspace argument,
 install dry-run, exact install, list, idempotent reinstall, conflict, removal
@@ -316,7 +316,7 @@ dry-run, referenced removal rejection, default set/show/clear, and proof that a
 default never activates a session. Every dry-run snapshots the complete data
 root before/after and requires byte-identical state.
 
-- [ ] **Step 2: Run RED**
+- [x] **Step 2: Run RED**
 
 ```powershell
 python -m pytest tests/unit/test_standalone_cli.py \
@@ -324,7 +324,7 @@ python -m pytest tests/unit/test_standalone_cli.py \
   -q -p no:cacheprovider
 ```
 
-- [ ] **Step 3: Implement strict scope translation**
+- [x] **Step 3: Implement strict scope translation**
 
 Use exactly one helper:
 
@@ -346,7 +346,7 @@ from `ok: true`; include `activates_character: false` on install/default
 responses. Keep the existing default handlers and add regression coverage
 rather than duplicate them.
 
-- [ ] **Step 4: Run GREEN and installer/default suites**
+- [x] **Step 4: Run GREEN and installer/default suites**
 
 ```powershell
 python -m pytest tests/unit/test_standalone_cli.py \
@@ -357,7 +357,7 @@ python -m pytest tests/unit/test_standalone_cli.py \
   tests/security/test_character_defaults_security.py -q -p no:cacheprovider
 ```
 
-- [ ] **Step 5: Commit scoped distribution slice**
+- [x] **Step 5: Commit scoped distribution slice**
 
 ```powershell
 git add src/kokoroarc/standalone_cli.py tests/unit/test_standalone_cli.py \
@@ -374,7 +374,7 @@ git commit -m "feat: expose scoped pack installation"
 - Modify: `tests/unit/test_standalone_cli.py`
 - Modify: `tests/security/test_standalone_cli_security.py`
 
-- [ ] **Step 1: Write consent/persistence RED tests**
+- [x] **Step 1: Write consent/persistence RED tests**
 
 Cover global/workspace grants, comma-list validation, idempotent grant, show,
 revoke, permission separation, absent/revoked behavior, canonical export,
@@ -383,7 +383,7 @@ localized summaries, wrong consent/installation, stale reset, and no automatic
 conversation harvesting. Assert all responses omit raw paths, secret-looking
 input, and supplied invalid text.
 
-- [ ] **Step 2: Run RED**
+- [x] **Step 2: Run RED**
 
 ```powershell
 python -m pytest tests/unit/test_standalone_cli.py \
@@ -392,7 +392,7 @@ python -m pytest tests/unit/test_standalone_cli.py \
   -q -p no:cacheprovider
 ```
 
-- [ ] **Step 3: Implement consent handlers with retained revision**
+- [x] **Step 3: Implement consent handlers with retained revision**
 
 Parse permissions into a unique ordered tuple restricted to
 `relationship_state`, `mood_state`, and `memory_references`. Capture the
@@ -400,7 +400,7 @@ current consent once, derive expected revision, then call `grant_consent`.
 For revoke, require a current artifact and pass its exact consent ID and grant
 revision to `revoke_consent`. Audit scope/arguments after callbacks.
 
-- [ ] **Step 4: Implement state export/reset handlers**
+- [x] **Step 4: Implement state export/reset handlers**
 
 `state export` calls `export_persistent_data`, canonicalizes once, then uses
 the new output publisher. For reset, load the exact consent, export current
@@ -409,7 +409,7 @@ consent/target/export hashes, and call `preview_persistent_reset`. Dry-run
 returns the decoded preview and writes nothing. Apply passes the exact retained
 `PersistentResetPreview` to `reset_persistent_data`.
 
-- [ ] **Step 5: Implement memory handlers**
+- [x] **Step 5: Implement memory handlers**
 
 Capture the closed summary JSON before callbacks. Add uses the current consent
 ID/revision. List decodes each `MemoryReferenceView.payload` and records
@@ -418,7 +418,7 @@ returns the exact matching reference ID/action; apply calls
 `remove_memory_reference` with `identifier_kind="host_memory_id"` and the
 retained consent ID. Unknown IDs stay fail-closed through the domain error.
 
-- [ ] **Step 6: Run GREEN and the complete persistence matrix**
+- [x] **Step 6: Run GREEN and the complete persistence matrix**
 
 ```powershell
 python -m pytest tests/unit/test_standalone_cli.py \
@@ -429,7 +429,7 @@ python -m pytest tests/unit/test_standalone_cli.py \
   tests/security/test_persistence_security.py -q -p no:cacheprovider
 ```
 
-- [ ] **Step 7: Commit persistence CLI slice**
+- [x] **Step 7: Commit persistence CLI slice**
 
 ```powershell
 git add src/kokoroarc/standalone_cli.py tests/unit/test_standalone_cli.py \
@@ -446,14 +446,14 @@ git commit -m "feat: expose consented persistence commands"
 - Modify: `tests/unit/test_standalone_cli.py`
 - Modify: `tests/security/test_standalone_cli_security.py`
 
-- [ ] **Step 1: Write suite-command RED tests**
+- [x] **Step 1: Write suite-command RED tests**
 
 Run without `KOKOROARC_DATA_DIR`. Cover default user dry-run with a patched
 D:-based home, explicit user skills root, explicit repo root, exact install,
 unchanged reinstall, conflict, wrong scope arguments, and no access or write
 beneath the real home. Assert `~/.codex/config.toml` remains untouched.
 
-- [ ] **Step 2: Run RED**
+- [x] **Step 2: Run RED**
 
 ```powershell
 python -m pytest tests/unit/test_standalone_cli.py \
@@ -461,14 +461,14 @@ python -m pytest tests/unit/test_standalone_cli.py \
   -q -p no:cacheprovider
 ```
 
-- [ ] **Step 3: Implement the suite handler**
+- [x] **Step 3: Implement the suite handler**
 
 Call `install_skill_suite(scope=args.scope, repo_root=..., skills_root=...,
 dry_run=args.dry_run)`. Do not resolve home or repository paths in the CLI;
 leave source discovery, confinement, identity, staging, and rollback to the
 verified Task 16 API. Return its exact canonical plan under `skill_suite`.
 
-- [ ] **Step 4: Run GREEN plus Task 16 regression gate**
+- [x] **Step 4: Run GREEN plus Task 16 regression gate**
 
 ```powershell
 python -m pytest tests/unit/test_standalone_cli.py \
@@ -477,7 +477,7 @@ python -m pytest tests/unit/test_standalone_cli.py \
   tests/security/test_skill_suite_security.py -q -p no:cacheprovider
 ```
 
-- [ ] **Step 5: Commit suite CLI slice**
+- [x] **Step 5: Commit suite CLI slice**
 
 ```powershell
 git add src/kokoroarc/standalone_cli.py tests/unit/test_standalone_cli.py \
@@ -493,7 +493,7 @@ git commit -m "feat: expose skill suite installation"
 - Create: `tests/integration/test_standalone_cli_workflow.py`
 - Modify: `tests/integration/test_research_cli.py`
 
-- [ ] **Step 1: Write the installed-workflow RED test**
+- [x] **Step 1: Write the installed-workflow RED test**
 
 Build wheel and sdist into a fresh D:-based root, install the wheel to an
 isolated target, move the subprocess working directory outside the checkout,
@@ -519,34 +519,34 @@ Drive this sequence through installed `python -m kokoroarc.cli`:
 At every step require one JSON stdout document, empty stderr, expected exact
 targets beneath the D:-root, and no implicit activation.
 
-- [ ] **Step 2: Run workflow RED**
+- [x] **Step 2: Run workflow RED**
 
 ```powershell
 python -m pytest tests/integration/test_standalone_cli_workflow.py -q \
   -p no:cacheprovider
 ```
 
-- [ ] **Step 3: Close workflow-only defects with focused RED regressions**
+- [x] **Step 3: Close workflow-only defects with focused RED regressions**
 
 Make only handler/adapter changes proven by a failing workflow assertion. Do
 not weaken domain safety or bypass installed data discovery. Keep every build,
 pip cache, data root, workspace, Skill root, and subprocess temp beneath the
 test's unique D:-based root.
 
-- [ ] **Step 4: Extend archive member and installed import assertions**
+- [x] **Step 4: Extend archive member and installed import assertions**
 
 Add `kokoroarc/standalone_cli.py` to the required wheel/sdist module inventory
 and probe parser construction plus one read-only compatibility command from
 installed code. Keep repository source absent from `PYTHONPATH`.
 
-- [ ] **Step 5: Run installed-artifact GREEN**
+- [x] **Step 5: Run installed-artifact GREEN**
 
 ```powershell
 python -m pytest tests/integration/test_standalone_cli_workflow.py \
   tests/integration/test_research_cli.py -q -p no:cacheprovider
 ```
 
-- [ ] **Step 6: Commit installed workflow slice**
+- [x] **Step 6: Commit installed workflow slice**
 
 ```powershell
 git add tests/integration/test_standalone_cli_workflow.py \
@@ -563,7 +563,7 @@ git commit -m "test: prove installed standalone workflows"
 - Modify: `README.md`
 - Modify: `tests/unit/test_standalone_cli.py`
 
-- [ ] **Step 1: Write documentation-contract RED tests**
+- [x] **Step 1: Write documentation-contract RED tests**
 
 Assert README contains executable examples and explicit statements for:
 
@@ -579,21 +579,21 @@ Assert README contains executable examples and explicit statements for:
 - private/publication readiness not publishing or granting rights; and
 - recovery/conflict behavior and backup guidance.
 
-- [ ] **Step 2: Run README contract RED**
+- [x] **Step 2: Run README contract RED**
 
 ```powershell
 python -m pytest tests/unit/test_standalone_cli.py -k readme \
   -q -p no:cacheprovider
 ```
 
-- [ ] **Step 3: Rewrite README milestone boundaries into user workflows**
+- [x] **Step 3: Rewrite README milestone boundaries into user workflows**
 
 Preserve authoring/research/testing sections, replace obsolete statements that
 Milestone 9 capabilities remain gated, and add concise PowerShell workflows.
 Label repository fixture paths as examples. State that the design revision
 `0.3.0` is not the product/package version.
 
-- [ ] **Step 4: Run README GREEN and link/path checks**
+- [x] **Step 4: Run README GREEN and link/path checks**
 
 ```powershell
 python -m pytest tests/unit/test_standalone_cli.py -k readme \
@@ -604,7 +604,7 @@ rg -n "Milestone 9.*gated|does not install that Skill globally" README.md
 Expected: documentation tests pass; any retained historical boundary wording
 is clearly scoped to its older milestone rather than current capability.
 
-- [ ] **Step 5: Commit documentation slice**
+- [x] **Step 5: Commit documentation slice**
 
 ```powershell
 git add README.md tests/unit/test_standalone_cli.py
@@ -619,7 +619,7 @@ git commit -m "docs: explain standalone suite workflows"
 - Modify: `docs/superpowers/plans/2026-08-14-kokoroarc-completion.md`
 - Test: all Task 17 files and adjacent CLI/distribution/persistence suites
 
-- [ ] **Step 1: Run the focused Task 17 gate**
+- [x] **Step 1: Run the focused Task 17 gate**
 
 ```powershell
 $env:PYTHONPATH='src'
@@ -631,21 +631,21 @@ python -m pytest tests/unit/test_standalone_cli.py \
   -q -p no:cacheprovider
 ```
 
-- [ ] **Step 2: Run adjacent and complete deterministic gates**
+- [x] **Step 2: Run adjacent and complete deterministic gates**
 
 Run non-overlapping unit, integration, security, and Skill partitions with
 fresh D:-based roots. Record exact collection count, pass/skip totals,
 durations, and every capability skip. Run `compileall`, enforce 88 columns on
 Task 17 additions, and run `git diff --check`.
 
-- [ ] **Step 3: Build wheel and sdist twice at one fixed base epoch**
+- [x] **Step 3: Build wheel and sdist twice at one fixed base epoch**
 
 Require byte-identical wheels, content-identical normalized sdists, exact
 module/schema/Skill/plugin inventories, installed workflow success with source
 unavailable, official plugin validation, and all four official Skill
 validators against both source and installed copies.
 
-- [ ] **Step 4: Perform inline specification and quality/security review**
+- [x] **Step 4: Perform inline specification and quality/security review**
 
 Review the frozen tree against design sections 7-12 and Task 17. Probe parser
 ambiguity, missing configuration, dry-run writes, path/output races, input ABA,
@@ -653,11 +653,47 @@ scope confusion, real-home access, secret/path echo, post-callback mutation,
 installed-data discovery, and destructive-target reporting. Fix every Critical
 or Important issue with a focused RED regression, then repeat affected gates.
 
-- [ ] **Step 5: Mark only Task 17 complete**
+- [x] **Step 5: Mark only Task 17 complete**
 
 Update the canonical completion plan with exact evidence. Leave Task 18
 unchecked and explicitly state that external behavioral/release closure and
 fresh independent final reviews remain open.
+
+**Task 17 pre-commit verification checkpoint (2026-08-20):** The frozen
+working tree is based on `9f857754e2ed61aac85390f379fd2b4c77d88444`.
+The complete 3,388-test collection passed with **3,347 passed and 41 documented
+Windows filesystem-capability skips in 1912.49 seconds**. The final focused
+Task 17 gate passed **84 tests in 128.02 seconds**, and the complete Task 16/17
+Skill-suite regression passed **148 tests with 4 documented capability skips
+in 73.81 seconds**. The formerly colliding installed-source workflow passed
+from a clean artifact installation and proved exact four-Skill reinstall
+idempotence.
+
+Two builds used `SOURCE_DATE_EPOCH=1787151982`. Their 109-member wheels were
+byte-identical at 346,526 bytes and SHA-256
+`e5e069cb5a219f0b6c59b4b2a94bbad7507a3add1ede0e544d2d304bfee6c5b4`.
+The raw sdists were 282,683 and 282,690 bytes with SHA-256 values
+`119b60ba8ca1ade94e0349935ea3ca6209ab50fe74b6ef694449f4cd604a2411`
+and `1801fab5789db78cad5354a98c95c16c4211766df3257fb5b3bb9d3e6188c6c3`;
+both had 145 members and the same 116-file normalized content manifest,
+SHA-256 `ba41fbde61e5ed54aa30e7e315aba7d28acad40e66ebb729addd25c1e901e307`.
+Each distribution contained 54 Python modules, 38 schemas, and 12 Skill files;
+the sdist contained the one plugin manifest.
+
+Clean wheel and sdist targets imported both code and schemas exclusively from
+their D:-based installation roots. Each installed artifact performed a first
+four-Skill install and then reported four `unchanged` actions with
+`will_write: false`, even when the target occupied the path that had exposed
+installed-source confusion. The official plugin validator passed, and all four
+official Skill validators passed for the source, wheel-installed, and
+sdist-installed copies. `compileall`, the 88-column changed-line audit, and the
+exact base-to-working-tree `git diff --check` passed. Inline specification and
+quality/security review closed three Important classes with focused RED tests:
+relative workspace rebasing across callbacks, non-sticky callback mutation
+audits, and installed package-data discovery confused by a prefix sibling
+`skills/` directory. Task 18 remains open for approved external behavioral
+evidence, the settled complete-suite release record, and fresh independent
+final reviews.
 
 - [ ] **Step 6: Stage and commit the exact Task 17 slice**
 
