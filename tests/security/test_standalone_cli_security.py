@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 from pathlib import Path
+import shutil
 from typing import Any
 
 import pytest
@@ -508,3 +509,82 @@ def test_memory_add_rejects_summary_changed_during_schema_callback(
 
     assert caught.value.code == "INPUT_PATH_UNSAFE"
     assert list_memory_references(data_root, "rin-aster", SCHEMAS) == ()
+
+
+def test_skill_suite_cli_dry_run_does_not_touch_home_or_codex_config(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    fake_home = tmp_path / "fake-home"
+    config = fake_home / ".codex" / "config.toml"
+    config.parent.mkdir(parents=True)
+    config.write_bytes(b"caller_owned = true\n")
+    before = _filesystem_snapshot(fake_home)
+    monkeypatch.setattr(Path, "home", lambda: fake_home)
+    monkeypatch.delenv("KOKOROARC_DATA_DIR", raising=False)
+
+    assert cli.main(["suite", "install", "--dry-run", "--json"]) == 0
+
+    captured = capsys.readouterr()
+    assert captured.err == ""
+    assert json.loads(captured.out)["skill_suite"]["dry_run"] is True
+    assert _filesystem_snapshot(fake_home) == before
+    assert config.read_bytes() == b"caller_owned = true\n"
+
+
+def test_skill_suite_cli_conflict_preserves_existing_skill_and_config(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    fake_home = tmp_path / "fake-home"
+    config = fake_home / ".codex" / "config.toml"
+    config.parent.mkdir(parents=True)
+    config.write_bytes(b"caller_owned = true\n")
+    skills_root = fake_home / ".agents" / "skills"
+    skills_root.mkdir(parents=True)
+    conflicting = skills_root / "using-kokoroarc"
+    shutil.copytree(Path("skills") / "using-kokoroarc", conflicting)
+    (conflicting / "SKILL.md").write_bytes(b"caller-owned-conflict\n")
+    before = _filesystem_snapshot(fake_home)
+    monkeypatch.setattr(Path, "home", lambda: fake_home)
+    monkeypatch.delenv("KOKOROARC_DATA_DIR", raising=False)
+
+    assert cli.main(["suite", "install", "--json"]) == 2
+
+    error = _error(capsys)
+    assert error["code"] == "SKILL_SUITE_CONFLICT"
+    assert _filesystem_snapshot(fake_home) == before
+    assert config.read_bytes() == b"caller_owned = true\n"
+
+
+def test_skill_suite_cli_invalid_scope_does_not_echo_supplied_path(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    supplied = str(tmp_path / "API_KEY=sk-proj-secret-path")
+    monkeypatch.delenv("KOKOROARC_DATA_DIR", raising=False)
+
+    assert (
+        cli.main(
+            [
+                "suite",
+                "install",
+                "--scope",
+                "user",
+                "--repo",
+                supplied,
+                "--dry-run",
+                "--json",
+            ]
+        )
+        == 2
+    )
+
+    captured = capsys.readouterr()
+    assert captured.err == ""
+    body = json.loads(captured.out)
+    assert body["error"]["code"] == "SKILL_SUITE_PATH_INVALID"
+    assert "sk-proj-secret-path" not in captured.out

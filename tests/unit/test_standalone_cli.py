@@ -50,6 +50,14 @@ def _filesystem_snapshot(root: Path) -> tuple[tuple[Any, ...], ...]:
     return tuple(snapshot)
 
 
+def _file_bytes(root: Path) -> dict[str, bytes]:
+    return {
+        path.relative_to(root).as_posix(): path.read_bytes()
+        for path in root.rglob("*")
+        if path.is_file()
+    }
+
+
 def _install_and_grant_cli(
     release: dict[str, Any],
     tmp_path: Path,
@@ -1228,3 +1236,134 @@ def test_memory_cli_add_list_remove_and_revoked_generation_lifecycle(
     )
     assert code == 0
     assert empty["memory_references"] == []
+
+
+def test_skill_suite_cli_default_user_dry_run_uses_fake_home_without_state(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    fake_home = tmp_path / "fake-home"
+    monkeypatch.setattr(Path, "home", lambda: fake_home)
+    monkeypatch.delenv("KOKOROARC_DATA_DIR", raising=False)
+
+    code, body = _cli_json(
+        ["suite", "install", "--dry-run", "--json"],
+        capsys,
+    )
+
+    assert code == 0
+    assert body["ok"] is True
+    assert body["skill_suite"]["scope"] == "user"
+    assert body["skill_suite"]["dry_run"] is True
+    assert body["skill_suite"]["will_write"] is True
+    assert body["skill_suite"]["skills_root"] == str(
+        (fake_home / ".agents" / "skills").resolve(strict=False)
+    )
+    assert not fake_home.exists()
+
+
+def test_skill_suite_cli_installs_explicit_user_root_idempotently(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    skills_root = tmp_path / "consumer-home" / ".agents" / "skills"
+    monkeypatch.delenv("KOKOROARC_DATA_DIR", raising=False)
+    command = [
+        "suite",
+        "install",
+        "--scope",
+        "user",
+        "--skills-root",
+        str(skills_root),
+        "--json",
+    ]
+
+    code, installed = _cli_json(command, capsys)
+    assert code == 0
+    assert installed["skill_suite"]["dry_run"] is False
+    assert installed["skill_suite"]["will_write"] is True
+    assert {item["action"] for item in installed["skill_suite"]["skills"]} == {
+        "install"
+    }
+    assert _file_bytes(skills_root) == _file_bytes(Path("skills"))
+
+    before = _filesystem_snapshot(skills_root)
+    code, repeated = _cli_json(command, capsys)
+    assert code == 0
+    assert repeated["skill_suite"]["will_write"] is False
+    assert {
+        item["action"] for item in repeated["skill_suite"]["skills"]
+    } == {"unchanged"}
+    assert _filesystem_snapshot(skills_root) == before
+
+
+def test_skill_suite_cli_repo_dry_run_then_install_is_confined(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    repo = tmp_path / "consumer-repo"
+    repo.mkdir()
+    monkeypatch.delenv("KOKOROARC_DATA_DIR", raising=False)
+    command = [
+        "suite",
+        "install",
+        "--scope",
+        "repo",
+        "--repo",
+        str(repo),
+        "--json",
+    ]
+    before = _filesystem_snapshot(repo)
+
+    code, preview = _cli_json(
+        [*command[:-1], "--dry-run", "--json"],
+        capsys,
+    )
+    assert code == 0
+    assert preview["skill_suite"]["scope"] == "repo"
+    assert preview["skill_suite"]["dry_run"] is True
+    assert _filesystem_snapshot(repo) == before
+
+    code, installed = _cli_json(command, capsys)
+    assert code == 0
+    assert installed["skill_suite"]["scope"] == "repo"
+    assert _file_bytes(repo / ".agents" / "skills") == _file_bytes(
+        Path("skills")
+    )
+
+
+@pytest.mark.parametrize(
+    "arguments",
+    [
+        ["--scope", "repo"],
+        ["--scope", "user", "--repo", "D:/unexpected"],
+        [
+            "--scope",
+            "repo",
+            "--repo",
+            "D:/repo",
+            "--skills-root",
+            "D:/unexpected",
+        ],
+    ],
+)
+def test_skill_suite_cli_rejects_mismatched_scope_arguments_without_state(
+    arguments: list[str],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.delenv("KOKOROARC_DATA_DIR", raising=False)
+    before = _filesystem_snapshot(tmp_path)
+
+    code, body = _cli_json(
+        ["suite", "install", *arguments, "--dry-run", "--json"],
+        capsys,
+    )
+
+    assert code == 2
+    assert body["error"]["code"] == "SKILL_SUITE_PATH_INVALID"
+    assert _filesystem_snapshot(tmp_path) == before

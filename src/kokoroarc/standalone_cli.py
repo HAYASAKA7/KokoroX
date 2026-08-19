@@ -25,6 +25,7 @@ from kokoroarc.distribution.registry import (
     list_installed_packs,
     resolve_install_scope,
 )
+from kokoroarc.distribution.suite import install_skill_suite
 from kokoroarc.errors import KokoroError
 from kokoroarc.json_compat import find_json_incompatibility
 from kokoroarc.packs.compiler import canonical_bytes
@@ -1473,6 +1474,25 @@ def _handle_memory_remove(
     }
 
 
+def _optional_path(raw_path: str | None) -> Path | None:
+    return None if raw_path is None else Path(raw_path)
+
+
+def _handle_suite_install(
+    args: argparse.Namespace,
+    data_root: Path | None,
+    schemas: SchemaRegistry,
+) -> dict[str, Any]:
+    del data_root, schemas
+    plan = install_skill_suite(
+        scope=args.scope,
+        repo_root=_optional_path(args.repo),
+        skills_root=_optional_path(args.skills_root),
+        dry_run=args.dry_run,
+    )
+    return {"ok": True, "skill_suite": plan}
+
+
 _HANDLERS: dict[StandaloneRoute, StandaloneHandler] = {
     ("pack", "compatibility"): _handle_pack_compatibility,
     ("pack", "export"): _handle_pack_export,
@@ -1488,6 +1508,7 @@ _HANDLERS: dict[StandaloneRoute, StandaloneHandler] = {
     ("memory", "add"): _handle_memory_add,
     ("memory", "list"): _handle_memory_list,
     ("memory", "remove"): _handle_memory_remove,
+    ("suite", "install"): _handle_suite_install,
 }
 
 
