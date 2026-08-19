@@ -10,14 +10,14 @@ CREDENTIAL_REPLACEMENT = "<redacted-credential>"
 
 
 _USER_PROFILE = re.compile(
-    r"[A-Za-z]:[\\/]+Users[\\/]+[^\\/\s\"']+",
+    r"(?:[A-Za-z]:[\\/]+Users[\\/]+|/(?:home|Users)/)[^\\/\s\"']+",
     re.IGNORECASE,
 )
 _ENVIRONMENT_ASSIGNMENT_PREFIX = re.compile(
-    r"(?P<prefix>[\"']?[A-Z0-9_-]*(?:API[_-]?KEY|ACCESS[_-]?KEY|"
+    r"(?P<prefix>(?:\\?[\"'])?[A-Z0-9_-]*(?:API[_-]?KEY|ACCESS[_-]?KEY|"
     r"PRIVATE[_-]?KEY|CLIENT[_-]?SECRET|SECRET|TOKEN|PASSWORD|PASSWD|"
     r"CREDENTIALS?)"
-    r"[\"']?\s*[:=]\s*)",
+    r"(?:\\?[\"'])?\s*[:=]\s*)",
     re.IGNORECASE,
 )
 _AUTHORIZATION_PREFIX = re.compile(

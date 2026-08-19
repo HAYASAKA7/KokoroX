@@ -229,7 +229,7 @@ writing the raw run status.
 
 ## Task 4: Build sanitizer, importer, and adjudicator
 
-- [ ] **Step 1: Write adversarial RED matrices**
+- [x] **Step 1: Write adversarial RED matrices**
 
 Cover Windows/POSIX user paths, URLs with credentials, Authorization forms,
 quoted/nested secrets, environment dumps, private keys, placeholder smuggling,
@@ -237,21 +237,21 @@ mixed encodings, unsafe filenames, CRLF/LF reproducibility, report/raw ledger
 drift, final-message mismatch, hidden shell/interpreter invocations, outside
 writes, missing/duplicate captures, and negative-case false passes.
 
-- [ ] **Step 2: Implement idempotent shared sanitization**
+- [x] **Step 2: Implement idempotent shared sanitization**
 
 Sanitize raw-to-retained bytes deterministically; then scan the retained output
 again. Record redaction class/count and both hashes. Sanitization never changes
 behavioral meaning, command structure, exit status, or evidence needed for
 adjudication.
 
-- [ ] **Step 3: Implement exact importer replay**
+- [x] **Step 3: Implement exact importer replay**
 
 Import only from the approval-bound D: root. Every retained file has one ledger
 entry; regeneration with the current importer must reproduce exact retained
 bytes and counts. No source file or final response is accepted without its raw
 binding.
 
-- [ ] **Step 4: Implement positive and negative adjudication**
+- [x] **Step 4: Implement positive and negative adjudication**
 
 Derive assertions from raw commands/captures, canonical artifacts, and protected
 state. Positive actions require exact valid command/output bindings. Negative
@@ -259,7 +259,7 @@ or stop assertions require trusted report integrity and reject any malformed,
 unbound, hidden, or contradictory execution record rather than treating it as
 absence of action.
 
-- [ ] **Step 5: Mutate every trust boundary**
+- [x] **Step 5: Mutate every trust boundary**
 
 Add full-run mutants for command wrappers, child shells, aliases, changed
 executables/import roots/cwd/env, write APIs, path construction, missing

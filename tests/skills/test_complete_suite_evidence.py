@@ -274,7 +274,12 @@ def test_approval_bound_complete_suite_inputs_are_lf_pinned() -> None:
         "tests/skills/complete-suite-output.schema.json",
         "tests/skills/complete_suite_preparation.py",
         "tests/skills/run_complete_suite_campaign.py",
+        "tests/skills/complete_suite_adjudication.py",
+        "tests/skills/complete_suite_sanitization.py",
+        "tests/skills/import_complete_suite_campaign.py",
+        "tests/skills/researching_characters_sanitization.py",
         "tests/skills/test_complete_suite_evidence.py",
+        "tests/skills/test_complete_suite_release_evidence.py",
         "docs/superpowers/plans/2026-08-20-kokoroarc-complete-suite-closure.md",
     )
     result = subprocess.run(
