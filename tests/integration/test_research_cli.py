@@ -43,6 +43,7 @@ REQUIRED_DISTRIBUTION_MODULES = {
         "installer",
         "migrations",
         "registry",
+        "suite",
     )
 }
 REQUIRED_PERSISTENCE_MODULES = {
@@ -121,6 +122,14 @@ PROTECTED_STATE_ROOTS = (
     "workspaces",
     "config",
 )
+
+
+def _relative_files(root: Path) -> set[str]:
+    return {
+        path.relative_to(root).as_posix()
+        for path in root.rglob("*")
+        if path.is_file()
+    }
 
 
 def _cli(
@@ -518,6 +527,9 @@ def test_built_archives_and_installed_research_cli_are_complete(
             for member in archive.getmembers()
             if member.isfile() and "/skills/" in member.name
         }
+    assert any(
+        entry.endswith("/.codex-plugin/plugin.json") for entry in sdist_entries
+    )
 
     for module in (
         REQUIRED_DISTRIBUTION_MODULES
@@ -621,6 +633,7 @@ def test_built_archives_and_installed_research_cli_are_complete(
                 "    empty_character_default,\n"
                 "    empty_installed_registry,\n"
                 "    install_karc_archive,\n"
+                "    install_skill_suite,\n"
                 "    inspect_karc_compatibility,\n"
                 "    list_installed_packs,\n"
                 "    load_character_default,\n"
@@ -628,11 +641,15 @@ def test_built_archives_and_installed_research_cli_are_complete(
                 "    load_selected_compiled,\n"
                 "    preview_karc_migration,\n"
                 "    preview_karc_install,\n"
+                "    preview_skill_suite_install,\n"
                 "    recover_karc_installations,\n"
                 "    remove_installed_pack,\n"
                 "    resolve_character_selection,\n"
                 "    resolve_install_scope,\n"
+                "    resolve_skill_suite_source,\n"
                 "    set_character_default,\n"
+                "    SKILL_SUITE_NAMES,\n"
+                "    SkillSuiteLimits,\n"
                 ")\n"
                 "assert callable(CharacterSelection)\n"
                 "assert callable(InstallScope)\n"
@@ -641,6 +658,7 @@ def test_built_archives_and_installed_research_cli_are_complete(
                 "assert callable(empty_character_default)\n"
                 "assert callable(empty_installed_registry)\n"
                 "assert callable(install_karc_archive)\n"
+                "assert callable(install_skill_suite)\n"
                 "assert callable(inspect_karc_compatibility)\n"
                 "assert callable(list_installed_packs)\n"
                 "assert callable(load_character_default)\n"
@@ -648,11 +666,15 @@ def test_built_archives_and_installed_research_cli_are_complete(
                 "assert callable(load_selected_compiled)\n"
                 "assert callable(preview_karc_migration)\n"
                 "assert callable(preview_karc_install)\n"
+                "assert callable(preview_skill_suite_install)\n"
                 "assert callable(recover_karc_installations)\n"
                 "assert callable(remove_installed_pack)\n"
                 "assert callable(resolve_character_selection)\n"
                 "assert callable(resolve_install_scope)\n"
+                "assert callable(resolve_skill_suite_source)\n"
                 "assert callable(set_character_default)\n"
+                "assert len(SKILL_SUITE_NAMES) == 4\n"
+                "assert SkillSuiteLimits().max_files == 12\n"
             ),
         ],
         check=False,
@@ -666,6 +688,57 @@ def test_built_archives_and_installed_research_cli_are_complete(
     )
     assert distribution_probe.stdout == ""
     assert distribution_probe.stderr == ""
+
+    installed_skill_root = tmp_path / "installed-skill-suite"
+    installed_source = installed / "share" / "kokoroarc" / "skills"
+    suite_probe = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            (
+                "import json\n"
+                "from pathlib import Path\n"
+                "import sys\n"
+                "from kokoroarc.distribution import (\n"
+                "    install_skill_suite,\n"
+                "    preview_skill_suite_install,\n"
+                "    resolve_skill_suite_source,\n"
+                ")\n"
+                "expected_source = Path(sys.argv[1]).resolve(strict=True)\n"
+                "target = Path(sys.argv[2])\n"
+                "assert resolve_skill_suite_source() == expected_source\n"
+                "preview = preview_skill_suite_install(skills_root=target)\n"
+                "assert not target.exists()\n"
+                "installed = install_skill_suite(skills_root=target)\n"
+                "print(json.dumps({\n"
+                "    'preview': preview,\n"
+                "    'installed': installed,\n"
+                "}, sort_keys=True))\n"
+            ),
+            str(installed_source),
+            str(installed_skill_root),
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+        env=probe_env,
+        cwd=outside_repository,
+    )
+    assert suite_probe.returncode == 0, suite_probe.stdout + suite_probe.stderr
+    suite_result = json.loads(suite_probe.stdout)
+    assert suite_result["preview"]["dry_run"] is True
+    assert suite_result["installed"]["dry_run"] is False
+    assert [item["action"] for item in suite_result["installed"]["skills"]] == [
+        "install",
+        "install",
+        "install",
+        "install",
+    ]
+    assert _relative_files(installed_skill_root) == REQUIRED_SKILL_FILES
+    for relative in REQUIRED_SKILL_FILES:
+        assert (installed_skill_root / relative).read_bytes() == (
+            installed_source / relative
+        ).read_bytes()
 
     persistence_probe = subprocess.run(
         [

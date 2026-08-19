@@ -17,6 +17,10 @@ SKILL_DIR = ROOT.parent.parent / "skills" / "researching-characters"
 SKILL_FILE = SKILL_DIR / "SKILL.md"
 CONTRACT_FILE = SKILL_DIR / "references" / "research-contract.md"
 METADATA_FILE = SKILL_DIR / "agents" / "openai.yaml"
+HISTORICAL_METADATA_SHA256 = (
+    "093eb44756a018c1a8ffe856f4237e31d161e936aeeaf1df2a452b3146785c3e"
+)
+LEGACY_METADATA_LINE = b'schema_version: "1.0"\n'
 CAMPAIGN_ROOT = ROOT / "evidence" / "researching-characters"
 CAMPAIGN_FILE = CAMPAIGN_ROOT / "campaign.yaml"
 CASES = (
@@ -86,6 +90,15 @@ PROTECTED_STATE_ROOTS = {
 
 def _sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def _historical_metadata_sha256() -> str:
+    current = METADATA_FILE.read_bytes()
+    assert current.endswith(b"\n")
+    assert LEGACY_METADATA_LINE not in current
+    historical = current + LEGACY_METADATA_LINE
+    assert yaml.safe_load(historical)["schema_version"] == "1.0"
+    return hashlib.sha256(historical).hexdigest()
 
 
 def _strict_json(path: Path) -> dict:
@@ -412,13 +425,14 @@ def test_structural_contract_defines_cli_provenance_and_handoff() -> None:
 
 def test_structural_agent_metadata_is_minimal_and_valid() -> None:
     metadata = yaml.safe_load(METADATA_FILE.read_text(encoding="utf-8"))
-    assert metadata["schema_version"] == "1.0"
+    assert set(metadata) == {"interface"}
     assert set(metadata["interface"]) == {
         "display_name",
         "short_description",
         "default_prompt",
     }
     assert "$researching-characters" in metadata["interface"]["default_prompt"]
+    assert _historical_metadata_sha256() == HISTORICAL_METADATA_SHA256
 
 
 def test_structural_baseline_records_the_executed_red_without_skill_attribution() -> None:
@@ -470,7 +484,7 @@ def test_campaign_evidence_preserves_exact_failed_first_approval() -> None:
         "33b1bf3b8c98a97282295bffe7ebe474d5ee43687378ff29e48dcabac2239876"
     )
     assert approval["contract_sha256"] == _sha256(CONTRACT_FILE)
-    assert approval["metadata_sha256"] == _sha256(METADATA_FILE)
+    assert approval["metadata_sha256"] == _historical_metadata_sha256()
     assert approval["status"] == "skill_failed"
     assert approval["skill_passed_cases"] == 10
     assert approval["skill_failed_cases"] == 1
@@ -528,7 +542,7 @@ def test_corrective_campaign_binds_eleven_fresh_current_skill_runs() -> None:
     }
     assert approval["skill_sha256"] == _sha256(SKILL_FILE)
     assert approval["contract_sha256"] == _sha256(CONTRACT_FILE)
-    assert approval["metadata_sha256"] == _sha256(METADATA_FILE)
+    assert approval["metadata_sha256"] == _historical_metadata_sha256()
     assert approval["status"] == "skill_passed"
     assert approval["skill_passed_cases"] == 11
     assert approval["skill_failed_cases"] == 0

@@ -16,7 +16,10 @@ Skill frontmatter and closed layout from captured bytes, plans an install into
 one explicit scope, and publishes missing Skill directories with atomic
 no-replace renames. Existing identical installations are unchanged; conflicts,
 redirects, mutation, and incomplete transactions fail closed and roll back only
-nodes whose identities were retained by this transaction.
+nodes whose identities were retained by this transaction. A same-target lock is
+a persistent one-byte regular coordination file in the nearest safe existing
+ancestor; retaining that inode avoids split-lock races between consecutive
+installers and it is not part of the installed Skill tree.
 
 **Tech Stack:** Python 3.11+, PyYAML safe duplicate-key parsing, standard-library
 filesystem/hash/fsync/locking primitives, pytest, Codex `SKILL.md` directories,
@@ -194,7 +197,8 @@ python C:\Users\cyanl\.codex\skills\.system\plugin-creator\scripts\create_basic_
 - [ ] Add RED integration tests that install all four Skills beneath an
   explicit D:-based user `skills_root` and an explicit repository root.
 - [ ] Assert every installed byte equals the source snapshot, results are
-  deterministic, staging/lock debris is absent, and no unrelated file changes.
+  deterministic, staging debris is absent, the persistent coordination lock
+  remains stable, and no unrelated file changes.
 - [ ] Add a RED exact reinstall test that returns four `unchanged` actions and
   performs no replacement or metadata rewrite.
 - [ ] Add a RED mixed test where two identical Skills pre-exist and two are
@@ -202,9 +206,10 @@ python C:\Users\cyanl\.codex\skills\.system\plugin-creator\scripts\create_basic_
 - [ ] Add a RED conflict test proving no missing Skill is installed when any
   target has non-identical bytes.
 - [ ] Run the integration file RED.
-- [ ] Add a same-root transaction lock with retained identity and bounded
-  acquisition semantics. Create missing `.agents`/`skills` ancestors one level
-  at a time, retaining identities and refusing redirects/replacements.
+- [ ] Add a same-root persistent one-byte transaction lock with retained
+  identity and bounded acquisition semantics. Create missing `.agents`/`skills`
+  ancestors one level at a time, retaining identities and refusing
+  redirects/replacements.
 - [ ] Stage every missing Skill as a unique hidden sibling. Write only captured
   source bytes with exclusive create, restrictive regular-file modes, file
   fsync, directory fsync, and a complete byte/identity revalidation.
@@ -328,3 +333,28 @@ git commit -m "feat: package the kokoroarc skill suite"
 - [ ] Verify exact commit/tree/parent, clean status, exact base-to-HEAD diff,
   focused tests, plugin validator, four Skill validators, and installed-wheel
   smoke on the committed tree before reporting Task 16 complete.
+
+## Pre-commit closure record
+
+- Final focused gate: `88 passed, 4 skipped in 49.56s`.
+- Exact final collection: `3312` tests. Non-overlapping final partitions:
+  `unit 2122 passed/4 skipped in 1263.51s`, `integration 250/4 in 501.03s`,
+  `security 631/33 in 1645.46s`, and `skills 268/0 in 173.01s`.
+- One earlier pre-review monolithic launch timed out after `1804.4s` and was
+  excluded; it was replaced by the exact, exhaustive partition accounting.
+- Fixed base epoch: `1787123335`. Repeat wheel SHA-256:
+  `b682f892ae3239091d8cdd3494d6cceed5078bfb06979cd307de41afee490154`.
+  Repeat 115-file normalized sdist content-manifest SHA-256:
+  `31fd9828a5d806541c15f09b56798a4b45cc7033f5faf13c7e84d8156ba99cef`.
+  Raw sdist containers differ only in setuptools-generated mtimes on Windows.
+- Plugin, four source Skills, and four installed Skills passed the official
+  validators. The final wheel discovered installed Skill data outside the
+  repository, dry-ran without writes, installed all twelve exact files, and
+  returned four `unchanged` actions on exact reinstall.
+- Inline specification and quality/security review reproduced five timing
+  gaps across source resolution, repo confinement, destination-root identity,
+  byte-identical installed-Skill replacement, and final-fsync verification.
+  Five focused RED regressions now fail closed; no Critical or Important
+  finding remains on the reviewed pre-commit tree.
+- Compile, 88-column changed-line, `git diff --check`, archive inventory, and
+  intended-path status gates pass. Task 17 and Task 18 remain explicitly open.

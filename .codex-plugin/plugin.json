@@ -1,0 +1,20 @@
+{
+  "name": "kokoroarc",
+  "version": "0.1.0",
+  "description": "Build, test, install, and use KokoroArc character Skills.",
+  "author": {
+    "name": "KokoroArc"
+  },
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "KokoroArc",
+    "shortDescription": "Use the four KokoroArc character Skills in Codex.",
+    "longDescription": "KokoroArc adds local Skills for character use, authoring, research, and release testing.",
+    "developerName": "KokoroArc",
+    "category": "Productivity",
+    "capabilities": [
+      "Skills"
+    ],
+    "defaultPrompt": "Help me choose the right KokoroArc Skill."
+  }
+}

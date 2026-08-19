@@ -308,12 +308,32 @@ metadata remains canonical LF.
 
 **Use before editing:** `plugin-creator`, `skill-creator`, `writing-skills`, and current official OpenAI Skill documentation.
 
-- [ ] Write RED manifest/inventory tests for a four-Skill plugin bundle and direct local installation.
-- [ ] Create `.codex-plugin/plugin.json` with valid local defaults and no undeclared connectors.
-- [ ] Implement `distribution/suite.py` and dry-run/atomic install for repo `.agents/skills` and user `.agents/skills` roots.
-- [ ] Add RED conflict, unknown file, invalid Skill, source mutation, unsafe destination, real-home isolation, symlink/junction, rollback, and idempotent reinstall tests.
-- [ ] Validate all four source and installed Skills with the standard validator.
-- [ ] Commit: `feat: package the kokoroarc skill suite`.
+- [x] Write RED manifest/inventory tests for a four-Skill plugin bundle and direct local installation.
+- [x] Create `.codex-plugin/plugin.json` with valid local defaults and no undeclared connectors.
+- [x] Implement `distribution/suite.py` and dry-run/atomic install for repo `.agents/skills` and user `.agents/skills` roots.
+- [x] Add RED conflict, unknown file, invalid Skill, source mutation, unsafe destination, real-home isolation, symlink/junction, rollback, and idempotent reinstall tests.
+- [x] Validate all four source and installed Skills with the standard validator.
+- [x] Commit: `feat: package the kokoroarc skill suite`.
+
+Task 16 closure (2026-08-19): the final focused gate passed `88` tests
+with `4` documented Windows capability skips. Exact non-overlapping full-suite
+partitions accounted for all `3312` collected tests: `3271 passed, 41 skipped`
+(`unit 2122/4`, `integration 250/4`, `security 631/33`, `skills 268/0`). A
+single pre-review monolithic launch reached its 30-minute harness timeout and
+was not counted; the final partitioned runs completed with explicit zero exits.
+The fixed-base epoch was `1787123335`: repeat wheels were byte-identical at
+SHA-256 `B682F892AE3239091D8CDD3494D6CCEED5078BFB06979CD307DE41AFEE490154`,
+and both 115-file sdists had the same normalized content-manifest SHA-256
+`31FD9828A5D806541C15F09B56798A4B45CC7033F5FAF13C7E84D8156BA99CEF`;
+setuptools-generated sdist container mtimes remain variable on Windows. The
+official plugin validator, all four source Skill validators, all four
+installed-wheel Skill validators, outside-repository wheel install/reinstall
+smoke, compile, changed-line width, and whitespace gates passed. Inline
+specification and quality/security review found five source/destination
+identity timing gaps; each received a focused RED regression and fail-closed
+remediation, after which no acceptance-level finding remained. Tasks 17 and
+18 remain open: Milestone 9 CLI/documentation and complete-suite release work
+are not claimed by this closure.
 
 ### Task 17: Expose the Milestone 9 CLI and complete documentation
 

@@ -39,6 +39,13 @@ from kokoroarc.distribution.registry import (
     load_installed_registry,
     resolve_install_scope,
 )
+from kokoroarc.distribution.suite import (
+    SKILL_SUITE_NAMES,
+    SkillSuiteLimits,
+    install_skill_suite,
+    preview_skill_suite_install,
+    resolve_skill_suite_source,
+)
 
 __all__ = [
     "CharacterSelection",
@@ -50,12 +57,15 @@ __all__ = [
     "MigrationPreview",
     "MigrationRegistry",
     "MigrationStep",
+    "SKILL_SUITE_NAMES",
+    "SkillSuiteLimits",
     "apply_karc_migration",
     "build_karc_archive",
     "clear_character_default",
     "empty_character_default",
     "empty_installed_registry",
     "install_karc_archive",
+    "install_skill_suite",
     "inspect_karc_compatibility",
     "inspect_karc_container",
     "list_installed_packs",
@@ -65,9 +75,11 @@ __all__ = [
     "load_selected_compiled",
     "preview_karc_install",
     "preview_karc_migration",
+    "preview_skill_suite_install",
     "recover_karc_installations",
     "remove_installed_pack",
     "resolve_character_selection",
     "resolve_install_scope",
+    "resolve_skill_suite_source",
     "set_character_default",
 ]

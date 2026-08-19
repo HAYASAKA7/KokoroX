@@ -12,6 +12,10 @@ RESULTS_PATH = ROOT / "tests" / "skills" / "researching-characters-results.md"
 EVIDENCE_PATH = ROOT / "tests" / "skills" / "research-release-verification.md"
 GIT_ATTRIBUTES_PATH = ROOT / ".gitattributes"
 TASK_11_BASE = "274c5a57051b8ee31d95deab11ae26d00707911a"
+HISTORICAL_RESEARCH_METADATA_SHA256 = (
+    "093EB44756A018C1A8FFE856F4237E31D161E936AEEAF1DF2A452B3146785C3E"
+)
+LEGACY_RESEARCH_METADATA_LINE = b'schema_version: "1.0"\n'
 
 
 def _section(document: str, heading: str) -> str:
@@ -514,15 +518,23 @@ def test_exact_task_11_range_has_no_undeclared_whitespace_errors() -> None:
     assert checked.returncode == 0, checked.stdout + checked.stderr
 
 
-def test_release_evidence_binds_current_skill_files() -> None:
+def test_release_evidence_binds_historical_research_inputs() -> None:
     evidence = EVIDENCE_PATH.read_text(encoding="utf-8")
     for relative in (
         "skills/researching-characters/SKILL.md",
         "skills/researching-characters/references/research-contract.md",
-        "skills/researching-characters/agents/openai.yaml",
     ):
         digest = hashlib.sha256((ROOT / relative).read_bytes()).hexdigest().upper()
         assert f"`{relative}` | `{digest}`" in evidence
+    relative = "skills/researching-characters/agents/openai.yaml"
+    current = (ROOT / relative).read_bytes()
+    assert current.endswith(b"\n")
+    assert LEGACY_RESEARCH_METADATA_LINE not in current
+    historical = hashlib.sha256(
+        current + LEGACY_RESEARCH_METADATA_LINE
+    ).hexdigest().upper()
+    assert historical == HISTORICAL_RESEARCH_METADATA_SHA256
+    assert f"`{relative}` | `{historical}`" in evidence
 
 
 def test_release_evidence_records_distribution_inventory() -> None:
