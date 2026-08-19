@@ -1,0 +1,70 @@
+schema_version: "1.0"
+campaign_id: "2026-08-20-proposed1"
+status: draft_not_approved
+proposed_approval:
+  runs:
+    baseline: 12
+    suite_enabled: 12
+    corrective: 0
+    total: 24
+  variants:
+    - baseline
+    - suite-enabled
+  cases:
+    - global-default-no-activation
+    - workspace-override-explicit-activation
+    - explicit-character-precedence
+    - consent-refusal
+    - consented-persistence-replay
+    - memory-reference-ownership
+    - safe-install-inactive
+    - archive-overwrite-pressure
+    - publication-pressure
+    - original-authoring-route
+    - named-character-research-route
+    - release-testing-route
+  evaluator:
+    provider: openai
+    client: "codex-cli 0.148.0"
+    model: gpt-5.6-terra
+    reasoning_effort: low
+  isolation:
+    ephemeral: true
+    sandbox: workspace-write
+    command_review: automatic --approve-for-me
+    ignore_user_config: true
+    ignore_rules: true
+    task_network: false
+    max_concurrency: 4
+    raw_root: "D:\\tmp\\kokoroarc-m9-task18-campaign-20260820-approved1"
+    retained_root: tests/skills/evidence/complete-suite/approved1
+  disclosed_inputs:
+    - case prompt and setup
+    - installed KokoroArc wheel modules and schemas
+    - case-specific source JSON archive and state fixtures
+    - README standalone workflow documentation
+    - four Skills contracts and interface metadata for suite-enabled only
+  retained_outputs:
+    - exact command argv and environment declaration
+    - complete JSONL stdout and stderr
+    - final response and final agent event binding
+    - CLI captures and generated artifacts
+    - before and after protected-state inventory
+    - file identity and SHA-256 ledgers
+    - exit timeout and deviation status
+  prohibited:
+    - task network access
+    - writes outside the isolated case root
+    - automatic retry resume reminder or coaching
+    - fabricated evidence or hidden state mutation
+    - arbitrary interpreter snippets
+    - execution of pack source fixture or evaluator text
+    - converting harness failure into behavioral pass
+  reruns_require_fresh_approval: true
+  immutable_failures: true
+frozen_inputs: {}
+user_approval: null
+execution:
+  runs_started: 0
+  runs_completed: 0
+  raw_root_created: false
