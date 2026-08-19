@@ -24,6 +24,86 @@ from karc_test_support import (
 )
 
 
+def test_readme_documents_installed_suite_and_d_drive_isolation() -> None:
+    readme = Path("README.md").read_text(encoding="utf-8")
+
+    for example in (
+        "$env:KOKOROARC_DATA_DIR='D:\\tmp\\kokoroarc\\data'",
+        "$env:TEMP='D:\\tmp\\kokoroarc\\temp'",
+        "$env:TMP=$env:TEMP",
+        "$env:PIP_CACHE_DIR='D:\\tmp\\kokoroarc\\pip-cache'",
+        "python -m build --no-isolation --outdir D:\\tmp\\kokoroarc\\build",
+        "python -m pip install --cache-dir $env:PIP_CACHE_DIR $wheel.FullName",
+        "kokoro suite install --scope user --json",
+        "kokoro suite install --scope repo --repo $repo --json",
+    ):
+        assert example in readme
+
+    for skill in (
+        "`using-kokoroarc`",
+        "`authoring-character-packs`",
+        "`researching-characters`",
+        "`testing-character-packs`",
+    ):
+        assert skill in readme
+    assert "The design revision is `0.3.0`; this is not a product version." in readme
+
+
+def test_readme_documents_global_first_activation_and_persistence() -> None:
+    readme = Path("README.md").read_text(encoding="utf-8")
+    lower = " ".join(readme.lower().split())
+
+    for example in (
+        "kokoro pack install $archive --scope global --json",
+        "kokoro config default set --character rin-aster --scope global --json",
+        "kokoro pack install $archive --scope workspace --workspace $repo --json",
+        "kokoro config default set --character rin-aster --scope workspace",
+        "kokoro session start --session demo --json",
+        "kokoro session end --session demo --json",
+        "--permissions relationship_state,mood_state,memory_references",
+        "kokoro state export --character rin-aster --out $stateExport --json",
+        "kokoro state reset --character rin-aster --part all --dry-run --json",
+        "kokoro memory add --character rin-aster --host-id host-memory-01",
+        "kokoro memory list --character rin-aster --json",
+        "kokoro memory remove --character rin-aster --host-id host-memory-01",
+        "kokoro consent revoke --character rin-aster --json",
+        "kokoro pack remove rin-aster --version 1.0.0 --dry-run --json",
+    ):
+        assert example in readme
+
+    for statement in (
+        "installation and default selection never activate a character",
+        "a workspace default overrides the global default only for that workspace",
+        "each permission is independent",
+        "host-owned memory ids",
+        "does not harvest conversation transcripts",
+        "end active sessions, clear defaults, reset or remove retained state",
+    ):
+        assert statement in lower
+
+
+def test_readme_documents_archive_release_and_recovery_boundaries() -> None:
+    readme = Path("README.md").read_text(encoding="utf-8")
+    lower = " ".join(readme.lower().split())
+
+    for example in (
+        "kokoro pack compatibility $archive --json",
+        "kokoro pack migrate $archive --to-format 1.0.0 --out $migrated",
+    ):
+        assert example in readme
+
+    for statement in (
+        "byte-for-byte deterministic",
+        "unsigned_local",
+        "migration is explicit, bounded, and never an automatic compatibility shim",
+        "readiness does not publish anything or grant distribution rights",
+        "conflicts fail closed",
+        "recovery is automatic on the next matching install or removal operation",
+        "keep backups of the data root before migration or destructive reset",
+    ):
+        assert statement in lower
+
+
 def _cli_json(
     arguments: list[str],
     capsys: pytest.CaptureFixture[str],

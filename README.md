@@ -1,28 +1,198 @@
 # KokoroArc
 
-KokoroArc is a multilingual character-persona runtime for AI agents. The initial vertical slice provides a Python CLI, a data-only original Character Pack, deterministic session state, multilingual render planning, structural and protected-output validation, and the `using-kokoroarc` Agent Skill.
+KokoroArc is a local-first multilingual character-persona runtime and Agent
+Skill suite. It provides deterministic Character Packs, explicit session
+activation, multilingual render planning, release gates, scoped installation,
+opt-in persistence, and four data-safe Agent Skills.
 
 The design revision is `0.3.0`; this is not a product version.
 
-## Quick start
+## Install the wheel and all four Skills
 
-KokoroArc activates characters explicitly; installing or discussing a Character Pack does not start a persona session. All compiled packs, sessions, state, and journals follow `KOKOROARC_DATA_DIR`.
+On Windows, keep build output, product data, subprocess temporary files, and the
+pip cache beneath a trusted D:-based root. From a source checkout, this builds
+and installs a wheel without placing operational data on C:. If you already
+have a wheel, skip the build command and point `$wheel` at that file.
 
 ```powershell
-$env:KOKOROARC_DATA_DIR='D:\tmp\kokoroarc'
-python -m pip install --cache-dir D:\tmp\kokoroarc-pip-cache -e ".[dev]"
-$compiled = kokoro pack compile characters/original/rin-aster --json | ConvertFrom-Json
-kokoro session start --character $compiled.path --session demo --json
-kokoro runtime context --session demo --locale zh-CN --scenario debugging --json
+$env:KOKOROARC_DATA_DIR='D:\tmp\kokoroarc\data'
+$env:TEMP='D:\tmp\kokoroarc\temp'
+$env:TMP=$env:TEMP
+$env:PIP_CACHE_DIR='D:\tmp\kokoroarc\pip-cache'
+New-Item -ItemType Directory -Force `
+  $env:KOKOROARC_DATA_DIR,$env:TEMP,$env:PIP_CACHE_DIR | Out-Null
+
+python -m build --no-isolation --outdir D:\tmp\kokoroarc\build
+$wheel=Get-ChildItem 'D:\tmp\kokoroarc\build\*.whl' | Select-Object -First 1
+python -m pip install --cache-dir $env:PIP_CACHE_DIR $wheel.FullName
+kokoro suite install --scope user --json
 ```
 
-Use the repository-local `using-kokoroarc` Agent Skill after explicit activation or when the user explicitly asks for a response through a named installed Character Pack. The latter request authorizes activation for the current host session; merely installing or discussing a pack does not.
+The user-scope command installs these four Skills into the host's user Skill
+root and is the recommended global-first choice for most users:
+
+- `using-kokoroarc` for explicit character use;
+- `authoring-character-packs` for private source-pack authoring;
+- `researching-characters` for evidence-bound named-character research; and
+- `testing-character-packs` for test, review, promotion, and readiness gates.
+
+Use a repository scope when only one workspace should discover the suite:
+
+```powershell
+$repo='D:\Projects\consumer'
+kokoro suite install --scope repo --repo $repo --json
+```
+
+Add `--dry-run` to preview either installation. Repeating an identical install
+returns four `unchanged` actions; a different pre-existing Skill fails closed
+instead of being overwritten. The wheel carries the Skill files as package
+data, but `pip install` alone does not copy them into a host Skill root.
+
+## Global-first Character Pack operation
+
+The following uses a verified `rin-aster.karc` archive as an example. Repository
+fixtures and Rin Aster paths are examples, not templates for a new character.
+Compatibility inspection is read-only; install and default selection are
+explicit mutations but do not activate the character.
+
+```powershell
+$archive='D:\tmp\kokoroarc\rin-aster.karc'
+kokoro pack compatibility $archive --json
+kokoro pack install $archive --scope global --json
+kokoro pack list --scope global --json
+kokoro config default set --character rin-aster --scope global --json
+kokoro config default show --scope global --json
+```
+
+Installation and default selection never activate a character. Activation
+starts only at an explicit session boundary, and ending the session is equally
+explicit:
+
+```powershell
+kokoro session show --json
+kokoro session start --session demo --json
+kokoro runtime context --session demo --locale zh-CN --scenario debugging --json
+kokoro session end --session demo --json
+```
+
+An explicit compiled path still has highest precedence. Without one, a session
+started with `--workspace` resolves that workspace's default, then falls back
+to the global default. A workspace default overrides the global default only
+for that workspace:
+
+```powershell
+$repo='D:\Projects\consumer'
+kokoro pack install $archive --scope workspace --workspace $repo --json
+kokoro config default set --character rin-aster --scope workspace `
+  --workspace $repo --json
+kokoro session start --session workspace-demo --workspace $repo --json
+kokoro session end --session workspace-demo --json
+```
+
+Merely installing, selecting, inspecting, or discussing a Character Pack never
+starts a persona session. Use `using-kokoroarc` only after explicit activation
+or when the user explicitly requests a named installed character for the
+current host session.
+
+## Consent, state, and memory
+
+Session state remains session-local by default. Global or workspace persistence
+requires explicit consent for `relationship_state`, `mood_state`, and
+`memory_references`. Each permission is independent; granting one never grants
+another, and revocation blocks future writes without silently deleting data.
+
+```powershell
+kokoro consent grant --character rin-aster --scope global `
+  --permissions relationship_state,mood_state,memory_references --json
+kokoro consent show --character rin-aster --scope global --json
+
+$stateExport='D:\tmp\kokoroarc\exports\rin-state.json'
+kokoro state export --character rin-aster --out $stateExport --json
+kokoro state reset --character rin-aster --part all --dry-run --json
+kokoro state reset --character rin-aster --part all --json
+kokoro consent revoke --character rin-aster --json
+```
+
+Memory commands accept host-owned memory IDs plus an explicitly approved,
+bounded summary file. KokoroArc stores only that reference and summary; it does
+not harvest conversation transcripts, infer memories from chat, or copy host
+memory contents. Preview removal with `memory remove --dry-run` before applying
+it.
+
+```powershell
+$summaryFile='D:\tmp\kokoroarc\approved-memory-summary.json'
+@'
+{"summary":"Prefers concise explanations.","localized_summaries":{"en-US":"Prefers concise explanations."}}
+'@ | Set-Content -LiteralPath $summaryFile -Encoding utf8NoBOM -NoNewline
+kokoro memory add --character rin-aster --host-id host-memory-01 `
+  --summary-file $summaryFile --json
+kokoro memory list --character rin-aster --json
+kokoro memory remove --character rin-aster --host-id host-memory-01 `
+  --dry-run --json
+kokoro memory remove --character rin-aster --host-id host-memory-01 --json
+```
+
+Before removing a pack, end active sessions, clear defaults, reset or remove
+retained state, remove retained memory references, and revoke active consent.
+Reset is consent-gated, so preview and apply it before revocation. Then preview
+the exact version removal before applying it:
+
+```powershell
+kokoro session end --session demo --json
+kokoro config default clear --scope global --json
+kokoro pack remove rin-aster --version 1.0.0 --dry-run --json
+kokoro pack remove rin-aster --version 1.0.0 --json
+```
+
+## Archives, migration, publication, and recovery
+
+For identical canonical release inputs, private `.karc` output is byte-for-byte
+deterministic. A local private archive is marked `unsigned_local`; this records
+its trust boundary and is not a remote signature or publication claim. Inspect
+an archive before installation:
+
+```powershell
+kokoro pack compatibility $archive --json
+```
+
+Migration is explicit, bounded, and never an automatic compatibility shim.
+It accepts only a supported source/target format path, writes a new archive,
+and never overwrites the input. Preview first:
+
+```powershell
+$migrated='D:\tmp\kokoroarc\rin-aster-v1.karc'
+kokoro pack migrate $archive --to-format 1.0.0 --out $migrated `
+  --dry-run --json
+kokoro pack migrate $archive --to-format 1.0.0 --out $migrated --json
+```
+
+Private readiness and public-candidate readiness are local evidence reports.
+Readiness does not publish anything or grant distribution rights. Public
+readiness additionally requires an explicit applicable rights/compliance
+attestation; self-assertion cannot unlock it.
+
+Install, remove, migration, default, persistence, and suite operations use
+bounded locks, canonical inputs, and atomic publication. Conflicts fail closed;
+the command does not guess which concurrent value should win. Interrupted
+install/removal transactions leave an identity-bound journal, and recovery is
+automatic on the next matching install or removal operation. If recovery
+cannot prove every retained byte and path, it returns a stable recovery error
+and deletes nothing unverified. Keep backups of the data root before migration
+or destructive reset; copy it only while KokoroArc is inactive so the backup is
+internally consistent.
 
 ## Author a private inactive draft with the repository-local Skill
 
 Milestone 6 authoring turns a wholly original brief or a private user dossier into a deterministic Character Draft. The result is always private, inactive, and fixed at `build_status: draft` with `activation_allowed: false`. It is not researched, externally verified, installable, public, or active.
 
-The authoring workflow belongs to the repository-local Agent Skill at `skills/authoring-character-packs/SKILL.md`; installing the Python package does not install that Skill globally. The Skill's `name` and trigger-only `description` are in the `SKILL.md` frontmatter. `skills/authoring-character-packs/agents/openai.yaml` is optional interface metadata (display name, short description, and default prompt), not the source of the Skill name or trigger. Give the agent this repository as its workspace. A host that indexes workspace Skills reads the `SKILL.md` frontmatter and can resolve `$authoring-character-packs` to that local directory, after which the agent opens `SKILL.md` and its linked contract. If the host does not index repository Skills, explicitly tell the agent to open that exact local `SKILL.md` before authoring.
+The authoring workflow belongs to the `authoring-character-packs` Agent Skill.
+In this repository its entry point is
+`skills/authoring-character-packs/SKILL.md`; an installed suite places the same
+Skill beneath the selected user or repository Skill root. The Skill's `name`
+and trigger-only `description` are in `SKILL.md` frontmatter.
+`agents/openai.yaml` is optional interface metadata, not the source of the
+Skill name or trigger. If the host does not index Skills, explicitly tell the
+agent to open that exact `SKILL.md` and its linked contract before authoring.
 
 Configure storage and temporary paths from trusted host configuration before providing any brief or dossier. On Windows, for example:
 
@@ -45,7 +215,9 @@ The workflow validates the request and workspace deterministically, then compile
 
 An eligible researched or hybrid build may continue by opening `$authoring-character-packs`. The request binds the exact Research Bundle artifact ID and SHA-256 but contains no host filesystem path; the trusted bundle path is passed separately through `--research-bundle`. Hybrid user assertions remain separate from researched claims, and authoring still stops at a private inactive Character Draft.
 
-Milestone 7 does not add draft testing or promotion, global installation, default bindings, persistent workspace/global relationship memory, archive export, or public publication. Those complete-suite capabilities remain gated by Milestones 8 and 9.
+Research itself still stops at a private inactive bundle. Testing, promotion,
+archive export, installation, defaults, and consented persistence are separate
+explicit workflows; completing research does not imply any of them.
 
 ## Validate and compile an already-authored source pack
 
@@ -66,7 +238,7 @@ The fixture and Rin Aster paths above are repository examples, not an instructio
 
 ## Test, review, and promote a Character Pack
 
-Milestone 8 release commands consume structured artifacts only. They do not run
+Release commands consume structured artifacts only. They do not run
 an evaluator, browse, publish to a network, activate a character, or infer a
 human review. `pack test` performs the deterministic hard gates; `soft-eval`
 aggregates an already prepared evaluator artifact; `promote` records explicit
@@ -79,9 +251,9 @@ publication-readiness work, give the agent this repository and ask it to use
 `skills/testing-character-packs/SKILL.md`. It does not trigger
 for ordinary character use, casual design discussion, authoring, or research.
 The workflow is private by default, does not install a pack, does not activate
-a character, and does not publish or perform network I/O. The archives carry
-the four Skill directories as inert package data; host installation, defaults,
-persistence, and memory remain gated by Milestone 9.
+a character, and does not publish or perform network I/O. Installation,
+defaults, consented persistence, memory references, and Skill registration are
+separate explicit administration commands documented above.
 
 ```text
 kokoro pack test <source-dir> --request <request.json> \
