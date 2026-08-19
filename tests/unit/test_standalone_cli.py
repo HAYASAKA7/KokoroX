@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+from hashlib import sha256
 import json
 from pathlib import Path
 from typing import Any
@@ -9,9 +10,17 @@ import pytest
 
 import kokoroarc.cli as cli
 from kokoroarc.cli import build_parser
+from kokoroarc.packs.compiler import canonical_bytes
 from kokoroarc.standalone_cli import (
     standalone_requires_data_root,
     standalone_route,
+)
+
+from karc_test_support import (
+    archive_documents,
+    build_private_archive,
+    build_public_archive,
+    make_legacy_090_archive,
 )
 
 
@@ -371,3 +380,208 @@ def test_main_dispatches_stateful_route_with_data_root(
     assert observed["route"] == ("pack", "list")
     assert observed["data_root"] == tmp_path
     assert observed["schemas"] is not None
+
+
+def test_pack_compatibility_inspects_archive_without_persistent_state(
+    rin_verified_release: dict[str, Any],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    archive = build_private_archive(rin_verified_release)
+    archive_path = tmp_path / "rin.karc"
+    archive_path.write_bytes(archive)
+    before = tuple(sorted(path.name for path in tmp_path.iterdir()))
+    monkeypatch.delenv("KOKOROARC_DATA_DIR", raising=False)
+
+    assert (
+        cli.main(["pack", "compatibility", str(archive_path), "--json"])
+        == 0
+    )
+
+    captured = capsys.readouterr()
+    body = json.loads(captured.out)
+    assert captured.err == ""
+    assert body["ok"] is True
+    assert body["compatibility"]["compatible"] is True
+    assert body["compatibility"]["installation_allowed"] is True
+    assert archive_path.read_bytes() == archive
+    assert tuple(sorted(path.name for path in tmp_path.iterdir())) == before
+
+
+def test_pack_export_writes_exact_private_archive_once(
+    rin_verified_release: dict[str, Any],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    expected = build_private_archive(rin_verified_release)
+    documents = archive_documents(expected)
+    promotion_dir = tmp_path / "published-promotion"
+    promotion_dir.mkdir()
+    inputs = {
+        "compiled": tmp_path / "compiled.json",
+        "promotion": promotion_dir / "promotion.json",
+        "hard": tmp_path / "hard.json",
+        "soft": tmp_path / "soft.json",
+        "review": promotion_dir / "review-attestation.json",
+    }
+    by_name = {
+        "compiled": "pack/compiled.json",
+        "promotion": "release/promotion-record.json",
+        "hard": "release/hard-validation-report.json",
+        "soft": "release/soft-evaluation-report.json",
+        "review": "release/review-attestation.json",
+    }
+    for name, path in inputs.items():
+        path.write_bytes(canonical_bytes(documents[by_name[name]]))
+    output = tmp_path / "rin.karc"
+    monkeypatch.delenv("KOKOROARC_DATA_DIR", raising=False)
+
+    assert (
+        cli.main(
+            [
+                "pack",
+                "export",
+                "--compiled",
+                str(inputs["compiled"]),
+                "--promotion",
+                str(inputs["promotion"]),
+                "--hard-report",
+                str(inputs["hard"]),
+                "--soft-report",
+                str(inputs["soft"]),
+                "--out",
+                str(output),
+                "--json",
+            ]
+        )
+        == 0
+    )
+
+    captured = capsys.readouterr()
+    assert captured.err == ""
+    assert json.loads(captured.out) == {
+        "ok": True,
+        "path": str(output.resolve()),
+        "archive_sha256": sha256(expected).hexdigest(),
+        "visibility": "private",
+    }
+    assert output.read_bytes() == expected
+
+
+def test_pack_export_binds_publication_report_for_public_archive(
+    rin_public_verified_release: dict[str, Any],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    expected = build_public_archive(rin_public_verified_release)
+    documents = archive_documents(expected)
+    promotion_dir = tmp_path / "published-promotion"
+    promotion_dir.mkdir()
+    inputs = {
+        "compiled": tmp_path / "compiled.json",
+        "promotion": promotion_dir / "promotion.json",
+        "hard": tmp_path / "hard.json",
+        "soft": tmp_path / "soft.json",
+        "review": promotion_dir / "review-attestation.json",
+        "publication": tmp_path / "publication.json",
+    }
+    by_name = {
+        "compiled": "pack/compiled.json",
+        "promotion": "release/promotion-record.json",
+        "hard": "release/hard-validation-report.json",
+        "soft": "release/soft-evaluation-report.json",
+        "review": "release/review-attestation.json",
+        "publication": "release/publication-readiness-report.json",
+    }
+    for name, path in inputs.items():
+        path.write_bytes(canonical_bytes(documents[by_name[name]]))
+    output = tmp_path / "rin-public.karc"
+    monkeypatch.delenv("KOKOROARC_DATA_DIR", raising=False)
+
+    assert (
+        cli.main(
+            [
+                "pack",
+                "export",
+                "--compiled",
+                str(inputs["compiled"]),
+                "--promotion",
+                str(inputs["promotion"]),
+                "--hard-report",
+                str(inputs["hard"]),
+                "--soft-report",
+                str(inputs["soft"]),
+                "--publication-report",
+                str(inputs["publication"]),
+                "--out",
+                str(output),
+                "--json",
+            ]
+        )
+        == 0
+    )
+
+    captured = capsys.readouterr()
+    assert captured.err == ""
+    assert json.loads(captured.out) == {
+        "ok": True,
+        "path": str(output.resolve()),
+        "archive_sha256": sha256(expected).hexdigest(),
+        "visibility": "public_candidate",
+    }
+    assert output.read_bytes() == expected
+
+
+def test_pack_migration_previews_then_writes_new_archive(
+    rin_verified_release: dict[str, Any],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    current = build_private_archive(rin_verified_release)
+    legacy = make_legacy_090_archive(current)
+    source = tmp_path / "rin-legacy.karc"
+    source.write_bytes(legacy)
+    output = tmp_path / "rin-current.karc"
+    monkeypatch.delenv("KOKOROARC_DATA_DIR", raising=False)
+    arguments = [
+        "pack",
+        "migrate",
+        str(source),
+        "--to-format",
+        "1.0.0",
+        "--out",
+        str(output),
+        "--json",
+    ]
+
+    assert cli.main([*arguments[:-1], "--dry-run", "--json"]) == 0
+
+    preview_capture = capsys.readouterr()
+    preview = json.loads(preview_capture.out)
+    assert preview_capture.err == ""
+    assert preview["ok"] is True
+    assert preview["dry_run"] is True
+    assert preview["path"] == str(output.resolve())
+    assert preview["plan"]["mode"] == "preview"
+    assert preview["plan"]["input_archive_sha256"] == sha256(legacy).hexdigest()
+    assert preview["plan"]["output_archive_sha256"] == sha256(current).hexdigest()
+    assert not output.exists()
+
+    assert cli.main(arguments) == 0
+
+    applied_capture = capsys.readouterr()
+    applied = json.loads(applied_capture.out)
+    assert applied_capture.err == ""
+    assert applied == {
+        "ok": True,
+        "dry_run": False,
+        "path": str(output.resolve()),
+        "archive_sha256": sha256(current).hexdigest(),
+        "plan": {**preview["plan"], "mode": "applied"},
+    }
+    assert output.read_bytes() == current
+    assert source.read_bytes() == legacy

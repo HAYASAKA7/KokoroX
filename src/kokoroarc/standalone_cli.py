@@ -1,14 +1,54 @@
 from __future__ import annotations
 
 import argparse
+from dataclasses import dataclass
+import errno
+from hashlib import sha256
+import json
+import os
 from pathlib import Path
+import stat
+import tempfile
 from typing import Any, Callable
 
+from kokoroarc.distribution.archive import KarcLimits, build_karc_archive
+from kokoroarc.distribution.compatibility import inspect_karc_compatibility
+from kokoroarc.distribution.migrations import (
+    apply_karc_migration,
+    preview_karc_migration,
+)
 from kokoroarc.errors import KokoroError
+from kokoroarc.json_compat import find_json_incompatibility
 from kokoroarc.schemas import SchemaRegistry
 
 
 StandaloneRoute = tuple[str, str]
+StandaloneHandler = Callable[
+    [argparse.Namespace, Path | None, SchemaRegistry],
+    dict[str, Any],
+]
+
+JSON_INPUT_MAX_BYTES = 4 * 1024 * 1024
+_WINDOWS_RESERVED_NAMES = frozenset(
+    {
+        "aux",
+        "con",
+        "nul",
+        "prn",
+        *(f"com{number}" for number in range(1, 10)),
+        *(f"lpt{number}" for number in range(1, 10)),
+    }
+)
+_DIRECTORY_FSYNC_UNSUPPORTED = frozenset(
+    value
+    for value in (
+        getattr(errno, "EINVAL", None),
+        getattr(errno, "ENOTSUP", None),
+        getattr(errno, "EOPNOTSUPP", None),
+        getattr(errno, "EBADF", None),
+    )
+    if value is not None
+)
 
 _PACK_ROUTES = frozenset(
     {
@@ -37,6 +77,71 @@ _DATA_ROOT_ROUTES = frozenset(
         ("memory", "remove"),
     }
 )
+
+
+@dataclass(frozen=True, slots=True)
+class _InputIdentity:
+    device: int
+    inode: int
+    size: int
+    modified_ns: int
+    file_type: int
+    links: int
+
+
+@dataclass(frozen=True, slots=True)
+class _InputDirectoryIdentity:
+    path: Path
+    device: int
+    inode: int
+    file_type: int
+
+
+@dataclass(frozen=True, slots=True)
+class _CapturedFile:
+    path: Path
+    directories: tuple[_InputDirectoryIdentity, ...]
+    identity: _InputIdentity
+    payload: bytes
+    max_bytes: int
+
+
+@dataclass(frozen=True, slots=True)
+class _CapturedJson:
+    file: _CapturedFile
+    value: dict[str, Any]
+
+
+@dataclass(frozen=True, slots=True)
+class _DirectoryIdentity:
+    path: Path
+    device: int
+    inode: int
+    file_type: int
+
+
+@dataclass(frozen=True, slots=True)
+class _NewOutput:
+    target: Path
+    directories: tuple[_DirectoryIdentity, ...]
+    unsafe_code: str
+    exists_code: str
+
+
+class _AuditedSchemas:
+    def __init__(
+        self,
+        delegate: SchemaRegistry,
+        audit: Callable[[], None],
+    ) -> None:
+        self._delegate = delegate
+        self._audit = audit
+
+    def validate(self, name: str, instance: Any) -> None:
+        try:
+            self._delegate.validate(name, instance)
+        finally:
+            self._audit()
 
 
 def _add_json(
@@ -205,13 +310,649 @@ def standalone_requires_data_root(args: argparse.Namespace) -> bool:
     return route in _DATA_ROOT_ROUTES
 
 
+def _input_error(code: str, message: str) -> KokoroError:
+    return KokoroError(code, message)
+
+
+def _input_identity(path_stat: os.stat_result) -> _InputIdentity:
+    return _InputIdentity(
+        device=path_stat.st_dev,
+        inode=path_stat.st_ino,
+        size=path_stat.st_size,
+        modified_ns=path_stat.st_mtime_ns,
+        file_type=stat.S_IFMT(path_stat.st_mode),
+        links=path_stat.st_nlink,
+    )
+
+
+def _input_is_redirect(path: Path, path_stat: os.stat_result) -> bool:
+    if stat.S_ISLNK(path_stat.st_mode):
+        return True
+    is_junction = getattr(path, "is_junction", None)
+    try:
+        if is_junction is not None and is_junction():
+            return True
+    except OSError as error:
+        raise _input_error(
+            "INPUT_READ_FAILED",
+            "Input file could not be read.",
+        ) from error
+    reparse = getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0)
+    attributes = getattr(path_stat, "st_file_attributes", 0)
+    return bool(reparse and attributes & reparse)
+
+
+def _argument_path(raw_path: str) -> Path:
+    return Path(os.path.abspath(Path(raw_path).expanduser()))
+
+
+def _input_directory_identity(path: Path) -> _InputDirectoryIdentity:
+    try:
+        path_stat = path.lstat()
+    except OSError as error:
+        raise _input_error(
+            "INPUT_PATH_UNSAFE",
+            "Input file path is unsafe.",
+        ) from error
+    if (
+        not stat.S_ISDIR(path_stat.st_mode)
+        or _input_is_redirect(path, path_stat)
+    ):
+        raise _input_error("INPUT_PATH_UNSAFE", "Input file path is unsafe.")
+    return _InputDirectoryIdentity(
+        path=path,
+        device=path_stat.st_dev,
+        inode=path_stat.st_ino,
+        file_type=stat.S_IFMT(path_stat.st_mode),
+    )
+
+
+def _input_directory_chain(path: Path) -> tuple[_InputDirectoryIdentity, ...]:
+    return tuple(
+        _input_directory_identity(directory)
+        for directory in reversed((path.parent, *path.parent.parents))
+    )
+
+
+def _capture_binary(path: Path, *, max_bytes: int) -> _CapturedFile:
+    directories = _input_directory_chain(path)
+    try:
+        path_stat = path.lstat()
+    except FileNotFoundError as error:
+        raise _input_error("INPUT_NOT_FOUND", "Input file was not found.") from error
+    except OSError as error:
+        raise _input_error(
+            "INPUT_READ_FAILED",
+            "Input file could not be read.",
+        ) from error
+    if (
+        not stat.S_ISREG(path_stat.st_mode)
+        or _input_is_redirect(path, path_stat)
+        or path_stat.st_nlink != 1
+    ):
+        raise _input_error("INPUT_PATH_UNSAFE", "Input file path is unsafe.")
+    if path_stat.st_size > max_bytes:
+        raise _input_error("INPUT_TOO_LARGE", "Input file exceeds the size limit.")
+    initial_identity = _input_identity(path_stat)
+    descriptor: int | None = None
+    try:
+        flags = os.O_RDONLY | getattr(os, "O_BINARY", 0)
+        flags |= getattr(os, "O_NOFOLLOW", 0)
+        descriptor = os.open(path, flags)
+        with os.fdopen(descriptor, "rb") as handle:
+            descriptor = None
+            if _input_identity(os.fstat(handle.fileno())) != initial_identity:
+                raise _input_error(
+                    "INPUT_PATH_UNSAFE",
+                    "Input file path is unsafe.",
+                )
+            contents = handle.read(max_bytes + 1)
+            handle.seek(0)
+            repeated = handle.read(max_bytes + 1)
+            final_open_identity = _input_identity(os.fstat(handle.fileno()))
+    except FileNotFoundError as error:
+        raise _input_error("INPUT_NOT_FOUND", "Input file was not found.") from error
+    except KokoroError:
+        raise
+    except OSError as error:
+        raise _input_error(
+            "INPUT_READ_FAILED",
+            "Input file could not be read.",
+        ) from error
+    finally:
+        if descriptor is not None:
+            try:
+                os.close(descriptor)
+            except OSError:
+                pass
+    if len(contents) > max_bytes:
+        raise _input_error("INPUT_TOO_LARGE", "Input file exceeds the size limit.")
+    if contents != repeated or final_open_identity != initial_identity:
+        raise _input_error("INPUT_PATH_UNSAFE", "Input file path is unsafe.")
+    try:
+        final_identity = _input_identity(path.lstat())
+    except OSError as error:
+        raise _input_error("INPUT_PATH_UNSAFE", "Input file path is unsafe.") from error
+    if final_identity != initial_identity:
+        raise _input_error("INPUT_PATH_UNSAFE", "Input file path is unsafe.")
+    if _input_directory_chain(path) != directories:
+        raise _input_error("INPUT_PATH_UNSAFE", "Input file path is unsafe.")
+    return _CapturedFile(
+        path=path,
+        directories=directories,
+        identity=initial_identity,
+        payload=contents,
+        max_bytes=max_bytes,
+    )
+
+
+def _audit_capture(capture: _CapturedFile) -> None:
+    current = _capture_binary(capture.path, max_bytes=capture.max_bytes)
+    if (
+        current.directories != capture.directories
+        or current.identity != capture.identity
+        or current.payload != capture.payload
+    ):
+        raise _input_error("INPUT_PATH_UNSAFE", "Input file path is unsafe.")
+
+
+def _audit_captures(captures: tuple[_CapturedFile, ...]) -> None:
+    for capture in captures:
+        _audit_capture(capture)
+
+
+def _strict_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    result: dict[str, Any] = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError("duplicate key")
+        result[key] = value
+    return result
+
+
+def _reject_constant(_value: str) -> None:
+    raise ValueError("non-finite number")
+
+
+def _capture_json(path: Path) -> _CapturedJson:
+    captured = _capture_binary(path, max_bytes=JSON_INPUT_MAX_BYTES)
+    try:
+        value = json.loads(
+            captured.payload.decode("utf-8"),
+            object_pairs_hook=_strict_object,
+            parse_constant=_reject_constant,
+        )
+    except (
+        UnicodeDecodeError,
+        json.JSONDecodeError,
+        RecursionError,
+        ValueError,
+    ) as error:
+        raise _input_error(
+            "INPUT_INVALID_JSON",
+            "Input file contains invalid JSON.",
+        ) from error
+    if not isinstance(value, dict) or find_json_incompatibility(value) is not None:
+        raise _input_error(
+            "INPUT_INVALID_JSON",
+            "Input file contains invalid JSON.",
+        )
+    return _CapturedJson(file=captured, value=value)
+
+
+def _output_error(code: str, message: str) -> KokoroError:
+    return KokoroError(code, message)
+
+
+def _output_is_redirect(
+    path: Path,
+    path_stat: os.stat_result,
+    *,
+    unsafe_code: str = "KARC_EXPORT_PATH_UNSAFE",
+) -> bool:
+    if stat.S_ISLNK(path_stat.st_mode):
+        return True
+    is_junction = getattr(path, "is_junction", None)
+    try:
+        if is_junction is not None and is_junction():
+            return True
+    except OSError as error:
+        raise _output_error(
+            unsafe_code,
+            "Archive output path is unsafe.",
+        ) from error
+    reparse = getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0)
+    attributes = getattr(path_stat, "st_file_attributes", 0)
+    return bool(reparse and attributes & reparse)
+
+
+def _directory_identity(
+    path: Path,
+    *,
+    unsafe_code: str = "KARC_EXPORT_PATH_UNSAFE",
+) -> _DirectoryIdentity:
+    try:
+        path_stat = path.lstat()
+    except OSError as error:
+        raise _output_error(
+            unsafe_code,
+            "Archive output path is unsafe.",
+        ) from error
+    if (
+        not stat.S_ISDIR(path_stat.st_mode)
+        or _output_is_redirect(path, path_stat, unsafe_code=unsafe_code)
+    ):
+        raise _output_error(
+            unsafe_code,
+            "Archive output path is unsafe.",
+        )
+    return _DirectoryIdentity(
+        path=path,
+        device=path_stat.st_dev,
+        inode=path_stat.st_ino,
+        file_type=stat.S_IFMT(path_stat.st_mode),
+    )
+
+
+def _safe_output_component(component: str, *, unsafe_code: str) -> None:
+    if (
+        not component
+        or component.rstrip(" .") != component
+        or ":" in component
+        or any(ord(character) < 32 for character in component)
+        or component.split(".", 1)[0].lower() in _WINDOWS_RESERVED_NAMES
+    ):
+        raise _output_error(
+            unsafe_code,
+            "Archive output path is unsafe.",
+        )
+
+
+def _prepare_new_output(
+    raw_path: str,
+    *,
+    suffix: str,
+    unsafe_code: str = "KARC_EXPORT_PATH_UNSAFE",
+    exists_code: str = "KARC_EXPORT_OUTPUT_EXISTS",
+) -> _NewOutput:
+    supplied = Path(raw_path).expanduser()
+    if ".." in supplied.parts:
+        raise _output_error(
+            unsafe_code,
+            "Archive output path is unsafe.",
+        )
+    target = Path(os.path.abspath(supplied))
+    if target.suffix.lower() != suffix:
+        raise _output_error(
+            unsafe_code,
+            "Archive output path is unsafe.",
+        )
+    for component in target.parts[1:]:
+        _safe_output_component(component, unsafe_code=unsafe_code)
+    directories = tuple(
+        _directory_identity(path, unsafe_code=unsafe_code)
+        for path in reversed((target.parent, *target.parent.parents))
+    )
+    try:
+        target_stat = target.lstat()
+    except FileNotFoundError:
+        target_stat = None
+    except OSError as error:
+        raise _output_error(
+            unsafe_code,
+            "Archive output path is unsafe.",
+        ) from error
+    if target_stat is not None:
+        raise _output_error(
+            exists_code,
+            "Archive output already exists.",
+        )
+    return _NewOutput(
+        target=target,
+        directories=directories,
+        unsafe_code=unsafe_code,
+        exists_code=exists_code,
+    )
+
+
+def _audit_new_output(output: _NewOutput) -> None:
+    for expected in output.directories:
+        if (
+            _directory_identity(
+                expected.path,
+                unsafe_code=output.unsafe_code,
+            )
+            != expected
+        ):
+            raise _output_error(
+                output.unsafe_code,
+                "Archive output path is unsafe.",
+            )
+    try:
+        output.target.lstat()
+    except FileNotFoundError:
+        return
+    except OSError as error:
+        raise _output_error(
+            output.unsafe_code,
+            "Archive output path is unsafe.",
+        ) from error
+    raise _output_error(
+        output.exists_code,
+        "Archive output already exists.",
+    )
+
+
+def _node(identity: _InputIdentity) -> tuple[int, int, int]:
+    return (identity.device, identity.inode, identity.file_type)
+
+
+def _cleanup_staging(path: Path, expected_node: tuple[int, int, int]) -> None:
+    try:
+        path_stat = path.lstat()
+    except FileNotFoundError:
+        return
+    except OSError as error:
+        raise _output_error(
+            "KARC_EXPORT_CLEANUP_FAILED",
+            "Archive staging cleanup failed.",
+        ) from error
+    identity = _input_identity(path_stat)
+    if (
+        not stat.S_ISREG(path_stat.st_mode)
+        or _output_is_redirect(path, path_stat)
+        or _node(identity) != expected_node
+    ):
+        raise _output_error(
+            "KARC_EXPORT_CLEANUP_FAILED",
+            "Archive staging cleanup failed.",
+        )
+    try:
+        path.unlink()
+    except OSError as error:
+        raise _output_error(
+            "KARC_EXPORT_CLEANUP_FAILED",
+            "Archive staging cleanup failed.",
+        ) from error
+
+
+def _fsync_directory(path: Path) -> None:
+    if os.name == "nt":
+        return
+    descriptor = -1
+    try:
+        flags = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0)
+        descriptor = os.open(path, flags)
+        os.fsync(descriptor)
+    except OSError as error:
+        if error.errno not in _DIRECTORY_FSYNC_UNSUPPORTED:
+            raise _output_error(
+                "KARC_EXPORT_DURABILITY_FAILED",
+                "Archive output durability could not be confirmed.",
+            ) from error
+    finally:
+        if descriptor >= 0:
+            os.close(descriptor)
+
+
+def _publish_new_bytes(output: _NewOutput, payload: bytes) -> Path:
+    descriptor = -1
+    staging: Path | None = None
+    staging_node: tuple[int, int, int] | None = None
+    try:
+        descriptor, raw_staging = tempfile.mkstemp(
+            prefix=f".{output.target.name}.staging-",
+            suffix=".tmp",
+            dir=output.target.parent,
+        )
+        staging = Path(raw_staging)
+        staging_identity = _input_identity(os.fstat(descriptor))
+        staging_node = _node(staging_identity)
+        with os.fdopen(descriptor, "wb") as handle:
+            descriptor = -1
+            handle.write(payload)
+            handle.flush()
+            os.fsync(handle.fileno())
+        written = _capture_binary(staging, max_bytes=len(payload))
+        if _node(written.identity) != staging_node or written.payload != payload:
+            raise _output_error(
+                "KARC_EXPORT_WRITE_FAILED",
+                "Archive output could not be written.",
+            )
+        _audit_new_output(output)
+        os.link(staging, output.target)
+        staging.unlink()
+        staging = None
+        _fsync_directory(output.target.parent)
+        published = _capture_binary(output.target, max_bytes=len(payload))
+        if published.payload != payload:
+            raise _output_error(
+                "KARC_EXPORT_WRITE_FAILED",
+                "Archive output could not be written.",
+            )
+        for expected in output.directories:
+            if (
+                _directory_identity(
+                    expected.path,
+                    unsafe_code=output.unsafe_code,
+                )
+                != expected
+            ):
+                raise _output_error(
+                    output.unsafe_code,
+                    "Archive output path is unsafe.",
+                )
+        return output.target
+    except FileExistsError as error:
+        raise _output_error(
+            "KARC_EXPORT_OUTPUT_EXISTS",
+            "Archive output already exists.",
+        ) from error
+    except KokoroError:
+        raise
+    except OSError as error:
+        raise _output_error(
+            "KARC_EXPORT_WRITE_FAILED",
+            "Archive output could not be written.",
+        ) from error
+    finally:
+        if descriptor >= 0:
+            try:
+                os.close(descriptor)
+            except OSError:
+                pass
+        if staging is not None and staging_node is not None:
+            _cleanup_staging(staging, staging_node)
+
+
+def _handle_pack_compatibility(
+    args: argparse.Namespace,
+    data_root: Path | None,
+    schemas: SchemaRegistry,
+) -> dict[str, Any]:
+    del data_root
+    limits = KarcLimits()
+    captured = _capture_binary(
+        _argument_path(args.archive),
+        max_bytes=limits.max_archive_bytes,
+    )
+    audit = lambda: _audit_capture(captured)
+    try:
+        report = inspect_karc_compatibility(
+            captured.payload,
+            _AuditedSchemas(schemas, audit),
+            limits=limits,
+        )
+        return {"ok": True, "compatibility": report}
+    finally:
+        audit()
+
+
+def _handle_pack_export(
+    args: argparse.Namespace,
+    data_root: Path | None,
+    schemas: SchemaRegistry,
+) -> dict[str, Any]:
+    del data_root
+    promotion_path = _argument_path(args.promotion)
+    captured = {
+        "compiled": _capture_json(_argument_path(args.compiled)),
+        "promotion": _capture_json(promotion_path),
+        "hard": _capture_json(_argument_path(args.hard_report)),
+        "soft": _capture_json(_argument_path(args.soft_report)),
+        "review": _capture_json(
+            promotion_path.parent / "review-attestation.json"
+        ),
+    }
+    if args.publication_report is not None:
+        captured["publication"] = _capture_json(
+            _argument_path(args.publication_report)
+        )
+    files = tuple(item.file for item in captured.values())
+    output = _prepare_new_output(args.out, suffix=".karc")
+
+    def audit() -> None:
+        _audit_captures(files)
+        _audit_new_output(output)
+
+    audit()
+    try:
+        try:
+            archive = build_karc_archive(
+                compiled_pack=captured["compiled"].value,
+                hard_validation_report=captured["hard"].value,
+                soft_evaluation_report=captured["soft"].value,
+                review_attestation=captured["review"].value,
+                promotion_record=captured["promotion"].value,
+                publication_readiness_report=(
+                    captured["publication"].value
+                    if "publication" in captured
+                    else None
+                ),
+                schemas=_AuditedSchemas(schemas, audit),
+            )
+        except Exception:
+            audit()
+            raise
+        audit()
+        target = _publish_new_bytes(output, archive)
+    finally:
+        _audit_captures(files)
+    return {
+        "ok": True,
+        "path": str(target),
+        "archive_sha256": sha256(archive).hexdigest(),
+        "visibility": captured["promotion"].value["visibility"],
+    }
+
+
+def _handle_pack_migrate(
+    args: argparse.Namespace,
+    data_root: Path | None,
+    schemas: SchemaRegistry,
+) -> dict[str, Any]:
+    del data_root
+    limits = KarcLimits()
+    source = _capture_binary(
+        _argument_path(args.archive),
+        max_bytes=limits.max_archive_bytes,
+    )
+    output = _prepare_new_output(
+        args.out,
+        suffix=".karc",
+        unsafe_code="MIGRATION_PATH_INVALID",
+        exists_code="MIGRATION_OUTPUT_EXISTS",
+    )
+    if os.path.normcase(str(source.path)) == os.path.normcase(str(output.target)):
+        raise KokoroError(
+            "MIGRATION_OUTPUT_CONFLICT",
+            "Migration output must differ from its input.",
+        )
+
+    def audit_pending() -> None:
+        _audit_capture(source)
+        _audit_new_output(output)
+
+    audit_pending()
+    try:
+        preview = preview_karc_migration(
+            source.payload,
+            args.to_format,
+            _AuditedSchemas(schemas, audit_pending),
+            limits=limits,
+        )
+    except Exception:
+        audit_pending()
+        raise
+    audit_pending()
+    if args.dry_run:
+        return {
+            "ok": True,
+            "dry_run": True,
+            "path": str(output.target),
+            "plan": preview.plan,
+        }
+
+    try:
+        applied = apply_karc_migration(
+            input_path=source.path,
+            output_path=output.target,
+            target_format_version=args.to_format,
+            schemas=_AuditedSchemas(schemas, audit_pending),
+            limits=limits,
+        )
+    except Exception:
+        audit_pending()
+        raise
+    _audit_capture(source)
+    published = _capture_binary(
+        output.target,
+        max_bytes=limits.max_archive_bytes,
+    )
+    expected_hash = applied["output_archive_sha256"]
+    if sha256(published.payload).hexdigest() != expected_hash:
+        raise KokoroError(
+            "MIGRATION_OUTPUT_INVALID",
+            "Migration output is not a current canonical archive.",
+        )
+    for expected in output.directories:
+        if (
+            _directory_identity(
+                expected.path,
+                unsafe_code=output.unsafe_code,
+            )
+            != expected
+        ):
+            raise KokoroError(
+                "MIGRATION_PATH_INVALID",
+                "Migration output ancestry changed.",
+            )
+    return {
+        "ok": True,
+        "dry_run": False,
+        "path": str(output.target),
+        "archive_sha256": expected_hash,
+        "plan": applied,
+    }
+
+
+_HANDLERS: dict[StandaloneRoute, StandaloneHandler] = {
+    ("pack", "compatibility"): _handle_pack_compatibility,
+    ("pack", "export"): _handle_pack_export,
+    ("pack", "migrate"): _handle_pack_migrate,
+}
+
+
 def handle_standalone(
     args: argparse.Namespace,
     data_root: Path | None,
     schemas: SchemaRegistry,
 ) -> dict[str, Any]:
-    del args, data_root, schemas
-    raise KokoroError("COMMAND_FAILED", "Command could not be completed.")
+    route = standalone_route(args)
+    handler = _HANDLERS.get(route) if route is not None else None
+    if handler is None:
+        raise KokoroError("COMMAND_FAILED", "Command could not be completed.")
+    return handler(args, data_root, schemas)
 
 
 __all__ = [
