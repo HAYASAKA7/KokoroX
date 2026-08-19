@@ -45,6 +45,17 @@ REQUIRED_DISTRIBUTION_MODULES = {
         "registry",
     )
 }
+REQUIRED_PERSISTENCE_MODULES = {
+    f"kokoroarc/persistence/{name}.py"
+    for name in (
+        "__init__",
+        "_storage",
+        "consent",
+        "memory",
+        "migrations",
+        "state",
+    )
+}
 REQUIRED_RESEARCH_SCHEMAS = {
     f"{name}.schema.json"
     for name in (
@@ -79,6 +90,10 @@ REQUIRED_STANDALONE_SCHEMAS = {
         "character-default-config",
         "persistence-consent",
         "memory-reference",
+        "persistence-export",
+        "persistent-character-state",
+        "persistent-state-event",
+        "state-migration-plan",
     )
 }
 REQUIRED_SKILL_FILES = {
@@ -506,6 +521,7 @@ def test_built_archives_and_installed_research_cli_are_complete(
 
     for module in (
         REQUIRED_DISTRIBUTION_MODULES
+        | REQUIRED_PERSISTENCE_MODULES
         | REQUIRED_RESEARCH_MODULES
         | REQUIRED_TESTING_MODULES
     ):
@@ -650,6 +666,59 @@ def test_built_archives_and_installed_research_cli_are_complete(
     )
     assert distribution_probe.stdout == ""
     assert distribution_probe.stderr == ""
+
+    persistence_probe = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            (
+                "from kokoroarc.persistence import (\n"
+                "    MemoryReferenceView,\n"
+                "    MemoryRemovalResult,\n"
+                "    PersistentResetPreview,\n"
+                "    add_memory_reference,\n"
+                "    advance_persistent_mood_turn,\n"
+                "    apply_persistent_mood_event,\n"
+                "    apply_persistent_relationship_event,\n"
+                "    apply_state_migration,\n"
+                "    export_persistent_data,\n"
+                "    grant_consent,\n"
+                "    list_memory_references,\n"
+                "    load_consent,\n"
+                "    load_persistent_state,\n"
+                "    preview_persistent_reset,\n"
+                "    preview_state_migration,\n"
+                "    remove_memory_reference,\n"
+                "    replay_persistent_state,\n"
+                "    reset_persistent_data,\n"
+                "    revoke_consent,\n"
+                ")\n"
+                "values = (\n"
+                "    MemoryReferenceView, MemoryRemovalResult,\n"
+                "    PersistentResetPreview, add_memory_reference,\n"
+                "    advance_persistent_mood_turn, apply_persistent_mood_event,\n"
+                "    apply_persistent_relationship_event, apply_state_migration,\n"
+                "    export_persistent_data, grant_consent,\n"
+                "    list_memory_references, load_consent,\n"
+                "    load_persistent_state, preview_persistent_reset,\n"
+                "    preview_state_migration, remove_memory_reference,\n"
+                "    replay_persistent_state, reset_persistent_data,\n"
+                "    revoke_consent,\n"
+                ")\n"
+                "assert all(callable(value) for value in values)\n"
+            ),
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+        env=probe_env,
+        cwd=outside_repository,
+    )
+    assert persistence_probe.returncode == 0, (
+        persistence_probe.stdout + persistence_probe.stderr
+    )
+    assert persistence_probe.stdout == ""
+    assert persistence_probe.stderr == ""
 
     request = _cli(
         [

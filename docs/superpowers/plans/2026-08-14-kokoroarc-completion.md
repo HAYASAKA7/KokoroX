@@ -296,13 +296,13 @@ metadata remains canonical LF.
 
 **Create:** `persistence/consent.py`, `state.py`, `memory.py`, migration helpers and tests.
 
-- [ ] Write RED consent grant/show/revoke tests with separate relationship, mood, and memory permissions.
-- [ ] Write RED persistent transition, CAS, idempotency, replay, export, scoped reset, revocation, and recovery tests.
-- [ ] Write RED memory add/list/remove tests that accept only explicit host IDs and bounded approved summaries.
-- [ ] Add security cases for silent persistence, consent widening, cross-scope/character access, conversation harvesting, secret/path content, stale state, unsafe links, state-contract upgrades without migration, and remove/reset failure windows.
-- [ ] Reuse the existing deterministic transition/store rules; add scoped persistent storage and declarative replay-verified migration.
-- [ ] Keep session-only as default and require explicit consent IDs for durable writes.
-- [ ] Commit: `feat: add consented character persistence`.
+- [x] Write RED consent grant/show/revoke tests with separate relationship, mood, and memory permissions.
+- [x] Write RED persistent transition, CAS, idempotency, replay, export, scoped reset, revocation, and recovery tests.
+- [x] Write RED memory add/list/remove tests that accept only explicit host IDs and bounded approved summaries.
+- [x] Add security cases for silent persistence, consent widening, cross-scope/character access, conversation harvesting, secret/path content, stale state, unsafe links, state-contract upgrades without migration, and remove/reset failure windows.
+- [x] Reuse the existing deterministic transition/store rules; add scoped persistent storage and declarative replay-verified migration.
+- [x] Keep session-only as default and require explicit consent IDs for durable writes.
+- [x] Commit: `feat: add consented character persistence`.
 
 ### Task 16: Package and install the four-Skill suite
 
