@@ -112,6 +112,7 @@ hashes have been presented to the user.
 - Create: `tests/skills/complete-suite-cases.yaml`
 - Create: `tests/skills/complete-suite-campaign.yaml`
 - Create: `tests/skills/complete_suite_preparation.py`
+- Create: `tests/skills/complete-suite-output.schema.json`
 - Create: `tests/skills/run_complete_suite_campaign.py`
 - Create: `tests/skills/import_complete_suite_campaign.py`
 - Create: `tests/skills/complete_suite_adjudication.py`
@@ -200,27 +201,27 @@ root.
 
 ## Task 3: Build an evidence-bound runner
 
-- [ ] **Step 1: Write runner RED tests**
+- [x] **Step 1: Write runner RED tests**
 
 Require `draft_not_approved` to stop before spawning. After approval, require
 exact frozen hashes, 24 unique session launches, max concurrency four, no
 retry/resume path, one output schema, literal argv, fixed model/reasoning, and
 automatic command review without bypassing the workspace-write sandbox.
 
-- [ ] **Step 2: Implement launch and raw retention**
+- [x] **Step 2: Implement launch and raw retention**
 
 Launch `codex exec` once per case/variant. Retain argv, environment declaration,
 prompt bytes, raw JSONL stdout, stderr, final output, exit code, timeout state,
 start/end timestamps, agent final-message events, and post-run inventory. A
 timeout or nonzero exit is evidence, not an invitation to rerun.
 
-- [ ] **Step 3: Bind final output and command evidence**
+- [x] **Step 3: Bind final output and command evidence**
 
 Extract the unique final agent event from the raw session stream and bind its
 exact bytes/hash to `final.md`. Parse only closed event/command forms. Never use
 claimed argv/captures in place of raw executed command records.
 
-- [ ] **Step 4: Fail closed on case-root or lifecycle drift**
+- [x] **Step 4: Fail closed on case-root or lifecycle drift**
 
 Recheck case root, cwd, package/Skill hashes, environment, file identities,
 created paths, protected state, process completion, and all captures before
