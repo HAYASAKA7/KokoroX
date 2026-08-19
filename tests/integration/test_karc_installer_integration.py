@@ -15,8 +15,10 @@ from kokoroarc.distribution.installer import (
     remove_installed_pack,
 )
 from kokoroarc.distribution.registry import load_installed_registry
+from kokoroarc.errors import KokoroError
 from kokoroarc.packs.compiler import canonical_bytes
 from kokoroarc.schemas import SchemaRegistry
+from kokoroarc.state.store import SessionStore
 
 from karc_test_support import build_private_archive
 
@@ -313,6 +315,59 @@ def test_removal_is_scope_local_and_deletes_archive_after_final_reference(
         SCHEMAS,
         workspace_root=workspace,
     )["entries"] == {}
+
+
+def test_real_session_blocks_removal_until_it_is_ended(
+    rin_verified_release: dict[str, Any],
+    tmp_path: Path,
+) -> None:
+    archive = build_private_archive(rin_verified_release)
+    source = tmp_path / "rin-aster.karc"
+    source.write_bytes(archive)
+    data_root = tmp_path / "data"
+    plan = install_karc_archive(source, data_root, SCHEMAS)
+    compiled = inspect_karc_container(archive).documents["pack/compiled.json"]
+    sessions = SessionStore(data_root)
+    sessions.start(
+        "removal-session",
+        compiled["character_id"],
+        compiled["character_version"],
+        compiled["source_hash"],
+    )
+
+    with pytest.raises(KokoroError) as caught:
+        remove_installed_pack(
+            data_root,
+            "original",
+            "rin-aster",
+            "1.0.0",
+            SCHEMAS,
+        )
+
+    assert caught.value.code == "KARC_REMOVE_REFERENCED"
+    assert caught.value.details == {"references": ["active_session"]}
+    manifest = data_root / "sessions" / "removal-session.json"
+    assert manifest.read_bytes().endswith(b"\n")
+
+    sessions.end("removal-session")
+    preview = remove_installed_pack(
+        data_root,
+        "original",
+        "rin-aster",
+        "1.0.0",
+        SCHEMAS,
+        dry_run=True,
+    )
+    removed = remove_installed_pack(
+        data_root,
+        "original",
+        "rin-aster",
+        "1.0.0",
+        SCHEMAS,
+    )
+
+    assert preview["will_write"] is False
+    assert removed["installation_id"] == plan["installation_id"]
 
 
 @pytest.mark.parametrize(

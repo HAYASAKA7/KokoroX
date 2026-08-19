@@ -1353,6 +1353,13 @@ def _recover_removal_under_lock(
                     scope,
                     entry,
                     schemas,
+                    container=_load_removal_archive(
+                        root / "archives" / f"{entry['archive_sha256']}.karc",
+                        scope,
+                        entry,
+                        schemas,
+                        limits,
+                    ),
                     persistence_lock=reference_lock,
                 )
                 if blockers:
@@ -1542,6 +1549,7 @@ def _preview_removal(
         scope,
         entry,
         schemas,
+        container=container,
         persistence_lock=persistence_lock,
     )
     if blockers:
@@ -1645,11 +1653,20 @@ def _reference_blockers(
     entry: dict[str, Any],
     schemas: _SchemaValidator,
     *,
+    container: InspectedKarcContainer | None = None,
     persistence_lock: PersistenceLock | None = None,
 ) -> list[str]:
     from kokoroarc.persistence._storage import persistence_reference_blockers
 
-    blockers = set(_legacy_reference_blockers(root, scope, entry, schemas))
+    blockers = set(
+        _legacy_reference_blockers(
+            root,
+            scope,
+            entry,
+            schemas,
+            session_hashes=_session_reference_hashes(entry, container),
+        )
+    )
     try:
         blockers.update(
             persistence_reference_blockers(
@@ -1678,8 +1695,13 @@ def _legacy_reference_blockers(
     scope: InstallScope,
     entry: dict[str, Any],
     schemas: _SchemaValidator,
+    *,
+    session_hashes: frozenset[str] | None = None,
 ) -> list[str]:
     blockers: set[str] = set()
+    exact_session_hashes = session_hashes or frozenset(
+        {cast(str, entry["compiled_sha256"])}
+    )
     config_path = (
         root / "config" / "global.json"
         if scope.kind == "global"
@@ -1703,7 +1725,7 @@ def _legacy_reference_blockers(
             session.get("active") is True
             and session.get("character_id") == _entry_character_id(entry)
             and session.get("character_version") == _entry_character_version(entry)
-            and session.get("compiled_pack_hash") == entry["compiled_sha256"]
+            and session.get("compiled_pack_hash") in exact_session_hashes
         ):
             blockers.add("active_session")
     for migration in _read_reference_directory(
@@ -1718,6 +1740,25 @@ def _legacy_reference_blockers(
         }:
             blockers.add("migration")
     return sorted(blockers)
+
+
+def _session_reference_hashes(
+    entry: dict[str, Any],
+    container: InspectedKarcContainer | None,
+) -> frozenset[str]:
+    hashes = {cast(str, entry["compiled_sha256"])}
+    if container is not None:
+        compiled = container.documents.get("pack/compiled.json")
+        source_hash = compiled.get("source_hash") if compiled is not None else None
+        if (
+            not isinstance(source_hash, str)
+            or _HEX_SHA256.fullmatch(source_hash) is None
+        ):
+            raise _reference_scan_error(
+                "Installed session binding could not be verified."
+            )
+        hashes.add(source_hash)
+    return frozenset(hashes)
 
 
 def _entry_binding(entry: dict[str, Any]) -> dict[str, Any]:
@@ -1803,11 +1844,17 @@ def _read_reference_document(
             object_pairs_hook=_unique_json_object,
             parse_constant=_reject_json_constant,
         )
-        if not isinstance(value, dict) or canonical_bytes(value) != payload:
+        if not isinstance(value, dict):
             raise ValueError("noncanonical reference")
+        normalized = canonical_bytes(value)
+        terminator = b""
+        if payload != normalized:
+            if schema_name != "session-manifest" or payload != normalized + b"\n":
+                raise ValueError("noncanonical reference")
+            terminator = b"\n"
         detached = cast(dict[str, Any], json.loads(payload))
         schemas.validate(schema_name, detached)
-        if canonical_bytes(detached) != payload:
+        if canonical_bytes(detached) + terminator != payload:
             raise ValueError("schema callback mutated reference")
         repeated = _read_removal_file(path, _MAX_REFERENCE_BYTES)
         if repeated != payload:

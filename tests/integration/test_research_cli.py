@@ -8,11 +8,18 @@ import shutil
 import subprocess
 import sys
 import tarfile
+from typing import Any
 import zipfile
+
+from karc_test_support import build_private_archive
 
 
 REPOSITORY_ROOT = Path.cwd().resolve()
 RESEARCH_FIXTURES = REPOSITORY_ROOT / "tests" / "fixtures" / "research"
+REQUIRED_CLI_MODULES = {
+    "kokoroarc/cli.py",
+    "kokoroarc/standalone_cli.py",
+}
 REQUIRED_RESEARCH_MODULES = {
     "kokoroarc/research/__init__.py",
     "kokoroarc/research/bundles.py",
@@ -493,6 +500,7 @@ def test_research_request_validate_resolves_wheel_install_schema_layout(
 
 def test_built_archives_and_installed_research_cli_are_complete(
     tmp_path: Path,
+    rin_verified_release: dict[str, Any],
 ) -> None:
     dist = tmp_path / "dist"
     built = subprocess.run(
@@ -532,7 +540,8 @@ def test_built_archives_and_installed_research_cli_are_complete(
     )
 
     for module in (
-        REQUIRED_DISTRIBUTION_MODULES
+        REQUIRED_CLI_MODULES
+        | REQUIRED_DISTRIBUTION_MODULES
         | REQUIRED_PERSISTENCE_MODULES
         | REQUIRED_RESEARCH_MODULES
         | REQUIRED_TESTING_MODULES
@@ -619,6 +628,30 @@ def test_built_archives_and_installed_research_cli_are_complete(
         for name in schema_names
     ]
     assert schema_probe.stderr == ""
+
+    route_probe = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            (
+                "import json\n"
+                "from kokoroarc.cli import build_parser\n"
+                "from kokoroarc.standalone_cli import standalone_route\n"
+                "args = build_parser().parse_args([\n"
+                "    'pack', 'compatibility', 'rin.karc', '--json',\n"
+                "])\n"
+                "print(json.dumps(standalone_route(args)))\n"
+            ),
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+        env=probe_env,
+        cwd=outside_repository,
+    )
+    assert route_probe.returncode == 0, route_probe.stdout + route_probe.stderr
+    assert json.loads(route_probe.stdout) == ["pack", "compatibility"]
+    assert route_probe.stderr == ""
 
     distribution_probe = subprocess.run(
         [
@@ -792,6 +825,26 @@ def test_built_archives_and_installed_research_cli_are_complete(
     )
     assert persistence_probe.stdout == ""
     assert persistence_probe.stderr == ""
+
+    archive_path = tmp_path / "rin-aster.karc"
+    archive_path.write_bytes(build_private_archive(rin_verified_release))
+    compatibility = _cli(
+        [
+            "pack",
+            "compatibility",
+            str(archive_path),
+            "--json",
+        ],
+        python_path=installed,
+        working_directory=outside_repository,
+    )
+    assert compatibility.returncode == 0, (
+        compatibility.stdout + compatibility.stderr
+    )
+    compatibility_body = json.loads(compatibility.stdout)
+    assert compatibility_body["compatibility"]["compatible"] is True
+    assert compatibility_body["compatibility"]["installation_allowed"] is True
+    assert compatibility.stderr == ""
 
     request = _cli(
         [
