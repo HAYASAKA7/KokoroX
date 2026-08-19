@@ -111,6 +111,7 @@ hashes have been presented to the user.
 
 - Create: `tests/skills/complete-suite-cases.yaml`
 - Create: `tests/skills/complete-suite-campaign.yaml`
+- Create: `tests/skills/complete_suite_preparation.py`
 - Create: `tests/skills/run_complete_suite_campaign.py`
 - Create: `tests/skills/import_complete_suite_campaign.py`
 - Create: `tests/skills/complete_suite_adjudication.py`
@@ -153,7 +154,7 @@ Use closed YAML mappings. Each case declares `id`, `route`, `coverage`,
 `setup`, `prompt`, `must`, `must_not`, `allowed_mutations`, and
 `protected_state`. Assertion names are data, not executable expressions.
 
-- [ ] **Step 3: Run structural GREEN and commit the design slice**
+- [x] **Step 3: Run structural GREEN and commit the design slice**
 
 ```powershell
 python -m pytest tests/skills/test_complete_suite_campaign_structure.py `
@@ -165,7 +166,7 @@ git commit -m "test: define complete suite behavioral cases"
 
 ## Task 2: Build deterministic isolated case preparation
 
-- [ ] **Step 1: Write setup/inventory RED tests**
+- [x] **Step 1: Write setup/inventory RED tests**
 
 For each case/variant, require a new root containing only the approved installed
 package, schemas, README, case inputs, D:-based data/temp directories, and the
@@ -173,13 +174,13 @@ variant-specific Skill set. Verify the root is not a symlink/junction and no
 case path escapes it. Capture a canonical pre-run inventory and protected-state
 document.
 
-- [ ] **Step 2: Build one fixed-epoch wheel and prepare cases from it**
+- [x] **Step 2: Build one fixed-epoch wheel and prepare cases from it**
 
 The runner builds once at the Task 17 base epoch, verifies inventory, installs
 to an isolated staging root, and copies only installed artifacts into each case.
 It must not import from the repository `src` tree during evaluator runs.
 
-- [ ] **Step 3: Materialize exact per-case fixtures**
+- [x] **Step 3: Materialize exact per-case fixtures**
 
 Use repository APIs before the external run to create deterministic archives,
 registries, defaults, consents, reports, promotion evidence, state, and memory
@@ -187,10 +188,15 @@ summaries. Never let evaluator prose construct trusted release attestations or
 approval artifacts. Every fixture and its intended mutation boundary is
 hash-bound in `case-manifest.json`.
 
-- [ ] **Step 4: Prove no real-home/config/network dependency**
+- [x] **Step 4: Prove no real-home/config/network dependency**
 
-Tests patch home/config/network-sensitive paths, inspect subprocess argv/env,
-and reject any undeclared inherited variable, repository path, or output root.
+Prepared evaluator roots and environments do not inherit real-home, config, or
+network state. The local pre-run build may locate the already-installed build
+frontend through the explicitly copied `APPDATA` toolchain path; pip config is
+disabled, dependency resolution and index access are disabled, and all build
+temp/cache paths remain under the declared D: root. Tests inspect subprocess
+argv/env and reject every other inherited variable, repository path, or output
+root.
 
 ## Task 3: Build an evidence-bound runner
 
