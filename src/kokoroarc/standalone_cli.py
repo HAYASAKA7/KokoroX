@@ -27,6 +27,22 @@ from kokoroarc.distribution.registry import (
 )
 from kokoroarc.errors import KokoroError
 from kokoroarc.json_compat import find_json_incompatibility
+from kokoroarc.packs.compiler import canonical_bytes
+from kokoroarc.persistence.consent import (
+    grant_consent,
+    load_consent,
+    revoke_consent,
+)
+from kokoroarc.persistence.memory import (
+    add_memory_reference,
+    list_memory_references,
+    remove_memory_reference,
+)
+from kokoroarc.persistence.state import (
+    export_persistent_data,
+    preview_persistent_reset,
+    reset_persistent_data,
+)
 from kokoroarc.schemas import SchemaRegistry
 
 
@@ -56,6 +72,9 @@ _DIRECTORY_FSYNC_UNSUPPORTED = frozenset(
         getattr(errno, "EBADF", None),
     )
     if value is not None
+)
+_PERSISTENCE_PERMISSIONS = frozenset(
+    {"relationship_state", "mood_state", "memory_references"}
 )
 
 _PACK_ROUTES = frozenset(
@@ -134,6 +153,9 @@ class _NewOutput:
     directories: tuple[_DirectoryIdentity, ...]
     unsafe_code: str
     exists_code: str
+    write_code: str
+    cleanup_code: str
+    durability_code: str
 
 
 class _AuditedSchemas:
@@ -582,6 +604,9 @@ def _prepare_new_output(
     suffix: str,
     unsafe_code: str = "KARC_EXPORT_PATH_UNSAFE",
     exists_code: str = "KARC_EXPORT_OUTPUT_EXISTS",
+    write_code: str = "KARC_EXPORT_WRITE_FAILED",
+    cleanup_code: str = "KARC_EXPORT_CLEANUP_FAILED",
+    durability_code: str = "KARC_EXPORT_DURABILITY_FAILED",
 ) -> _NewOutput:
     supplied = Path(raw_path).expanduser()
     if ".." in supplied.parts:
@@ -620,6 +645,9 @@ def _prepare_new_output(
         directories=directories,
         unsafe_code=unsafe_code,
         exists_code=exists_code,
+        write_code=write_code,
+        cleanup_code=cleanup_code,
+        durability_code=durability_code,
     )
 
 
@@ -655,36 +683,45 @@ def _node(identity: _InputIdentity) -> tuple[int, int, int]:
     return (identity.device, identity.inode, identity.file_type)
 
 
-def _cleanup_staging(path: Path, expected_node: tuple[int, int, int]) -> None:
+def _cleanup_staging(
+    path: Path,
+    expected_node: tuple[int, int, int],
+    *,
+    cleanup_code: str,
+) -> None:
     try:
         path_stat = path.lstat()
     except FileNotFoundError:
         return
     except OSError as error:
         raise _output_error(
-            "KARC_EXPORT_CLEANUP_FAILED",
-            "Archive staging cleanup failed.",
+            cleanup_code,
+            "Output staging cleanup failed.",
         ) from error
     identity = _input_identity(path_stat)
     if (
         not stat.S_ISREG(path_stat.st_mode)
-        or _output_is_redirect(path, path_stat)
+        or _output_is_redirect(
+            path,
+            path_stat,
+            unsafe_code=cleanup_code,
+        )
         or _node(identity) != expected_node
     ):
         raise _output_error(
-            "KARC_EXPORT_CLEANUP_FAILED",
-            "Archive staging cleanup failed.",
+            cleanup_code,
+            "Output staging cleanup failed.",
         )
     try:
         path.unlink()
     except OSError as error:
         raise _output_error(
-            "KARC_EXPORT_CLEANUP_FAILED",
-            "Archive staging cleanup failed.",
+            cleanup_code,
+            "Output staging cleanup failed.",
         ) from error
 
 
-def _fsync_directory(path: Path) -> None:
+def _fsync_directory(path: Path, *, durability_code: str) -> None:
     if os.name == "nt":
         return
     descriptor = -1
@@ -695,8 +732,8 @@ def _fsync_directory(path: Path) -> None:
     except OSError as error:
         if error.errno not in _DIRECTORY_FSYNC_UNSUPPORTED:
             raise _output_error(
-                "KARC_EXPORT_DURABILITY_FAILED",
-                "Archive output durability could not be confirmed.",
+                durability_code,
+                "Output durability could not be confirmed.",
             ) from error
     finally:
         if descriptor >= 0:
@@ -724,19 +761,22 @@ def _publish_new_bytes(output: _NewOutput, payload: bytes) -> Path:
         written = _capture_binary(staging, max_bytes=len(payload))
         if _node(written.identity) != staging_node or written.payload != payload:
             raise _output_error(
-                "KARC_EXPORT_WRITE_FAILED",
-                "Archive output could not be written.",
+                output.write_code,
+                "Output file could not be written.",
             )
         _audit_new_output(output)
         os.link(staging, output.target)
         staging.unlink()
         staging = None
-        _fsync_directory(output.target.parent)
+        _fsync_directory(
+            output.target.parent,
+            durability_code=output.durability_code,
+        )
         published = _capture_binary(output.target, max_bytes=len(payload))
         if published.payload != payload:
             raise _output_error(
-                "KARC_EXPORT_WRITE_FAILED",
-                "Archive output could not be written.",
+                output.write_code,
+                "Output file could not be written.",
             )
         for expected in output.directories:
             if (
@@ -753,15 +793,15 @@ def _publish_new_bytes(output: _NewOutput, payload: bytes) -> Path:
         return output.target
     except FileExistsError as error:
         raise _output_error(
-            "KARC_EXPORT_OUTPUT_EXISTS",
-            "Archive output already exists.",
+            output.exists_code,
+            "Output file already exists.",
         ) from error
     except KokoroError:
         raise
     except OSError as error:
         raise _output_error(
-            "KARC_EXPORT_WRITE_FAILED",
-            "Archive output could not be written.",
+            output.write_code,
+            "Output file could not be written.",
         ) from error
     finally:
         if descriptor >= 0:
@@ -770,7 +810,11 @@ def _publish_new_bytes(output: _NewOutput, payload: bytes) -> Path:
             except OSError:
                 pass
         if staging is not None and staging_node is not None:
-            _cleanup_staging(staging, staging_node)
+            _cleanup_staging(
+                staging,
+                staging_node,
+                cleanup_code=output.cleanup_code,
+            )
 
 
 def _handle_pack_compatibility(
@@ -1034,6 +1078,401 @@ def _handle_pack_remove(
     }
 
 
+def _permission_list(raw_permissions: Any) -> tuple[str, ...]:
+    if not isinstance(raw_permissions, str):
+        raise KokoroError(
+            "ARGUMENT_INVALID",
+            "Command arguments are invalid.",
+        )
+    permissions = tuple(
+        permission.strip() for permission in raw_permissions.split(",")
+    )
+    if (
+        not permissions
+        or any(permission not in _PERSISTENCE_PERMISSIONS for permission in permissions)
+        or len(set(permissions)) != len(permissions)
+    ):
+        raise KokoroError(
+            "ARGUMENT_INVALID",
+            "Command arguments are invalid.",
+        )
+    return permissions
+
+
+def _consent_revision(consent: dict[str, Any] | None) -> int:
+    if consent is None:
+        return 0
+    revoked = consent.get("revoked_revision")
+    if isinstance(revoked, int) and not isinstance(revoked, bool):
+        return revoked
+    granted = consent.get("grant_revision")
+    if isinstance(granted, int) and not isinstance(granted, bool):
+        return granted
+    raise KokoroError(
+        "PERSISTENCE_CONSENT_INVALID",
+        "Persistent consent is invalid.",
+    )
+
+
+def _require_current_consent(
+    consent: dict[str, Any] | None,
+) -> dict[str, Any]:
+    if consent is None:
+        raise KokoroError(
+            "PERSISTENCE_CONSENT_NOT_FOUND",
+            "Persistent consent was not found.",
+        )
+    return consent
+
+
+def _handle_consent_grant(
+    args: argparse.Namespace,
+    data_root: Path | None,
+    schemas: SchemaRegistry,
+) -> dict[str, Any]:
+    root = _require_data_root(data_root)
+    workspace = _workspace_root(args)
+    current = load_consent(
+        root,
+        args.character,
+        schemas,
+        namespace=args.namespace,
+        workspace_root=workspace,
+    )
+    consent = grant_consent(
+        root,
+        args.character,
+        list(_permission_list(args.permissions)),
+        schemas,
+        namespace=args.namespace,
+        version=args.version,
+        workspace_root=workspace,
+        expected_revision=_consent_revision(current),
+    )
+    return {"ok": True, "consent": consent}
+
+
+def _handle_consent_show(
+    args: argparse.Namespace,
+    data_root: Path | None,
+    schemas: SchemaRegistry,
+) -> dict[str, Any]:
+    consent = load_consent(
+        _require_data_root(data_root),
+        args.character,
+        schemas,
+        namespace=args.namespace,
+        workspace_root=_workspace_root(args),
+    )
+    return {"ok": True, "consent": consent}
+
+
+def _handle_consent_revoke(
+    args: argparse.Namespace,
+    data_root: Path | None,
+    schemas: SchemaRegistry,
+) -> dict[str, Any]:
+    root = _require_data_root(data_root)
+    workspace = _workspace_root(args)
+    current = load_consent(
+        root,
+        args.character,
+        schemas,
+        namespace=args.namespace,
+        workspace_root=workspace,
+    )
+    current = _require_current_consent(current)
+    consent = revoke_consent(
+        root,
+        args.character,
+        current["consent_id"],
+        schemas,
+        namespace=args.namespace,
+        workspace_root=workspace,
+        expected_revision=_consent_revision(current),
+    )
+    return {"ok": True, "consent": consent}
+
+
+def _persistence_output(raw_path: str) -> _NewOutput:
+    return _prepare_new_output(
+        raw_path,
+        suffix=".json",
+        unsafe_code="PERSISTENCE_PATH_UNSAFE",
+        exists_code="PERSISTENCE_OUTPUT_EXISTS",
+        write_code="PERSISTENCE_WRITE_FAILED",
+        cleanup_code="PERSISTENCE_CLEANUP_FAILED",
+        durability_code="PERSISTENCE_DURABILITY_FAILED",
+    )
+
+
+def _handle_state_export(
+    args: argparse.Namespace,
+    data_root: Path | None,
+    schemas: SchemaRegistry,
+) -> dict[str, Any]:
+    output = _persistence_output(args.out)
+    audit = lambda: _audit_new_output(output)
+    audit()
+    try:
+        exported = export_persistent_data(
+            _require_data_root(data_root),
+            args.character,
+            _AuditedSchemas(schemas, audit),
+            namespace=args.namespace,
+            workspace_root=_workspace_root(args),
+        )
+    except Exception:
+        audit()
+        raise
+    audit()
+    payload = canonical_bytes(exported)
+    _publish_new_bytes(output, payload)
+    return {
+        "ok": True,
+        "export_sha256": exported["export_sha256"],
+    }
+
+
+def _reset_id(
+    *,
+    workspace: Path | None,
+    namespace: str,
+    character_id: str,
+    consent: dict[str, Any],
+    target: str,
+    exported: dict[str, Any],
+) -> str:
+    scope = resolve_install_scope(workspace)
+    identity = {
+        "scope": scope.kind,
+        "workspace_id": scope.workspace_id,
+        "namespace": namespace,
+        "character_id": character_id,
+        "consent_id": consent["consent_id"],
+        "consent_sha256": sha256(canonical_bytes(consent)).hexdigest(),
+        "target": target,
+        "export_sha256": exported["export_sha256"],
+    }
+    return "reset-" + sha256(canonical_bytes(identity)).hexdigest()[:32]
+
+
+def _handle_state_reset(
+    args: argparse.Namespace,
+    data_root: Path | None,
+    schemas: SchemaRegistry,
+) -> dict[str, Any]:
+    root = _require_data_root(data_root)
+    workspace = _workspace_root(args)
+    consent = _require_current_consent(
+        load_consent(
+            root,
+            args.character,
+            schemas,
+            namespace=args.namespace,
+            workspace_root=workspace,
+        )
+    )
+    exported = export_persistent_data(
+        root,
+        args.character,
+        schemas,
+        namespace=args.namespace,
+        workspace_root=workspace,
+    )
+    preview = preview_persistent_reset(
+        root,
+        args.character,
+        consent["consent_id"],
+        schemas,
+        target=args.part,
+        reset_id=_reset_id(
+            workspace=workspace,
+            namespace=args.namespace,
+            character_id=args.character,
+            consent=consent,
+            target=args.part,
+            exported=exported,
+        ),
+        namespace=args.namespace,
+        workspace_root=workspace,
+    )
+    if args.dry_run:
+        return {
+            "ok": True,
+            "dry_run": True,
+            "preview": preview.document,
+        }
+    result = reset_persistent_data(
+        root,
+        args.character,
+        preview,
+        consent["consent_id"],
+        schemas,
+        namespace=args.namespace,
+        workspace_root=workspace,
+    )
+    return {
+        "ok": True,
+        "dry_run": False,
+        "preview": preview.document,
+        "result": result,
+    }
+
+
+def _memory_summary(captured: _CapturedJson) -> tuple[str, dict[str, str]]:
+    value = captured.value
+    if set(value) != {"summary", "localized_summaries"}:
+        raise _input_error(
+            "INPUT_INVALID_JSON",
+            "Input file contains invalid JSON.",
+        )
+    summary = value["summary"]
+    localized = value["localized_summaries"]
+    if (
+        not isinstance(summary, str)
+        or not isinstance(localized, dict)
+        or any(
+            not isinstance(locale, str) or not isinstance(text, str)
+            for locale, text in localized.items()
+        )
+    ):
+        raise _input_error(
+            "INPUT_INVALID_JSON",
+            "Input file contains invalid JSON.",
+        )
+    return summary, localized
+
+
+def _handle_memory_add(
+    args: argparse.Namespace,
+    data_root: Path | None,
+    schemas: SchemaRegistry,
+) -> dict[str, Any]:
+    captured = _capture_json(_argument_path(args.summary_file))
+    summary, localized = _memory_summary(captured)
+    root = _require_data_root(data_root)
+    workspace = _workspace_root(args)
+    audit = lambda: _audit_capture(captured.file)
+    audit()
+    try:
+        consent = _require_current_consent(
+            load_consent(
+                root,
+                args.character,
+                _AuditedSchemas(schemas, audit),
+                namespace=args.namespace,
+                workspace_root=workspace,
+            )
+        )
+        reference = add_memory_reference(
+            root,
+            args.character,
+            args.host_id,
+            summary,
+            localized,
+            consent["consent_id"],
+            _consent_revision(consent),
+            _AuditedSchemas(schemas, audit),
+            namespace=args.namespace,
+            workspace_root=workspace,
+        )
+        return {"ok": True, "memory_reference": reference}
+    finally:
+        audit()
+
+
+def _handle_memory_list(
+    args: argparse.Namespace,
+    data_root: Path | None,
+    schemas: SchemaRegistry,
+) -> dict[str, Any]:
+    references = list_memory_references(
+        _require_data_root(data_root),
+        args.character,
+        schemas,
+        namespace=args.namespace,
+        workspace_root=_workspace_root(args),
+    )
+    return {
+        "ok": True,
+        "memory_references": [
+            {
+                "reference": item.reference,
+                "active_consent_generation": item.active_consent_generation,
+            }
+            for item in references
+        ],
+    }
+
+
+def _handle_memory_remove(
+    args: argparse.Namespace,
+    data_root: Path | None,
+    schemas: SchemaRegistry,
+) -> dict[str, Any]:
+    root = _require_data_root(data_root)
+    workspace = _workspace_root(args)
+    consent = _require_current_consent(
+        load_consent(
+            root,
+            args.character,
+            schemas,
+            namespace=args.namespace,
+            workspace_root=workspace,
+        )
+    )
+    if args.dry_run:
+        references = list_memory_references(
+            root,
+            args.character,
+            schemas,
+            namespace=args.namespace,
+            workspace_root=workspace,
+        )
+        matching = next(
+            (
+                item.reference
+                for item in references
+                if item.reference["host_memory_id"] == args.host_id
+            ),
+            None,
+        )
+        if matching is None:
+            raise KokoroError(
+                "PERSISTENCE_MEMORY_NOT_FOUND",
+                "Persistent memory reference was not found.",
+            )
+        return {
+            "ok": True,
+            "dry_run": True,
+            "plan": {
+                "action": "remove_memory_reference",
+                "host_memory_id": args.host_id,
+                "memory_reference_id": matching["memory_reference_id"],
+                "will_remove": True,
+            },
+        }
+    result = remove_memory_reference(
+        root,
+        args.character,
+        args.host_id,
+        consent["consent_id"],
+        schemas,
+        identifier_kind="host_memory_id",
+        namespace=args.namespace,
+        workspace_root=workspace,
+    )
+    return {
+        "ok": True,
+        "dry_run": False,
+        "result": {
+            "removed": result.removed,
+            "memory_reference_id": result.memory_reference_id,
+        },
+    }
+
+
 _HANDLERS: dict[StandaloneRoute, StandaloneHandler] = {
     ("pack", "compatibility"): _handle_pack_compatibility,
     ("pack", "export"): _handle_pack_export,
@@ -1041,6 +1480,14 @@ _HANDLERS: dict[StandaloneRoute, StandaloneHandler] = {
     ("pack", "list"): _handle_pack_list,
     ("pack", "migrate"): _handle_pack_migrate,
     ("pack", "remove"): _handle_pack_remove,
+    ("consent", "grant"): _handle_consent_grant,
+    ("consent", "revoke"): _handle_consent_revoke,
+    ("consent", "show"): _handle_consent_show,
+    ("state", "export"): _handle_state_export,
+    ("state", "reset"): _handle_state_reset,
+    ("memory", "add"): _handle_memory_add,
+    ("memory", "list"): _handle_memory_list,
+    ("memory", "remove"): _handle_memory_remove,
 }
 
 

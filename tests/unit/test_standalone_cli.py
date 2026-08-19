@@ -50,6 +50,41 @@ def _filesystem_snapshot(root: Path) -> tuple[tuple[Any, ...], ...]:
     return tuple(snapshot)
 
 
+def _install_and_grant_cli(
+    release: dict[str, Any],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    *,
+    permissions: str,
+) -> tuple[Path, dict[str, Any]]:
+    source = tmp_path / "rin.karc"
+    source.write_bytes(build_private_archive(release))
+    data_root = tmp_path / "data"
+    monkeypatch.setenv("KOKOROARC_DATA_DIR", str(data_root))
+    code, _installed = _cli_json(
+        ["pack", "install", str(source), "--json"],
+        capsys,
+    )
+    assert code == 0
+    code, granted = _cli_json(
+        [
+            "consent",
+            "grant",
+            "--character",
+            "rin-aster",
+            "--scope",
+            "global",
+            "--permissions",
+            permissions,
+            "--json",
+        ],
+        capsys,
+    )
+    assert code == 0
+    return data_root, granted["consent"]
+
+
 @pytest.mark.parametrize(
     ("arguments", "route", "requires_data_root"),
     [
@@ -796,3 +831,400 @@ def test_scoped_pack_cli_rejects_mismatched_workspace_arguments(
     assert code == 2
     assert body["error"]["code"] == "ARGUMENT_INVALID"
     assert not (tmp_path / "data").exists()
+
+
+def test_consent_cli_grant_show_replace_and_revoke_lifecycle(
+    rin_verified_release: dict[str, Any],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    source = tmp_path / "rin.karc"
+    source.write_bytes(build_private_archive(rin_verified_release))
+    data_root = tmp_path / "data"
+    monkeypatch.setenv("KOKOROARC_DATA_DIR", str(data_root))
+    code, _installed = _cli_json(
+        ["pack", "install", str(source), "--json"],
+        capsys,
+    )
+    assert code == 0
+    grant = [
+        "consent",
+        "grant",
+        "--character",
+        "rin-aster",
+        "--scope",
+        "global",
+        "--permissions",
+        "memory_references,relationship_state",
+        "--json",
+    ]
+
+    code, first = _cli_json(grant, capsys)
+    assert code == 0, first
+    assert first["consent"]["status"] == "active"
+    assert first["consent"]["grant_revision"] == 1
+    assert first["consent"]["permissions"] == [
+        "relationship_state",
+        "memory_references",
+    ]
+
+    code, shown = _cli_json(
+        ["consent", "show", "--character", "rin-aster", "--json"],
+        capsys,
+    )
+    assert code == 0
+    assert shown == {"ok": True, "consent": first["consent"]}
+
+    code, repeated = _cli_json(grant, capsys)
+    assert code == 0
+    assert repeated == first
+
+    code, replaced = _cli_json(
+        [
+            "consent",
+            "grant",
+            "--character",
+            "rin-aster",
+            "--scope",
+            "global",
+            "--permissions",
+            "mood_state",
+            "--json",
+        ],
+        capsys,
+    )
+    assert code == 0
+    assert replaced["consent"]["grant_revision"] == 2
+    assert replaced["consent"]["permissions"] == ["mood_state"]
+
+    code, revoked = _cli_json(
+        ["consent", "revoke", "--character", "rin-aster", "--json"],
+        capsys,
+    )
+    assert code == 0
+    assert revoked["consent"]["status"] == "revoked"
+    assert revoked["consent"]["revoked_revision"] == 3
+
+    code, final = _cli_json(
+        ["consent", "show", "--character", "rin-aster", "--json"],
+        capsys,
+    )
+    assert code == 0
+    assert final == revoked
+
+
+def test_consent_cli_rejects_invalid_permission_list_without_mutation(
+    rin_verified_release: dict[str, Any],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    source = tmp_path / "rin.karc"
+    source.write_bytes(build_private_archive(rin_verified_release))
+    data_root = tmp_path / "data"
+    monkeypatch.setenv("KOKOROARC_DATA_DIR", str(data_root))
+    code, _installed = _cli_json(
+        ["pack", "install", str(source), "--json"],
+        capsys,
+    )
+    assert code == 0
+    before = _filesystem_snapshot(data_root)
+
+    code, body = _cli_json(
+        [
+            "consent",
+            "grant",
+            "--character",
+            "rin-aster",
+            "--scope",
+            "global",
+            "--permissions",
+            "relationship_state,,memory_references",
+            "--json",
+        ],
+        capsys,
+    )
+
+    assert code == 2
+    assert body["error"]["code"] == "ARGUMENT_INVALID"
+    assert _filesystem_snapshot(data_root) == before
+
+
+def test_consent_cli_workspace_scope_is_isolated_and_absent_show_is_read_only(
+    rin_verified_release: dict[str, Any],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    source = tmp_path / "rin.karc"
+    source.write_bytes(build_private_archive(rin_verified_release))
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    data_root = tmp_path / "data"
+    monkeypatch.setenv("KOKOROARC_DATA_DIR", str(data_root))
+
+    code, absent = _cli_json(
+        ["consent", "show", "--character", "rin-aster", "--json"],
+        capsys,
+    )
+    assert code == 0
+    assert absent == {"ok": True, "consent": None}
+    assert not data_root.exists()
+
+    code, _installed = _cli_json(
+        [
+            "pack",
+            "install",
+            str(source),
+            "--scope",
+            "workspace",
+            "--workspace",
+            str(workspace),
+            "--json",
+        ],
+        capsys,
+    )
+    assert code == 0
+    code, granted = _cli_json(
+        [
+            "consent",
+            "grant",
+            "--character",
+            "rin-aster",
+            "--scope",
+            "workspace",
+            "--workspace",
+            str(workspace),
+            "--permissions",
+            "relationship_state",
+            "--json",
+        ],
+        capsys,
+    )
+    assert code == 0
+    assert granted["consent"]["scope"] == "workspace"
+    assert len(granted["consent"]["workspace_id"]) == 64
+
+    code, global_show = _cli_json(
+        ["consent", "show", "--character", "rin-aster", "--json"],
+        capsys,
+    )
+    assert code == 0
+    assert global_show == {"ok": True, "consent": None}
+
+
+def test_state_cli_exports_canonical_json_and_resets_every_part(
+    rin_verified_release: dict[str, Any],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    data_root, _consent = _install_and_grant_cli(
+        rin_verified_release,
+        tmp_path,
+        monkeypatch,
+        capsys,
+        permissions="relationship_state,mood_state,memory_references",
+    )
+    output = tmp_path / "persistent-state.json"
+
+    code, exported = _cli_json(
+        [
+            "state",
+            "export",
+            "--character",
+            "rin-aster",
+            "--out",
+            str(output),
+            "--json",
+        ],
+        capsys,
+    )
+    assert code == 0
+    document = json.loads(output.read_bytes())
+    assert output.read_bytes() == canonical_bytes(document)
+    assert exported == {
+        "ok": True,
+        "export_sha256": document["export_sha256"],
+    }
+
+    for target in ("relationship", "mood", "memory", "all"):
+        before = _filesystem_snapshot(data_root)
+        code, preview = _cli_json(
+            [
+                "state",
+                "reset",
+                "--character",
+                "rin-aster",
+                "--part",
+                target,
+                "--dry-run",
+                "--json",
+            ],
+            capsys,
+        )
+        assert code == 0
+        assert preview["ok"] is True
+        assert preview["dry_run"] is True
+        assert preview["preview"]["target"] == target
+        assert preview["preview"]["reset_id"].startswith("reset-")
+        assert _filesystem_snapshot(data_root) == before
+
+        code, applied = _cli_json(
+            [
+                "state",
+                "reset",
+                "--character",
+                "rin-aster",
+                "--part",
+                target,
+                "--json",
+            ],
+            capsys,
+        )
+        assert code == 0
+        assert applied["ok"] is True
+        assert applied["dry_run"] is False
+        assert applied["preview"]["target"] == target
+        assert applied["result"]["record_state"] == "committed"
+
+
+def test_memory_cli_add_list_remove_and_revoked_generation_lifecycle(
+    rin_verified_release: dict[str, Any],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    data_root, _consent = _install_and_grant_cli(
+        rin_verified_release,
+        tmp_path,
+        monkeypatch,
+        capsys,
+        permissions="memory_references",
+    )
+    summary_file = tmp_path / "summary.json"
+    summary = {
+        "summary": "The user approved concise technical explanations.",
+        "localized_summaries": {
+            "zh-CN": "用户批准了简洁的技术说明。",
+            "ja-JP": "簡潔な技術説明をユーザーが承認しました。",
+            "en-US": "The user approved concise technical explanations.",
+        },
+    }
+    summary_file.write_bytes(canonical_bytes(summary))
+    add = [
+        "memory",
+        "add",
+        "--character",
+        "rin-aster",
+        "--host-id",
+        "host-memory-preference-01",
+        "--summary-file",
+        str(summary_file),
+        "--json",
+    ]
+
+    code, added = _cli_json(add, capsys)
+    assert code == 0
+    reference = added["memory_reference"]
+    assert reference["host_memory_id"] == "host-memory-preference-01"
+    assert reference["localized_summaries"] == {
+        locale: summary["localized_summaries"][locale]
+        for locale in ("en-US", "ja-JP", "zh-CN")
+    }
+    code, repeated = _cli_json(add, capsys)
+    assert code == 0
+    assert repeated == added
+
+    code, listed = _cli_json(
+        ["memory", "list", "--character", "rin-aster", "--json"],
+        capsys,
+    )
+    assert code == 0
+    assert listed["memory_references"] == [
+        {
+            "reference": reference,
+            "active_consent_generation": True,
+        }
+    ]
+
+    before = _filesystem_snapshot(data_root)
+    code, preview = _cli_json(
+        [
+            "memory",
+            "remove",
+            "--character",
+            "rin-aster",
+            "--host-id",
+            "host-memory-preference-01",
+            "--dry-run",
+            "--json",
+        ],
+        capsys,
+    )
+    assert code == 0
+    assert preview == {
+        "ok": True,
+        "dry_run": True,
+        "plan": {
+            "action": "remove_memory_reference",
+            "host_memory_id": "host-memory-preference-01",
+            "memory_reference_id": reference["memory_reference_id"],
+            "will_remove": True,
+        },
+    }
+    assert _filesystem_snapshot(data_root) == before
+
+    code, revoked = _cli_json(
+        ["consent", "revoke", "--character", "rin-aster", "--json"],
+        capsys,
+    )
+    assert code == 0
+    assert revoked["consent"]["status"] == "revoked"
+    before_blocked_add = _filesystem_snapshot(data_root)
+    code, blocked_add = _cli_json(
+        [
+            *add[: add.index("host-memory-preference-01")],
+            "host-memory-preference-02",
+            *add[add.index("host-memory-preference-01") + 1 :],
+        ],
+        capsys,
+    )
+    assert code == 2
+    assert blocked_add["error"]["code"] == "PERSISTENCE_CONSENT_REVOKED"
+    assert _filesystem_snapshot(data_root) == before_blocked_add
+    code, stale = _cli_json(
+        ["memory", "list", "--character", "rin-aster", "--json"],
+        capsys,
+    )
+    assert code == 0
+    assert stale["memory_references"][0]["active_consent_generation"] is False
+
+    code, removed = _cli_json(
+        [
+            "memory",
+            "remove",
+            "--character",
+            "rin-aster",
+            "--host-id",
+            "host-memory-preference-01",
+            "--json",
+        ],
+        capsys,
+    )
+    assert code == 0
+    assert removed == {
+        "ok": True,
+        "dry_run": False,
+        "result": {
+            "removed": True,
+            "memory_reference_id": reference["memory_reference_id"],
+        },
+    }
+    code, empty = _cli_json(
+        ["memory", "list", "--character", "rin-aster", "--json"],
+        capsys,
+    )
+    assert code == 0
+    assert empty["memory_references"] == []

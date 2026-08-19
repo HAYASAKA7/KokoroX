@@ -9,8 +9,11 @@ import pytest
 
 import kokoroarc.cli as cli
 from kokoroarc.cli import build_parser
+from kokoroarc.distribution.installer import install_karc_archive
 from kokoroarc.errors import KokoroError
 from kokoroarc.packs.compiler import canonical_bytes
+from kokoroarc.persistence.consent import grant_consent
+from kokoroarc.persistence.memory import list_memory_references
 from kokoroarc.schemas import SchemaRegistry
 from kokoroarc.standalone_cli import handle_standalone
 
@@ -73,6 +76,40 @@ def _error(capsys: pytest.CaptureFixture[str]) -> dict[str, Any]:
     body = json.loads(captured.out)
     assert body["ok"] is False
     return body["error"]
+
+
+def _filesystem_snapshot(root: Path) -> tuple[tuple[Any, ...], ...]:
+    if not root.exists():
+        return ()
+    snapshot: list[tuple[Any, ...]] = []
+    for path in sorted(root.rglob("*")):
+        relative = path.relative_to(root).as_posix()
+        path_stat = path.stat(follow_symlinks=False)
+        if path.is_file():
+            snapshot.append(
+                (relative, "file", path_stat.st_mtime_ns, path.read_bytes())
+            )
+        else:
+            snapshot.append((relative, "directory", path_stat.st_mtime_ns))
+    return tuple(snapshot)
+
+
+def _prepare_persistence(
+    root: Path,
+    release: dict[str, Any],
+) -> Path:
+    archive = root / "rin.karc"
+    archive.write_bytes(build_private_archive(release))
+    data_root = root / "data"
+    install_karc_archive(archive, data_root, SCHEMAS)
+    grant_consent(
+        data_root,
+        "rin-aster",
+        ["relationship_state", "mood_state", "memory_references"],
+        SCHEMAS,
+        expected_revision=0,
+    )
+    return data_root
 
 
 def test_export_rejects_duplicate_json_without_writing(
@@ -330,3 +367,144 @@ def test_migration_preserves_output_that_appears_during_schema_callback(
 
     assert caught.value.code == "MIGRATION_OUTPUT_EXISTS"
     assert output.read_bytes() == sentinel
+
+
+def test_state_export_never_overwrites_existing_output(
+    rin_verified_release: dict[str, Any],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    data_root = _prepare_persistence(tmp_path, rin_verified_release)
+    output = tmp_path / "state.json"
+    sentinel = b"caller-owned-state"
+    output.write_bytes(sentinel)
+    monkeypatch.setenv("KOKOROARC_DATA_DIR", str(data_root))
+
+    assert (
+        cli.main(
+            [
+                "state",
+                "export",
+                "--character",
+                "rin-aster",
+                "--out",
+                str(output),
+                "--json",
+            ]
+        )
+        == 2
+    )
+
+    error = _error(capsys)
+    assert error["code"] == "PERSISTENCE_OUTPUT_EXISTS"
+    assert output.read_bytes() == sentinel
+    assert str(output) not in json.dumps(error)
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        b'{"summary":"one","summary":"two","localized_summaries":{}}',
+        canonical_bytes(
+            {
+                "summary": "API_KEY=sk-proj-abcdefghijklmnopqrstuvwxyz123456",
+                "localized_summaries": {
+                    "en-US": "API_KEY=sk-proj-abcdefghijklmnopqrstuvwxyz123456"
+                },
+            }
+        ),
+    ],
+)
+def test_memory_add_rejects_duplicate_or_secret_summary_without_echo(
+    payload: bytes,
+    rin_verified_release: dict[str, Any],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    data_root = _prepare_persistence(tmp_path, rin_verified_release)
+    summary = tmp_path / "summary.json"
+    summary.write_bytes(payload)
+    before = _filesystem_snapshot(data_root)
+    monkeypatch.setenv("KOKOROARC_DATA_DIR", str(data_root))
+
+    assert (
+        cli.main(
+            [
+                "memory",
+                "add",
+                "--character",
+                "rin-aster",
+                "--host-id",
+                "host-memory-secret-01",
+                "--summary-file",
+                str(summary),
+                "--json",
+            ]
+        )
+        == 2
+    )
+
+    captured = capsys.readouterr()
+    assert captured.err == ""
+    body = json.loads(captured.out)
+    assert body["error"]["code"] in {
+        "INPUT_INVALID_JSON",
+        "PERSISTENCE_MEMORY_CONTENT_REJECTED",
+        "PERSISTENCE_MEMORY_UNSAFE_CONTENT",
+    }
+    assert "sk-proj-" not in captured.out
+    assert str(summary) not in captured.out
+    assert _filesystem_snapshot(data_root) == before
+    assert list_memory_references(data_root, "rin-aster", SCHEMAS) == ()
+
+
+def test_memory_add_rejects_summary_changed_during_schema_callback(
+    rin_verified_release: dict[str, Any],
+    tmp_path: Path,
+) -> None:
+    data_root = _prepare_persistence(tmp_path, rin_verified_release)
+    summary = tmp_path / "summary.json"
+    summary.write_bytes(
+        canonical_bytes(
+            {
+                "summary": "The user approved concise explanations.",
+                "localized_summaries": {
+                    "en-US": "The user approved concise explanations."
+                },
+            }
+        )
+    )
+
+    class MutatingSchemas:
+        def __init__(self) -> None:
+            self.called = False
+
+        def validate(self, name: str, instance: Any) -> None:
+            SCHEMAS.validate(name, instance)
+            if not self.called:
+                self.called = True
+                summary.write_bytes(b"{}")
+
+    with pytest.raises(KokoroError) as caught:
+        handle_standalone(
+            build_parser().parse_args(
+                [
+                    "memory",
+                    "add",
+                    "--character",
+                    "rin-aster",
+                    "--host-id",
+                    "host-memory-approved-01",
+                    "--summary-file",
+                    str(summary),
+                    "--json",
+                ]
+            ),
+            data_root,
+            MutatingSchemas(),  # type: ignore[arg-type]
+        )
+
+    assert caught.value.code == "INPUT_PATH_UNSAFE"
+    assert list_memory_references(data_root, "rin-aster", SCHEMAS) == ()
