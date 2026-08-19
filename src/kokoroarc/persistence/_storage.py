@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 import errno
 import json
@@ -11,15 +12,28 @@ import re
 import stat
 import sys
 import tempfile
-from typing import Any, Callable, Literal, NoReturn, Protocol, Sequence, cast
+from typing import (
+    Any,
+    Callable,
+    Iterator,
+    Literal,
+    Mapping,
+    NoReturn,
+    Protocol,
+    Sequence,
+    cast,
+)
 
-from kokoroarc.distribution.registry import resolve_install_scope
+from kokoroarc.distribution.registry import InstallScope, resolve_install_scope
 from kokoroarc.errors import KokoroError
 from kokoroarc.packs.compiler import canonical_bytes
 
 
 _SLUG_PATTERN = re.compile(r"[a-z0-9]+(?:-[a-z0-9]+)*\Z")
 _JSON_NAME_PATTERN = re.compile(r"[a-z0-9][a-z0-9._-]{0,127}\.json\Z")
+_SHA256_PATTERN = re.compile(r"[a-f0-9]{64}\Z")
+_GENERATION_PATTERN = re.compile(r"generation-[a-f0-9]{32}\Z")
+_MIGRATION_ID_PATTERN = re.compile(r"migration-[a-f0-9]{32}\Z")
 _WINDOWS_RESERVED_DEVICE_BASENAMES = frozenset(
     {
         "con",
@@ -61,6 +75,12 @@ class SchemaValidator(Protocol):
 
     def validate(self, name: str, instance: Any) -> None:
         raise NotImplementedError
+
+
+@dataclass(frozen=True, slots=True)
+class _NoCallbackSchemas:
+    def validate(self, _name: str, _instance: Any) -> None:
+        return None
 
 
 @dataclass(frozen=True, slots=True)
@@ -119,6 +139,14 @@ class _DirectorySnapshot:
     identity: _DirectoryIdentity
     entries: tuple[tuple[str, tuple[int, int, int, int, int, int]], ...]
     limit: int
+
+
+@dataclass(frozen=True, slots=True)
+class _ReferenceLayoutSnapshot:
+    path: Path
+    identity: _DirectoryIdentity
+    entries: tuple[tuple[str, tuple[int, int, int, int, int, int]], ...]
+    allowed: tuple[tuple[str, Literal["directory", "file"]], ...]
 
 
 @dataclass(frozen=True, slots=True)
@@ -313,6 +341,408 @@ def open_persistence_scope(
     )
     boundary = _capture_scope_boundary(root, workspace_root, schemas)
     return PersistenceScope(root, key, boundary, limits)
+
+
+@contextmanager
+def persistence_reference_lock(
+    data_root: Path,
+    scope: InstallScope,
+    namespace: str,
+    character_id: str,
+) -> Iterator[PersistenceLock]:
+    """Hold the exact persistence character lock during installation removal."""
+
+    reference_scope = _reference_scope(
+        data_root,
+        scope,
+        namespace,
+        character_id,
+        _NoCallbackSchemas(),
+        PersistenceLimits(),
+    )
+    with _acquire_character_lock(reference_scope) as lock:
+        yield lock
+
+
+def persistence_reference_blockers(
+    data_root: Path,
+    scope: InstallScope,
+    installation: Mapping[str, Any],
+    schemas: SchemaValidator,
+    *,
+    limits: PersistenceLimits = PersistenceLimits(),
+    _lock: PersistenceLock | None = None,
+) -> list[str]:
+    """Return exact current persistent references to one installation."""
+
+    binding = _reference_installation_binding(scope, installation)
+    reference_scope = _reference_scope(
+        data_root,
+        scope,
+        cast(str, binding["namespace"]),
+        cast(str, binding["character_id"]),
+        schemas,
+        limits,
+    )
+    if _lock is not None:
+        _require_reference_lock(_lock, reference_scope)
+    blockers = _scan_persistence_reference_blockers(
+        reference_scope,
+        binding,
+    )
+    reference_scope.boundary.assert_clean()
+    if _lock is not None:
+        _lock.scope.boundary.audits.update(
+            reference_scope.boundary.audits
+        )
+        _lock.scope.boundary.assert_clean()
+    return sorted(blockers)
+
+
+def _reference_scope(
+    data_root: Path,
+    install_scope: InstallScope,
+    namespace: str,
+    character_id: str,
+    schemas: SchemaValidator,
+    limits: PersistenceLimits,
+) -> PersistenceScope:
+    root = _absolute_path(data_root)
+    _assert_safe_segment(namespace, "namespace")
+    _assert_safe_segment(character_id, "character_id")
+    if install_scope.kind == "global":
+        if install_scope.workspace_id is not None:
+            raise _path_unsafe("scope_binding")
+    elif (
+        install_scope.kind != "workspace"
+        or not isinstance(install_scope.workspace_id, str)
+        or _SHA256_PATTERN.fullmatch(install_scope.workspace_id) is None
+    ):
+        raise _path_unsafe("scope_binding")
+    key = PersistenceKey(
+        scope=install_scope.kind,
+        workspace_id=install_scope.workspace_id,
+        namespace=namespace,
+        character_id=character_id,
+    )
+    return PersistenceScope(
+        root,
+        key,
+        _capture_scope_boundary(root, None, schemas),
+        limits,
+    )
+
+
+def _reference_installation_binding(
+    scope: InstallScope,
+    installation: Mapping[str, Any],
+) -> dict[str, Any]:
+    required = {
+        "installation_id",
+        "compiled_artifact_id",
+        "archive_sha256",
+        "compiled_sha256",
+        "relative_path",
+    }
+    if not required.issubset(installation):
+        raise _changed("installation_binding")
+    relative_path = installation.get("relative_path")
+    compiled_artifact_id = installation.get("compiled_artifact_id")
+    if not isinstance(relative_path, str) or not isinstance(
+        compiled_artifact_id,
+        str,
+    ):
+        raise _changed("installation_binding")
+    relative_parts = relative_path.split("/")
+    artifact_parts = compiled_artifact_id.split("/")
+    if scope.kind == "global":
+        expected_prefix = ["global"]
+    else:
+        expected_prefix = ["workspaces", cast(str, scope.workspace_id)]
+    if (
+        len(relative_parts) != len(expected_prefix) + 2
+        or relative_parts[: len(expected_prefix)] != expected_prefix
+        or len(artifact_parts) != 3
+        or artifact_parts[2] != "compiled"
+    ):
+        raise _changed("installation_binding")
+    namespace = artifact_parts[0]
+    character_id, character_version = relative_parts[-2:]
+    if artifact_parts[1] != character_id:
+        raise _changed("installation_binding")
+    _assert_safe_segment(namespace, "namespace")
+    _assert_safe_segment(character_id, "character_id")
+    installation_id = installation.get("installation_id")
+    archive_sha256 = installation.get("archive_sha256")
+    compiled_sha256 = installation.get("compiled_sha256")
+    if (
+        not isinstance(installation_id, str)
+        or not installation_id
+        or len(installation_id) > 256
+        or not isinstance(character_version, str)
+        or not character_version
+        or len(character_version) > 64
+        or not isinstance(archive_sha256, str)
+        or _SHA256_PATTERN.fullmatch(archive_sha256) is None
+        or not isinstance(compiled_sha256, str)
+        or _SHA256_PATTERN.fullmatch(compiled_sha256) is None
+    ):
+        raise _changed("installation_binding")
+    return {
+        "installation_id": installation_id,
+        "namespace": namespace,
+        "character_id": character_id,
+        "character_version": character_version,
+        "archive_sha256": archive_sha256,
+        "compiled_sha256": compiled_sha256,
+    }
+
+
+def _require_reference_lock(
+    lock: PersistenceLock,
+    scope: PersistenceScope,
+) -> None:
+    if (
+        not lock.owns()
+        or lock.scope.root != scope.root
+        or lock.scope.key != scope.key
+        or lock.path != scope.lock_path
+    ):
+        raise _path_unsafe("reference_lock")
+
+
+def _scan_persistence_reference_blockers(
+    scope: PersistenceScope,
+    binding: dict[str, Any],
+) -> set[str]:
+    from kokoroarc.persistence import memory as memory_module
+    from kokoroarc.persistence import state as state_module
+
+    blockers: set[str] = set()
+    consent_root = scope.character_root("consents")
+    consent_layout = _retain_reference_layout(
+        scope,
+        consent_root,
+        {"current.json": "file", "history": "directory"},
+        "consent-layout",
+    )
+    current_consent = read_canonical_object(
+        consent_root / "current.json",
+        limit=scope.limits.max_consent_bytes,
+        schema_name="persistence-consent",
+        boundary=scope.boundary,
+        optional=True,
+    )
+    if current_consent is None:
+        if consent_layout is not None:
+            raise _changed("current_consent_missing")
+    else:
+        consent_value = current_consent.value
+        consent_binding = _stored_installation_binding(
+            consent_value.get("installation")
+        )
+        if (
+            consent_value.get("scope") != scope.key.scope
+            or consent_value.get("workspace_id") != scope.key.workspace_id
+            or consent_binding["namespace"] != scope.key.namespace
+            or consent_binding["character_id"] != scope.key.character_id
+        ):
+            raise _changed("current_consent_scope")
+        if (
+            consent_value.get("status") == "active"
+            and consent_binding == binding
+        ):
+            blockers.add("persistence_consent")
+
+    state_root = scope.character_root("persistent-state")
+    _retain_reference_layout(
+        scope,
+        state_root,
+        {
+            "current.json": "file",
+            "generations": "directory",
+            "resets": "directory",
+        },
+        "state-layout",
+    )
+    pointer = state_module._read_pointer(scope, optional=True)
+    if pointer is not None:
+        replayed = state_module._replay_generation(
+            scope,
+            cast(str, pointer.value["generation_id"]),
+            allow_projection_mismatch=False,
+        )
+        relationship = replayed.state.get("relationship")
+        mood = replayed.state.get("mood")
+        retained = (
+            isinstance(relationship, dict)
+            and isinstance(relationship.get("revision"), int)
+            and relationship["revision"] > 0
+        ) or (
+            isinstance(mood, dict)
+            and isinstance(mood.get("revision"), int)
+            and mood["revision"] > 0
+        )
+        if retained and replayed.state.get("installation") == binding:
+            blockers.add("persistent_state")
+
+    for snapshot in memory_module._scan_memory_references(scope):
+        value = snapshot.value
+        if all(value.get(field) == binding[field] for field in binding):
+            blockers.add("memory_reference")
+
+    _scan_migration_reference(scope, binding, blockers, state_module)
+    scope.boundary.assert_clean()
+    return blockers
+
+
+def _scan_migration_reference(
+    scope: PersistenceScope,
+    binding: dict[str, Any],
+    blockers: set[str],
+    state_module: Any,
+) -> None:
+    marker_path = scope.transaction_path
+    if _lstat(marker_path) is None:
+        scope.boundary.audits[f"absent:{marker_path}"] = _absent_file_audit(
+            marker_path
+        )
+        return
+    marker = _snapshot_canonical_file(
+        marker_path,
+        scope.limits.max_transaction_bytes,
+    )
+    scope.boundary.audits[f"migration:{marker_path}"] = _file_audit(
+        marker.path,
+        marker.payload,
+        marker.identity,
+    )
+    value = marker.value
+    identity = value.get("target_directory_identity")
+    target_installation = value.get("target_installation")
+    if (
+        set(value)
+        != {
+            "schema_version",
+            "kind",
+            "phase",
+            "migration_id",
+            "plan_sha256",
+            "source_generation_id",
+            "target_generation_id",
+            "target_installation",
+            "target_directory_identity",
+        }
+        or value.get("schema_version") != "1.0"
+        or value.get("kind") != "state_migration"
+        or value.get("phase") not in {"prepared", "committed"}
+        or not isinstance(value.get("migration_id"), str)
+        or _MIGRATION_ID_PATTERN.fullmatch(value["migration_id"]) is None
+        or not isinstance(value.get("plan_sha256"), str)
+        or _SHA256_PATTERN.fullmatch(value["plan_sha256"]) is None
+        or not isinstance(value.get("source_generation_id"), str)
+        or _GENERATION_PATTERN.fullmatch(value["source_generation_id"])
+        is None
+        or not isinstance(value.get("target_generation_id"), str)
+        or _GENERATION_PATTERN.fullmatch(value["target_generation_id"])
+        is None
+        or value["source_generation_id"] == value["target_generation_id"]
+        or (
+            identity is not None
+            and (
+                not isinstance(identity, dict)
+                or set(identity) != {"device", "inode", "file_type"}
+                or any(
+                    isinstance(item, bool)
+                    or not isinstance(item, int)
+                    or item < 0
+                    for item in identity.values()
+                )
+            )
+        )
+        or (value["phase"] == "committed" and identity is None)
+    ):
+        raise _changed("migration_marker")
+    target_binding = _stored_installation_binding(target_installation)
+    if (
+        target_binding["namespace"] != scope.key.namespace
+        or target_binding["character_id"] != scope.key.character_id
+    ):
+        raise _changed("migration_target_binding")
+    source = state_module._replay_generation(
+        scope,
+        cast(str, value["source_generation_id"]),
+        allow_projection_mismatch=False,
+    )
+    if source.state.get("installation") == binding:
+        blockers.add("state_migration")
+    if target_binding == binding:
+        blockers.add("state_migration")
+    if identity is not None:
+        target_root = state_module._generation_root(
+            scope,
+            cast(str, value["target_generation_id"]),
+        )
+        actual_identity = _capture_directory_identity(target_root)
+        if (
+            actual_identity.device != identity["device"]
+            or actual_identity.inode != identity["inode"]
+            or actual_identity.file_type != identity["file_type"]
+        ):
+            raise _changed("migration_target_identity")
+        target = state_module._replay_generation(
+            scope,
+            cast(str, value["target_generation_id"]),
+            allow_projection_mismatch=False,
+        )
+        if target.state.get("generation_id") != value["target_generation_id"]:
+            raise _changed("migration_target")
+        if target.state.get("installation") != target_binding:
+            raise _changed("migration_target_binding")
+
+
+def _stored_installation_binding(value: Any) -> dict[str, Any]:
+    required = {
+        "installation_id",
+        "namespace",
+        "character_id",
+        "character_version",
+        "archive_sha256",
+        "compiled_sha256",
+    }
+    if not isinstance(value, dict) or set(value) != required:
+        raise _changed("installation_binding")
+    installation_id = value.get("installation_id")
+    namespace = value.get("namespace")
+    character_id = value.get("character_id")
+    character_version = value.get("character_version")
+    archive_sha256 = value.get("archive_sha256")
+    compiled_sha256 = value.get("compiled_sha256")
+    if (
+        not isinstance(installation_id, str)
+        or not installation_id
+        or len(installation_id) > 256
+        or not isinstance(namespace, str)
+        or not isinstance(character_id, str)
+        or not isinstance(character_version, str)
+        or not character_version
+        or len(character_version) > 64
+        or not isinstance(archive_sha256, str)
+        or _SHA256_PATTERN.fullmatch(archive_sha256) is None
+        or not isinstance(compiled_sha256, str)
+        or _SHA256_PATTERN.fullmatch(compiled_sha256) is None
+    ):
+        raise _changed("installation_binding")
+    _assert_safe_segment(namespace, "namespace")
+    _assert_safe_segment(character_id, "character_id")
+    return {
+        "installation_id": installation_id,
+        "namespace": namespace,
+        "character_id": character_id,
+        "character_version": character_version,
+        "archive_sha256": archive_sha256,
+        "compiled_sha256": compiled_sha256,
+    }
 
 
 def read_canonical_object(
@@ -520,6 +950,82 @@ def _reject_json_constant(_value: str) -> NoReturn:
 def _bounded_regular_json_entries(path: Path, limit: int) -> tuple[Path, ...]:
     snapshot = _capture_directory_snapshot(path, limit)
     return tuple(path / name for name, _identity in snapshot.entries)
+
+
+def _retain_reference_layout(
+    scope: PersistenceScope,
+    path: Path,
+    allowed: Mapping[str, Literal["directory", "file"]],
+    audit_name: str,
+) -> _ReferenceLayoutSnapshot | None:
+    canonical_path = _absolute_path(path)
+    snapshot = _capture_reference_layout(canonical_path, allowed)
+    if snapshot is None:
+        scope.boundary.audits[f"layout:{audit_name}"] = _absent_file_audit(
+            canonical_path
+        )
+        return None
+    scope.boundary.audits[f"layout:{audit_name}"] = (
+        lambda: _audit_reference_layout(snapshot)
+    )
+    return snapshot
+
+
+def _capture_reference_layout(
+    path: Path,
+    allowed: Mapping[str, Literal["directory", "file"]],
+) -> _ReferenceLayoutSnapshot | None:
+    linked = _lstat(path)
+    if linked is None:
+        return None
+    _require_safe_directory(path, linked)
+    identity = _capture_directory_identity(path)
+    allowed_items = tuple(sorted(allowed.items()))
+    entries: list[Any] = []
+    try:
+        with os.scandir(path) as iterator:
+            for entry in iterator:
+                entries.append(entry)
+                if len(entries) > len(allowed_items):
+                    raise _path_unsafe("unexpected_reference_layout")
+    except KokoroError:
+        raise
+    except OSError as error:
+        raise _changed("scan_reference_layout") from error
+    names = [entry.name for entry in entries]
+    if len({name.casefold() for name in names}) != len(names):
+        raise _path_unsafe("case_collision")
+    if any(name not in allowed for name in names):
+        raise _path_unsafe("unexpected_reference_layout")
+    captured: list[tuple[str, tuple[int, int, int, int, int, int]]] = []
+    for entry in entries:
+        entry_path = path / entry.name
+        try:
+            entry_stat = entry_path.lstat()
+        except OSError as error:
+            raise _changed("reference_entry_changed") from error
+        if allowed[entry.name] == "file":
+            _require_safe_regular_file(entry_path, entry_stat)
+        else:
+            _require_safe_directory(entry_path, entry_stat)
+        captured.append((entry.name, _file_identity(entry_stat)))
+    if not _directory_identity_matches(identity):
+        raise _changed("reference_layout_changed")
+    return _ReferenceLayoutSnapshot(
+        path=path,
+        identity=identity,
+        entries=tuple(sorted(captured)),
+        allowed=allowed_items,
+    )
+
+
+def _audit_reference_layout(snapshot: _ReferenceLayoutSnapshot) -> None:
+    current = _capture_reference_layout(
+        snapshot.path,
+        dict(snapshot.allowed),
+    )
+    if current != snapshot:
+        raise _changed("reference_layout_changed")
 
 
 def _capture_directory_snapshot(path: Path, limit: int) -> _DirectorySnapshot:

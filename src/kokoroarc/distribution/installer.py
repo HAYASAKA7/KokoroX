@@ -14,7 +14,7 @@ import re
 import secrets
 import stat
 import sys
-from typing import Any, Callable, Protocol, cast
+from typing import TYPE_CHECKING, Any, Callable, Protocol, cast
 
 from kokoroarc.distribution.archive import (
     KarcLimits,
@@ -40,6 +40,9 @@ from kokoroarc.distribution.registry import (
 )
 from kokoroarc.errors import KokoroError
 from kokoroarc.packs.compiler import canonical_bytes
+
+if TYPE_CHECKING:
+    from kokoroarc.persistence._storage import PersistenceLock
 
 
 _STABLE_VERSION_TOKEN = re.compile(r"[a-z0-9]+(?:[._-][a-z0-9]+)*")
@@ -387,6 +390,11 @@ def remove_installed_pack(
 ) -> dict[str, Any]:
     """Preview or remove one exact inactive installation."""
 
+    from kokoroarc.persistence._storage import (
+        persistence_reference_blockers,
+        persistence_reference_lock,
+    )
+
     root = _absolute_path(data_root)
     scope = resolve_install_scope(workspace_root)
     identity = _removal_identity(namespace, character_id, character_version)
@@ -496,16 +504,77 @@ def remove_installed_pack(
             audited.assert_clean()
             return result
         with _acquire_registry_lock(root, scope) as lock:
-            data_boundary = _capture_data_root(root)
-            result = _remove_under_lock(
-                root,
-                scope,
-                lock,
-                identity,
-                audited,
-                limits,
-            )
-            audited.assert_clean()
+            try:
+                preflight_registry, _preflight_sha256 = _registry_state(
+                    root,
+                    scope,
+                    audited,
+                )
+                preflight_entry = preflight_registry["entries"].get(identity)
+                if not isinstance(preflight_entry, dict):
+                    raise _error(
+                        "KARC_REMOVE_NOT_FOUND",
+                        "The selected installation identity is not installed.",
+                    )
+                preflight_blockers = _legacy_reference_blockers(
+                    root,
+                    scope,
+                    preflight_entry,
+                    audited,
+                )
+                if preflight_blockers:
+                    try:
+                        preflight_blockers = sorted(
+                            set(preflight_blockers)
+                            | set(
+                                persistence_reference_blockers(
+                                    root,
+                                    scope,
+                                    preflight_entry,
+                                    audited,
+                                )
+                            )
+                        )
+                    except KokoroError as error:
+                        raise _reference_scan_error(
+                            "Persistent character references could not be "
+                            "verified.",
+                            reason=error.code,
+                        ) from error
+                    raise _error(
+                        "KARC_REMOVE_REFERENCED",
+                        "The selected installation is still referenced.",
+                        references=preflight_blockers,
+                    )
+                with persistence_reference_lock(
+                    root,
+                    scope,
+                    namespace,
+                    character_id,
+                ) as reference_lock:
+                    data_boundary = _capture_data_root(root)
+                    result = _remove_under_lock(
+                        root,
+                        scope,
+                        lock,
+                        reference_lock,
+                        identity,
+                        audited,
+                        limits,
+                    )
+                    audited.assert_clean()
+            except KokoroError as error:
+                if error.code == "PERSISTENCE_LOCKED":
+                    raise _error(
+                        "KARC_REMOVE_CONFLICT",
+                        "Persistent character storage is currently changing.",
+                    ) from error
+                if error.code.startswith("PERSISTENCE_"):
+                    raise _reference_scan_error(
+                        "Persistent character references could not be verified.",
+                        reason=error.code,
+                    ) from error
+                raise
         return result
     except Exception:
         audited.raise_if_failed()
@@ -1078,6 +1147,7 @@ def _remove_under_lock(
     root: Path,
     scope: InstallScope,
     lock: _RegistryLock,
+    reference_lock: PersistenceLock,
     identity: str,
     schemas: _SchemaValidator,
     limits: KarcLimits,
@@ -1132,7 +1202,9 @@ def _remove_under_lock(
         schemas,
         limits,
         dry_run=False,
+        persistence_lock=reference_lock,
     )
+    reference_lock.assert_owned()
     _require_registry_current(lock, registry, registry_sha256, schemas)
     installation = root / "installed" / Path(entry["relative_path"])
     installation_identity = _capture_node_identity(installation, directory=True)
@@ -1164,6 +1236,7 @@ def _remove_under_lock(
         )
     _install_failure_point("removal_journal_created")
 
+    reference_lock.assert_owned()
     _write_installed_registry_cas_locked(
         lock,
         registry["revision"],
@@ -1233,6 +1306,8 @@ def _recover_removal_under_lock(
     schemas: _SchemaValidator,
     limits: KarcLimits,
 ) -> dict[str, Any]:
+    from kokoroarc.persistence._storage import persistence_reference_lock
+
     if not lock.owns():
         raise _recovery_error("Removal scope lock changed during recovery.")
     boundary = schemas if isinstance(schemas, _BoundarySchemas) else None
@@ -1265,47 +1340,71 @@ def _recover_removal_under_lock(
     )
     actions: list[str] = []
     if predecessor:
-        blockers = _reference_blockers(root, scope, entry, schemas)
-        if blockers:
-            raise _recovery_error(
-                "New references appeared before registry removal.",
-                references=blockers,
-            )
-        successor = _detached(registry)
-        successor["revision"] = expected_revision + 1
-        del successor["entries"][identity]
-        if sha256(canonical_bytes(successor)).hexdigest() != next_sha256:
-            raise _recovery_error("Removal registry successor is not reproducible.")
-        _write_installed_registry_cas_locked(
-            lock,
-            expected_revision,
-            expected_sha256,
-            successor,
-            schemas,
-        )
-        registry = successor
-        if boundary is not None:
-            boundary.set_audit(
-                "registry",
-                lambda: _require_registry_snapshot(
+        binding = _entry_binding(entry)
+        try:
+            with persistence_reference_lock(
+                root,
+                scope,
+                cast(str, binding["namespace"]),
+                cast(str, binding["character_id"]),
+            ) as reference_lock:
+                blockers = _reference_blockers(
                     root,
                     scope,
+                    entry,
+                    schemas,
+                    persistence_lock=reference_lock,
+                )
+                if blockers:
+                    raise _recovery_error(
+                        "New references appeared before registry removal.",
+                        references=blockers,
+                    )
+                successor = _detached(registry)
+                successor["revision"] = expected_revision + 1
+                del successor["entries"][identity]
+                if sha256(canonical_bytes(successor)).hexdigest() != next_sha256:
+                    raise _recovery_error(
+                        "Removal registry successor is not reproducible."
+                    )
+                reference_lock.assert_owned()
+                _write_installed_registry_cas_locked(
+                    lock,
+                    expected_revision,
+                    expected_sha256,
                     successor,
-                    next_sha256,
-                ),
-            )
-        journal["phase"] = "registry_published"
-        journal_identity = _write_journal(journal_path, journal)
-        if boundary is not None:
-            boundary.set_audit(
-                "journal",
-                lambda: _audit_journal(
-                    journal_path,
-                    journal_identity,
-                    journal,
-                ),
-            )
-        actions.append("published_registry")
+                    schemas,
+                )
+                registry = successor
+                if boundary is not None:
+                    boundary.set_audit(
+                        "registry",
+                        lambda: _require_registry_snapshot(
+                            root,
+                            scope,
+                            successor,
+                            next_sha256,
+                        ),
+                    )
+                journal["phase"] = "registry_published"
+                journal_identity = _write_journal(journal_path, journal)
+                if boundary is not None:
+                    boundary.set_audit(
+                        "journal",
+                        lambda: _audit_journal(
+                            journal_path,
+                            journal_identity,
+                            journal,
+                        ),
+                    )
+                actions.append("published_registry")
+        except KokoroError as error:
+            if error.code.startswith("PERSISTENCE_"):
+                raise _recovery_error(
+                    "Persistent references could not be verified during recovery.",
+                    reason=error.code,
+                ) from error
+            raise
     elif not successor_visible:
         raise _recovery_error("Installed registry conflicts with removal journal.")
 
@@ -1421,6 +1520,7 @@ def _preview_removal(
     limits: KarcLimits,
     *,
     dry_run: bool,
+    persistence_lock: PersistenceLock | None = None,
 ) -> tuple[dict[str, Any], InspectedKarcContainer, dict[str, Any]]:
     entry = registry["entries"].get(identity)
     if not isinstance(entry, dict):
@@ -1437,7 +1537,13 @@ def _preview_removal(
         schemas,
         limits,
     )
-    blockers = _reference_blockers(root, scope, entry, schemas)
+    blockers = _reference_blockers(
+        root,
+        scope,
+        entry,
+        schemas,
+        persistence_lock=persistence_lock,
+    )
     if blockers:
         raise _error(
             "KARC_REMOVE_REFERENCED",
@@ -1534,6 +1640,40 @@ def _validate_installed_entry(
 
 
 def _reference_blockers(
+    root: Path,
+    scope: InstallScope,
+    entry: dict[str, Any],
+    schemas: _SchemaValidator,
+    *,
+    persistence_lock: PersistenceLock | None = None,
+) -> list[str]:
+    from kokoroarc.persistence._storage import persistence_reference_blockers
+
+    blockers = set(_legacy_reference_blockers(root, scope, entry, schemas))
+    try:
+        blockers.update(
+            persistence_reference_blockers(
+                root,
+                scope,
+                entry,
+                schemas,
+                _lock=persistence_lock,
+            )
+        )
+    except KokoroError as error:
+        raise _reference_scan_error(
+            "Persistent character references could not be verified.",
+            reason=error.code,
+        ) from error
+    if persistence_lock is not None and isinstance(schemas, _BoundarySchemas):
+        schemas.set_audit(
+            "persistent_references",
+            persistence_lock.scope.boundary.assert_clean,
+        )
+    return sorted(blockers)
+
+
+def _legacy_reference_blockers(
     root: Path,
     scope: InstallScope,
     entry: dict[str, Any],

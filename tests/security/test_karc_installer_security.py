@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+from contextlib import contextmanager
 import json
 from pathlib import Path
+from threading import Event, Thread
 from types import SimpleNamespace
 from typing import Any
 
@@ -11,6 +13,11 @@ import pytest
 
 import kokoroarc.distribution.installer as installer_module
 import kokoroarc.distribution.registry as registry_module
+import kokoroarc.persistence._storage as persistence_storage_module
+import kokoroarc.persistence.consent as persistence_consent_module
+import kokoroarc.persistence.memory as persistence_memory_module
+import kokoroarc.persistence.migrations as persistence_migrations_module
+import kokoroarc.persistence.state as persistence_state_module
 from kokoroarc.distribution.installer import (
     install_karc_archive,
     preview_karc_install,
@@ -24,9 +31,31 @@ from kokoroarc.distribution.registry import (
 )
 from kokoroarc.errors import KokoroError
 from kokoroarc.packs.compiler import canonical_bytes
+from kokoroarc.persistence.consent import grant_consent, revoke_consent
+from kokoroarc.persistence.memory import (
+    add_memory_reference,
+    remove_memory_reference,
+)
+from kokoroarc.persistence.migrations import (
+    apply_state_migration,
+    preview_state_migration,
+)
+from kokoroarc.persistence.state import (
+    apply_persistent_relationship_event,
+    preview_persistent_reset,
+    reset_persistent_data,
+)
 from kokoroarc.schemas import SchemaRegistry
 
 from karc_test_support import build_private_archive
+from persistence_support import (
+    ConsentedRin,
+    approved_memory_inputs,
+    consented_rin,
+    install_rin,
+    install_rin_successor,
+    interaction_event,
+)
 
 
 SCHEMAS = SchemaRegistry(Path("schemas/v1"))
@@ -61,6 +90,26 @@ class _CountingScandir:
         path = next(self._paths)
         self._consumed[0] += 1
         return SimpleNamespace(path=str(path))
+
+
+class _CountingNameScandir:
+    def __init__(self, names: list[str], consumed: list[int]) -> None:
+        self._names = iter(names)
+        self._consumed = consumed
+
+    def __enter__(self) -> _CountingNameScandir:
+        return self
+
+    def __exit__(self, *_args: object) -> None:
+        return None
+
+    def __iter__(self) -> _CountingNameScandir:
+        return self
+
+    def __next__(self) -> SimpleNamespace:
+        name = next(self._names)
+        self._consumed[0] += 1
+        return SimpleNamespace(name=name)
 
 
 def _assert_recovery_required(function: object, *args: object) -> None:
@@ -498,6 +547,1123 @@ def test_exact_references_block_removal_without_changing_storage(
     }
     assert caught.value.code == "KARC_REMOVE_REFERENCED"
     assert after == before
+
+
+def test_active_persistence_consent_blocks_exact_installation_removal(
+    consented_rin: ConsentedRin,
+) -> None:
+    with pytest.raises(KokoroError) as caught:
+        remove_installed_pack(
+            consented_rin.data_root,
+            "original",
+            "rin-aster",
+            "1.0.0",
+            SCHEMAS,
+        )
+
+    assert caught.value.code == "KARC_REMOVE_REFERENCED"
+    assert caught.value.details["references"] == ["persistence_consent"]
+
+
+def test_removal_reports_legacy_and_persistent_blockers_together(
+    consented_rin: ConsentedRin,
+) -> None:
+    config = consented_rin.data_root / "config" / "global.json"
+    config.parent.mkdir(parents=True)
+    config.write_bytes(canonical_bytes(_default_config(consented_rin.installation)))
+
+    with pytest.raises(KokoroError) as caught:
+        remove_installed_pack(
+            consented_rin.data_root,
+            "original",
+            "rin-aster",
+            "1.0.0",
+            SCHEMAS,
+        )
+
+    assert caught.value.code == "KARC_REMOVE_REFERENCED"
+    assert caught.value.details["references"] == [
+        "default",
+        "persistence_consent",
+    ]
+
+
+def test_persistent_state_blocks_after_consent_revocation(
+    consented_rin: ConsentedRin,
+) -> None:
+    apply_persistent_relationship_event(
+        consented_rin.data_root,
+        "rin-aster",
+        interaction_event("removal-state-event-1", 0),
+        consented_rin.consent["consent_id"],
+        consented_rin.consent["grant_revision"],
+        SCHEMAS,
+        expected_state_revision=0,
+        operation_id="removal-state-operation-1",
+    )
+    revoke_consent(
+        consented_rin.data_root,
+        "rin-aster",
+        consented_rin.consent["consent_id"],
+        SCHEMAS,
+        expected_revision=consented_rin.consent["grant_revision"],
+    )
+
+    with pytest.raises(KokoroError) as caught:
+        remove_installed_pack(
+            consented_rin.data_root,
+            "original",
+            "rin-aster",
+            "1.0.0",
+            SCHEMAS,
+        )
+
+    assert caught.value.code == "KARC_REMOVE_REFERENCED"
+    assert caught.value.details["references"] == ["persistent_state"]
+
+
+def test_memory_reference_blocks_after_consent_revocation(
+    consented_rin: ConsentedRin,
+) -> None:
+    host_memory_id, summary, localized = approved_memory_inputs()
+    add_memory_reference(
+        consented_rin.data_root,
+        "rin-aster",
+        host_memory_id,
+        summary,
+        localized,
+        consented_rin.consent["consent_id"],
+        consented_rin.consent["grant_revision"],
+        SCHEMAS,
+    )
+    revoke_consent(
+        consented_rin.data_root,
+        "rin-aster",
+        consented_rin.consent["consent_id"],
+        SCHEMAS,
+        expected_revision=consented_rin.consent["grant_revision"],
+    )
+
+    with pytest.raises(KokoroError) as caught:
+        remove_installed_pack(
+            consented_rin.data_root,
+            "original",
+            "rin-aster",
+            "1.0.0",
+            SCHEMAS,
+        )
+
+    assert caught.value.code == "KARC_REMOVE_REFERENCED"
+    assert caught.value.details["references"] == ["memory_reference"]
+
+
+def test_incomplete_state_migration_blocks_source_installation_removal(
+    consented_rin: ConsentedRin,
+    tmp_path: Path,
+    verified_release_factory: Any,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    apply_persistent_relationship_event(
+        consented_rin.data_root,
+        "rin-aster",
+        interaction_event("removal-migration-event-1", 0),
+        consented_rin.consent["consent_id"],
+        consented_rin.consent["grant_revision"],
+        SCHEMAS,
+        expected_state_revision=0,
+        operation_id="removal-migration-operation-1",
+    )
+    target = install_rin_successor(
+        consented_rin,
+        tmp_path,
+        verified_release_factory,
+    )
+    plan = preview_state_migration(
+        consented_rin.data_root,
+        "rin-aster",
+        target.consent["consent_id"],
+        target.consent["grant_revision"],
+        SCHEMAS,
+        mood_strategy="preserve_identical_contract",
+    )
+    original = (
+        persistence_migrations_module._replace_current_generation_pointer
+    )
+
+    def cutover_then_fail(*args: Any, **kwargs: Any) -> Any:
+        original(*args, **kwargs)
+        raise KokoroError(
+            "PERSISTENCE_DURABILITY_FAILED",
+            "injected",
+            details={
+                "operation": "pointer_cutover",
+                "reason": "injected",
+                "record_state": "committed",
+            },
+        )
+
+    monkeypatch.setattr(
+        persistence_migrations_module,
+        "_replace_current_generation_pointer",
+        cutover_then_fail,
+    )
+    with pytest.raises(KokoroError) as migration_error:
+        apply_state_migration(
+            consented_rin.data_root,
+            "rin-aster",
+            target.consent["consent_id"],
+            target.consent["grant_revision"],
+            plan,
+            SCHEMAS,
+            mood_strategy="preserve_identical_contract",
+        )
+    assert migration_error.value.code == "PERSISTENCE_MIGRATION_WRITE_FAILED"
+    assert migration_error.value.details["record_state"] == "committed"
+    marker = (
+        consented_rin.data_root
+        / "persistence-transactions"
+        / "global"
+        / "original.rin-aster.json"
+    )
+    assert marker.is_file()
+
+    with pytest.raises(KokoroError) as caught:
+        remove_installed_pack(
+            consented_rin.data_root,
+            "original",
+            "rin-aster",
+            "1.0.0",
+            SCHEMAS,
+        )
+
+    assert caught.value.code == "KARC_REMOVE_REFERENCED"
+    assert caught.value.details["references"] == ["state_migration"]
+
+
+def test_incomplete_state_migration_blocks_target_installation_removal(
+    consented_rin: ConsentedRin,
+    tmp_path: Path,
+    verified_release_factory: Any,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    apply_persistent_relationship_event(
+        consented_rin.data_root,
+        "rin-aster",
+        interaction_event("target-marker-event-1", 0),
+        consented_rin.consent["consent_id"],
+        consented_rin.consent["grant_revision"],
+        SCHEMAS,
+        expected_state_revision=0,
+        operation_id="target-marker-operation-1",
+    )
+    target = install_rin_successor(
+        consented_rin,
+        tmp_path,
+        verified_release_factory,
+    )
+    plan = preview_state_migration(
+        consented_rin.data_root,
+        "rin-aster",
+        target.consent["consent_id"],
+        target.consent["grant_revision"],
+        SCHEMAS,
+        mood_strategy="preserve_identical_contract",
+    )
+
+    def stop_after_marker(*_args: Any, **_kwargs: Any) -> Any:
+        raise KokoroError(
+            "PERSISTENCE_DURABILITY_FAILED",
+            "injected",
+            details={"record_state": "not_visible"},
+        )
+
+    monkeypatch.setattr(
+        persistence_migrations_module,
+        "_prepare_target_generation",
+        stop_after_marker,
+    )
+    with pytest.raises(KokoroError):
+        apply_state_migration(
+            consented_rin.data_root,
+            "rin-aster",
+            target.consent["consent_id"],
+            target.consent["grant_revision"],
+            plan,
+            SCHEMAS,
+            mood_strategy="preserve_identical_contract",
+        )
+    marker = (
+        consented_rin.data_root
+        / "persistence-transactions"
+        / "global"
+        / "original.rin-aster.json"
+    )
+    assert marker.is_file()
+    revoke_consent(
+        consented_rin.data_root,
+        "rin-aster",
+        target.consent["consent_id"],
+        SCHEMAS,
+        expected_revision=target.consent["grant_revision"],
+    )
+
+    with pytest.raises(KokoroError) as caught:
+        remove_installed_pack(
+            consented_rin.data_root,
+            "original",
+            "rin-aster",
+            "1.1.0",
+            SCHEMAS,
+        )
+
+    assert caught.value.code == "KARC_REMOVE_REFERENCED"
+    assert caught.value.details["references"] == ["state_migration"]
+
+
+def test_revoked_consent_without_retained_data_does_not_block_removal(
+    consented_rin: ConsentedRin,
+) -> None:
+    revoke_consent(
+        consented_rin.data_root,
+        "rin-aster",
+        consented_rin.consent["consent_id"],
+        SCHEMAS,
+        expected_revision=consented_rin.consent["grant_revision"],
+    )
+
+    result = remove_installed_pack(
+        consented_rin.data_root,
+        "original",
+        "rin-aster",
+        "1.0.0",
+        SCHEMAS,
+    )
+
+    assert result["registry_identity"] == "original/rin-aster/1.0.0"
+
+
+def test_historical_consent_bytes_are_not_part_of_current_reference_scan(
+    consented_rin: ConsentedRin,
+) -> None:
+    revoke_consent(
+        consented_rin.data_root,
+        "rin-aster",
+        consented_rin.consent["consent_id"],
+        SCHEMAS,
+        expected_revision=consented_rin.consent["grant_revision"],
+    )
+    history = (
+        consented_rin.data_root
+        / "consents"
+        / "global"
+        / "original"
+        / "rin-aster"
+        / "history"
+        / "00000000000000000001.json"
+    )
+    history.write_bytes(b"historical bytes are not a current reference")
+
+    result = remove_installed_pack(
+        consented_rin.data_root,
+        "original",
+        "rin-aster",
+        "1.0.0",
+        SCHEMAS,
+    )
+
+    assert result["registry_identity"] == "original/rin-aster/1.0.0"
+
+
+def test_removed_memory_reference_does_not_block_removal(
+    consented_rin: ConsentedRin,
+) -> None:
+    host_memory_id, summary, localized = approved_memory_inputs()
+    add_memory_reference(
+        consented_rin.data_root,
+        "rin-aster",
+        host_memory_id,
+        summary,
+        localized,
+        consented_rin.consent["consent_id"],
+        consented_rin.consent["grant_revision"],
+        SCHEMAS,
+    )
+    remove_memory_reference(
+        consented_rin.data_root,
+        "rin-aster",
+        host_memory_id,
+        consented_rin.consent["consent_id"],
+        SCHEMAS,
+        identifier_kind="host_memory_id",
+    )
+    revoke_consent(
+        consented_rin.data_root,
+        "rin-aster",
+        consented_rin.consent["consent_id"],
+        SCHEMAS,
+        expected_revision=consented_rin.consent["grant_revision"],
+    )
+
+    result = remove_installed_pack(
+        consented_rin.data_root,
+        "original",
+        "rin-aster",
+        "1.0.0",
+        SCHEMAS,
+    )
+
+    assert result["registry_identity"] == "original/rin-aster/1.0.0"
+
+
+def test_reset_persistent_state_does_not_block_removal(
+    consented_rin: ConsentedRin,
+) -> None:
+    apply_persistent_relationship_event(
+        consented_rin.data_root,
+        "rin-aster",
+        interaction_event("reset-removal-event-1", 0),
+        consented_rin.consent["consent_id"],
+        consented_rin.consent["grant_revision"],
+        SCHEMAS,
+        expected_state_revision=0,
+        operation_id="reset-removal-operation-1",
+    )
+    preview = preview_persistent_reset(
+        consented_rin.data_root,
+        "rin-aster",
+        consented_rin.consent["consent_id"],
+        SCHEMAS,
+        target="relationship",
+        reset_id="reset-before-removal-1",
+    )
+    reset_persistent_data(
+        consented_rin.data_root,
+        "rin-aster",
+        preview,
+        consented_rin.consent["consent_id"],
+        SCHEMAS,
+    )
+    revoke_consent(
+        consented_rin.data_root,
+        "rin-aster",
+        consented_rin.consent["consent_id"],
+        SCHEMAS,
+        expected_revision=consented_rin.consent["grant_revision"],
+    )
+
+    result = remove_installed_pack(
+        consented_rin.data_root,
+        "original",
+        "rin-aster",
+        "1.0.0",
+        SCHEMAS,
+    )
+
+    assert result["registry_identity"] == "original/rin-aster/1.0.0"
+
+
+def test_unrelated_character_persistence_storage_is_not_scanned(
+    consented_rin: ConsentedRin,
+) -> None:
+    unrelated = (
+        consented_rin.data_root
+        / "consents"
+        / "global"
+        / "original"
+        / "other-character"
+    )
+    unrelated.mkdir(parents=True)
+    (unrelated / "current.json").write_bytes(b"not selected character data")
+    revoke_consent(
+        consented_rin.data_root,
+        "rin-aster",
+        consented_rin.consent["consent_id"],
+        SCHEMAS,
+        expected_revision=consented_rin.consent["grant_revision"],
+    )
+
+    result = remove_installed_pack(
+        consented_rin.data_root,
+        "original",
+        "rin-aster",
+        "1.0.0",
+        SCHEMAS,
+    )
+
+    assert result["registry_identity"] == "original/rin-aster/1.0.0"
+    assert (unrelated / "current.json").read_bytes() == (
+        b"not selected character data"
+    )
+
+
+def test_successor_version_consent_does_not_block_prior_version_removal(
+    consented_rin: ConsentedRin,
+    tmp_path: Path,
+    verified_release_factory: Any,
+) -> None:
+    install_rin_successor(
+        consented_rin,
+        tmp_path,
+        verified_release_factory,
+    )
+
+    result = remove_installed_pack(
+        consented_rin.data_root,
+        "original",
+        "rin-aster",
+        "1.0.0",
+        SCHEMAS,
+    )
+
+    assert result["registry_identity"] == "original/rin-aster/1.0.0"
+
+
+def test_completed_migration_leaves_source_history_nonblocking(
+    consented_rin: ConsentedRin,
+    tmp_path: Path,
+    verified_release_factory: Any,
+) -> None:
+    apply_persistent_relationship_event(
+        consented_rin.data_root,
+        "rin-aster",
+        interaction_event("completed-migration-event-1", 0),
+        consented_rin.consent["consent_id"],
+        consented_rin.consent["grant_revision"],
+        SCHEMAS,
+        expected_state_revision=0,
+        operation_id="completed-migration-operation-1",
+    )
+    target = install_rin_successor(
+        consented_rin,
+        tmp_path,
+        verified_release_factory,
+    )
+    plan = preview_state_migration(
+        consented_rin.data_root,
+        "rin-aster",
+        target.consent["consent_id"],
+        target.consent["grant_revision"],
+        SCHEMAS,
+        mood_strategy="preserve_identical_contract",
+    )
+    apply_state_migration(
+        consented_rin.data_root,
+        "rin-aster",
+        target.consent["consent_id"],
+        target.consent["grant_revision"],
+        plan,
+        SCHEMAS,
+        mood_strategy="preserve_identical_contract",
+    )
+
+    result = remove_installed_pack(
+        consented_rin.data_root,
+        "original",
+        "rin-aster",
+        "1.0.0",
+        SCHEMAS,
+    )
+
+    assert result["registry_identity"] == "original/rin-aster/1.0.0"
+
+
+def test_workspace_persistence_does_not_block_global_removal(
+    rin_verified_release: dict[str, Any],
+    tmp_path: Path,
+) -> None:
+    data_root = tmp_path / "data"
+    install_rin(data_root, rin_verified_release)
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    install_rin(
+        data_root,
+        rin_verified_release,
+        workspace_root=workspace,
+    )
+    grant_consent(
+        data_root,
+        "rin-aster",
+        ["relationship_state"],
+        SCHEMAS,
+        workspace_root=workspace,
+        expected_revision=0,
+    )
+
+    result = remove_installed_pack(
+        data_root,
+        "original",
+        "rin-aster",
+        "1.0.0",
+        SCHEMAS,
+    )
+
+    assert result["scope"] == "global"
+    assert result["archive_removed"] is False
+
+
+def test_removal_rejects_unknown_persistence_root_entry(
+    consented_rin: ConsentedRin,
+) -> None:
+    unexpected = (
+        consented_rin.data_root
+        / "consents"
+        / "global"
+        / "original"
+        / "rin-aster"
+        / "unexpected.json"
+    )
+    unexpected.write_bytes(canonical_bytes({"unexpected": True}))
+
+    with pytest.raises(KokoroError) as caught:
+        remove_installed_pack(
+            consented_rin.data_root,
+            "original",
+            "rin-aster",
+            "1.0.0",
+            SCHEMAS,
+        )
+
+    assert caught.value.code == "KARC_REMOVE_REFERENCE_SCAN_INVALID"
+
+
+def test_removal_rejects_redirected_persistence_reference(
+    consented_rin: ConsentedRin,
+    tmp_path: Path,
+) -> None:
+    current = (
+        consented_rin.data_root
+        / "consents"
+        / "global"
+        / "original"
+        / "rin-aster"
+        / "current.json"
+    )
+    outside = tmp_path / "outside-consent.json"
+    outside.write_bytes(current.read_bytes())
+    current.unlink()
+    try:
+        current.symlink_to(outside)
+    except OSError as error:
+        pytest.skip(f"file symlinks unavailable: {type(error).__name__}")
+
+    with pytest.raises(KokoroError) as caught:
+        remove_installed_pack(
+            consented_rin.data_root,
+            "original",
+            "rin-aster",
+            "1.0.0",
+            SCHEMAS,
+        )
+
+    assert caught.value.code == "KARC_REMOVE_REFERENCE_SCAN_INVALID"
+
+
+def test_removal_rejects_malformed_persistence_reference(
+    consented_rin: ConsentedRin,
+) -> None:
+    current = (
+        consented_rin.data_root
+        / "consents"
+        / "global"
+        / "original"
+        / "rin-aster"
+        / "current.json"
+    )
+    current.write_bytes(b'{"schema_version":"1.0"}')
+
+    with pytest.raises(KokoroError) as caught:
+        remove_installed_pack(
+            consented_rin.data_root,
+            "original",
+            "rin-aster",
+            "1.0.0",
+            SCHEMAS,
+        )
+
+    assert caught.value.code == "KARC_REMOVE_REFERENCE_SCAN_INVALID"
+
+
+def test_removal_rejects_persistence_membership_change_during_callback(
+    consented_rin: ConsentedRin,
+) -> None:
+    host_memory_id, summary, localized = approved_memory_inputs()
+    reference = add_memory_reference(
+        consented_rin.data_root,
+        "rin-aster",
+        host_memory_id,
+        summary,
+        localized,
+        consented_rin.consent["consent_id"],
+        consented_rin.consent["grant_revision"],
+        SCHEMAS,
+    )
+    memory_root = (
+        consented_rin.data_root
+        / "memory-references"
+        / "global"
+        / "original"
+        / "rin-aster"
+    )
+
+    class MutatingSchemas:
+        changed = False
+
+        def validate(self, name: str, instance: Any) -> None:
+            SCHEMAS.validate(name, instance)
+            if name == "memory-reference" and not self.changed:
+                (memory_root / "appeared.json").write_bytes(
+                    canonical_bytes(reference)
+                )
+                self.changed = True
+
+    schemas = MutatingSchemas()
+    with pytest.raises(KokoroError) as caught:
+        remove_installed_pack(
+            consented_rin.data_root,
+            "original",
+            "rin-aster",
+            "1.0.0",
+            schemas,
+        )
+
+    assert schemas.changed is True
+    assert caught.value.code == "KARC_REMOVE_REFERENCE_SCAN_INVALID"
+
+
+def test_persistence_reference_scan_stops_at_limit_plus_one(
+    consented_rin: ConsentedRin,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    registry = load_installed_registry(consented_rin.data_root, SCHEMAS)
+    entry = registry["entries"]["original/rin-aster/1.0.0"]
+    memory_root = (
+        consented_rin.data_root
+        / "memory-references"
+        / "global"
+        / "original"
+        / "rin-aster"
+    )
+    memory_root.mkdir(parents=True)
+    names = [f"memory-{index:05d}.json" for index in range(10_000)]
+    consumed = [0]
+    original = persistence_storage_module.os.scandir
+
+    def counting_scandir(path: Path) -> Any:
+        if Path(path) == memory_root:
+            return _CountingNameScandir(names, consumed)
+        return original(path)
+
+    monkeypatch.setattr(
+        persistence_storage_module.os,
+        "scandir",
+        counting_scandir,
+    )
+    with pytest.raises(KokoroError) as caught:
+        persistence_storage_module.persistence_reference_blockers(
+            consented_rin.data_root,
+            resolve_install_scope(),
+            entry,
+            SCHEMAS,
+            limits=persistence_storage_module.PersistenceLimits(
+                max_memory_references=3,
+            ),
+        )
+
+    assert caught.value.code == "PERSISTENCE_LIMIT_EXCEEDED"
+    assert consumed == [4]
+
+
+@pytest.mark.parametrize("creation_kind", ["consent", "memory", "state"])
+def test_removal_race_never_leaves_new_persistence_reference(
+    rin_verified_release: dict[str, Any],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    creation_kind: str,
+) -> None:
+    data_root = tmp_path / "data"
+    install_rin(data_root, rin_verified_release)
+    consent = None
+    if creation_kind != "consent":
+        consent = grant_consent(
+            data_root,
+            "rin-aster",
+            ["relationship_state", "memory_references"],
+            SCHEMAS,
+            expected_revision=0,
+        )
+    scan_started = Event()
+    creation_finished = Event()
+    outcomes: dict[str, str] = {}
+    original = installer_module._reference_blockers
+
+    def gated_reference_scan(*args: Any, **kwargs: Any) -> Any:
+        scan_started.set()
+        creation_finished.wait(timeout=30)
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(
+        installer_module,
+        "_reference_blockers",
+        gated_reference_scan,
+    )
+
+    def create_reference() -> None:
+        assert scan_started.wait(timeout=30)
+        try:
+            if creation_kind == "consent":
+                grant_consent(
+                    data_root,
+                    "rin-aster",
+                    ["relationship_state"],
+                    SCHEMAS,
+                    expected_revision=0,
+                )
+            elif creation_kind == "memory":
+                assert consent is not None
+                host_memory_id, summary, localized = approved_memory_inputs()
+                add_memory_reference(
+                    data_root,
+                    "rin-aster",
+                    host_memory_id,
+                    summary,
+                    localized,
+                    consent["consent_id"],
+                    consent["grant_revision"],
+                    SCHEMAS,
+                )
+            else:
+                assert consent is not None
+                apply_persistent_relationship_event(
+                    data_root,
+                    "rin-aster",
+                    interaction_event("removal-race-event-1", 0),
+                    consent["consent_id"],
+                    consent["grant_revision"],
+                    SCHEMAS,
+                    expected_state_revision=0,
+                    operation_id="removal-race-operation-1",
+                )
+            outcomes["creation"] = "success"
+        except KokoroError as error:
+            outcomes["creation"] = error.code
+        finally:
+            creation_finished.set()
+
+    thread = Thread(target=create_reference)
+    thread.start()
+    try:
+        remove_installed_pack(
+            data_root,
+            "original",
+            "rin-aster",
+            "1.0.0",
+            SCHEMAS,
+        )
+        outcomes["removal"] = "success"
+    except KokoroError as error:
+        outcomes["removal"] = error.code
+    thread.join(timeout=30)
+
+    assert thread.is_alive() is False
+    assert outcomes["creation"] == "PERSISTENCE_LOCKED"
+    if creation_kind == "consent":
+        assert outcomes["removal"] == "success"
+    else:
+        assert outcomes["removal"] == "KARC_REMOVE_REFERENCED"
+
+
+@pytest.mark.parametrize("creation_kind", ["consent", "memory", "state"])
+def test_persistence_creator_lock_wins_before_removal(
+    rin_verified_release: dict[str, Any],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    creation_kind: str,
+) -> None:
+    data_root = tmp_path / "data"
+    install_rin(data_root, rin_verified_release)
+    consent = None
+    if creation_kind != "consent":
+        consent = grant_consent(
+            data_root,
+            "rin-aster",
+            ["relationship_state", "memory_references"],
+            SCHEMAS,
+            expected_revision=0,
+        )
+    module = {
+        "consent": persistence_consent_module,
+        "memory": persistence_memory_module,
+        "state": persistence_state_module,
+    }[creation_kind]
+    original_lock = module._acquire_character_lock
+    creator_locked = Event()
+    allow_creator = Event()
+    outcome: dict[str, str] = {}
+
+    @contextmanager
+    def gated_creator_lock(scope: Any) -> Any:
+        with original_lock(scope) as lock:
+            creator_locked.set()
+            if not allow_creator.wait(timeout=30):
+                raise AssertionError("creator lock was not released")
+            yield lock
+
+    monkeypatch.setattr(module, "_acquire_character_lock", gated_creator_lock)
+
+    def create_reference() -> None:
+        try:
+            if creation_kind == "consent":
+                grant_consent(
+                    data_root,
+                    "rin-aster",
+                    ["relationship_state"],
+                    SCHEMAS,
+                    expected_revision=0,
+                )
+            elif creation_kind == "memory":
+                assert consent is not None
+                host_memory_id, summary, localized = approved_memory_inputs()
+                add_memory_reference(
+                    data_root,
+                    "rin-aster",
+                    host_memory_id,
+                    summary,
+                    localized,
+                    consent["consent_id"],
+                    consent["grant_revision"],
+                    SCHEMAS,
+                )
+            else:
+                assert consent is not None
+                apply_persistent_relationship_event(
+                    data_root,
+                    "rin-aster",
+                    interaction_event("creator-wins-event-1", 0),
+                    consent["consent_id"],
+                    consent["grant_revision"],
+                    SCHEMAS,
+                    expected_state_revision=0,
+                    operation_id="creator-wins-operation-1",
+                )
+            outcome["creation"] = "success"
+        except KokoroError as error:
+            outcome["creation"] = error.code
+
+    thread = Thread(target=create_reference)
+    thread.start()
+    assert creator_locked.wait(timeout=30)
+    try:
+        with pytest.raises(KokoroError) as caught:
+            remove_installed_pack(
+                data_root,
+                "original",
+                "rin-aster",
+                "1.0.0",
+                SCHEMAS,
+            )
+        assert caught.value.code == "KARC_REMOVE_CONFLICT"
+    finally:
+        allow_creator.set()
+        thread.join(timeout=30)
+
+    assert thread.is_alive() is False
+    assert outcome == {"creation": "success"}
+    registry = load_installed_registry(data_root, SCHEMAS)
+    assert "original/rin-aster/1.0.0" in registry["entries"]
+
+
+def test_removal_race_never_leaves_incomplete_migration_marker(
+    consented_rin: ConsentedRin,
+    tmp_path: Path,
+    verified_release_factory: Any,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    apply_persistent_relationship_event(
+        consented_rin.data_root,
+        "rin-aster",
+        interaction_event("removal-marker-race-event-1", 0),
+        consented_rin.consent["consent_id"],
+        consented_rin.consent["grant_revision"],
+        SCHEMAS,
+        expected_state_revision=0,
+        operation_id="removal-marker-race-operation-1",
+    )
+    target = install_rin_successor(
+        consented_rin,
+        tmp_path,
+        verified_release_factory,
+    )
+    plan = preview_state_migration(
+        consented_rin.data_root,
+        "rin-aster",
+        target.consent["consent_id"],
+        target.consent["grant_revision"],
+        SCHEMAS,
+        mood_strategy="preserve_identical_contract",
+    )
+    marker = (
+        consented_rin.data_root
+        / "persistence-transactions"
+        / "global"
+        / "original.rin-aster.json"
+    )
+    scan_started = Event()
+    creation_finished = Event()
+    outcomes: dict[str, str] = {}
+    original_scan = installer_module._reference_blockers
+    original_cutover = (
+        persistence_migrations_module._replace_current_generation_pointer
+    )
+
+    def gated_reference_scan(*args: Any, **kwargs: Any) -> Any:
+        scan_started.set()
+        creation_finished.wait(timeout=30)
+        return original_scan(*args, **kwargs)
+
+    def cutover_then_fail(*args: Any, **kwargs: Any) -> Any:
+        original_cutover(*args, **kwargs)
+        raise KokoroError(
+            "PERSISTENCE_DURABILITY_FAILED",
+            "injected",
+            details={"record_state": "committed"},
+        )
+
+    monkeypatch.setattr(
+        installer_module,
+        "_reference_blockers",
+        gated_reference_scan,
+    )
+    monkeypatch.setattr(
+        persistence_migrations_module,
+        "_replace_current_generation_pointer",
+        cutover_then_fail,
+    )
+
+    def create_marker() -> None:
+        assert scan_started.wait(timeout=30)
+        try:
+            apply_state_migration(
+                consented_rin.data_root,
+                "rin-aster",
+                target.consent["consent_id"],
+                target.consent["grant_revision"],
+                plan,
+                SCHEMAS,
+                mood_strategy="preserve_identical_contract",
+            )
+            outcomes["migration"] = "success"
+        except KokoroError as error:
+            outcomes["migration"] = error.code
+        finally:
+            creation_finished.set()
+
+    thread = Thread(target=create_marker)
+    thread.start()
+    try:
+        remove_installed_pack(
+            consented_rin.data_root,
+            "original",
+            "rin-aster",
+            "1.0.0",
+            SCHEMAS,
+        )
+        outcomes["removal"] = "success"
+    except KokoroError as error:
+        outcomes["removal"] = error.code
+    thread.join(timeout=30)
+
+    assert thread.is_alive() is False
+    assert outcomes == {
+        "migration": "PERSISTENCE_LOCKED",
+        "removal": "KARC_REMOVE_REFERENCED",
+    }
+    assert marker.exists() is False
+
+
+def test_migration_creator_lock_wins_before_removal(
+    consented_rin: ConsentedRin,
+    tmp_path: Path,
+    verified_release_factory: Any,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    apply_persistent_relationship_event(
+        consented_rin.data_root,
+        "rin-aster",
+        interaction_event("migration-creator-event-1", 0),
+        consented_rin.consent["consent_id"],
+        consented_rin.consent["grant_revision"],
+        SCHEMAS,
+        expected_state_revision=0,
+        operation_id="migration-creator-operation-1",
+    )
+    target = install_rin_successor(
+        consented_rin,
+        tmp_path,
+        verified_release_factory,
+    )
+    plan = preview_state_migration(
+        consented_rin.data_root,
+        "rin-aster",
+        target.consent["consent_id"],
+        target.consent["grant_revision"],
+        SCHEMAS,
+        mood_strategy="preserve_identical_contract",
+    )
+    original_lock = persistence_migrations_module._acquire_character_lock
+    creator_locked = Event()
+    allow_creator = Event()
+    outcome: dict[str, str] = {}
+
+    @contextmanager
+    def gated_creator_lock(scope: Any) -> Any:
+        with original_lock(scope) as lock:
+            creator_locked.set()
+            if not allow_creator.wait(timeout=30):
+                raise AssertionError("migration lock was not released")
+            yield lock
+
+    monkeypatch.setattr(
+        persistence_migrations_module,
+        "_acquire_character_lock",
+        gated_creator_lock,
+    )
+
+    def create_migration() -> None:
+        try:
+            apply_state_migration(
+                consented_rin.data_root,
+                "rin-aster",
+                target.consent["consent_id"],
+                target.consent["grant_revision"],
+                plan,
+                SCHEMAS,
+                mood_strategy="preserve_identical_contract",
+            )
+            outcome["migration"] = "success"
+        except KokoroError as error:
+            outcome["migration"] = error.code
+
+    thread = Thread(target=create_migration)
+    thread.start()
+    assert creator_locked.wait(timeout=30)
+    try:
+        with pytest.raises(KokoroError) as caught:
+            remove_installed_pack(
+                consented_rin.data_root,
+                "original",
+                "rin-aster",
+                "1.0.0",
+                SCHEMAS,
+            )
+        assert caught.value.code == "KARC_REMOVE_CONFLICT"
+    finally:
+        allow_creator.set()
+        thread.join(timeout=30)
+
+    assert thread.is_alive() is False
+    assert outcome == {"migration": "success"}
+    registry = load_installed_registry(consented_rin.data_root, SCHEMAS)
+    assert "original/rin-aster/1.0.0" in registry["entries"]
 
 
 def test_inactive_and_unrelated_references_do_not_block_removal(

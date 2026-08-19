@@ -1012,6 +1012,9 @@ def _migration_marker_document(
         "plan_sha256": sha256(built.plan_payload).hexdigest(),
         "source_generation_id": built.plan["source"]["generation_id"],
         "target_generation_id": built.generation_id,
+        "target_installation": _detached(
+            cast(dict[str, Any], built.plan["target"])["installation"]
+        ),
         "target_directory_identity": (
             None
             if target_directory_identity is None
