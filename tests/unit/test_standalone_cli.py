@@ -24,6 +24,32 @@ from karc_test_support import (
 )
 
 
+def _cli_json(
+    arguments: list[str],
+    capsys: pytest.CaptureFixture[str],
+) -> tuple[int, dict[str, Any]]:
+    result = cli.main(arguments)
+    captured = capsys.readouterr()
+    assert captured.err == ""
+    return result, json.loads(captured.out)
+
+
+def _filesystem_snapshot(root: Path) -> tuple[tuple[Any, ...], ...]:
+    if not root.exists():
+        return ()
+    snapshot: list[tuple[Any, ...]] = []
+    for path in sorted(root.rglob("*")):
+        relative = path.relative_to(root).as_posix()
+        path_stat = path.stat(follow_symlinks=False)
+        if path.is_file():
+            snapshot.append(
+                (relative, "file", path_stat.st_mtime_ns, path.read_bytes())
+            )
+        else:
+            snapshot.append((relative, "directory", path_stat.st_mtime_ns))
+    return tuple(snapshot)
+
+
 @pytest.mark.parametrize(
     ("arguments", "route", "requires_data_root"),
     [
@@ -585,3 +611,188 @@ def test_pack_migration_previews_then_writes_new_archive(
     }
     assert output.read_bytes() == current
     assert source.read_bytes() == legacy
+
+
+def test_scoped_pack_cli_global_install_list_and_remove_workflow(
+    rin_verified_release: dict[str, Any],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    source = tmp_path / "rin.karc"
+    source.write_bytes(build_private_archive(rin_verified_release))
+    data_root = tmp_path / "data"
+    monkeypatch.setenv("KOKOROARC_DATA_DIR", str(data_root))
+    install = ["pack", "install", str(source), "--json"]
+
+    code, preview = _cli_json(
+        ["pack", "install", str(source), "--dry-run", "--json"],
+        capsys,
+    )
+    assert code == 0
+    assert preview["ok"] is True
+    assert preview["dry_run"] is True
+    assert preview["plan"]["scope"] == "global"
+    assert preview["plan"]["will_write"] is True
+    assert preview["activates_character"] is False
+    assert not data_root.exists()
+
+    code, applied = _cli_json(install, capsys)
+    assert code == 0
+    assert applied["ok"] is True
+    assert applied["dry_run"] is False
+    assert applied["plan"]["scope"] == "global"
+    assert applied["plan"]["idempotent"] is False
+    assert applied["activates_character"] is False
+
+    code, listed = _cli_json(["pack", "list", "--json"], capsys)
+    assert code == 0
+    assert listed["scope"] == "global"
+    assert listed["workspace_id"] is None
+    assert len(listed["installed"]) == 1
+    assert listed["installed"][0]["registry_identity"] == (
+        "original/rin-aster/1.0.0"
+    )
+    assert listed["activates_character"] is False
+
+    code, repeated = _cli_json(install, capsys)
+    assert code == 0
+    assert repeated["plan"]["idempotent"] is True
+    assert repeated["plan"]["will_write"] is False
+
+    before = _filesystem_snapshot(data_root)
+    code, removal_preview = _cli_json(
+        [
+            "pack",
+            "remove",
+            "rin-aster",
+            "--version",
+            "1.0.0",
+            "--dry-run",
+            "--json",
+        ],
+        capsys,
+    )
+    assert code == 0
+    assert removal_preview["dry_run"] is True
+    assert removal_preview["plan"]["will_write"] is False
+    assert removal_preview["plan"]["archive_will_be_removed"] is True
+    assert removal_preview["activates_character"] is False
+    assert _filesystem_snapshot(data_root) == before
+
+    code, removed = _cli_json(
+        [
+            "pack",
+            "remove",
+            "rin-aster",
+            "--version",
+            "1.0.0",
+            "--json",
+        ],
+        capsys,
+    )
+    assert code == 0
+    assert removed["dry_run"] is False
+    assert removed["plan"]["operation"] == "remove"
+    assert removed["activates_character"] is False
+
+    code, empty = _cli_json(["pack", "list", "--json"], capsys)
+    assert code == 0
+    assert empty["installed"] == []
+
+
+def test_scoped_pack_cli_workspace_dry_run_is_read_only(
+    rin_verified_release: dict[str, Any],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    source = tmp_path / "rin.karc"
+    source.write_bytes(build_private_archive(rin_verified_release))
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    data_root = tmp_path / "data"
+    monkeypatch.setenv("KOKOROARC_DATA_DIR", str(data_root))
+    before = _filesystem_snapshot(workspace)
+
+    code, body = _cli_json(
+        [
+            "pack",
+            "install",
+            str(source),
+            "--scope",
+            "workspace",
+            "--workspace",
+            str(workspace),
+            "--dry-run",
+            "--json",
+        ],
+        capsys,
+    )
+
+    assert code == 0
+    assert body["plan"]["scope"] == "workspace"
+    assert len(body["plan"]["workspace_id"]) == 64
+    assert body["activates_character"] is False
+    assert not data_root.exists()
+    assert _filesystem_snapshot(workspace) == before
+
+
+def test_scoped_pack_cli_empty_list_does_not_create_storage(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    data_root = tmp_path / "data"
+    monkeypatch.setenv("KOKOROARC_DATA_DIR", str(data_root))
+
+    code, body = _cli_json(["pack", "list", "--json"], capsys)
+
+    assert code == 0
+    assert body == {
+        "ok": True,
+        "scope": "global",
+        "workspace_id": None,
+        "installed": [],
+        "activates_character": False,
+    }
+    assert not data_root.exists()
+
+
+@pytest.mark.parametrize(
+    "arguments",
+    [
+        ["pack", "list", "--scope", "workspace", "--json"],
+        [
+            "pack",
+            "list",
+            "--scope",
+            "workspace",
+            "--workspace",
+            "",
+            "--json",
+        ],
+        [
+            "pack",
+            "list",
+            "--scope",
+            "global",
+            "--workspace",
+            "D:/unexpected",
+            "--json",
+        ],
+    ],
+)
+def test_scoped_pack_cli_rejects_mismatched_workspace_arguments(
+    arguments: list[str],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.setenv("KOKOROARC_DATA_DIR", str(tmp_path / "data"))
+
+    code, body = _cli_json(arguments, capsys)
+
+    assert code == 2
+    assert body["error"]["code"] == "ARGUMENT_INVALID"
+    assert not (tmp_path / "data").exists()

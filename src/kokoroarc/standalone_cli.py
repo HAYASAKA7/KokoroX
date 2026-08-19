@@ -13,9 +13,17 @@ from typing import Any, Callable
 
 from kokoroarc.distribution.archive import KarcLimits, build_karc_archive
 from kokoroarc.distribution.compatibility import inspect_karc_compatibility
+from kokoroarc.distribution.installer import (
+    install_karc_archive,
+    remove_installed_pack,
+)
 from kokoroarc.distribution.migrations import (
     apply_karc_migration,
     preview_karc_migration,
+)
+from kokoroarc.distribution.registry import (
+    list_installed_packs,
+    resolve_install_scope,
 )
 from kokoroarc.errors import KokoroError
 from kokoroarc.json_compat import find_json_incompatibility
@@ -936,10 +944,103 @@ def _handle_pack_migrate(
     }
 
 
+def _workspace_root(args: argparse.Namespace) -> Path | None:
+    scope = getattr(args, "scope", None)
+    workspace = getattr(args, "workspace", None)
+    if scope == "workspace":
+        if not isinstance(workspace, str) or not workspace:
+            raise KokoroError(
+                "ARGUMENT_INVALID",
+                "Command arguments are invalid.",
+            )
+        return Path(workspace)
+    if scope != "global" or workspace is not None:
+        raise KokoroError(
+            "ARGUMENT_INVALID",
+            "Command arguments are invalid.",
+        )
+    return None
+
+
+def _require_data_root(data_root: Path | None) -> Path:
+    if data_root is None:
+        raise KokoroError(
+            "DATA_DIR_REQUIRED",
+            "Set KOKOROARC_DATA_DIR before running a stateful command.",
+        )
+    return data_root
+
+
+def _handle_pack_install(
+    args: argparse.Namespace,
+    data_root: Path | None,
+    schemas: SchemaRegistry,
+) -> dict[str, Any]:
+    plan = install_karc_archive(
+        _argument_path(args.archive),
+        _require_data_root(data_root),
+        schemas,
+        workspace_root=_workspace_root(args),
+        dry_run=args.dry_run,
+    )
+    return {
+        "ok": True,
+        "dry_run": bool(args.dry_run),
+        "plan": plan,
+        "activates_character": False,
+    }
+
+
+def _handle_pack_list(
+    args: argparse.Namespace,
+    data_root: Path | None,
+    schemas: SchemaRegistry,
+) -> dict[str, Any]:
+    workspace = _workspace_root(args)
+    scope = resolve_install_scope(workspace)
+    installed = list_installed_packs(
+        _require_data_root(data_root),
+        schemas,
+        workspace_root=workspace,
+    )
+    return {
+        "ok": True,
+        "scope": scope.kind,
+        "workspace_id": scope.workspace_id,
+        "installed": installed,
+        "activates_character": False,
+    }
+
+
+def _handle_pack_remove(
+    args: argparse.Namespace,
+    data_root: Path | None,
+    schemas: SchemaRegistry,
+) -> dict[str, Any]:
+    plan = remove_installed_pack(
+        _require_data_root(data_root),
+        args.namespace,
+        args.character_id,
+        args.version,
+        schemas,
+        workspace_root=_workspace_root(args),
+        dry_run=args.dry_run,
+    )
+    return {
+        "ok": True,
+        "dry_run": bool(args.dry_run),
+        "plan": plan,
+        "activates_character": False,
+    }
+
+
 _HANDLERS: dict[StandaloneRoute, StandaloneHandler] = {
     ("pack", "compatibility"): _handle_pack_compatibility,
     ("pack", "export"): _handle_pack_export,
+    ("pack", "install"): _handle_pack_install,
+    ("pack", "list"): _handle_pack_list,
     ("pack", "migrate"): _handle_pack_migrate,
+    ("pack", "remove"): _handle_pack_remove,
 }
 
 
