@@ -743,9 +743,12 @@ def prepare_approved_campaign(
     )
     if distribution.get("wheel") != approved.wheel:
         raise RuntimeError("built wheel does not match the approved wheel")
-    fixture_assets = preparation.build_fixture_assets(
+    fixture_assets = preparation.build_fixture_assets_isolated(
         paths.repository_root,
         harness / "fixture-assets",
+        installed_root=harness / "distribution" / "installed",
+        python_executable=python_executable,
+        base_environment=base_environment,
     )
     output_schema = _read_bytes(paths.output_schema_file, max_bytes=1024 * 1024)
     readme = paths.repository_root / "README.md"
@@ -1710,12 +1713,28 @@ def _seal_campaign(
     approved: ApprovedCampaign,
     *,
     batch_failed: bool,
+    failure: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     raw_root = approved.raw_root
-    for name in ("campaign-ledger.json", "campaign-completion.json", "COMPLETED"):
+    for name in (
+        "campaign-failure.json",
+        "campaign-ledger.json",
+        "campaign-completion.json",
+        "COMPLETED",
+    ):
         target = raw_root / name
         if target.exists() or target.is_symlink():
             raise RuntimeError("campaign sealing output already exists")
+    normalized_failure = None if failure is None else dict(failure)
+    failure_artifact = None
+    failure_snapshot = None
+    if normalized_failure is not None:
+        failure_snapshot = preparation.inventory_tree(raw_root)
+        _write_json(raw_root / "campaign-failure.json", normalized_failure)
+        failure_artifact = _optional_artifact_record(
+            raw_root / "campaign-failure.json",
+            max_bytes=preparation.MAX_FILE_BYTES,
+        )
     deviations: list[dict[str, Any]] = []
     runs: list[dict[str, Any]] = []
     thread_ordinals: dict[str, list[int]] = {}
@@ -1808,6 +1827,15 @@ def _seal_campaign(
                 "code": "RUN_PLAN_FAILED",
             }
         )
+    if normalized_failure is not None:
+        deviations.append(
+            {
+                "ordinal": 0,
+                "variant": None,
+                "case_id": None,
+                "code": str(normalized_failure["code"]),
+            }
+        )
     deviations.sort(
         key=lambda value: (
             int(value["ordinal"]),
@@ -1830,6 +1858,10 @@ def _seal_campaign(
         "deviations": deviations,
         "sealed": True,
     }
+    if normalized_failure is not None:
+        ledger["failure"] = normalized_failure
+        ledger["failure_artifact"] = failure_artifact
+        ledger["failure_snapshot"] = failure_snapshot
     _write_json(raw_root / "campaign-ledger.json", ledger)
     ledger_hash = _sha256_file(
         raw_root / "campaign-ledger.json",
@@ -1851,6 +1883,19 @@ def _seal_campaign(
     with (raw_root / "COMPLETED").open("xb") as handle:
         handle.write(ledger_hash.encode("ascii") + b"\n")
     return ledger
+
+
+def _preparation_failure(exception: BaseException) -> dict[str, Any]:
+    error_type = type(exception).__name__
+    if re.fullmatch(r"[A-Za-z][A-Za-z0-9_]{0,127}", error_type) is None:
+        error_type = "Exception"
+    return {
+        "schema_version": "1.0",
+        "phase": "preparation",
+        "code": "CAMPAIGN_PREPARATION_FAILED",
+        "error_type": error_type,
+        "retry_allowed": False,
+    }
 
 
 def execute_campaign(
@@ -1913,12 +1958,24 @@ def execute_campaign(
         raise RuntimeError("codex client version does not match approval")
     prepare = prepare_approved_campaign if prepare_factory is None else prepare_factory
     execute_one = run_one if run_factory is None else run_factory
-    prepared = prepare(
-        approved,
-        selected,
-        python_executable=str(python),
-        base_environment=environment,
-    )
+    try:
+        prepared = prepare(
+            approved,
+            selected,
+            python_executable=str(python),
+            base_environment=environment,
+        )
+    except BaseException as exc:
+        if not approved.raw_root.is_dir():
+            raise
+        _seal_campaign(
+            approved,
+            batch_failed=False,
+            failure=_preparation_failure(exc),
+        )
+        raise RuntimeError(
+            "campaign preparation sealed with deviations"
+        ) from exc
     if prepared != approved.raw_root:
         raise RuntimeError("prepared campaign root does not match approval")
 

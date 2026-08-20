@@ -622,6 +622,33 @@ def test_real_fixed_epoch_wheel_matches_task17_release(
     assert result["installed"]["file_count"] == 113
 
 
+def test_fixture_asset_builder_uses_the_explicit_installed_runtime(
+    tmp_path: Path,
+) -> None:
+    installed = _fake_installed(tmp_path / "distribution")
+    marker = tmp_path / "frozen-runtime-used.txt"
+    _write(installed / "yaml.py", "# fixture-worker import sentinel\n")
+    _write(
+        installed / "kokoroarc" / "schemas.py",
+        (
+            "from pathlib import Path\n"
+            f"Path({str(marker)!r}).write_bytes(b'used')\n"
+            "raise RuntimeError('frozen runtime sentinel')\n"
+        ),
+    )
+
+    with pytest.raises(RuntimeError, match="fixture asset build failed"):
+        preparation.build_fixture_assets_isolated(
+            REPOSITORY_ROOT,
+            tmp_path / "fixture-assets",
+            installed_root=installed,
+            python_executable=sys.executable,
+            base_environment=os.environ,
+        )
+
+    assert marker.read_bytes() == b"used"
+
+
 def test_fixture_assets_are_exact_valid_and_versioned(tmp_path: Path) -> None:
     assets = preparation.build_fixture_assets(
         REPOSITORY_ROOT,

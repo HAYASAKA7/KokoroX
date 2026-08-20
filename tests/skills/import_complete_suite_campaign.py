@@ -762,6 +762,126 @@ def _write_json(path: Path, value: object) -> None:
     path.write_bytes(runner.canonical_bytes(value) + b"\n")
 
 
+def _preparation_failure(ledger: Mapping[str, Any]) -> dict[str, Any] | None:
+    failure = ledger.get("failure")
+    if failure is None:
+        return None
+    if (
+        not isinstance(failure, dict)
+        or set(failure)
+        != {
+            "schema_version",
+            "phase",
+            "code",
+            "error_type",
+            "retry_allowed",
+        }
+        or failure.get("schema_version") != "1.0"
+        or failure.get("phase") != "preparation"
+        or failure.get("code") != "CAMPAIGN_PREPARATION_FAILED"
+        or not isinstance(failure.get("error_type"), str)
+        or re.fullmatch(
+            r"[A-Za-z][A-Za-z0-9_]{0,127}",
+            failure["error_type"],
+        )
+        is None
+        or failure.get("retry_allowed") is not False
+    ):
+        raise RuntimeError("sealed campaign preparation failure is invalid")
+    return dict(failure)
+
+
+def _campaign_artifact_names(
+    ledger: Mapping[str, Any],
+) -> tuple[str, ...]:
+    if _preparation_failure(ledger) is not None:
+        return (
+            "approval.json",
+            "campaign-failure.json",
+            "campaign-ledger.json",
+            "campaign-completion.json",
+            "COMPLETED",
+        )
+    return (
+        "approval.json",
+        "prepared-campaign.json",
+        "campaign-ledger.json",
+        "campaign-completion.json",
+        "COMPLETED",
+    )
+
+
+def _validate_preparation_snapshot(
+    raw_root: Path,
+    ledger: Mapping[str, Any],
+) -> None:
+    snapshot = ledger.get("failure_snapshot")
+    if not isinstance(snapshot, dict) or set(snapshot) != {
+        "file_count",
+        "total_bytes",
+        "tree_sha256",
+        "files",
+    }:
+        raise RuntimeError("sealed preparation snapshot is invalid")
+    files = snapshot.get("files")
+    if (
+        not isinstance(files, list)
+        or not all(
+            isinstance(entry, dict)
+            and set(entry) == {"path", "size", "sha256"}
+            and isinstance(entry.get("path"), str)
+            and isinstance(entry.get("size"), int)
+            and not isinstance(entry.get("size"), bool)
+            and entry["size"] >= 0
+            and isinstance(entry.get("sha256"), str)
+            and _SHA256.fullmatch(entry["sha256"]) is not None
+            for entry in files
+        )
+    ):
+        raise RuntimeError("sealed preparation snapshot is invalid")
+    paths = [entry["path"] for entry in files]
+    sealing_paths = {
+        "campaign-failure.json",
+        "campaign-ledger.json",
+        "campaign-completion.json",
+        "COMPLETED",
+    }
+    if (
+        paths != sorted(paths)
+        or len(set(paths)) != len(paths)
+        or "approval.json" not in paths
+        or set(paths) & sealing_paths
+    ):
+        raise RuntimeError("sealed preparation snapshot is invalid")
+    expected_snapshot = {
+        "file_count": len(files),
+        "total_bytes": sum(entry["size"] for entry in files),
+        "tree_sha256": sha256(preparation.canonical_bytes(files)).hexdigest(),
+        "files": files,
+    }
+    if snapshot != expected_snapshot:
+        raise RuntimeError("sealed preparation snapshot is invalid")
+    observed = preparation.inventory_tree(raw_root)
+    observed_files = observed.get("files")
+    if not isinstance(observed_files, list):
+        raise RuntimeError("sealed preparation snapshot changed")
+    observed_by_path = {
+        entry["path"]: entry
+        for entry in observed_files
+        if isinstance(entry, dict) and isinstance(entry.get("path"), str)
+    }
+    snapshot_by_path = {entry["path"]: entry for entry in files}
+    if (
+        len(observed_by_path) != len(observed_files)
+        or set(observed_by_path) != set(snapshot_by_path) | sealing_paths
+        or any(
+            observed_by_path.get(path) != entry
+            for path, entry in snapshot_by_path.items()
+        )
+    ):
+        raise RuntimeError("sealed preparation snapshot changed")
+
+
 def _validate_sealed_campaign(
     raw_root: Path,
     paths: runner.HarnessPaths,
@@ -815,6 +935,7 @@ def _validate_sealed_campaign(
     completion = _load_json_object(completion_path)
     ledger_hash = sha256(_read_text_artifact(ledger_path)).hexdigest()
     completed_marker = _read_text_artifact(raw_root / "COMPLETED")
+    preparation_failure = _preparation_failure(ledger)
     if (
         approval.get("campaign_sha256") != approved_campaign_sha256
         or approval.get("approval_envelope_sha256") != envelope_hash
@@ -828,6 +949,29 @@ def _validate_sealed_campaign(
         or completed_marker != ledger_hash.encode("ascii") + b"\n"
     ):
         raise RuntimeError("sealed campaign binding is invalid")
+    if preparation_failure is not None:
+        _validate_preparation_snapshot(raw_root, ledger)
+        if (
+            ledger.get("runs_started") != 0
+            or ledger.get("runs_completed") != 0
+            or completion.get("runs_started") != 0
+            or completion.get("runs_completed") != 0
+            or not _matches_artifact_record(
+                raw_root / "campaign-failure.json",
+                ledger.get("failure_artifact"),
+            )
+            or (raw_root / "prepared-campaign.json").exists()
+            or (raw_root / "prepared-campaign.json").is_symlink()
+            or (raw_root / "runs").exists()
+            or (raw_root / "runs").is_symlink()
+        ):
+            raise RuntimeError("sealed preparation failure binding is invalid")
+    elif (
+        ledger.get("failure_artifact") is not None
+        or (raw_root / "campaign-failure.json").exists()
+        or (raw_root / "campaign-failure.json").is_symlink()
+    ):
+        raise RuntimeError("sealed campaign failure binding is invalid")
     runs = ledger.get("runs")
     if not isinstance(runs, list) or len(runs) != len(plan):
         raise RuntimeError("sealed campaign run ledger is invalid")
@@ -903,6 +1047,7 @@ def import_campaign(
     raw_root: Path,
     *,
     paths: runner.HarnessPaths | None = None,
+    retained_repository_root: Path | None = None,
     approved_campaign_sha256: str,
     required_frozen_paths: Sequence[str] | None = None,
     observed_git: Mapping[str, str] | None = None,
@@ -935,7 +1080,19 @@ def import_campaign(
         required_frozen_paths=required,
         observed_git=observed,
     )
-    retained_root = _retained_root(campaign, selected.repository_root)
+    retained_repository = (
+        selected.repository_root
+        if retained_repository_root is None
+        else retained_repository_root
+    )
+    try:
+        preparation._require_plain_directory(
+            retained_repository,
+            label="retained repository root",
+        )
+    except (OSError, ValueError) as exc:
+        raise RuntimeError("retained repository root is unsafe") from exc
+    retained_root = _retained_root(campaign, retained_repository)
     if retained_root.exists() or retained_root.is_symlink():
         raise RuntimeError("retained campaign root already exists")
     retained_parent = retained_root.parent
@@ -956,6 +1113,7 @@ def import_campaign(
     retain = retain_run_evidence if retain_factory is None else retain_factory
     replay = replay_run_evidence if replay_factory is None else replay_factory
     try:
+        campaign_names = _campaign_artifact_names(raw_ledger)
         campaign_entries = [
             retain_text_artifact(
                 raw_root / name,
@@ -964,35 +1122,35 @@ def import_campaign(
                 retained_path=f"campaign/{name}",
                 allow_redaction=False,
             )
-            for name in (
-                "approval.json",
-                "prepared-campaign.json",
-                "campaign-ledger.json",
-                "campaign-completion.json",
-                "COMPLETED",
-            )
+            for name in campaign_names
         ]
         run_entries: list[dict[str, Any]] = []
-        for item in plan:
-            case_root = raw_root / "runs" / item.variant / item.case_id
-            retained_run = scratch / "runs" / item.variant / item.case_id
-            retained_run.mkdir(parents=True)
-            ledger = retain(case_root, retained_run, item)
-            replay(case_root, retained_run, ledger)
-            ledger_path = scratch / "ledgers" / item.variant / f"{item.case_id}.json"
-            _write_json(ledger_path, ledger)
-            run_entries.append(
-                {
-                    "ordinal": item.ordinal,
-                    "variant": item.variant,
-                    "case_id": item.case_id,
-                    "ledger_path": (
-                        f"ledgers/{item.variant}/{item.case_id}.json"
-                    ),
-                    "ledger_sha256": sha256(ledger_path.read_bytes()).hexdigest(),
-                    "evaluable": ledger.get("evaluable") is True,
-                }
-            )
+        preparation_failure = _preparation_failure(raw_ledger)
+        if preparation_failure is None:
+            for item in plan:
+                case_root = raw_root / "runs" / item.variant / item.case_id
+                retained_run = scratch / "runs" / item.variant / item.case_id
+                retained_run.mkdir(parents=True)
+                ledger = retain(case_root, retained_run, item)
+                replay(case_root, retained_run, ledger)
+                ledger_path = (
+                    scratch / "ledgers" / item.variant / f"{item.case_id}.json"
+                )
+                _write_json(ledger_path, ledger)
+                run_entries.append(
+                    {
+                        "ordinal": item.ordinal,
+                        "variant": item.variant,
+                        "case_id": item.case_id,
+                        "ledger_path": (
+                            f"ledgers/{item.variant}/{item.case_id}.json"
+                        ),
+                        "ledger_sha256": sha256(
+                            ledger_path.read_bytes()
+                        ).hexdigest(),
+                        "evaluable": ledger.get("evaluable") is True,
+                    }
+                )
         import_ledger = {
             "schema_version": "1.0",
             "campaign_sha256": approved_campaign_sha256,
@@ -1005,6 +1163,9 @@ def import_campaign(
             "run_count": len(run_entries),
             "runs": run_entries,
         }
+        if preparation_failure is not None:
+            import_ledger["failure"] = preparation_failure
+            import_ledger["runs_authorized"] = len(plan)
         _write_json(scratch / "import-ledger.json", import_ledger)
         if retained_root.exists() or retained_root.is_symlink():
             raise RuntimeError("retained campaign root already exists")
@@ -1018,6 +1179,8 @@ def import_campaign(
 def _require_import_layout(
     retained_root: Path,
     plan: Sequence[runner.RunSpec],
+    *,
+    preparation_failed: bool = False,
 ) -> None:
     try:
         preparation._require_plain_directory(
@@ -1027,6 +1190,28 @@ def _require_import_layout(
         root_entries = {entry.name for entry in retained_root.iterdir()}
     except (OSError, ValueError) as exc:
         raise RuntimeError("retained campaign root is unavailable or unsafe") from exc
+    if preparation_failed:
+        if root_entries != {"campaign", "import-ledger.json"}:
+            raise RuntimeError("retained campaign layout is invalid")
+        try:
+            preparation._require_plain_directory(
+                retained_root / "campaign",
+                label="retained campaign root",
+            )
+            campaign_files = {
+                entry.name for entry in (retained_root / "campaign").iterdir()
+            }
+        except (OSError, ValueError) as exc:
+            raise RuntimeError("retained campaign layout is invalid") from exc
+        if campaign_files != {
+            "approval.json",
+            "campaign-failure.json",
+            "campaign-ledger.json",
+            "campaign-completion.json",
+            "COMPLETED",
+        }:
+            raise RuntimeError("retained campaign layout is invalid")
+        return
     if root_entries - {"campaign", "import-ledger.json", "ledgers", "results", "runs"}:
         raise RuntimeError("retained campaign layout is invalid")
     for name in ("campaign", "ledgers", "runs"):
@@ -1140,6 +1325,7 @@ def replay_campaign_import(
     retained_root: Path,
     *,
     paths: runner.HarnessPaths | None = None,
+    retained_repository_root: Path | None = None,
     approved_campaign_sha256: str,
     required_frozen_paths: Sequence[str] | None = None,
     observed_git: Mapping[str, str] | None = None,
@@ -1177,11 +1363,28 @@ def replay_campaign_import(
         required_frozen_paths=required,
         observed_git=observed,
     )
-    if retained_root != _retained_root(campaign, selected.repository_root):
+    retained_repository = (
+        selected.repository_root
+        if retained_repository_root is None
+        else retained_repository_root
+    )
+    try:
+        preparation._require_plain_directory(
+            retained_repository,
+            label="retained repository root",
+        )
+    except (OSError, ValueError) as exc:
+        raise RuntimeError("retained repository root is unsafe") from exc
+    if retained_root != _retained_root(campaign, retained_repository):
         raise RuntimeError("retained campaign root does not match approval")
     if require_confined_status:
-        _require_confined_worktree(selected.repository_root, retained_root)
-    _require_import_layout(retained_root, plan)
+        _require_confined_worktree(retained_repository, retained_root)
+    preparation_failure = _preparation_failure(raw_ledger)
+    _require_import_layout(
+        retained_root,
+        plan,
+        preparation_failed=preparation_failure is not None,
+    )
     import_path = retained_root / "import-ledger.json"
     import_bytes = _read_text_artifact(import_path)
     import_ledger = _load_json_object(import_path)
@@ -1195,6 +1398,8 @@ def replay_campaign_import(
         "run_count",
         "runs",
     }
+    if preparation_failure is not None:
+        expected_fields |= {"failure", "runs_authorized"}
     campaign_files = import_ledger.get("campaign_files")
     runs = import_ledger.get("runs")
     raw_ledger_hash = sha256(
@@ -1208,21 +1413,23 @@ def replay_campaign_import(
         != runner.approval_envelope_sha256(campaign)
         or import_ledger.get("raw_campaign_ledger_sha256") != raw_ledger_hash
         or import_ledger.get("raw_deviations") != raw_ledger.get("deviations")
-        or import_ledger.get("run_count") != len(plan)
+        or import_ledger.get("run_count")
+        != (0 if preparation_failure is not None else len(plan))
         or not isinstance(campaign_files, list)
         or not isinstance(runs, list)
-        or len(runs) != len(plan)
+        or len(runs) != (0 if preparation_failure is not None else len(plan))
+        or (
+            preparation_failure is not None
+            and (
+                import_ledger.get("failure") != preparation_failure
+                or import_ledger.get("runs_authorized") != len(plan)
+            )
+        )
     ):
         raise RuntimeError("campaign import ledger is invalid")
     expected_campaign_paths = {
         f"campaign/{name}"
-        for name in (
-            "approval.json",
-            "prepared-campaign.json",
-            "campaign-ledger.json",
-            "campaign-completion.json",
-            "COMPLETED",
-        )
+        for name in _campaign_artifact_names(raw_ledger)
     }
     expected_campaign_raw = {
         path.removeprefix("campaign/") for path in expected_campaign_paths
@@ -1234,6 +1441,10 @@ def replay_campaign_import(
     ):
         raise RuntimeError("campaign import ledger is invalid")
     replay_artifact_ledger(raw_root, retained_root, campaign_files)
+    if preparation_failure is not None:
+        if _read_text_artifact(import_path) != import_bytes:
+            raise RuntimeError("campaign import ledger changed")
+        return campaign, cases, plan, (), import_ledger
     replay = replay_run_evidence if replay_factory is None else replay_factory
     ledgers: list[dict[str, Any]] = []
     seen_paths: set[str] = set()

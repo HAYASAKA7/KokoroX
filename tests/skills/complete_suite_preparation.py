@@ -1085,6 +1085,53 @@ def build_fixture_assets(repository_root: Path, assets_root: Path) -> Path:
     return assets_root
 
 
+def build_fixture_assets_isolated(
+    repository_root: Path,
+    assets_root: Path,
+    *,
+    installed_root: Path,
+    python_executable: str | None = None,
+    base_environment: Mapping[str, str] | None = None,
+) -> Path:
+    _require_plain_directory(repository_root, label="repository root")
+    _validate_installed_distribution(installed_root)
+    if assets_root.exists() or assets_root.is_symlink():
+        raise ValueError("fixture assets root already exists")
+    _require_plain_directory(assets_root.parent, label="fixture assets parent")
+    installed_before = inventory_tree(installed_root)
+    worker_root = assets_root.parent / "fixture-worker"
+    environment = build_environment(worker_root, base_environment)
+    environment.update(
+        {
+            "PYTHONNOUSERSITE": "1",
+            "PYTHONPATH": str(installed_root.resolve(strict=True)),
+            "PYTHONSAFEPATH": "1",
+        }
+    )
+    executable = python_executable or sys.executable
+    worker = Path(__file__).resolve(strict=True)
+    _run_checked(
+        [
+            executable,
+            "-P",
+            "-s",
+            str(worker),
+            "_build-fixture-assets",
+            str(repository_root.resolve(strict=True)),
+            str(assets_root.absolute()),
+        ],
+        cwd=worker_root,
+        environment=environment,
+        operation="fixture asset build",
+    )
+    if inventory_tree(installed_root) != installed_before:
+        raise RuntimeError("fixture asset build changed the installed runtime")
+    _require_plain_directory(assets_root, label="fixture assets root")
+    _load_json(assets_root / "fixture-assets.json")
+    inventory_tree(assets_root)
+    return assets_root
+
+
 def _release_asset(fixtures: Path, version: str, name: str) -> Path:
     return fixtures / "releases" / version / name
 
@@ -1460,3 +1507,13 @@ def materialize_case_fixtures(
         },
     )
     _update_case_manifest(case_root, case)
+
+
+def _main() -> None:
+    if len(sys.argv) != 4 or sys.argv[1] != "_build-fixture-assets":
+        raise SystemExit("unsupported complete-suite preparation command")
+    build_fixture_assets(Path(sys.argv[2]), Path(sys.argv[3]))
+
+
+if __name__ == "__main__":
+    _main()

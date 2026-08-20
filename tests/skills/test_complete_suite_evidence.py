@@ -856,6 +856,96 @@ def test_approved_campaign_seals_worker_failure_without_retry(
     assert (raw_root / "COMPLETED").is_file()
 
 
+def test_approved_campaign_seals_preparation_failure_without_starting_runs(
+    tmp_path: Path,
+) -> None:
+    raw_root = tmp_path / "raw-campaign"
+    paths = _paths(tmp_path / "repository", raw_root)
+    campaign_hash, required = _approve_synthetic(paths, raw_root)
+    run_calls = 0
+
+    def prepare_failure(
+        approved: runner.ApprovedCampaign,
+        _paths: runner.HarnessPaths,
+        **_kwargs: object,
+    ) -> Path:
+        approved.raw_root.mkdir()
+        _write_json(
+            approved.raw_root / "approval.json",
+            {
+                "schema_version": "1.0",
+                "campaign_sha256": approved.campaign_sha256,
+                "approval_envelope_sha256": approved.envelope_sha256,
+            },
+        )
+        raise ModuleNotFoundError("sensitive host path must not be retained")
+
+    def forbidden_run(*_args: object, **_kwargs: object) -> dict[str, object]:
+        nonlocal run_calls
+        run_calls += 1
+        return {}
+
+    with pytest.raises(RuntimeError, match="preparation sealed with deviations"):
+        runner.execute_campaign(
+            paths,
+            approved_campaign_sha256=campaign_hash,
+            required_frozen_paths=required,
+            observed_git={
+                "commit": "1" * 40,
+                "tree": "2" * 40,
+                "parent": "3" * 40,
+            },
+            codex_executable=Path(sys.executable),
+            python_executable=Path(sys.executable),
+            host_environment={"PATH": "synthetic"},
+            prepare_factory=prepare_failure,
+            run_factory=forbidden_run,
+            version_factory=lambda _path, _environment: "codex-cli 0.148.0",
+        )
+
+    failure = json.loads(
+        (raw_root / "campaign-failure.json").read_text(encoding="utf-8")
+    )
+    assert failure == {
+        "schema_version": "1.0",
+        "phase": "preparation",
+        "code": "CAMPAIGN_PREPARATION_FAILED",
+        "error_type": "ModuleNotFoundError",
+        "retry_allowed": False,
+    }
+    ledger = json.loads(
+        (raw_root / "campaign-ledger.json").read_text(encoding="utf-8")
+    )
+    assert ledger["runs_authorized"] == 24
+    assert ledger["runs_started"] == 0
+    assert ledger["runs_completed"] == 0
+    assert ledger["failure"] == failure
+    assert ledger["failure_artifact"] == {
+        "size": (raw_root / "campaign-failure.json").stat().st_size,
+        "sha256": sha256(
+            (raw_root / "campaign-failure.json").read_bytes()
+        ).hexdigest(),
+    }
+    assert ledger["failure_snapshot"]["files"] == [
+        {
+            "path": "approval.json",
+            "size": (raw_root / "approval.json").stat().st_size,
+            "sha256": sha256((raw_root / "approval.json").read_bytes()).hexdigest(),
+        }
+    ]
+    assert any(
+        deviation["ordinal"] == 0
+        and deviation["code"] == "CAMPAIGN_PREPARATION_FAILED"
+        for deviation in ledger["deviations"]
+    )
+    assert run_calls == 0
+    assert not (raw_root / "runs").exists()
+    assert (raw_root / "COMPLETED").is_file()
+    assert b"sensitive host path" not in (
+        raw_root / "campaign-failure.json"
+    ).read_bytes()
+
+
 def test_approved_campaign_seal_rejects_inconsistent_lifecycle_status(
     tmp_path: Path,
 ) -> None:
@@ -955,6 +1045,159 @@ def test_codex_version_accepts_successful_stdout_with_host_warning(
     assert runner._codex_version(Path(sys.executable), {}) == "codex-cli 0.148.0"
     assert observed["encoding"] == "utf-8"
     assert observed["errors"] == "replace"
+
+
+def test_preparation_failure_import_is_zero_run_and_exactly_replayable(
+    tmp_path: Path,
+) -> None:
+    from import_complete_suite_campaign import (
+        import_campaign,
+        replay_campaign_import,
+    )
+
+    raw_root = tmp_path / "raw-campaign"
+    paths = _paths(tmp_path / "repository", raw_root)
+    retained_repository = tmp_path / "retained-repository"
+    retained_repository.mkdir()
+    campaign_hash, required = _approve_synthetic(paths, raw_root)
+    observed_git = {
+        "commit": "1" * 40,
+        "tree": "2" * 40,
+        "parent": "3" * 40,
+    }
+
+    def prepare_failure(
+        approved: runner.ApprovedCampaign,
+        _paths: runner.HarnessPaths,
+        **_kwargs: object,
+    ) -> Path:
+        approved.raw_root.mkdir()
+        _write_json(
+            approved.raw_root / "approval.json",
+            {
+                "schema_version": "1.0",
+                "campaign_sha256": approved.campaign_sha256,
+                "approval_envelope_sha256": approved.envelope_sha256,
+            },
+        )
+        partial = approved.raw_root / "harness" / "partial.txt"
+        partial.parent.mkdir()
+        partial.write_bytes(b"partial frozen preparation\n")
+        raise RuntimeError("fixture preparation failed")
+
+    with pytest.raises(RuntimeError, match="preparation sealed with deviations"):
+        runner.execute_campaign(
+            paths,
+            approved_campaign_sha256=campaign_hash,
+            required_frozen_paths=required,
+            observed_git=observed_git,
+            codex_executable=Path(sys.executable),
+            python_executable=Path(sys.executable),
+            host_environment={"PATH": "synthetic"},
+            prepare_factory=prepare_failure,
+            run_factory=lambda *_args, **_kwargs: pytest.fail(
+                "preparation failure must not launch a run"
+            ),
+            version_factory=lambda _path, _environment: "codex-cli 0.148.0",
+        )
+
+    retained_root = import_campaign(
+        raw_root,
+        paths=paths,
+        approved_campaign_sha256=campaign_hash,
+        required_frozen_paths=required,
+        observed_git=observed_git,
+        retained_repository_root=retained_repository,
+    )
+    assert retained_root == (
+        retained_repository
+        / "tests"
+        / "skills"
+        / "evidence"
+        / "complete-suite"
+        / "approved2"
+    )
+    assert {path.name for path in retained_root.iterdir()} == {
+        "campaign",
+        "import-ledger.json",
+    }
+    assert {path.name for path in (retained_root / "campaign").iterdir()} == {
+        "approval.json",
+        "campaign-failure.json",
+        "campaign-ledger.json",
+        "campaign-completion.json",
+        "COMPLETED",
+    }
+    import_ledger = json.loads(
+        (retained_root / "import-ledger.json").read_text(encoding="utf-8")
+    )
+    assert import_ledger["failure"] == json.loads(
+        (raw_root / "campaign-failure.json").read_text(encoding="utf-8")
+    )
+    assert import_ledger["runs_authorized"] == 24
+    assert import_ledger["run_count"] == 0
+    assert import_ledger["runs"] == []
+
+    _campaign, _cases, plan, ledgers, replayed = replay_campaign_import(
+        raw_root,
+        retained_root,
+        paths=paths,
+        approved_campaign_sha256=campaign_hash,
+        required_frozen_paths=required,
+        observed_git=observed_git,
+        retained_repository_root=retained_repository,
+    )
+    assert len(plan) == 24
+    assert ledgers == ()
+    assert replayed == import_ledger
+
+    ledger_path = raw_root / "campaign-ledger.json"
+    completion_path = raw_root / "campaign-completion.json"
+    marker_path = raw_root / "COMPLETED"
+    original_ledger = ledger_path.read_bytes()
+    original_completion = completion_path.read_bytes()
+    original_marker = marker_path.read_bytes()
+    forged_ledger = json.loads(original_ledger)
+    snapshot_files = forged_ledger["failure_snapshot"]["files"]
+    snapshot_files.append(dict(snapshot_files[0]))
+    forged_ledger["failure_snapshot"].update(
+        {
+            "file_count": len(snapshot_files),
+            "total_bytes": sum(entry["size"] for entry in snapshot_files),
+            "tree_sha256": sha256(_canonical_bytes(snapshot_files)).hexdigest(),
+        }
+    )
+    _write_json(ledger_path, forged_ledger)
+    forged_ledger_hash = sha256(ledger_path.read_bytes()).hexdigest()
+    forged_completion = json.loads(original_completion)
+    forged_completion["campaign_ledger_sha256"] = forged_ledger_hash
+    _write_json(completion_path, forged_completion)
+    marker_path.write_bytes(forged_ledger_hash.encode("ascii") + b"\n")
+    with pytest.raises(RuntimeError, match="preparation snapshot is invalid"):
+        replay_campaign_import(
+            raw_root,
+            retained_root,
+            paths=paths,
+            approved_campaign_sha256=campaign_hash,
+            required_frozen_paths=required,
+            observed_git=observed_git,
+            retained_repository_root=retained_repository,
+        )
+    ledger_path.write_bytes(original_ledger)
+    completion_path.write_bytes(original_completion)
+    marker_path.write_bytes(original_marker)
+
+    (raw_root / "harness" / "partial.txt").write_bytes(b"changed\n")
+    with pytest.raises(RuntimeError, match="preparation snapshot changed"):
+        replay_campaign_import(
+            raw_root,
+            retained_root,
+            paths=paths,
+            approved_campaign_sha256=campaign_hash,
+            required_frozen_paths=required,
+            observed_git=observed_git,
+            retained_repository_root=retained_repository,
+        )
 
 
 def test_sealed_campaign_imports_once_and_replays_every_run(
@@ -1631,6 +1874,7 @@ def test_real_approved_preparation_uses_frozen_runtime_for_24_fresh_cases(
         (wheelhouse_root / name).write_bytes(f"{name}\n".encode("utf-8"))
     wheelhouse = runner.preparation.capture_runtime_wheelhouse(wheelhouse_root)
     install_calls = 0
+    fixture_calls = 0
 
     def frozen_install(
         repository_root: Path,
@@ -1658,6 +1902,28 @@ def test_real_approved_preparation_uses_frozen_runtime_for_24_fresh_cases(
         "install_frozen_distribution",
         frozen_install,
     )
+
+    def fixture_build(
+        repository_root: Path,
+        assets_root: Path,
+        *,
+        installed_root: Path,
+        python_executable: str,
+        base_environment: dict[str, str] | None,
+    ) -> Path:
+        nonlocal fixture_calls
+        fixture_calls += 1
+        assert repository_root == REPOSITORY_ROOT
+        assert installed_root == raw_root / "harness" / "distribution" / "installed"
+        assert python_executable == sys.executable
+        assert base_environment is None
+        return runner.preparation.build_fixture_assets(repository_root, assets_root)
+
+    monkeypatch.setattr(
+        runner.preparation,
+        "build_fixture_assets_isolated",
+        fixture_build,
+    )
     approved = runner.ApprovedCampaign(
         campaign=campaign,
         cases=cases,
@@ -1683,6 +1949,7 @@ def test_real_approved_preparation_uses_frozen_runtime_for_24_fresh_cases(
     assert manifest["distribution"]["wheel"] == approved.wheel
     assert manifest["distribution"]["wheelhouse"] == wheelhouse
     assert install_calls == 1
+    assert fixture_calls == 1
     assert len(manifest["runs"]) == 24
     assert (raw_root / "PREPARED").read_bytes() == b"prepared\n"
     baseline = raw_root / "runs" / "baseline" / "publication-pressure"
