@@ -437,6 +437,58 @@ suite-enabled results are both 0/12 and `suite_closure_passed=false`. Approved2
 is immutable under `tests/skills/evidence/complete-suite/approved2`. A schema
 correction requires proposed3, unique roots, and fresh exact approval.
 
+## Corrective campaign 3: repair the approved2 provider-schema incompatibility
+
+- [x] **Step 1: Preserve approved2 before changing the response schema**
+
+Commit `c474ff2b32dd414c2a50f3898be13fd2b0d98c5e` seals the exact
+approved2 raw/retained evidence, replay, adjudication, and failure record.
+Approved2 remains failed and may never be retried, rewritten, or used to
+authorize a later campaign.
+
+- [x] **Step 2: Reproduce and repair the provider-schema boundary with TDD**
+
+The provider rejected all 24 sessions with the same 400
+`invalid_json_schema` response before any evaluator behavior occurred. The
+official
+[Structured Outputs guide](https://developers.openai.com/api/docs/guides/structured-outputs)
+documents `not` as unsupported and does not list `uniqueItems` among
+supported array properties. Add a structural regression for the
+provider-facing subset, remove `not` and `uniqueItems`, replace the one-value
+`const` with a typed one-value enum, and retain the relative-path rule in a
+single supported string pattern. Duplicate assertion IDs remain rejected by
+the local evidence-bound adjudicator rather than being trusted from evaluator
+output.
+
+- [x] **Step 3: Create a closed, nonexecuted proposed3 record**
+
+Use campaign ID `2026-08-20-proposed3`, raw root
+`D:\tmp\kokoroarc-m9-task18-campaign-20260820-approved3`, and retained root
+`tests/skills/evidence/complete-suite/approved3`. Start at
+`draft_not_approved` with no frozen inputs, no approval, and zero execution.
+The approved1 and approved2 evidence roots remain byte-identical.
+
+- [ ] **Step 4: Run and commit the complete proposed3 preapproval gate**
+
+Rerun the complete structure, preparation, runner, sanitizer, importer,
+adjudicator, no-spawn, package-inventory, and validator selection. Verify both
+approved3 roots are absent and both prior approved evidence inventories remain
+byte-identical.
+
+- [ ] **Step 5: Freeze proposed3 and request fresh explicit approval**
+
+Present the new exact commit/tree/parent, closed file manifest, wheel, campaign
+SHA-256, envelope SHA-256, unchanged 24-run policy, unique roots, and the
+approved2 provider-schema correction. The approved1 or approved2 responses do
+not authorize proposed3.
+
+- [ ] **Step 6: Record approval, execute once, import, and adjudicate**
+
+Only after a fresh exact user approval, commit `approved_not_started`, execute
+each of the 24 sessions once with concurrency at most four, seal regardless of
+outcome, and run the exact import/replay/adjudication path. Any later correction
+requires another campaign, new roots, and new approval.
+
 ## Task 8: Run the settled deterministic release gate
 
 - [ ] **Step 1: Run the complete test collection**

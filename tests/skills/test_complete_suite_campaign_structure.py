@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 import re
 
+from jsonschema import Draft202012Validator
 import yaml
 
 
@@ -10,6 +12,9 @@ REPOSITORY_ROOT = Path.cwd().resolve()
 CASES_FILE = REPOSITORY_ROOT / "tests" / "skills" / "complete-suite-cases.yaml"
 CAMPAIGN_FILE = (
     REPOSITORY_ROOT / "tests" / "skills" / "complete-suite-campaign.yaml"
+)
+OUTPUT_SCHEMA_FILE = (
+    REPOSITORY_ROOT / "tests" / "skills" / "complete-suite-output.schema.json"
 )
 EXPECTED_CASES = (
     "global-default-no-activation",
@@ -62,6 +67,49 @@ def _load(path: Path) -> dict[str, object]:
     value = yaml.safe_load(path.read_text(encoding="utf-8"))
     assert isinstance(value, dict)
     return value
+
+
+def _schema_nodes(value: object):
+    if isinstance(value, dict):
+        yield value
+        for child in value.values():
+            yield from _schema_nodes(child)
+    elif isinstance(value, list):
+        for child in value:
+            yield from _schema_nodes(child)
+
+
+def test_complete_suite_output_schema_uses_provider_strict_subset() -> None:
+    schema = json.loads(OUTPUT_SCHEMA_FILE.read_text(encoding="utf-8"))
+    nodes = tuple(_schema_nodes(schema))
+
+    unsupported_keywords = {
+        "allOf",
+        "dependentRequired",
+        "dependentSchemas",
+        "else",
+        "if",
+        "not",
+        "then",
+        "uniqueItems",
+    }
+    assert all(not (unsupported_keywords & node.keys()) for node in nodes)
+    assert all("const" not in node for node in nodes)
+    for node in nodes:
+        if "pattern" in node or "enum" in node:
+            assert node.get("type") == "string"
+
+    assert schema["properties"]["schema_version"] == {
+        "type": "string",
+        "enum": ["1.0"],
+    }
+
+    relative_path = schema["$defs"]["relative_path"]
+    validator = Draft202012Validator(relative_path)
+    for accepted in ("file.json", "folder/file.json", ".hidden/config"):
+        assert validator.is_valid(accepted)
+    for rejected in (".", "..", "folder/.", "folder/../file.json"):
+        assert not validator.is_valid(rejected)
 
 
 def test_complete_suite_cases_are_closed_ordered_and_bounded() -> None:
@@ -130,7 +178,7 @@ def test_complete_suite_campaign_state_is_closed_and_nonexecuted() -> None:
         "execution",
     }
     assert document["schema_version"] == "1.0"
-    assert document["campaign_id"] == "2026-08-20-proposed2"
+    assert document["campaign_id"] == "2026-08-20-proposed3"
     assert document["status"] in {
         "draft_not_approved",
         "approved_not_started",
@@ -195,10 +243,10 @@ def test_complete_suite_campaign_state_is_closed_and_nonexecuted() -> None:
         "task_network": False,
         "max_concurrency": 4,
         "raw_root": (
-            "D:\\tmp\\kokoroarc-m9-task18-campaign-20260820-approved2"
+            "D:\\tmp\\kokoroarc-m9-task18-campaign-20260820-approved3"
         ),
         "retained_root": (
-            "tests/skills/evidence/complete-suite/approved2"
+            "tests/skills/evidence/complete-suite/approved3"
         ),
     }
     assert proposed["reruns_require_fresh_approval"] is True
