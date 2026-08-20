@@ -13,11 +13,12 @@ provider process.
 
 **Architecture:** Commit a canonical harness checkpoint whose 141
 approval-bound files are LF-stable in both the preparation worktree and a fresh
-`core.autocrlf=true` checkout. Reuse and revalidate the closed seven-wheel
-offline wheelhouse, rebuild KokoroArc at the fixed release epoch, then freeze
-only the non-approval-bound campaign metadata against the canonical harness
-commit. Run all preapproval, replay, packaging, validator, checkout, and
-absence gates on the exact frozen draft before presenting its hashes.
+`core.autocrlf=true` checkout. Reuse and revalidate only the six third-party
+wheels, rebuild KokoroArc from canonical LF bytes at the fixed release epoch,
+and assemble a new closed seven-wheel proposed5 wheelhouse. Then freeze only
+the non-approval-bound campaign metadata against the canonical harness commit.
+Run all preapproval, replay, packaging, validator, checkout, and absence gates
+on the exact frozen draft before presenting its hashes.
 
 **Tech Stack:** Python 3.14, pytest, PyYAML, JSON Schema, Git, PowerShell 7,
 `build`, and the existing KokoroArc complete-suite campaign harness.
@@ -41,14 +42,18 @@ D:\tmp\kokoroarc-m9-task18-campaign-20260820-approved5
 Proposed retained root, which must remain absent:
 tests/skills/evidence/complete-suite/approved5
 
-Reusable dependency wheelhouse:
+Immutable proposed4 source wheelhouse:
 D:\tmp\kokoroarc-proposed4-wheelhouse-788e86a-01
 
-Task 17 KokoroArc wheel SHA-256:
-61ef3a5ff7201eebbcc6d6fb1c88016ce6de8cf74ab38592c0206ed72db4e1e5
+New proposed5 wheelhouse, which must be absent before assembly:
+D:\tmp\kokoroarc-proposed5-wheelhouse-canonical-lf-01
 
-Expected wheelhouse manifest SHA-256:
+Immutable proposed4 source-manifest SHA-256:
 0753050ecf612684fec5102e993253c74842ec618bfcc086a025f5dee69bbba2
+
+Canonical-LF KokoroArc fixed-epoch wheel:
+size = 345607
+sha256 = 76ebb700b7bb9c4eb88fd74a2268c077eeff741245cb7d7f6402673e2f02174f
 ```
 
 Never invoke `tests/skills/run_complete_suite_campaign.py` with an approved
@@ -74,7 +79,7 @@ temporary root.
 - Modify: `tests/skills/test_complete_suite_campaign_structure.py`
 - Test: `tests/skills/test_complete_suite_campaign_structure.py`
 
-- [ ] **Step 1: Change the campaign identity and roots asserted by the
+- [x] **Step 1: Change the campaign identity and roots asserted by the
   structure test**
 
 Change `test_complete_suite_campaign_state_is_closed_and_nonexecuted` to
@@ -97,7 +102,7 @@ Keep the existing zero execution counters and 24-run policy assertions.
 Retain the conditional frozen-input validation so an empty draft can become a
 fully frozen draft without weakening the test.
 
-- [ ] **Step 2: Add an approval-bound LF policy test**
+- [x] **Step 2: Add an approval-bound LF policy test**
 
 Import `subprocess` and the campaign runner module in the structure test. Add
 `test_approval_bound_checkout_policy_is_explicit_and_current_bytes_are_lf`.
@@ -116,7 +121,7 @@ The test must:
 This test intentionally fails first because `MANIFEST.in` has no explicit LF
 attribute and legacy worktree bytes still contain CRLF.
 
-- [ ] **Step 3: Run the RED selection**
+- [x] **Step 3: Run the RED selection**
 
 ```powershell
 python -B -m pytest tests/skills/test_complete_suite_campaign_structure.py::test_complete_suite_campaign_state_is_closed_and_nonexecuted tests/skills/test_complete_suite_campaign_structure.py::test_approval_bound_checkout_policy_is_explicit_and_current_bytes_are_lf -q -p no:cacheprovider --basetemp D:\tmp\kokoroarc-proposed5-red-01
@@ -135,7 +140,7 @@ No provider process or proposed5 root may appear.
 - Verify: all 141 paths returned by
   `tests/skills/run_complete_suite_campaign.py::approval_bound_paths`
 
-- [ ] **Step 1: Pin `MANIFEST.in` to LF**
+- [x] **Step 1: Pin `MANIFEST.in` to LF**
 
 Add this rule next to the other distribution inputs:
 
@@ -143,7 +148,7 @@ Add this rule next to the other distribution inputs:
 MANIFEST.in text eol=lf
 ```
 
-- [ ] **Step 2: Convert the campaign record to an unapproved proposed5
+- [x] **Step 2: Convert the campaign record to an unapproved proposed5
   skeleton**
 
 In `tests/skills/complete-suite-campaign.yaml`:
@@ -158,7 +163,7 @@ In `tests/skills/complete-suite-campaign.yaml`:
 Do not change cases, evaluator, prohibited operations, rerun policy, or the
 24-run count.
 
-- [ ] **Step 3: Normalize only approval-bound LF files**
+- [x] **Step 3: Normalize only approval-bound LF files**
 
 Use `runner.approval_bound_paths()` as the exact allowlist. For each path whose
 Git attributes are `text: set` and `eol: lf`, replace raw CRLF byte pairs with
@@ -173,16 +178,16 @@ Git content delta is only the new `.gitattributes` rule, the proposed5 draft
 record, and the test changes. LF normalization of already-normalized Git blobs
 must not create unrelated semantic diffs.
 
-- [ ] **Step 4: Run the focused GREEN selection**
+- [x] **Step 4: Run the focused GREEN selection**
 
 ```powershell
-python -B -m pytest tests/skills/test_complete_suite_campaign_structure.py tests/skills/test_complete_suite_preparation.py::test_fixture_assets_are_built_inside_the_installed_runtime tests/skills/test_complete_suite_evidence.py::test_preparation_failure_import_is_zero_run_and_exactly_replayable -q -p no:cacheprovider --basetemp D:\tmp\kokoroarc-proposed5-green-01
+python -B -m pytest tests/skills/test_complete_suite_campaign_structure.py tests/skills/test_complete_suite_preparation.py::test_fixture_asset_builder_uses_the_explicit_installed_runtime tests/skills/test_complete_suite_evidence.py::test_preparation_failure_import_is_zero_run_and_exactly_replayable -q -p no:cacheprovider --basetemp D:\tmp\kokoroarc-proposed5-green-02
 ```
 
 Expected: pass, with only documented filesystem-capability skips if selected
 tests reach those branches.
 
-- [ ] **Step 5: Verify draft/root absence and the exact working diff**
+- [x] **Step 5: Verify draft/root absence and the exact working diff**
 
 ```powershell
 Test-Path 'D:\tmp\kokoroarc-m9-task18-campaign-20260820-approved5'
@@ -193,6 +198,28 @@ git status --short
 
 Both `Test-Path` results must be `False`.
 
+Implementation record (2026-08-20): the initial selection failed exactly for
+the proposed4 campaign ID and unspecified `MANIFEST.in` attributes. After the
+record and attribute changes, the intermediate run passed campaign state and
+failed only on legacy CRLF bytes. The first allowlist normalization attempt
+then failed closed on the sole remaining attribute omission,
+`tests/skills/researching_characters_adjudication.py`; that path received an
+explicit LF rule. The completed bytewise pass verified 141/141 explicit LF
+paths and zero remaining CRLF pairs. The corrected focused gate passed 7 tests
+in 4.06 seconds. Git re-indexing proved the normalized legacy files retained
+their existing blob hashes, leaving only the four intended semantic changes.
+Both proposed5 roots remained absent.
+
+Approved distribution revision (2026-08-20): the first complete harness run
+exposed a truthful reproducibility mismatch rather than a product regression.
+The canonical-LF fixed-epoch wheel reproduced twice at 345,607 bytes and
+SHA-256 `76ebb700b7bb9c4eb88fd74a2268c077eeff741245cb7d7f6402673e2f02174f`.
+Rebuilding the preserved mixed-newline approved4 source reproduced the older
+346,526-byte content, while the proposed4 wheelhouse member used non-epoch ZIP
+timestamps. The user approved retaining canonical LF, reusing only the six
+third-party wheels, rebuilding KokoroArc, and assembling a new proposed5
+wheelhouse. The predecessor wheel and wheelhouse remain immutable evidence.
+
 ## Task 3: Commit the canonical harness checkpoint
 
 **Files:**
@@ -200,28 +227,39 @@ Both `Test-Path` results must be `False`.
 - Modify: `.gitattributes`
 - Modify: `tests/skills/complete-suite-campaign.yaml`
 - Modify: `tests/skills/test_complete_suite_campaign_structure.py`
+- Modify: `tests/skills/test_complete_suite_preparation.py`
 - Modify: `docs/superpowers/plans/2026-08-20-kokoroarc-complete-suite-closure.md`
+- Modify: `docs/superpowers/specs/2026-08-20-kokoroarc-complete-suite-campaign-5-design.md`
 - Modify: this plan only to record completed checkpoints
 
-- [ ] **Step 1: Run the complete pre-checkpoint harness test partition**
+- [x] **Step 1: Run the complete pre-checkpoint harness test partition**
 
 ```powershell
-python -B -m pytest tests/skills/test_complete_suite_campaign_structure.py tests/skills/test_complete_suite_preparation.py tests/skills/test_complete_suite_evidence.py tests/skills/test_complete_suite_release_evidence.py -q -p no:cacheprovider --basetemp D:\tmp\kokoroarc-proposed5-harness-01
+python -B -m pytest tests/skills/test_complete_suite_campaign_structure.py tests/skills/test_complete_suite_preparation.py tests/skills/test_complete_suite_evidence.py tests/skills/test_complete_suite_release_evidence.py -q -p no:cacheprovider --basetemp D:\tmp\kokoroarc-proposed5-harness-02
 ```
 
 Require every non-capability test to pass. Record exact pass/skip counts and
 skip reasons in the closure plan.
 
-- [ ] **Step 2: Re-run the isolated builder and zero-run failure regressions**
+- [x] **Step 2: Re-run the isolated builder and zero-run failure regressions**
 
 ```powershell
-python -B -m pytest tests/skills/test_complete_suite_preparation.py -k "fixture_assets and installed_runtime" tests/skills/test_complete_suite_evidence.py -k "preparation_failure" -q -p no:cacheprovider --basetemp D:\tmp\kokoroarc-proposed5-boundaries-01
+python -B -m pytest tests/skills/test_complete_suite_preparation.py::test_fixture_asset_builder_uses_the_explicit_installed_runtime tests/skills/test_complete_suite_evidence.py::test_preparation_failure_import_is_zero_run_and_exactly_replayable -q -p no:cacheprovider --basetemp D:\tmp\kokoroarc-proposed5-boundaries-02
 ```
 
 Require installed-runtime origin checks to pass and zero-run replay to remain
 exact.
 
-- [ ] **Step 3: Audit and stage only the canonical checkpoint**
+Pre-checkpoint verification record (2026-08-20): the complete four-module
+partition passed 151 tests with 3 documented Windows capability skips in
+424.34 seconds. The skips were two unavailable directory-link cases and one
+unavailable symlink case. The two explicit installed-runtime/zero-run boundary
+regressions then passed 2/2 in 2.20 seconds. The earlier 150-pass/3-skip/1-fail
+run is retained as the RED evidence for the superseded Task 17 wheel oracle;
+the corrected canonical-LF oracle passed independently and in the complete
+partition.
+
+- [x] **Step 3: Audit and stage only the canonical checkpoint**
 
 ```powershell
 git diff --check
@@ -230,7 +268,7 @@ git diff -- .gitattributes tests/skills/complete-suite-campaign.yaml tests/skill
 ```
 
 Confirm approved1-through-approved4 evidence is unchanged and proposed5 roots
-remain absent. Stage only the five listed logical changes and inspect
+remain absent. Stage only the seven listed logical changes and inspect
 `git diff --cached --check` plus `git diff --cached --stat`.
 
 - [ ] **Step 4: Commit the canonical checkpoint**
@@ -295,26 +333,38 @@ summary under `D:\tmp`; do not add it to retained campaign evidence.
 - Read: `tests/skills/complete_suite_preparation.py`
 - Read: `D:\tmp\kokoroarc-proposed4-wheelhouse-788e86a-01`
 
-- [ ] **Step 1: Re-capture the existing wheelhouse**
+- [ ] **Step 1: Re-capture the immutable source wheelhouse**
 
 Call `complete_suite_preparation.capture_runtime_wheelhouse` on the exact
 wheelhouse path. Require seven flat wheels, the exact distribution set, no
 extra entry, and manifest SHA-256
 `0753050ecf612684fec5102e993253c74842ec618bfcc086a025f5dee69bbba2`.
-This step is offline and must not invoke pip download or any network client.
+This validates immutable predecessor evidence only. It is offline and must not
+invoke pip download or any network client.
 
 - [ ] **Step 2: Rebuild KokoroArc twice at the fixed release epoch**
 
 Use two new D:-based source checkouts of the canonical harness commit and the
 fixed Task 17 `SOURCE_DATE_EPOCH`. Build wheel and sdist twice with bytecode and
 build directories under unique D: roots. Require both wheels to be
-byte-identical and the KokoroArc wheel SHA-256 to equal
-`61ef3a5ff7201eebbcc6d6fb1c88016ce6de8cf74ab38592c0206ed72db4e1e5`.
+byte-identical, 345,607 bytes, and the KokoroArc wheel SHA-256 to equal
+`76ebb700b7bb9c4eb88fd74a2268c077eeff741245cb7d7f6402673e2f02174f`.
 Require normalized sdist contents and package inventories to match.
 
-- [ ] **Step 3: Prove offline installed-runtime behavior**
+- [ ] **Step 3: Assemble and close the proposed5 wheelhouse**
 
-Install only from the closed wheelhouse into a new D:-based target with
+First require
+`D:\tmp\kokoroarc-proposed5-wheelhouse-canonical-lf-01` to be absent. Create
+that unique directory, copy into it only the six third-party wheels from the
+immutable source wheelhouse, and add the newly rebuilt canonical-LF KokoroArc
+wheel. Do not copy the proposed4 KokoroArc wheel. Capture the new wheelhouse and
+require seven flat wheels, the exact distribution set, no extra entry, and the
+expected KokoroArc size/SHA-256. Record the newly computed inventory and
+manifest hashes; do not use a placeholder or the proposed4 manifest hash.
+
+- [ ] **Step 4: Prove offline installed-runtime behavior**
+
+Install only from the new closed wheelhouse into a new D:-based target with
 `--no-index`, `--find-links`, `--only-binary=:all:`, `--no-deps` as appropriate
 for the already closed dependency set. With repository source absent from
 `sys.path`, require:

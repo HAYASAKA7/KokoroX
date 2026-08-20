@@ -3,12 +3,20 @@ from __future__ import annotations
 import json
 from pathlib import Path
 import re
+import subprocess
+import sys
 
 from jsonschema import Draft202012Validator
 import yaml
 
 
-REPOSITORY_ROOT = Path.cwd().resolve()
+SKILLS_ROOT = Path(__file__).resolve().parent
+REPOSITORY_ROOT = SKILLS_ROOT.parents[1]
+sys.path.insert(0, str(SKILLS_ROOT))
+
+import run_complete_suite_campaign as runner  # noqa: E402
+
+
 CASES_FILE = REPOSITORY_ROOT / "tests" / "skills" / "complete-suite-cases.yaml"
 CAMPAIGN_FILE = (
     REPOSITORY_ROOT / "tests" / "skills" / "complete-suite-campaign.yaml"
@@ -178,11 +186,8 @@ def test_complete_suite_campaign_state_is_closed_and_nonexecuted() -> None:
         "execution",
     }
     assert document["schema_version"] == "1.0"
-    assert document["campaign_id"] == "2026-08-20-proposed4"
-    assert document["status"] in {
-        "draft_not_approved",
-        "approved_not_started",
-    }
+    assert document["campaign_id"] == "2026-08-20-proposed5"
+    assert document["status"] == "draft_not_approved"
     assert document["execution"] == {
         "runs_started": 0,
         "runs_completed": 0,
@@ -234,23 +239,7 @@ def test_complete_suite_campaign_state_is_closed_and_nonexecuted() -> None:
     else:
         assert document["status"] == "draft_not_approved"
 
-    if document["status"] == "draft_not_approved":
-        assert document["user_approval"] is None
-    else:
-        assert frozen
-        approval = document["user_approval"]
-        assert isinstance(approval, dict)
-        assert set(approval) == {
-            "approval_id",
-            "approved_at",
-            "response",
-            "approved_envelope_sha256",
-        }
-        assert approval["response"].strip()
-        assert re.fullmatch(
-            r"[0-9a-f]{64}",
-            approval["approved_envelope_sha256"],
-        )
+    assert document["user_approval"] is None
 
     proposed = document["proposed_approval"]
     assert isinstance(proposed, dict)
@@ -277,10 +266,10 @@ def test_complete_suite_campaign_state_is_closed_and_nonexecuted() -> None:
         "task_network": False,
         "max_concurrency": 4,
         "raw_root": (
-            "D:\\tmp\\kokoroarc-m9-task18-campaign-20260820-approved4"
+            "D:\\tmp\\kokoroarc-m9-task18-campaign-20260820-approved5"
         ),
         "retained_root": (
-            "tests/skills/evidence/complete-suite/approved4"
+            "tests/skills/evidence/complete-suite/approved5"
         ),
     }
     assert proposed["reruns_require_fresh_approval"] is True
@@ -288,6 +277,38 @@ def test_complete_suite_campaign_state_is_closed_and_nonexecuted() -> None:
     assert proposed["disclosed_inputs"]
     assert proposed["retained_outputs"]
     assert proposed["prohibited"]
+
+
+def test_approval_bound_checkout_policy_is_explicit_and_current_bytes_are_lf(
+) -> None:
+    relative_paths = runner.approval_bound_paths()
+
+    assert len(relative_paths) == 141
+    assert relative_paths == tuple(sorted(set(relative_paths)))
+
+    attributes: dict[str, dict[str, str]] = {}
+    for offset in range(0, len(relative_paths), 32):
+        batch = relative_paths[offset : offset + 32]
+        result = subprocess.run(
+            ["git", "check-attr", "text", "eol", "--", *batch],
+            cwd=REPOSITORY_ROOT,
+            check=True,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+        )
+        for line in result.stdout.splitlines():
+            relative, attribute, value = line.split(": ", maxsplit=2)
+            attributes.setdefault(relative, {})[attribute] = value
+
+    assert set(attributes) == set(relative_paths)
+    for relative in relative_paths:
+        assert attributes[relative] == {
+            "text": "set",
+            "eol": "lf",
+        }, relative
+        raw = REPOSITORY_ROOT.joinpath(*relative.split("/")).read_bytes()
+        assert b"\r\n" not in raw, relative
 
 
 def test_complete_suite_route_matrix_mentions_every_skill() -> None:

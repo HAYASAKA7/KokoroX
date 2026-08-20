@@ -602,7 +602,7 @@ def test_build_installed_distribution_builds_one_fixed_epoch_wheel(
     assert result["fixed_epoch"] == preparation.FIXED_EPOCH
 
 
-def test_real_fixed_epoch_wheel_matches_task17_release(
+def test_real_fixed_epoch_wheel_matches_canonical_lf_release(
     tmp_path: Path,
 ) -> None:
     result = preparation.build_installed_distribution(
@@ -614,9 +614,9 @@ def test_real_fixed_epoch_wheel_matches_task17_release(
     assert result["fixed_epoch"] == 1_787_151_982
     assert result["wheel"] == {
         "filename": "kokoroarc-0.0.0.dev0-py3-none-any.whl",
-        "size": 346_526,
+        "size": 345_607,
         "sha256": (
-            "e5e069cb5a219f0b6c59b4b2a94bbad7507a3add1ede0e544d2d304bfee6c5b4"
+            "76ebb700b7bb9c4eb88fd74a2268c077eeff741245cb7d7f6402673e2f02174f"
         ),
     }
     assert result["installed"]["file_count"] == 113

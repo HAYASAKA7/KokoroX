@@ -1,7 +1,8 @@
 # KokoroArc Complete-Suite Corrective Campaign 5 Design
 
 **Date:** 2026-08-20
-**Status:** Approved for implementation; not approved for provider execution
+**Status:** Approved for implementation, including the canonical-LF
+distribution revision; not approved for provider execution
 **Scope:** Task 18 complete-suite behavioral campaign preparation only
 
 ## 1. Decision
@@ -62,16 +63,31 @@ imported and replayed without fabricated run directories.
 
 ## 5. Distribution and dependency inputs
 
-The existing seven-wheel dependency wheelhouse may be reused because campaign
-5 performs no package-source change and revalidates every filename, size,
-SHA-256, distribution identity, and closed-manifest hash. Reuse avoids another
-network operation and duplicate D: storage. Changed or unexpected wheelhouse
-bytes invalidate the draft.
+Campaign 5 reuses only the six third-party wheels from the immutable proposed4
+wheelhouse. Each dependency wheel must retain its exact filename, size,
+SHA-256, and distribution identity. Reuse is offline and does not authorize a
+download, network client, or mutation of the predecessor wheelhouse.
 
-The KokoroArc wheel is rebuilt at the fixed release epoch and must be
-byte-identical to the Task 17 release wheel. Offline installation, module
-origin checks, CLI version/help, and real Rin validation smokes run before the
-campaign is frozen.
+The proposed4 KokoroArc wheel remains immutable predecessor evidence but is
+not a campaign 5 input. Its archive used mixed CRLF/LF source bytes and its ZIP
+timestamps did not equal the recorded fixed release epoch. Preserving those
+bytes merely to retain the predecessor hash would violate the canonical
+checkout contract.
+
+KokoroArc is rebuilt twice from the canonical-LF harness commit at
+`SOURCE_DATE_EPOCH=1787151982`. Both builds must produce the same wheel:
+
+```text
+filename: kokoroarc-0.0.0.dev0-py3-none-any.whl
+size: 345607
+sha256: 76ebb700b7bb9c4eb88fd74a2268c077eeff741245cb7d7f6402673e2f02174f
+```
+
+The new wheel is combined with the six byte-identical dependency wheels in a
+unique proposed5 seven-wheel wheelhouse. That new closed manifest is captured
+and bound only after assembly. Offline installation, module-origin checks, CLI
+version/help, real Rin validation, and isolated fixture-generation smokes run
+against this exact wheelhouse before the campaign is frozen.
 
 ## 6. Draft and approval lifecycle
 
@@ -81,7 +97,8 @@ are zero. The draft binds:
 
 - the frozen harness commit, tree, and parent;
 - the exact approval-bound file manifest and digest;
-- the dependency wheelhouse manifest and KokoroArc wheel;
+- the newly assembled dependency wheelhouse manifest and canonical-LF
+  KokoroArc wheel;
 - the 24-run policy and evaluator configuration;
 - the unique raw and retained roots; and
 - the resulting campaign and approval-envelope SHA-256 values.
@@ -99,7 +116,8 @@ The same committed tree must pass:
 - structure, preparation, runner, sanitizer, importer, adjudicator, and result
   validation tests;
 - the isolated fixture-builder and zero-run preparation-failure regressions;
-- offline wheelhouse install and real CLI smokes;
+- two byte-identical fixed-epoch canonical-LF builds, new wheelhouse capture,
+  offline install, and real CLI smokes;
 - exact raw-to-retained replay and unchanged inventories for approved1 through
   approved4;
 - the fresh-checkout 141-file raw-byte audit;
@@ -112,9 +130,11 @@ approval and never launches a provider process.
 
 ## 8. Rejected alternatives
 
-Preserving the mixed approved4 newline state was rejected because a clean
-checkout could not reproduce it. Adding a separate approval snapshot archive
-was rejected because it would create a second source of truth beside Git and
-the raw file manifest. Deriving approval only from normalized Git blobs was
-rejected because the harness executes checked-out raw bytes, not abstract blob
-content.
+Preserving the mixed approved4 newline state, including solely to retain its
+KokoroArc wheel hash, was rejected because a clean checkout could not
+reproduce it. Adding a separate approval snapshot archive was rejected because
+it would create a second source of truth beside Git and the raw file manifest.
+Deriving approval only from normalized Git blobs was rejected because the
+harness executes checked-out raw bytes, not abstract blob content. Reusing the
+entire proposed4 wheelhouse was rejected because its KokoroArc member is not a
+truthful fixed-epoch build of the canonical-LF source.

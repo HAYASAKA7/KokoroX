@@ -686,8 +686,23 @@ Use campaign ID `2026-08-20-proposed5`, raw root
 `tests/skills/evidence/complete-suite/approved5`. Normalize every
 approval-bound working-tree file to its declared checkout policy, prove the
 141-file manifest in a fresh `core.autocrlf=true` checkout, rerun the complete
-preapproval gate, and freeze a new draft envelope. Do not create the raw or
-retained campaign root and do not launch a provider process.
+preapproval gate, and freeze a new draft envelope. Reuse only the six immutable
+third-party wheels from proposed4, rebuild KokoroArc twice from canonical LF
+bytes at the fixed epoch, and bind a newly assembled proposed5 wheelhouse. The
+approved distribution revision explicitly rejects reusing the predecessor
+KokoroArc wheel because its mixed-newline contents and ZIP timestamps do not
+represent the canonical-LF fixed-epoch build. Do not create the raw or retained
+campaign root and do not launch a provider process.
+
+Campaign 5 pre-checkpoint verification (2026-08-20): the canonical-LF wheel
+oracle passed at 345,607 bytes and SHA-256
+`76ebb700b7bb9c4eb88fd74a2268c077eeff741245cb7d7f6402673e2f02174f`.
+The complete structure/preparation/evidence/release-evidence partition passed
+151 tests with 3 documented Windows directory-link/symlink capability skips in
+424.34 seconds. The explicit installed-runtime fixture and exact zero-run
+preparation-failure replay regressions passed 2/2. Both proposed5 campaign
+roots remained absent and no provider process was launched. Canonical harness
+commit identity and the newly assembled wheelhouse remain to be recorded.
 
 - [ ] **Step 12: Request fresh exact proposed5 approval**
 

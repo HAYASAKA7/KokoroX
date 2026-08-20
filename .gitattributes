@@ -6,6 +6,7 @@ tests/skills/transcripts/** -text
 
 # Distribution inputs and release hashes require checkout-stable LF.
 README.md text eol=lf
+MANIFEST.in text eol=lf
 pyproject.toml text eol=lf
 src/** text eol=lf
 schemas/** text eol=lf
@@ -36,6 +37,7 @@ tests/skills/evidence/testing-character-packs/** -text whitespace=cr-at-eol,-bla
 # Complete-suite approval inputs are raw-hash-bound across checkout policies.
 tests/skills/complete-suite-* text eol=lf
 tests/skills/*complete_suite*.py text eol=lf
+tests/skills/researching_characters_adjudication.py text eol=lf
 tests/skills/researching_characters_sanitization.py text eol=lf
 tests/skills/evidence/complete-suite/** -text whitespace=cr-at-eol,-blank-at-eol,-blank-at-eof
 docs/superpowers/plans/2026-08-20-kokoroarc-complete-suite-closure.md text eol=lf
