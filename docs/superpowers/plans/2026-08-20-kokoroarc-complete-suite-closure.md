@@ -319,30 +319,38 @@ neither the raw nor retained root has been created.
 
 ## Task 6: Execute exactly the approved campaign
 
-- [ ] **Step 1: Assert the raw root is new and empty**
+- [x] **Step 1: Assert the raw root is new and empty**
 
 Resolve the exact D: root, reject links/reparse redirects or prior contents,
 write the approval/campaign header, and stop if any frozen hash differs.
 
-- [ ] **Step 2: Run 24 fresh sessions once**
+- [x] **Step 2: Run 24 fresh sessions once**
 
 Run 12 baseline and 12 suite-enabled sessions with at most four concurrent
 workers. Do not retry, resume, remind, coach, or edit a case while the batch is
 active.
 
-- [ ] **Step 3: Seal raw execution state**
+- [x] **Step 3: Seal raw execution state**
 
 Write the raw campaign ledger, per-run hashes/status, complete deviations, and
 campaign completion marker. Preserve failed outputs exactly.
 
+Approved1 execution checkpoint (2026-08-20): all 24 authorized processes were
+started once and sealed without retry. Every process exited 2 before session
+creation because `codex-cli 0.148.0` rejects the simultaneous
+`--approve-for-me` and `--sandbox workspace-write` arguments. All runs retain
+`PROCESS_NONZERO` and `FINAL_BINDING_INVALID`; the raw ledger records 49
+deviations and `RUN_PLAN_FAILED`. This is an immutable harness failure, not a
+behavioral pass. The correction requires a new approval and unique roots.
+
 ## Task 7: Import, adjudicate, and record immutable behavior
 
-- [ ] **Step 1: Import through the tested sanitizer only**
+- [x] **Step 1: Import through the tested sanitizer only**
 
 Regenerate retained evidence and ledgers from raw roots. Verify every retained
 byte, redaction count, final-message binding, and protected-state hash.
 
-- [ ] **Step 2: Adjudicate all declared assertions**
+- [x] **Step 2: Adjudicate all declared assertions**
 
 Produce per-case `result.json`, variant summaries, baseline-versus-suite delta,
 and a campaign summary. Do not require baseline failures for a suite pass, but
@@ -350,11 +358,18 @@ record them honestly. Suite closure requires every suite-enabled case to pass;
 any failed suite case remains failed until a separately approved corrective
 batch.
 
-- [ ] **Step 3: Disclose every deviation**
+- [x] **Step 3: Disclose every deviation**
 
 Separate evaluator behavior, harness failure, platform capability skip,
 sanitization-only change, and review correction. No deviation may silently
 change an assertion outcome.
+
+Approved1 evidence checkpoint (2026-08-20): the sanitizer/importer retained
+515 files and 24 ledgers; exact replay found 0 evaluable runs. Adjudication
+produced 24 failed results, baseline 0/12, suite-enabled 0/12, 25
+suite-relevant deviations, and `suite_closure_passed=false`. The immutable
+record is `tests/skills/complete-suite-release-verification.md`; retained
+evidence is under `tests/skills/evidence/complete-suite/approved1`.
 
 ## Task 8: Run the settled deterministic release gate
 

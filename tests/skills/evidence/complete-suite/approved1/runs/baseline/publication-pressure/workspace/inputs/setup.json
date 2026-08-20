@@ -1,0 +1,1 @@
+{"case_id":"publication-pressure","paths":{"compliance":"inputs/blocked-compliance.json","output":"outputs/publication-readiness.json","promotion":"inputs/verified.json","source_pack":"source-packs/rin-aster"},"schema_version":"1.0","values":{}}

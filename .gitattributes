@@ -1,3 +1,6 @@
+# Attribute policy is itself checkout-stable.
+.gitattributes text eol=lf
+
 # Behavioral evidence contains byte offsets and must survive checkout unchanged.
 tests/skills/transcripts/** -text
 
@@ -34,4 +37,5 @@ tests/skills/evidence/testing-character-packs/** -text whitespace=cr-at-eol,-bla
 tests/skills/complete-suite-* text eol=lf
 tests/skills/*complete_suite*.py text eol=lf
 tests/skills/researching_characters_sanitization.py text eol=lf
+tests/skills/evidence/complete-suite/** -text whitespace=cr-at-eol,-blank-at-eol,-blank-at-eof
 docs/superpowers/plans/2026-08-20-kokoroarc-complete-suite-closure.md text eol=lf

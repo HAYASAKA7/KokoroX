@@ -1,0 +1,6 @@
+error: the argument '--approve-for-me' cannot be used with '--sandbox <SANDBOX_MODE>'
+
+Usage: codex exec [OPTIONS] [PROMPT]
+       codex exec [OPTIONS] <COMMAND> [ARGS]
+
+For more information, try '--help'.
