@@ -641,6 +641,15 @@ the `approved_not_started` commit and one-shot 24-session execution. The current
 design approval does not authorize provider execution or dependency network
 access.
 
+Approval received (2026-08-20): the user responded `approve` directly to the
+presentation of exact envelope
+`0e6b3e3146b4d3cf6539b14412e0f127c39d60d41048d96ddcad26987100ae64`.
+The approval record ID is `user-approval-0e6b3e3146b4-04` and its UTC timestamp
+is `2026-08-20T08:54:04Z`. Execution remains blocked until the
+`approved_not_started` record is validated and committed cleanly.
+The validated approved campaign SHA-256 is
+`3f283f7cec6bb147f819616883c28cd1281f1478e63d869f33cceb457eb1789b`.
+
 ## Task 8: Run the settled deterministic release gate
 
 - [ ] **Step 1: Run the complete test collection**

@@ -1,6 +1,6 @@
 schema_version: '1.0'
 campaign_id: 2026-08-20-proposed4
-status: draft_not_approved
+status: approved_not_started
 proposed_approval:
   runs:
     baseline: 12
@@ -567,7 +567,11 @@ frozen_inputs:
       filename: kokoroarc-0.0.0.dev0-py3-none-any.whl
       size: 346526
       sha256: 61ef3a5ff7201eebbcc6d6fb1c88016ce6de8cf74ab38592c0206ed72db4e1e5
-user_approval: null
+user_approval:
+  approval_id: user-approval-0e6b3e3146b4-04
+  approved_at: '2026-08-20T08:54:04Z'
+  response: approve
+  approved_envelope_sha256: 0e6b3e3146b4d3cf6539b14412e0f127c39d60d41048d96ddcad26987100ae64
 execution:
   runs_started: 0
   runs_completed: 0
