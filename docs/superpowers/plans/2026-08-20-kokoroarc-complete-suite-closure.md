@@ -584,13 +584,27 @@ No dependency download, provider process, proposed4 campaign root, or proposed4
 results root was created; the real frozen-wheelhouse smoke remains part of
 Step 7.
 
-- [ ] **Step 7: Run and commit the proposed4 preapproval gate**
+- [x] **Step 7: Run and commit the proposed4 preapproval gate**
 
 Run the focused RED-to-GREEN selection and the complete Task 18 harness gate,
 all four Skill validators, raw replay/final binding for approved1 through
 approved3, inventory and secret scans, package/runtime smoke, exact-range
 whitespace checks, and clean status. Commit the implementation before creating
 an approval envelope.
+
+Proposed4 checkpoint (2026-08-20): implementation commit
+`788e86a08af8c94a36bed8d4b33021091201b4a6` has tree
+`2660d8902d0bb4d1265ff7ecad551ae2c9b6c09e` and parent
+`a2d7236bc289a96f417b06e986b1f9b9034d58ee`. Its exact post-commit
+complete-suite harness gate passed 147 tests with three documented Windows
+link/symlink capability skips. Two fixed-epoch KokoroArc wheel builds were
+byte-identical at SHA-256
+`61ef3a5ff7201eebbcc6d6fb1c88016ce6de8cf74ab38592c0206ed72db4e1e5`.
+After separate network approval, the seven-distribution binary wheelhouse was
+acquired under D:, closed at manifest SHA-256
+`0753050ecf612684fec5102e993253c74842ec618bfcc086a025f5dee69bbba2`,
+and passed offline isolated imports, CLI version, and Rin validation smokes.
+No provider process or proposed4 campaign/results root was created.
 
 - [ ] **Step 8: Create and freeze proposed4 without executing it**
 

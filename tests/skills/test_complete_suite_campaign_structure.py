@@ -178,7 +178,7 @@ def test_complete_suite_campaign_state_is_closed_and_nonexecuted() -> None:
         "execution",
     }
     assert document["schema_version"] == "1.0"
-    assert document["campaign_id"] == "2026-08-20-proposed3"
+    assert document["campaign_id"] == "2026-08-20-proposed4"
     assert document["status"] in {
         "draft_not_approved",
         "approved_not_started",
@@ -189,22 +189,56 @@ def test_complete_suite_campaign_state_is_closed_and_nonexecuted() -> None:
         "raw_root_created": False,
     }
 
-    if document["status"] == "draft_not_approved":
-        assert document["frozen_inputs"] == {}
-        assert document["user_approval"] is None
-    else:
-        frozen = document["frozen_inputs"]
-        approval = document["user_approval"]
+    frozen = document["frozen_inputs"]
+    if frozen:
         assert isinstance(frozen, dict)
         assert set(frozen) == {
             "schema_version",
             "harness_git",
             "files",
             "wheel",
+            "runtime_wheelhouse",
         }
         assert frozen["schema_version"] == "1.0"
         assert isinstance(frozen["files"], dict)
         assert frozen["files"]
+        runtime = frozen["runtime_wheelhouse"]
+        assert isinstance(runtime, dict)
+        assert set(runtime) == {
+            "schema_version",
+            "root",
+            "distributions",
+            "inventory",
+            "inventory_sha256",
+            "wheels",
+            "kokoroarc_wheel",
+        }
+        assert runtime["schema_version"] == "1.0"
+        assert runtime["root"] == (
+            "D:\\tmp\\kokoroarc-proposed4-wheelhouse-788e86a-01"
+        )
+        assert runtime["distributions"] == [
+            "attrs",
+            "jsonschema",
+            "jsonschema-specifications",
+            "kokoroarc",
+            "pyyaml",
+            "referencing",
+            "rpds-py",
+        ]
+        assert re.fullmatch(r"[0-9a-f]{64}", runtime["inventory_sha256"])
+        assert isinstance(runtime["inventory"], dict)
+        assert isinstance(runtime["wheels"], list)
+        assert len(runtime["wheels"]) == 7
+        assert frozen["wheel"] == runtime["kokoroarc_wheel"]
+    else:
+        assert document["status"] == "draft_not_approved"
+
+    if document["status"] == "draft_not_approved":
+        assert document["user_approval"] is None
+    else:
+        assert frozen
+        approval = document["user_approval"]
         assert isinstance(approval, dict)
         assert set(approval) == {
             "approval_id",
@@ -243,10 +277,10 @@ def test_complete_suite_campaign_state_is_closed_and_nonexecuted() -> None:
         "task_network": False,
         "max_concurrency": 4,
         "raw_root": (
-            "D:\\tmp\\kokoroarc-m9-task18-campaign-20260820-approved3"
+            "D:\\tmp\\kokoroarc-m9-task18-campaign-20260820-approved4"
         ),
         "retained_root": (
-            "tests/skills/evidence/complete-suite/approved3"
+            "tests/skills/evidence/complete-suite/approved4"
         ),
     }
     assert proposed["reruns_require_fresh_approval"] is True
