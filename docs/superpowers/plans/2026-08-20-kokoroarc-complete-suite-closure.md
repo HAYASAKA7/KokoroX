@@ -468,12 +468,23 @@ Use campaign ID `2026-08-20-proposed3`, raw root
 `draft_not_approved` with no frozen inputs, no approval, and zero execution.
 The approved1 and approved2 evidence roots remain byte-identical.
 
-- [ ] **Step 4: Run and commit the complete proposed3 preapproval gate**
+- [x] **Step 4: Run and commit the complete proposed3 preapproval gate**
 
 Rerun the complete structure, preparation, runner, sanitizer, importer,
 adjudicator, no-spawn, package-inventory, and validator selection. Verify both
 approved3 roots are absent and both prior approved evidence inventories remain
 byte-identical.
+
+Checkpoint: provider-compatible harness commit
+`8623f555641b1b8596f559f14923e773c1c5a471` (tree
+`84451c7befca6aa1ce87839580cff73498dea995`, parent
+`c474ff2b32dd414c2a50f3898be13fd2b0d98c5e`) passed 124 tests with 3
+documented Windows link-capability skips in 493.18 seconds. All four Skill
+validators passed. Both proposed3 roots were absent. The 515-file approved1
+and approved2 inventories recomputed exactly to
+`8eae25e7b6a0bee1929c3405280ff4d900403a34a52d423cfd0390a0aa7bb862`
+and `c04fc14fa99acfefd3e06c0f003da793630714e39c0c540b37f2e0412e1cdf88`;
+the exact harness range and final status were clean.
 
 - [ ] **Step 5: Freeze proposed3 and request fresh explicit approval**
 
