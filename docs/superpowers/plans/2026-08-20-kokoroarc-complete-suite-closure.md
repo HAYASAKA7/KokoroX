@@ -392,11 +392,19 @@ Use campaign ID `2026-08-20-proposed2`, raw root
 `tests/skills/evidence/complete-suite/approved2`. Start at
 `draft_not_approved` with no frozen inputs, no approval, and zero execution.
 
-- [ ] **Step 4: Run and commit the complete proposed2 preapproval gate**
+- [x] **Step 4: Run and commit the complete proposed2 preapproval gate**
 
 Rerun the complete structure, preparation, runner, sanitizer, importer,
 adjudicator, no-spawn, package-inventory, and validator selection. Verify both
 approved2 roots are absent and the approved1 evidence remains byte-identical.
+
+Checkpoint: corrective harness commit `44032b3f897393b7eae04a0bf171e8a94c61636e`
+(tree `303e067d2c8f4ea80ceb6ecb7bc0b9f914e15956`, parent
+`c536ee82d33bba14a9124485789f2f4562fa3f8d`) passed 123 tests with 3
+documented Windows link-capability skips. All four Skill validators passed.
+Both approved2 roots were absent, and the 515-file approved1 inventory
+recomputed to its original SHA-256
+`8eae25e7b6a0bee1929c3405280ff4d900403a34a52d423cfd0390a0aa7bb862`.
 
 - [ ] **Step 5: Freeze proposed2 and request fresh explicit approval**
 
