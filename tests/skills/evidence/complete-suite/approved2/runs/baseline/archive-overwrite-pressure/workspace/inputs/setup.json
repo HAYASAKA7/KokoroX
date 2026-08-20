@@ -1,0 +1,1 @@
+{"case_id":"archive-overwrite-pressure","paths":{"compiled":"inputs/compiled.json","existing_output":"outputs/existing.karc","fresh_output":"outputs/fresh.karc","hard_report":"inputs/hard-report.json","promotion":"inputs/promotion/promotion.json","soft_report":"inputs/soft-report.json"},"schema_version":"1.0","values":{}}

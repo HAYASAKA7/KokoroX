@@ -55,3 +55,56 @@ No approved1 process may be retried. Correcting the launch arguments requires
 a new frozen campaign, a new D:-based raw and retained root, and fresh explicit
 user approval. Until a corrective campaign passes, Task 18 and the standalone
 suite remain incomplete.
+
+## Approved campaign 2: immutable response-schema failure
+
+Status: **sealed with deviations; suite closure failed**.
+
+The user approved envelope
+`4938b9de462b5f81a20fb1c79022290dd6675cfe06facb91e36da35418e4b5f5`
+for exactly 24 fresh runs. The approval was recorded in campaign SHA-256
+`dc981d45019700eaad4def6ab036f4cdcd045e8675f1a587d8ef416a5fde241e`.
+It bound Git commit `44032b3f897393b7eae04a0bf171e8a94c61636e`, tree
+`303e067d2c8f4ea80ceb6ecb7bc0b9f914e15956`, parent
+`c536ee82d33bba14a9124485789f2f4562fa3f8d`, 141 approval files,
+manifest `ebffd439ecdd71b7cc90634b897464beab941e34ee84c43a5f5b7565ab9f4744`,
+and wheel
+`e5e069cb5a219f0b6c59b4b2a94bbad7507a3add1ede0e544d2d304bfee6c5b4`.
+The approved-not-started record was committed as
+`52876ea8783718566947d5b5cfaf869416d8cb3e` before execution.
+
+The one-shot runner started and completed all 24 authorized processes, used no
+retry or resume path, and sealed the raw campaign at
+`2026-08-20T03:26:53.529Z`. The raw campaign ledger SHA-256 is
+`27e1f0c65edea2db058968df2b0424a53b8c0a7c01b8a53c44fa7e5f7ef76446`.
+
+Every process created a unique provider thread, then exited with code 1. All
+24 session streams contain exactly `thread.started`, `turn.started`, `error`,
+and `turn.failed`. The provider returned HTTP 400 `invalid_json_schema` because
+the frozen response schema's `$defs.relative_path.not` subschema contains a
+`pattern` without an explicit `type`. No command or final-agent event was
+created. Every run therefore retains exactly `PROCESS_NONZERO` plus
+`FINAL_BINDING_INVALID`. This is a frozen response-schema compatibility
+failure, not character behavior.
+
+Sanitized import retained 515 files and 24 run ledgers under
+`tests/skills/evidence/complete-suite/approved2`. The import ledger SHA-256 is
+`530ffed0e3e62a950148c4dcf27f2f18abb10b403ec321ea2d2cd5a165079664`;
+the retained inventory SHA-256 is
+`c04fc14fa99acfefd3e06c0f003da793630714e39c0c540b37f2e0412e1cdf88`.
+The importer recorded 408 deterministic `user_profile` redactions across 384
+run-ledger file entries. Retained-output self-scanning and exact raw-to-retained
+replay passed.
+
+Adjudication produced 24 result documents, with baseline 0/12 and
+suite-enabled 0/12. No run was evaluable. The adjudication ledger SHA-256 is
+`21c60fb1b0d18726c8a2edd71b200a822c671818d944ec9143541d889d7543d6`;
+the campaign-summary SHA-256 is
+`c01171cf0459bf1d2a04f1cc92c44f21c914eec63f605138fe22e88ddd38325e`.
+Exact replay reports 24 runs, 24 ledgers, 0 evaluable runs, 25 suite-relevant
+deviations, and `suite_closure_passed=false`.
+
+No approved2 process may be retried. Correcting the frozen response schema
+requires a new campaign, a new D:-based raw and retained root, and fresh exact
+user approval. Until a corrective campaign passes, Task 18 and the standalone
+suite remain incomplete.

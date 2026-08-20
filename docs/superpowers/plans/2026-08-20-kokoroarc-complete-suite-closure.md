@@ -422,12 +422,20 @@ wheel `e5e069cb5a219f0b6c59b4b2a94bbad7507a3add1ede0e544d2d304bfee6c5b4`,
 24 one-shot runs, and the unique approved2 roots. Approval ID
 `user-approval-4938b9de462b-02` was recorded at `2026-08-20T03:20:14Z`.
 
-- [ ] **Step 6: Record approval, execute once, import, and adjudicate**
+- [x] **Step 6: Record approval, execute once, import, and adjudicate**
 
 Commit `approved_not_started` before execution. Run each of the 24 sessions
 once with concurrency at most four; seal regardless of outcome. Import and
 adjudicate through the exact tested replay paths. A further correction requires
 another approval and unique roots.
+
+Approved2 checkpoint: all 24 authorized provider threads were started once and
+sealed without retry. The provider rejected the frozen response schema before
+evaluation because `$defs.relative_path.not` has no explicit `type`. Exact
+import and adjudication replay passed, but no run was evaluable; baseline and
+suite-enabled results are both 0/12 and `suite_closure_passed=false`. Approved2
+is immutable under `tests/skills/evidence/complete-suite/approved2`. A schema
+correction requires proposed3, unique roots, and fresh exact approval.
 
 ## Task 8: Run the settled deterministic release gate
 
