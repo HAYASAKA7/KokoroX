@@ -1,0 +1,19 @@
+{
+  "schema_version": "1.0",
+  "artifact_id": "original/mika-moongear/draft",
+  "character_id": "mika-moongear",
+  "character_version": "0.1.0",
+  "namespace": "original",
+  "display_name": "Mika Moongear",
+  "build_status": "draft",
+  "visibility": "private",
+  "activation_allowed": false,
+  "authored_original": true,
+  "research_status": "not_applicable",
+  "release_validation": "not_run",
+  "installation_status": "not_installed",
+  "publication_status": "not_published",
+  "locales": ["zh-CN", "en-US", "ja-JP"],
+  "fixtures": ["tests/multilingual.yaml", "tests/protected-spans.yaml"],
+  "unresolved_evidence": ["No external canon or external evidence applies; no external verification was requested or performed.", "The local draft validator and compiler could not run because the configured CLI environment is missing the jsonschema dependency."]
+}

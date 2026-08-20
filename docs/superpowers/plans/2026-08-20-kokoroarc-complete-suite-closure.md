@@ -486,19 +486,44 @@ and approved2 inventories recomputed exactly to
 and `c04fc14fa99acfefd3e06c0f003da793630714e39c0c540b37f2e0412e1cdf88`;
 the exact harness range and final status were clean.
 
-- [ ] **Step 5: Freeze proposed3 and request fresh explicit approval**
+- [x] **Step 5: Freeze proposed3 and request fresh explicit approval**
 
 Present the new exact commit/tree/parent, closed file manifest, wheel, campaign
 SHA-256, envelope SHA-256, unchanged 24-run policy, unique roots, and the
 approved2 provider-schema correction. The approved1 or approved2 responses do
 not authorize proposed3.
 
-- [ ] **Step 6: Record approval, execute once, import, and adjudicate**
+- [x] **Step 6: Record approval, execute once, import, and adjudicate**
 
 Only after a fresh exact user approval, commit `approved_not_started`, execute
 each of the 24 sessions once with concurrency at most four, seal regardless of
 outcome, and run the exact import/replay/adjudication path. Any later correction
 requires another campaign, new roots, and new approval.
+
+Approved3 checkpoint: the user approved envelope
+`6e02744b1523e8455652cfd1999a2c400398b1d46e3991b7640fb1acb4e85aa3`.
+The approval was recorded in campaign SHA-256
+`2c86e70cc07266b5ffb97e46cb6e998bcffcfa01496e435170c60df4d3dde53d`
+and committed as `f48b05e2380da9de628e6b9865d8cea7c890dd84` before
+execution. The one-shot runner started and completed all 24 processes with no
+retry, timeout, nonzero process exit, or raw deviation and sealed raw ledger
+`81797df9d23dd0068b8d0c818689a4a30abc96e29f76b46127fcb5f065edb479`.
+Exact import/replay retained 542 files and 24 evaluable run ledgers under
+`tests/skills/evidence/complete-suite/approved3`; import ledger
+`d8611bc380a7033ccff2928f5e12f5596e779bdf8d55999efc2b831ca24903ab`
+and retained inventory
+`811c92b0c6e141d511bb67fdffdffbec2e0765f6cb9a5cf520527e8aae40f6d7`
+replay exactly.
+
+Approved3 remains a harness failure rather than behavioral evidence. The
+isolated runtime installed the KokoroArc wheel with `--no-deps`, so invoked CLI
+processes failed at import time with `ModuleNotFoundError: jsonschema`. The
+frozen adjudicator also rejects the actual escaped Windows PowerShell wrapper
+form and rejects the provider-approved `not_applicable` claim status in its
+own result validator. Its one adjudication attempt therefore failed closed
+before publishing a results tree. Approved3 may never be retried or rewritten;
+any correction requires a proposed4 campaign, unique roots, a new frozen
+envelope, and fresh explicit approval.
 
 ## Task 8: Run the settled deterministic release gate
 

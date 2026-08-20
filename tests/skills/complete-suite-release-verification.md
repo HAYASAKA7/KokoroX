@@ -108,3 +108,53 @@ No approved2 process may be retried. Correcting the frozen response schema
 requires a new campaign, a new D:-based raw and retained root, and fresh exact
 user approval. Until a corrective campaign passes, Task 18 and the standalone
 suite remain incomplete.
+
+## Approved campaign 3: immutable installed-runtime harness failure
+
+Status: **sealed without raw deviations; adjudication failed closed; suite
+closure failed**.
+
+The user approved envelope
+`6e02744b1523e8455652cfd1999a2c400398b1d46e3991b7640fb1acb4e85aa3`
+for exactly 24 fresh runs. The approval was recorded in campaign SHA-256
+`2c86e70cc07266b5ffb97e46cb6e998bcffcfa01496e435170c60df4d3dde53d`.
+It bound Git commit `8623f555641b1b8596f559f14923e773c1c5a471`, tree
+`84451c7befca6aa1ce87839580cff73498dea995`, parent
+`c474ff2b32dd414c2a50f3898be13fd2b0d98c5e`, 141 approval files,
+manifest `28b43b685c5298b2c374bc41ba12ff2e5972a4e1105efc3b41ee65233a2e88fa`,
+and wheel
+`e5e069cb5a219f0b6c59b4b2a94bbad7507a3add1ede0e544d2d304bfee6c5b4`.
+The approved-not-started record was committed as
+`f48b05e2380da9de628e6b9865d8cea7c890dd84` before execution.
+
+The one-shot runner started and completed all 24 authorized processes, used no
+retry or resume path, and sealed the raw campaign at
+`2026-08-20T06:07:37.772Z`. Every process created a unique provider thread and
+exited with code 0; no process timed out and the campaign recorded zero raw
+deviations. The raw campaign ledger SHA-256 is
+`81797df9d23dd0068b8d0c818689a4a30abc96e29f76b46127fcb5f065edb479`.
+
+Sanitized import retained 542 files and 24 evaluable run ledgers under
+`tests/skills/evidence/complete-suite/approved3`. The import ledger SHA-256 is
+`d8611bc380a7033ccff2928f5e12f5596e779bdf8d55999efc2b831ca24903ab`;
+the retained inventory SHA-256 is
+`811c92b0c6e141d511bb67fdffdffbec2e0765f6cb9a5cf520527e8aae40f6d7`.
+Retained-output self-scanning, final-event binding, and exact raw-to-retained
+replay passed for all 24 runs.
+
+Approved3 does not establish character behavior. The isolated runtime was
+created by installing the KokoroArc wheel with `--no-deps`, while the package
+requires PyYAML and jsonschema. KokoroArc CLI invocations therefore failed at
+module import with `ModuleNotFoundError: No module named 'jsonschema'`. In
+addition, the frozen adjudicator does not recognize the actual escaped Windows
+PowerShell executable form (or the optional `-NoProfile` wrapper flag), and
+its result validator omits the `not_applicable` status allowed by the approved
+provider schema. The first and only local adjudication attempt consequently
+raised `RuntimeError: campaign adjudication result is invalid` and atomically
+removed its scratch tree; no results directory was published.
+
+No approved3 process may be retried, and its retained evidence may not be
+rewritten. Repairing the installed runtime, wrapper parser, and output/result
+contract requires a new frozen campaign with unique D:-based raw and retained
+roots and fresh exact user approval. Until a corrective campaign passes, Task
+18 and the standalone suite remain incomplete.

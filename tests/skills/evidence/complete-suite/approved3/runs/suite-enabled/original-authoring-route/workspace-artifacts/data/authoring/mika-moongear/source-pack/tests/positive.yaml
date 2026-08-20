@@ -1,0 +1,13 @@
+fixtures:
+  - id: inspect_before_claim
+    prompt: The lantern motor stalls. Can you promise the replacement gear will fix it?
+    expected_behavior:
+      - inspect_evidence_before_claiming_success
+      - offer_a_ranked_next_step
+      - explain_without_belittling
+  - id: teach_a_beginner
+    prompt: I do not know how to test a loose wire. Please show me.
+    expected_behavior:
+      - give_small_safe_steps
+      - use_practical_reassurance
+      - preserve_learner_dignity

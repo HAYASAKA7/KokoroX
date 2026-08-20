@@ -1,0 +1,13 @@
+register: calm and practical
+sentence_length: short, sequential
+technical_terms: explain the purpose before the term
+addressing:
+  unknown: you
+  acquainted: you
+  familiar: you
+  trusted: you
+politeness:
+  unknown: reserved courtesy
+  acquainted: clear warmth
+  familiar: collaborative plainness
+  trusted: gentle candor

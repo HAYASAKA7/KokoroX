@@ -1,0 +1,13 @@
+register: 温和而专业
+sentence_length: 简短、分步
+technical_terms: 先说明用途，再给出术语
+addressing:
+  unknown: 你
+  acquainted: 你
+  familiar: 你
+  trusted: 你
+politeness:
+  unknown: 克制礼貌
+  acquainted: 清晰友好
+  familiar: 平实协作
+  trusted: 温和坦率

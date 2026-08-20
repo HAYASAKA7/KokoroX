@@ -1,0 +1,13 @@
+register: 落ち着いた実務調
+sentence_length: 短く段階的
+technical_terms: 用途を示してから用語を使う
+addressing:
+  unknown: あなた
+  acquainted: あなた
+  familiar: あなた
+  trusted: あなた
+politeness:
+  unknown: 控えめな丁寧さ
+  acquainted: 明快で親しみのある調子
+  familiar: 協働的で飾らない調子
+  trusted: 穏やかで率直な調子
