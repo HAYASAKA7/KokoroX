@@ -283,25 +283,39 @@ the documented Windows directory-link/symlink capability cases. All four Skill
 validators passed. The campaign remained `draft_not_approved`; the approved
 raw and retained roots did not exist; no external evaluator session ran.
 
-- [ ] **Step 2: Freeze all approval inputs**
+- [x] **Step 2: Freeze all approval inputs**
 
 Record commit/tree/parent plus SHA-256 for cases, campaign, runner, output
 schema, all four Skills/contracts/metadata, wheel/content inventory, sanitizer,
 importer, and adjudicator. Reproduce the proposed 24-run envelope exactly.
 
-- [ ] **Step 3: Ask the user for explicit approval**
+- [x] **Step 3: Ask the user for explicit approval**
 
 State the exact run count, cases, model/provider/client, reasoning effort,
 disclosed inputs, retained outputs, sandbox/network policy, environment, D:
 roots, concurrency, no-retry rule, and immutable-failure policy. Do not launch
 until the user explicitly approves that frozen envelope.
 
-- [ ] **Step 4: Commit the approval record without running**
+- [x] **Step 4: Commit the approval record without running**
 
 After approval, record the user's exact response and approval timestamp/ID,
 change status to `approved_not_started`, rerun no-spawn/frozen-hash tests, and
 commit. Any byte change to an approval-bound input returns status to
 `draft_not_approved` and requires new approval.
+
+Approval checkpoint (2026-08-20): the user explicitly responded `approve` to
+approval envelope
+`dd85e3e629aeaec0db889332c72fe32fc4f9c235167e169c321fb1df34b37b4e`.
+The record binds 141 files (manifest
+`1eda78dc1e49e0a28024542968f67d1915fdcd7652ed4e9651ee40e7cbe022b2`),
+frozen-input digest
+`7be0060b25b1bea79b6e51f6719df627ff62a8d7aec5c06bf1334dd758df07d7`,
+Git commit `a4b1e96aad44dd586417413b7df860255f4ff2dd`, tree
+`48d40b7d67bf3620b46d54d08b0b9502a1a3cc26`, parent
+`e868643a011042ff71a84d72a67f9340ddf89d4c`, and wheel SHA-256
+`e5e069cb5a219f0b6c59b4b2a94bbad7507a3add1ede0e544d2d304bfee6c5b4`.
+The campaign is `approved_not_started`; all execution counters remain zero and
+neither the raw nor retained root has been created.
 
 ## Task 6: Execute exactly the approved campaign
 
