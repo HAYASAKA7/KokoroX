@@ -794,11 +794,19 @@ exactly, passed the Task 18 exact-range whitespace check, and left the worktree
 clean. Step 11 is therefore closed without provider execution; Step 12 remains
 the required fresh user-approval boundary.
 
-- [ ] **Step 12: Request fresh exact proposed5 approval**
+- [x] **Step 12: Request fresh exact proposed5 approval**
 
 Present the complete proposed5 envelope. No earlier design or campaign
 approval authorizes execution. Only a new explicit approval of the exact
 frozen envelope permits an `approved_not_started` commit and one-shot launch.
+
+Approval received (2026-08-20): the user responded `approve` directly to exact
+proposed5 envelope
+`53c30f3706a90f36b308a9a6d1367993f151b89bc6268c19c9d2f922d01abe18`.
+Approval ID `user-approval-53c30f3706a9-05` binds UTC timestamp
+`2026-08-20T14:05:45Z`, the unchanged 24-run policy, and the unique approved5
+roots. The only authorized next mutations are one validated
+`approved_not_started` commit and one no-retry campaign launch.
 
 ## Task 8: Run the settled deterministic release gate
 

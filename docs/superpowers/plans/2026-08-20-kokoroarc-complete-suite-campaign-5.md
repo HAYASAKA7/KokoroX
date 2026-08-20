@@ -724,7 +724,7 @@ File-manifest SHA-256, campaign SHA-256, approval-envelope SHA-256, and
 wheelhouse-manifest SHA-256 remained exactly unchanged. The exact Task 18
 base-to-record range passed `git diff --check`, and status was clean.
 
-- [ ] **Step 3: Present the exact approval envelope and stop**
+- [x] **Step 3: Present the exact approval envelope and stop**
 
 Present the user with:
 
@@ -741,6 +741,14 @@ Present the user with:
 Do not infer approval from the design approval or any earlier `approve`
 message. Stop and wait for a new explicit response to the exact proposed5
 envelope.
+
+Approval received (2026-08-20): the user responded `approve` directly to the
+presentation of exact envelope
+`53c30f3706a90f36b308a9a6d1367993f151b89bc6268c19c9d2f922d01abe18`.
+Approval ID `user-approval-53c30f3706a9-05` records UTC timestamp
+`2026-08-20T14:05:45Z`. This authorizes one `approved_not_started` commit and
+one one-shot 24-session execution only. Execution remains blocked until that
+record validates and commits cleanly.
 
 ## Completion boundary
 

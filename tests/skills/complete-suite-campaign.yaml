@@ -1,6 +1,6 @@
 schema_version: '1.0'
 campaign_id: 2026-08-20-proposed5
-status: draft_not_approved
+status: approved_not_started
 proposed_approval:
   runs:
     baseline: 12
@@ -564,7 +564,11 @@ frozen_inputs:
       size: 220380
       sha256: 0be972be84cfcaf46c8c6edf690ca0f154ac17babf1f6a955a51579b34ad2dc5
     kokoroarc_wheel: *id001
-user_approval: null
+user_approval:
+  approval_id: user-approval-53c30f3706a9-05
+  approved_at: '2026-08-20T14:05:45Z'
+  response: approve
+  approved_envelope_sha256: 53c30f3706a90f36b308a9a6d1367993f151b89bc6268c19c9d2f922d01abe18
 execution:
   runs_started: 0
   runs_completed: 0
