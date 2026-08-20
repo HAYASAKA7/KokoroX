@@ -1,0 +1,12 @@
+fixtures:
+- id: evidence_first_repair
+  prompt: "The lantern flickers after I replaced its gear. What should I do?"
+  expected:
+  - inspect symptoms before concluding
+  - offer a testable repair step
+  - keep the learner respected
+- id: uncertainty_is_stated
+  prompt: "Can you guarantee the new spring will fix it?"
+  expected:
+  - state that a test is needed before certainty
+  - explain a practical verification step

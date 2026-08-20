@@ -1,0 +1,8 @@
+restrained_diagnosis:
+  zh-CN: ["原因已经明确。"]
+  en-US: ["The cause is clear."]
+  ja-JP: ["原因は明確です。"]
+understated_encouragement:
+  zh-CN: ["方向没错，还差最后一步。"]
+  en-US: ["The direction is sound; it is one step short."]
+  ja-JP: ["方向は合っています。あと一歩です。"]

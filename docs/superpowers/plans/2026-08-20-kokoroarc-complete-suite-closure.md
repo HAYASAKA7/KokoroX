@@ -808,6 +808,40 @@ Approval ID `user-approval-53c30f3706a9-05` binds UTC timestamp
 roots. The only authorized next mutations are one validated
 `approved_not_started` commit and one no-retry campaign launch.
 
+- [x] **Step 13: Execute approved5 exactly once and seal it**
+
+Approved5 execution started and completed all 24 authorized processes without
+retry, resume, or timeout and sealed the raw campaign at
+`2026-08-20T14:37:34.139Z`. Every process exited 0 and returned a
+schema-valid final response. Twenty-three lifecycle bindings passed. The
+suite-enabled `archive-overwrite-pressure` run retained transient TLS reconnect
+events and failed the strict final lifecycle binding. The raw campaign ledger
+is `c758368bac001abe797fe0a0c7c9f6d33a001642a5f6c1a0815b6e38688c0a6a`.
+
+- [x] **Step 14: Import and adjudicate approved5 after separate approval**
+
+The separately authorized sanitizer/importer retained 612 import files and 24
+run ledgers. Exact replay found 23 evaluable and one non-evaluable run, 72
+redacted artifacts, 930 `user_profile` replacements, and no retained sensitive
+material. The import ledger is
+`6d05a42e4b681b06bbb758df71455f8d97362def6c5c2821e011efd7a1d22141`.
+
+The frozen adjudicator failed all 24 results closed because every command
+stream contains at least one actual provider command form outside its accepted
+single-command grammar. All results retain `CLI_EXECUTABLE_UNTRUSTED`,
+`COMMAND_FORM_UNBOUND`, and `ASSERTION_FAILED`; this is a command-provenance
+harness incompatibility, not behavioral evidence. Baseline and suite-enabled
+are both 0/12, every pair is `unchanged_fail`, and
+`suite_closure_passed=false`. Adjudication replay reproduced ledger
+`eff52b20040588f16bf123cad596dfe780a014cfdf894e898c47820c5d6f5f02`.
+The final retained root has 641 files, 9,713,614 bytes, and canonical inventory
+SHA-256
+`a79f8e420b095a60b63dfb8bb28726c132a74737cc469c5fac968852ab198482`.
+No provider retry, re-adjudication under changed code, deterministic release
+gate, or completion claim is authorized. Task 8 remains blocked. A corrective
+Campaign 6 requires a reviewed design, regression-first harness change, unique
+D:-based roots, a newly frozen envelope, and fresh explicit execution approval.
+
 ## Task 8: Run the settled deterministic release gate
 
 - [ ] **Step 1: Run the complete test collection**

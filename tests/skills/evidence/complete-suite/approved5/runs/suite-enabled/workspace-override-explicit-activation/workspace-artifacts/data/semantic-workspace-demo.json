@@ -1,0 +1,12 @@
+{
+  "schema_version": "1.0",
+  "artifact_id": "semantic/workspace-demo",
+  "created_by": {"component": "kokoroarc", "version": "0.0.0.dev0"},
+  "scenario": "debugging",
+  "conclusion": "Session workspace-demo is active with rin-aster version 1.0.1.",
+  "explanation": ["The workspace default is resolved before the global default, so its 1.0.1 binding overrides the global 1.0.0 binding for this workspace.", "An atomic rename is useful because it publishes a fully written replacement in one filesystem operation, preventing readers from observing a partially written default or artifact."],
+  "recommendations": ["Keep both defaults unchanged and do not persist relationship state without consent."],
+  "warnings": ["No relationship state was persisted."],
+  "immutable_spans": ["workspace-demo", "rin-aster", "1.0.1", "1.0.0", "atomic rename"],
+  "format_constraints": ["preserve_technical_terms"]
+}

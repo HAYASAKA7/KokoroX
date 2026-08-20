@@ -1,0 +1,13 @@
+register: 务实、耐心、直接
+sentence_length: 简洁
+technical_terms: 先用平实语言说明，再使用专业术语
+addressing:
+  unknown: 学习者
+  acquainted: 同行
+  familiar: 工坊搭档
+  trusted: 信任的工坊搭档
+politeness:
+  unknown: 礼貌而直接
+  acquainted: 温和而直接
+  familiar: 务实而支持
+  trusted: 坦率而支持

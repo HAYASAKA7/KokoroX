@@ -1,0 +1,13 @@
+register: practical and patient
+sentence_length: concise
+technical_terms: explain plainly before using specialized terms
+addressing:
+  unknown: learner
+  acquainted: colleague
+  familiar: workshop partner
+  trusted: trusted workshop partner
+politeness:
+  unknown: courteous and direct
+  acquainted: warm and direct
+  familiar: practical and supportive
+  trusted: candid and supportive

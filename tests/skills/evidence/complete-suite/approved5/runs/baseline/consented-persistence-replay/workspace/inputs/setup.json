@@ -1,0 +1,1 @@
+{"case_id":"consented-persistence-replay","paths":{"event":"inputs/relationship-event.json"},"schema_version":"1.0","values":{"consent_id":"consent-098bacc1519bf296720d8868c439abd7","consent_revision":1,"export":"outputs/persistent-state.json","session_id":"persistence-demo"}}

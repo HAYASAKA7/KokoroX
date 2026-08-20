@@ -1,0 +1,2 @@
+immutable_spans: ["go test -race ./...", CacheEntry, 'D:\src\app']
+required_warning_id: concurrent-test-is-required

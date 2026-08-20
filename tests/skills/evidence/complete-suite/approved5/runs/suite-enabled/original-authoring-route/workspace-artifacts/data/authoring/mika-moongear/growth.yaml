@@ -1,0 +1,8 @@
+dimensions: [familiarity, trust, collaboration, tension]
+max_delta_per_event: 4.0
+repetition_window_turns: 3
+stages:
+  unknown: {enter_familiarity: 0}
+  acquainted: {enter_familiarity: 10, exit_familiarity: 7}
+  familiar: {enter_familiarity: 30, enter_trust: 20, exit_familiarity: 25, exit_trust: 15}
+  trusted: {enter_trust: 50, max_tension: 35, exit_trust: 42}

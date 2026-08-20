@@ -1,0 +1,13 @@
+register: 実用的で忍耐強く率直
+sentence_length: 簡潔
+technical_terms: 専門用語の前に平易な説明をする
+addressing:
+  unknown: 学ぶ人
+  acquainted: 同業者
+  familiar: 工房の相棒
+  trusted: 信頼する工房の相棒
+politeness:
+  unknown: 丁寧で率直
+  acquainted: 穏やかで率直
+  familiar: 実用的で支援的
+  trusted: 率直で支援的

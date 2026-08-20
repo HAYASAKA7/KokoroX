@@ -217,3 +217,81 @@ evidence may not be rewritten. Corrective campaign 5 requires a new frozen
 campaign, new raw and retained roots, a fresh exact approval envelope, and a
 new explicit user approval. Until that campaign passes, Task 18 and the
 standalone suite remain incomplete.
+
+## Approved campaign 5: immutable command-provenance adjudication failure
+
+Status: **sealed with one raw lifecycle deviation; adjudication failed closed;
+suite closure failed**.
+
+The user approved envelope
+`53c30f3706a90f36b308a9a6d1367993f151b89bc6268c19c9d2f922d01abe18`
+for exactly 24 fresh runs. Approval ID
+`user-approval-53c30f3706a9-05` records the response `approve` at
+`2026-08-20T14:05:45Z`. The approved campaign SHA-256 is
+`16c6fd866d19dfd8b291edaccf643bdf95f57b25dbd38e65616c2796afaf0530`.
+It bound harness commit `03571d2d37d6643232ff6783e519f6dbb7a0aab5`, tree
+`0b2f2797238c55ea9bddc598891a9554de32c486`, parent
+`54ed269163247b86323f6895890758f03522e530`, 141 approval files at
+manifest SHA-256
+`23fb66d99aa3f1e671ca8ea7fb51c89c1e712209418b6f5608af293b1aec2e18`,
+the canonical-LF KokoroArc wheel at SHA-256
+`76ebb700b7bb9c4eb88fd74a2268c077eeff741245cb7d7f6402673e2f02174f`,
+and the seven-wheel runtime manifest at SHA-256
+`c2230d20a1fbe19c39f8c5cb9bf445b18d6b7a3e05e281912ed953d5078f5698`.
+The approved-not-started record was committed as
+`4e2b00f181217f7881d1e379645da37f4f83773e` before execution.
+
+The one-shot runner started and completed all 24 authorized processes, used no
+retry or resume path, and sealed the raw campaign at
+`2026-08-20T14:37:34.139Z`. Every process exited with code 0 and none timed
+out. All 24 final responses passed the provider output schema. Twenty-three
+runs retained a valid lifecycle/final binding. Suite-enabled
+`archive-overwrite-pressure`, ordinal 20, retained three transient TLS
+reconnect error events before its final response; the strict lifecycle binder
+therefore retained `FINAL_BINDING_INVALID` and the campaign disclosed one
+`RUN_LIFECYCLE_FAILURE`. The raw campaign ledger SHA-256 is
+`c758368bac001abe797fe0a0c7c9f6d33a001642a5f6c1a0815b6e38688c0a6a`.
+
+After separate authorization, the tested sanitizer/importer retained 612
+import files, including 24 run ledgers, under
+`tests/skills/evidence/complete-suite/approved5`. The importer recorded 930
+deterministic `user_profile` replacements across 72 retained artifacts. Exact
+raw-to-retained replay reproduced all 24 ledgers, with 23 evaluable and one
+non-evaluable run. The import ledger SHA-256 is
+`6d05a42e4b681b06bbb758df71455f8d97362def6c5c2821e011efd7a1d22141`.
+Retained-output self-scanning found no sensitive material.
+
+Adjudication added 29 canonical result files. Every one of the 24 results
+failed closed with `CLI_EXECUTABLE_UNTRUSTED`, `COMMAND_FORM_UNBOUND`, and
+`ASSERTION_FAILED`; 19 also retain `COMMAND_WRAPPER_INVALID`, 11 retain
+`UNSAFE_COMMAND`, 7 retain `FINAL_OUTCOME_INVALID`, 16 retain
+`ASSERTION_ADJUDICATOR_MISSING`, and ordinal 20 retains
+`RUN_NOT_EVALUABLE`. The actual provider command streams contain ordinary
+compound PowerShell payloads and call-operator invocations of the isolated
+`.tools\kokoro.cmd`. The frozen parser accepts only one direct CLI invocation
+or one literal workspace read per command record; unsupported compound syntax
+tokenizes to no trusted executable and cannot be bound to CLI evidence. This
+is an evidence-provenance/adjudicator incompatibility. It prevents a
+behavioral conclusion and may not be reinterpreted as either a Skill pass or a
+behavioral failure.
+
+The immutable outcome is baseline 0/12, suite-enabled 0/12, with all 12 paired
+cases classified `unchanged_fail` and `suite_closure_passed=false`. The
+adjudication ledger SHA-256 is
+`eff52b20040588f16bf123cad596dfe780a014cfdf894e898c47820c5d6f5f02`;
+the campaign-summary SHA-256 is
+`c317e6bcb7bc47de238084ae3513a61f48be44699ff3c93962d4774fd7cc3cd6`.
+Adjudication replay reproduced all 24 results and the same closure outcome.
+The final 641-file retained tree contains 9,713,614 bytes at canonical
+inventory SHA-256
+`a79f8e420b095a60b63dfb8bb28726c132a74737cc469c5fac968852ab198482`;
+its 29-file results subtree is
+`f5678c44711c8d98c07348bd6e0f4f6f3398bcdd8f232d29c1dda74d8c88b552`.
+
+No approved5 process may be retried, and neither its retained evidence nor its
+failed adjudication may be rewritten. A corrective Campaign 6 must first
+specify and regression-test an evidence-bound grammar for the command forms
+actually emitted, without accepting hidden execution or weakening output and
+confinement checks. It requires unique D:-based roots, a newly frozen envelope,
+and fresh explicit approval before any provider execution. Task 18 and the
+standalone suite remain incomplete.
