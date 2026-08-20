@@ -130,7 +130,7 @@ def test_complete_suite_campaign_state_is_closed_and_nonexecuted() -> None:
         "execution",
     }
     assert document["schema_version"] == "1.0"
-    assert document["campaign_id"] == "2026-08-20-proposed1"
+    assert document["campaign_id"] == "2026-08-20-proposed2"
     assert document["status"] in {
         "draft_not_approved",
         "approved_not_started",
@@ -195,10 +195,10 @@ def test_complete_suite_campaign_state_is_closed_and_nonexecuted() -> None:
         "task_network": False,
         "max_concurrency": 4,
         "raw_root": (
-            "D:\\tmp\\kokoroarc-m9-task18-campaign-20260820-approved1"
+            "D:\\tmp\\kokoroarc-m9-task18-campaign-20260820-approved2"
         ),
         "retained_root": (
-            "tests/skills/evidence/complete-suite/approved1"
+            "tests/skills/evidence/complete-suite/approved2"
         ),
     }
     assert proposed["reruns_require_fresh_approval"] is True

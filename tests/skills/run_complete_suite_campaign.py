@@ -396,9 +396,17 @@ def _validate_proposed_policy(proposed: object) -> dict[str, Any]:
         "ignore_rules": True,
         "task_network": False,
         "max_concurrency": 4,
-        "retained_root": "tests/skills/evidence/complete-suite/approved1",
     }
-    if any(isolation.get(key) != value for key, value in expected.items()):
+    retained_root = isolation.get("retained_root")
+    if (
+        any(isolation.get(key) != value for key, value in expected.items())
+        or not isinstance(retained_root, str)
+        or re.fullmatch(
+            r"tests/skills/evidence/complete-suite/approved[1-9][0-9]*",
+            retained_root,
+        )
+        is None
+    ):
         raise RuntimeError("approval envelope policy is invalid")
     for field in ("disclosed_inputs", "retained_outputs", "prohibited"):
         values = proposed.get(field)
@@ -1240,8 +1248,6 @@ def build_launch_spec(
         "--ignore-rules",
         "--skip-git-repo-check",
         "--approve-for-me",
-        "--sandbox",
-        "workspace-write",
         "--model",
         "gpt-5.6-terra",
         "--color",

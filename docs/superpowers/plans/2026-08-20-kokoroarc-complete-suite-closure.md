@@ -371,6 +371,46 @@ suite-relevant deviations, and `suite_closure_passed=false`. The immutable
 record is `tests/skills/complete-suite-release-verification.md`; retained
 evidence is under `tests/skills/evidence/complete-suite/approved1`.
 
+## Corrective campaign 2: repair the approved1 launch incompatibility
+
+- [x] **Step 1: Preserve approved1 before changing the harness**
+
+Commit the exact sanitized evidence, result documents, replay hashes, and
+failure record. Approved1 remains failed and may never be retried or rewritten.
+
+- [x] **Step 2: Reproduce and repair the CLI argument conflict with TDD**
+
+Require the launch command to contain exactly one `--approve-for-me` and no
+separate `--sandbox` option. `codex-cli 0.148.0` documents that
+`--approve-for-me` itself routes automatic review through workspace-write.
+Retain the explicit network-denial config and every other frozen policy.
+
+- [x] **Step 3: Create a closed, nonexecuted proposed2 record**
+
+Use campaign ID `2026-08-20-proposed2`, raw root
+`D:\tmp\kokoroarc-m9-task18-campaign-20260820-approved2`, and retained root
+`tests/skills/evidence/complete-suite/approved2`. Start at
+`draft_not_approved` with no frozen inputs, no approval, and zero execution.
+
+- [ ] **Step 4: Run and commit the complete proposed2 preapproval gate**
+
+Rerun the complete structure, preparation, runner, sanitizer, importer,
+adjudicator, no-spawn, package-inventory, and validator selection. Verify both
+approved2 roots are absent and the approved1 evidence remains byte-identical.
+
+- [ ] **Step 5: Freeze proposed2 and request fresh explicit approval**
+
+Present the new exact commit/tree/parent, closed file manifest, wheel, campaign
+SHA-256, envelope SHA-256, unchanged 24-run policy, new roots, and disclosed
+approved1 harness correction. Do not launch on the approved1 response.
+
+- [ ] **Step 6: Record approval, execute once, import, and adjudicate**
+
+Commit `approved_not_started` before execution. Run each of the 24 sessions
+once with concurrency at most four; seal regardless of outcome. Import and
+adjudicate through the exact tested replay paths. A further correction requires
+another approval and unique roots.
+
 ## Task 8: Run the settled deterministic release gate
 
 - [ ] **Step 1: Run the complete test collection**

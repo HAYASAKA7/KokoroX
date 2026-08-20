@@ -160,7 +160,7 @@ def _paths(root: Path, raw_root: Path) -> runner.HarnessPaths:
                     "max_concurrency": 4,
                     "raw_root": str(raw_root),
                     "retained_root": (
-                        "tests/skills/evidence/complete-suite/approved1"
+                        "tests/skills/evidence/complete-suite/approved2"
                     ),
                 },
                 "reruns_require_fresh_approval": True,
@@ -952,7 +952,7 @@ def test_sealed_campaign_imports_once_and_replays_every_run(
         / "skills"
         / "evidence"
         / "complete-suite"
-        / "approved1"
+        / "approved2"
     )
     assert retained_root == expected_root
     assert len(retained_calls) == 24
@@ -1615,8 +1615,9 @@ def test_codex_argv_and_shell_environment_are_literal_and_fail_closed(
     assert command[:3] == [str(codex), "exec", "--ephemeral"]
     assert command.count("--model") == 1
     assert command[command.index("--model") + 1] == "gpt-5.6-terra"
-    assert "--approve-for-me" in command
-    assert command[command.index("--sandbox") + 1] == "workspace-write"
+    assert command.count("--approve-for-me") == 1
+    assert "--sandbox" not in command
+    assert "--sandbox" not in spec.safe_command
     assert "--ignore-user-config" in command
     assert "--ignore-rules" in command
     assert "--output-schema" in command
