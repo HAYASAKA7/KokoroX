@@ -707,12 +707,22 @@ Append the exact frozen checkpoint details to the closure plan and this plan:
 Documentation must not claim provider execution, behavioral success, or suite
 completion.
 
-- [ ] **Step 2: Commit and re-run the final narrow gate**
+- [x] **Step 2: Commit and re-run the final narrow gate**
 
 Commit only the verification-record update. Then re-run structure tests,
 frozen-file verification in both checkouts, wheelhouse capture, campaign/envelope
 hash computation, `git diff --check`, and clean status. The documentation
 commit must not change any approval-bound byte or either frozen hash.
+
+Verification-record commit (2026-08-20):
+`9f259c81c65fdb4e191caed181fe33a9f3f37202`, tree
+`ad696327bac5570a53de46f4859aa716b72c69a0`, sole parent
+`2d7ce0a1bab429a86d60a7b3305dc820251b9708`. The post-commit structure gate
+passed 5/5 in 1.50 seconds. Direct verification of all 141 frozen files passed
+in both the documentation commit worktree and the detached metadata checkout.
+File-manifest SHA-256, campaign SHA-256, approval-envelope SHA-256, and
+wheelhouse-manifest SHA-256 remained exactly unchanged. The exact Task 18
+base-to-record range passed `git diff --check`, and status was clean.
 
 - [ ] **Step 3: Present the exact approval envelope and stop**
 

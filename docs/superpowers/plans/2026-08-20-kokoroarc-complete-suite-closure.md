@@ -679,7 +679,7 @@ mixed legacy working-tree newline state. Their exact approved hashes were
 recovered and checked without relaxing validation. Corrective campaign 5 must
 add fresh-checkout byte equality to the preapproval gate.
 
-- [ ] **Step 11: Create, verify, and freeze proposed5 without executing it**
+- [x] **Step 11: Create, verify, and freeze proposed5 without executing it**
 
 Use campaign ID `2026-08-20-proposed5`, raw root
 `D:\tmp\kokoroarc-m9-task18-campaign-20260820-approved5`, and retained root
@@ -783,6 +783,16 @@ wheelhouse. The exact Approved5 raw, retained, and results roots remain absent;
 no provider session was created; all execution counters remain zero; approval
 is null; and the draft status is unchanged. No behavioral or suite-completion
 claim is implied.
+
+The documentation-only verification record was committed as
+`9f259c81c65fdb4e191caed181fe33a9f3f37202` (tree
+`ad696327bac5570a53de46f4859aa716b72c69a0`, sole parent
+`2d7ce0a1bab429a86d60a7b3305dc820251b9708`). Its post-commit narrow gate
+passed 5/5 structure tests, verified all 141 frozen files in both checkouts,
+reproduced the file-manifest, campaign, approval-envelope, and wheelhouse hashes
+exactly, passed the Task 18 exact-range whitespace check, and left the worktree
+clean. Step 11 is therefore closed without provider execution; Step 12 remains
+the required fresh user-approval boundary.
 
 - [ ] **Step 12: Request fresh exact proposed5 approval**
 
