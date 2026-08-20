@@ -56,6 +56,39 @@ def _fake_installed(root: Path) -> Path:
     return installed
 
 
+def _fake_runtime_wheelhouse(root: Path) -> Path:
+    wheelhouse = root / "wheelhouse"
+    wheels = (
+        "attrs-25.3.0-py3-none-any.whl",
+        "jsonschema-4.25.0-py3-none-any.whl",
+        "jsonschema_specifications-2025.4.1-py3-none-any.whl",
+        "kokoroarc-0.0.0.dev0-py3-none-any.whl",
+        "PyYAML-6.0.2-cp312-cp312-win_amd64.whl",
+        "referencing-0.36.2-py3-none-any.whl",
+        "rpds_py-0.27.0-cp312-cp312-win_amd64.whl",
+    )
+    for index, name in enumerate(wheels, start=1):
+        _write(wheelhouse / name, f"wheel-{index}\n")
+    return wheelhouse
+
+
+def _add_fake_runtime_dependencies(installed: Path) -> None:
+    for name in (
+        "attrs",
+        "jsonschema",
+        "jsonschema_specifications",
+        "referencing",
+        "rpds",
+        "yaml",
+    ):
+        _write(installed / name / "__init__.py", "# isolated runtime\n")
+    _write(installed / "PyYAML-6.0.2.dist-info" / "METADATA", "pyyaml\n")
+    _write(
+        installed / "jsonschema-4.25.0.dist-info" / "METADATA",
+        "jsonschema\n",
+    )
+
+
 def _first_case() -> dict[str, object]:
     document = yaml.safe_load(
         (SKILLS_ROOT / "complete-suite-cases.yaml").read_text(encoding="utf-8")
@@ -310,6 +343,208 @@ def test_build_environment_is_closed_and_uses_fixed_epoch(tmp_path: Path) -> Non
         "PYTHONUTF8": "1",
         "SOURCE_DATE_EPOCH": str(preparation.FIXED_EPOCH),
     }
+
+
+def test_runtime_wheelhouse_is_closed_hash_bound_and_dependency_complete(
+    tmp_path: Path,
+) -> None:
+    wheelhouse = _fake_runtime_wheelhouse(tmp_path)
+
+    manifest = preparation.capture_runtime_wheelhouse(wheelhouse)
+
+    assert manifest["schema_version"] == "1.0"
+    assert manifest["root"] == str(wheelhouse.resolve())
+    assert manifest["distributions"] == [
+        "attrs",
+        "jsonschema",
+        "jsonschema-specifications",
+        "kokoroarc",
+        "pyyaml",
+        "referencing",
+        "rpds-py",
+    ]
+    assert manifest["inventory"] == preparation.inventory_tree(wheelhouse)
+    assert manifest["inventory_sha256"] == sha256(
+        preparation.canonical_bytes(manifest["inventory"])
+    ).hexdigest()
+    assert manifest["kokoroarc_wheel"] == {
+        "filename": "kokoroarc-0.0.0.dev0-py3-none-any.whl",
+        "size": len(b"wheel-4\n"),
+        "sha256": sha256(b"wheel-4\n").hexdigest(),
+    }
+
+    (wheelhouse / "unexpected.txt").write_text(
+        "not a wheel\n",
+        encoding="utf-8",
+        newline="\n",
+    )
+    with pytest.raises(ValueError, match="wheelhouse"):
+        preparation.capture_runtime_wheelhouse(wheelhouse)
+
+
+def test_runtime_wheelhouse_rejects_missing_dependency_and_manifest_drift(
+    tmp_path: Path,
+) -> None:
+    wheelhouse = _fake_runtime_wheelhouse(tmp_path)
+    manifest = preparation.capture_runtime_wheelhouse(wheelhouse)
+
+    jsonschema_wheel = wheelhouse / "jsonschema-4.25.0-py3-none-any.whl"
+    jsonschema_wheel.unlink()
+    with pytest.raises(ValueError, match="required distributions"):
+        preparation.capture_runtime_wheelhouse(wheelhouse)
+    with pytest.raises(ValueError, match="changed|manifest"):
+        preparation.validate_runtime_wheelhouse(wheelhouse, manifest)
+
+
+def test_runtime_wheelhouse_rejects_incomplete_or_extraneous_closure(
+    tmp_path: Path,
+) -> None:
+    wheelhouse = _fake_runtime_wheelhouse(tmp_path)
+    (wheelhouse / "referencing-0.36.2-py3-none-any.whl").unlink()
+
+    with pytest.raises(ValueError, match="required distributions"):
+        preparation.capture_runtime_wheelhouse(wheelhouse)
+
+    _write(
+        wheelhouse / "referencing-0.36.2-py3-none-any.whl",
+        "restored\n",
+    )
+    (wheelhouse / "empty-directory").mkdir()
+    with pytest.raises(ValueError, match="only flat wheels"):
+        preparation.capture_runtime_wheelhouse(wheelhouse)
+    (wheelhouse / "empty-directory").rmdir()
+
+    _write(wheelhouse / "unused-1.0.0-py3-none-any.whl", "unused\n")
+    with pytest.raises(ValueError, match="unexpected distributions"):
+        preparation.capture_runtime_wheelhouse(wheelhouse)
+
+
+def test_runtime_import_smoke_rejects_host_module_resolution(
+    tmp_path: Path,
+) -> None:
+    installed = tmp_path / "installed"
+    outside = tmp_path / "host-site-packages"
+    module_paths: dict[str, str] = {}
+    for name in (
+        "attrs",
+        "jsonschema",
+        "jsonschema_specifications",
+        "kokoroarc",
+        "referencing",
+        "rpds",
+        "yaml",
+    ):
+        module = installed / name / "__init__.py"
+        _write(module, "# isolated\n")
+        module_paths[name] = str(module)
+    leaked = outside / "referencing" / "__init__.py"
+    _write(leaked, "# host\n")
+    module_paths["referencing"] = str(leaked)
+
+    with pytest.raises(RuntimeError, match="outside the isolated target"):
+        preparation._relative_installed_module_paths(installed, module_paths)
+
+
+def test_frozen_distribution_installs_offline_and_runs_real_cli_smoke(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repository = tmp_path / "repository"
+    _write(
+        repository / "characters" / "original" / "rin-aster" / "character.yaml",
+        "schema_version: '1.0'\n",
+    )
+    wheelhouse = _fake_runtime_wheelhouse(tmp_path)
+    manifest = preparation.capture_runtime_wheelhouse(wheelhouse)
+    assets = tmp_path / "assets"
+    calls: list[dict[str, object]] = []
+
+    def fake_run(
+        command: list[str],
+        **kwargs: object,
+    ) -> subprocess.CompletedProcess[str]:
+        calls.append({"command": command, **kwargs})
+        if command[1:4] == ["-m", "pip", "install"]:
+            installed = _fake_installed(assets)
+            _add_fake_runtime_dependencies(installed)
+            return subprocess.CompletedProcess(command, 0, "", "")
+        if command[1] == "-c":
+            installed = assets / "installed"
+            paths = {
+                name: str(installed / name / "__init__.py")
+                for name in (
+                    "attrs",
+                    "jsonschema",
+                    "jsonschema_specifications",
+                    "kokoroarc",
+                    "referencing",
+                    "rpds",
+                    "yaml",
+                )
+            }
+            return subprocess.CompletedProcess(
+                command,
+                0,
+                json.dumps(paths, sort_keys=True) + "\n",
+                "",
+            )
+        if command[-1] == "--version":
+            return subprocess.CompletedProcess(
+                command,
+                0,
+                "kokoro 0.0.0.dev0\n",
+                "",
+            )
+        return subprocess.CompletedProcess(
+            command,
+            0,
+            '{"ok":true}\n',
+            "",
+        )
+
+    monkeypatch.setattr(preparation.subprocess, "run", fake_run)
+    result = preparation.install_frozen_distribution(
+        repository,
+        wheelhouse,
+        manifest,
+        assets,
+        python_executable="python-test",
+        base_environment={"PATH": "approved-path"},
+    )
+
+    assert len(calls) == 4
+    install_call, import_call, version_call, validation_call = calls
+    install_command = install_call["command"]
+    assert install_command[:5] == [
+        "python-test",
+        "-m",
+        "pip",
+        "install",
+        "--disable-pip-version-check",
+    ]
+    assert "--no-index" in install_command
+    assert "--find-links" in install_command
+    assert "--isolated" in install_command
+    assert "--no-input" in install_command
+    assert str((assets / "wheelhouse").resolve()) in install_command
+    assert "--no-deps" not in install_command
+    for call in (install_call, import_call, version_call, validation_call):
+        environment = call["env"]
+        assert environment["PIP_NO_INDEX"] == "1"
+        assert environment["PYTHONNOUSERSITE"] == "1"
+    assert import_call["env"]["PYTHONPATH"] == str(assets / "installed")
+    assert version_call["command"][-1] == "--version"
+    assert validation_call["command"][1:5] == [
+        "-m",
+        "kokoroarc.cli",
+        "pack",
+        "validate",
+    ]
+    assert validation_call["command"][-1] == "--json"
+    assert result["wheel"] == manifest["kokoroarc_wheel"]
+    assert result["wheelhouse"] == manifest
+    assert result["frozen_wheelhouse"] == manifest["inventory"]
+    assert result["smoke"]["passed"] is True
 
 
 def test_build_installed_distribution_builds_one_fixed_epoch_wheel(

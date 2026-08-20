@@ -201,6 +201,65 @@ def _cli_command(arguments: str) -> str:
     return _powershell_command(f"python -m kokoroarc.cli {arguments}")
 
 
+@pytest.mark.parametrize(
+    ("executable", "wrapper_flags", "expected_flag"),
+    (
+        (r"C:\Program Files\PowerShell\7\pwsh.exe", "-Command", "-Command"),
+        (r"C:\Program Files\PowerShell\7\pwsh.exe", "-c", "-c"),
+        (
+            r"C:\\Program Files\\PowerShell\\7\\pwsh.exe",
+            "-NoProfile -Command",
+            "-Command",
+        ),
+        (
+            r"C:\\Program Files/PowerShell\\7/pwsh.exe",
+            "-noprofile -C",
+            "-C",
+        ),
+    ),
+)
+def test_structured_command_accepts_only_the_declared_powershell_forms(
+    executable: str,
+    wrapper_flags: str,
+    expected_flag: str,
+) -> None:
+    from complete_suite_adjudication import _structured_command
+
+    payload = "python -m kokoroarc.cli pack validate workspace --json"
+    command = f'"{executable}" {wrapper_flags} {json.dumps(payload)}'
+
+    assert _structured_command(command, 0) == {
+        "command": executable,
+        "argv": [expected_flag, payload],
+        "exit_code": 0,
+    }
+
+
+@pytest.mark.parametrize(
+    "command",
+    (
+        r'"C:\Program Files\PowerShell\7\pwsh.exe" -NoLogo -Command "Get-Date"',
+        (
+            r'"C:\Program Files\PowerShell\7\pwsh.exe" '
+            r'-NoProfile -NoProfile -Command "Get-Date"'
+        ),
+        r'"C:\Program Files\PowerShell\7\pwsh.exe" -Command -NoProfile "Get-Date"',
+        r'"C:\Program Files\PowerShell\7\pwsh.exe" -NoProfile "Get-Date"',
+        r'"C:\Program Files\PowerShell\7\pwsh.exe" -File "script.ps1"',
+        r'"D:\Program Files\PowerShell\7\pwsh.exe" -Command "Get-Date"',
+        r'"..\PowerShell\7\pwsh.exe" -Command "Get-Date"',
+        r'"\\server\share\pwsh.exe" -Command "Get-Date"',
+        r'"\\?\C:\Program Files\PowerShell\7\pwsh.exe" -Command "Get-Date"',
+    ),
+)
+def test_structured_command_rejects_undeclared_powershell_forms(
+    command: str,
+) -> None:
+    from complete_suite_adjudication import _structured_command
+
+    assert _structured_command(command, 0) is None
+
+
 def _json_line(value: Mapping[str, Any]) -> str:
     return json.dumps(value, sort_keys=True, separators=(",", ":")) + "\n"
 
@@ -2433,6 +2492,54 @@ def test_safe_install_rejects_untrusted_powershell_wrapper(
 
     assert result["passed"] is False
     assert result["evidence_integrity"]["passed"] is False
+    assert all(
+        item["claimed_status"]
+        == ("satisfied" if item["requirement"] == "must" else "not_satisfied")
+        for item in result["assertions"]
+    )
+    assert all(item["passed"] is False for item in result["assertions"])
+
+
+@pytest.mark.parametrize("claim_mutation", ("omit", "duplicate", "invent"))
+def test_safe_install_requires_each_declared_claim_exactly_once(
+    tmp_path: Path,
+    claim_mutation: str,
+) -> None:
+    from complete_suite_adjudication import adjudicate_run
+
+    case = _complete_case("safe-install-inactive")
+    final = _claimed_final(
+        case,
+        outcome="completed",
+        response=(
+            "Previewed and installed only in this workspace. The identical "
+            "reinstall was unchanged. No default or session was created, "
+            "nothing was activated, and no archive was published."
+        ),
+    )
+    claims = list(final["claimed_assertions"])
+    if claim_mutation == "omit":
+        claims.pop()
+    elif claim_mutation == "duplicate":
+        claims.append(dict(claims[0]))
+    else:
+        claims.append(
+            {
+                "id": "invented_assertion",
+                "status": "satisfied",
+                "evidence_paths": [],
+            }
+        )
+    final["claimed_assertions"] = claims
+    _case, case_root, retained_run, ledger = _safe_install_fixture(
+        tmp_path,
+        final_document=final,
+    )
+
+    result = adjudicate_run(case, case_root, retained_run, ledger)
+
+    assert result["passed"] is False
+    assert "FINAL_CLAIMS_INVALID" in result["failure_codes"]
     assert all(item["passed"] is False for item in result["assertions"])
 
 

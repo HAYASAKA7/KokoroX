@@ -35,6 +35,33 @@ _CORE_ENVIRONMENT_KEYS = (
     "APPDATA",
 )
 _CASE_IDENTIFIER = re.compile(r"^[a-z][a-z0-9-]{2,63}$")
+_REQUIRED_RUNTIME_DISTRIBUTIONS = frozenset(
+    {
+        "attrs",
+        "jsonschema",
+        "jsonschema-specifications",
+        "kokoroarc",
+        "pyyaml",
+        "referencing",
+        "rpds-py",
+    }
+)
+_RUNTIME_IMPORT_MODULES = frozenset(
+    {
+        "attrs",
+        "jsonschema",
+        "jsonschema_specifications",
+        "kokoroarc",
+        "referencing",
+        "rpds",
+        "yaml",
+    }
+)
+_WHEEL_FILENAME = re.compile(
+    r"^(?P<distribution>[A-Za-z0-9_.]+)-.+-[^-]+-[^-]+-[^-]+\.whl$",
+    re.IGNORECASE,
+)
+_SMOKE_OUTPUT_BYTES = 1024 * 1024
 
 
 def canonical_bytes(value: object) -> bytes:
@@ -170,6 +197,103 @@ def inventory_tree(root: Path, *, allow_missing: bool = False) -> dict[str, Any]
     }
 
 
+def _wheel_distribution(filename: str) -> str:
+    matched = _WHEEL_FILENAME.fullmatch(filename)
+    if matched is None:
+        raise ValueError("runtime wheelhouse contains an invalid wheel filename")
+    return matched.group("distribution").replace("_", "-").casefold()
+
+
+def _flat_wheelhouse_entries(wheelhouse: Path) -> tuple[str, ...]:
+    names: list[str] = []
+    with os.scandir(wheelhouse) as iterator:
+        for entry in iterator:
+            names.append(entry.name)
+            if len(names) > MAX_FILES:
+                raise ValueError("runtime wheelhouse exceeds the entry limit")
+            path = Path(entry.path)
+            if (
+                entry.is_symlink()
+                or _is_link_or_reparse(path)
+                or not entry.is_file(follow_symlinks=False)
+            ):
+                raise ValueError("runtime wheelhouse must contain only flat wheels")
+    return tuple(sorted(names))
+
+
+def capture_runtime_wheelhouse(wheelhouse: Path) -> dict[str, Any]:
+    _require_plain_directory(wheelhouse, label="runtime wheelhouse")
+    first_entries = _flat_wheelhouse_entries(wheelhouse)
+    first = inventory_tree(wheelhouse)
+    files = first.get("files")
+    if not isinstance(files, list) or not files:
+        raise ValueError("runtime wheelhouse is empty")
+    wheels: list[dict[str, object]] = []
+    distributions: list[str] = []
+    for entry in files:
+        relative = entry.get("path") if isinstance(entry, dict) else None
+        if (
+            not isinstance(relative, str)
+            or "/" in relative
+            or not relative.lower().endswith(".whl")
+        ):
+            raise ValueError("runtime wheelhouse must contain only flat wheels")
+        distribution = _wheel_distribution(relative)
+        if distribution in distributions:
+            raise ValueError("runtime wheelhouse contains duplicate distributions")
+        distributions.append(distribution)
+        wheels.append(
+            {
+                "distribution": distribution,
+                "filename": relative,
+                "size": entry["size"],
+                "sha256": entry["sha256"],
+            }
+        )
+    observed_distributions = set(distributions)
+    missing = _REQUIRED_RUNTIME_DISTRIBUTIONS - observed_distributions
+    if missing:
+        raise ValueError("runtime wheelhouse is missing required distributions")
+    unexpected = observed_distributions - _REQUIRED_RUNTIME_DISTRIBUTIONS
+    if unexpected:
+        raise ValueError("runtime wheelhouse contains unexpected distributions")
+    second_entries = _flat_wheelhouse_entries(wheelhouse)
+    second = inventory_tree(wheelhouse)
+    if second_entries != first_entries or second != first:
+        raise ValueError("runtime wheelhouse changed while being captured")
+    kokoro_wheels = [
+        wheel for wheel in wheels if wheel["distribution"] == "kokoroarc"
+    ]
+    if len(kokoro_wheels) != 1:
+        raise ValueError("runtime wheelhouse KokoroArc wheel is ambiguous")
+    kokoroarc_wheel = {
+        key: kokoro_wheels[0][key]
+        for key in ("filename", "size", "sha256")
+    }
+    return {
+        "schema_version": "1.0",
+        "root": str(wheelhouse.resolve(strict=True)),
+        "distributions": sorted(distributions),
+        "inventory": first,
+        "inventory_sha256": sha256(canonical_bytes(first)).hexdigest(),
+        "wheels": sorted(wheels, key=lambda wheel: str(wheel["filename"])),
+        "kokoroarc_wheel": kokoroarc_wheel,
+    }
+
+
+def validate_runtime_wheelhouse(
+    wheelhouse: Path,
+    expected: Mapping[str, Any],
+) -> dict[str, Any]:
+    try:
+        observed = capture_runtime_wheelhouse(wheelhouse)
+    except (OSError, ValueError) as exc:
+        raise ValueError("runtime wheelhouse manifest changed") from exc
+    if observed != dict(expected):
+        raise ValueError("runtime wheelhouse manifest changed")
+    return observed
+
+
 def build_environment(
     root: Path,
     base_environment: Mapping[str, str] | None = None,
@@ -220,6 +344,33 @@ def _run_checked(
         raise RuntimeError(f"{operation} failed with exit code {completed.returncode}")
 
 
+def _run_captured(
+    command: list[str],
+    *,
+    cwd: Path,
+    environment: Mapping[str, str],
+    operation: str,
+) -> str:
+    completed = subprocess.run(
+        command,
+        cwd=cwd,
+        env=dict(environment),
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    stdout = completed.stdout if isinstance(completed.stdout, str) else ""
+    stderr = completed.stderr if isinstance(completed.stderr, str) else ""
+    if (
+        len(stdout.encode("utf-8")) > _SMOKE_OUTPUT_BYTES
+        or len(stderr.encode("utf-8")) > _SMOKE_OUTPUT_BYTES
+    ):
+        raise RuntimeError(f"{operation} output exceeded the size limit")
+    if completed.returncode != 0:
+        raise RuntimeError(f"{operation} failed with exit code {completed.returncode}")
+    return stdout
+
+
 def _validate_installed_distribution(installed: Path) -> None:
     _require_plain_directory(installed, label="installed distribution")
     required = (
@@ -237,6 +388,179 @@ def _validate_installed_distribution(installed: Path) -> None:
     if observed != tuple(sorted(SKILL_NAMES)):
         raise ValueError("installed Skill suite is incomplete")
     inventory_tree(installed)
+
+
+def _load_smoke_json(payload: str, *, operation: str) -> dict[str, Any]:
+    try:
+        value = json.loads(payload)
+    except (json.JSONDecodeError, TypeError) as exc:
+        raise RuntimeError(f"{operation} did not return valid JSON") from exc
+    if not isinstance(value, dict):
+        raise RuntimeError(f"{operation} did not return a JSON object")
+    return value
+
+
+def _relative_installed_module_paths(
+    installed: Path,
+    module_paths: Mapping[str, Any],
+) -> dict[str, str]:
+    expected = _RUNTIME_IMPORT_MODULES
+    if set(module_paths) != expected:
+        raise RuntimeError("runtime import smoke returned an invalid module set")
+    installed_resolved = installed.resolve(strict=True)
+    relative: dict[str, str] = {}
+    for name in sorted(expected):
+        value = module_paths.get(name)
+        if not isinstance(value, str) or not value:
+            raise RuntimeError("runtime import smoke returned an invalid module path")
+        try:
+            resolved = Path(value).resolve(strict=True)
+            child = resolved.relative_to(installed_resolved)
+        except (OSError, ValueError) as exc:
+            raise RuntimeError(
+                "runtime import resolved outside the isolated target"
+            ) from exc
+        relative[name] = child.as_posix()
+    return relative
+
+
+def install_frozen_distribution(
+    repository_root: Path,
+    wheelhouse: Path,
+    expected_wheelhouse: Mapping[str, Any],
+    assets_root: Path,
+    *,
+    python_executable: str | None = None,
+    base_environment: Mapping[str, str] | None = None,
+) -> dict[str, Any]:
+    _require_plain_directory(repository_root, label="repository root")
+    manifest = validate_runtime_wheelhouse(wheelhouse, expected_wheelhouse)
+    if assets_root.exists() or assets_root.is_symlink():
+        raise ValueError("distribution assets root already exists")
+    assets_root.mkdir(parents=True)
+    frozen_wheelhouse = assets_root / "wheelhouse"
+    frozen_wheelhouse_inventory = _copy_verified_tree(
+        wheelhouse,
+        frozen_wheelhouse,
+    )
+    if frozen_wheelhouse_inventory != manifest.get("inventory"):
+        raise ValueError("runtime wheelhouse copy changed")
+    installed = assets_root / "installed"
+    smoke_root = assets_root / "smoke"
+    smoke_root.mkdir()
+    source = repository_root / "characters" / "original" / "rin-aster"
+    smoke_source = smoke_root / "source-pack"
+    _copy_verified_tree(source, smoke_source)
+    (smoke_root / "data").mkdir()
+    before_smoke = inventory_tree(smoke_root)
+    environment = build_environment(assets_root, base_environment)
+    environment.update(
+        {
+            "KOKOROARC_DATA_DIR": str(smoke_root / "data"),
+            "PYTHONNOUSERSITE": "1",
+            "PYTHONPATH": str(installed),
+            "PYTHONSAFEPATH": "1",
+        }
+    )
+    executable = python_executable or sys.executable
+    kokoro_wheel = manifest["kokoroarc_wheel"]
+    wheel_path = frozen_wheelhouse / str(kokoro_wheel["filename"])
+    install_command = [
+        executable,
+        "-m",
+        "pip",
+        "install",
+        "--disable-pip-version-check",
+        "--isolated",
+        "--no-input",
+        "--no-compile",
+        "--no-index",
+        "--only-binary=:all:",
+        "--find-links",
+        str(frozen_wheelhouse.resolve(strict=True)),
+        "--target",
+        str(installed),
+        str(wheel_path),
+    ]
+    _run_captured(
+        install_command,
+        cwd=assets_root,
+        environment=environment,
+        operation="frozen wheelhouse install",
+    )
+    validate_runtime_wheelhouse(wheelhouse, manifest)
+    _validate_installed_distribution(installed)
+    import_code = (
+        "import attrs,json,jsonschema,jsonschema_specifications,kokoroarc,"
+        "referencing,rpds,yaml;"
+        "print(json.dumps({"
+        "'attrs':attrs.__file__,"
+        "'jsonschema':jsonschema.__file__,"
+        "'jsonschema_specifications':jsonschema_specifications.__file__,"
+        "'kokoroarc':kokoroarc.__file__,"
+        "'referencing':referencing.__file__,"
+        "'rpds':rpds.__file__,"
+        "'yaml':yaml.__file__},sort_keys=True))"
+    )
+    import_output = _run_captured(
+        [executable, "-c", import_code],
+        cwd=smoke_root,
+        environment=environment,
+        operation="runtime import smoke",
+    )
+    module_paths = _relative_installed_module_paths(
+        installed,
+        _load_smoke_json(import_output, operation="runtime import smoke"),
+    )
+    version_output = _run_captured(
+        [executable, "-m", "kokoroarc.cli", "--version"],
+        cwd=smoke_root,
+        environment=environment,
+        operation="runtime CLI version smoke",
+    )
+    if not version_output.startswith("kokoro "):
+        raise RuntimeError("runtime CLI version smoke returned an invalid version")
+    validation_output = _run_captured(
+        [
+            executable,
+            "-m",
+            "kokoroarc.cli",
+            "pack",
+            "validate",
+            str(smoke_source),
+            "--json",
+        ],
+        cwd=smoke_root,
+        environment=environment,
+        operation="runtime CLI validation smoke",
+    )
+    validation = _load_smoke_json(
+        validation_output,
+        operation="runtime CLI validation smoke",
+    )
+    if validation.get("ok") is not True:
+        raise RuntimeError("runtime CLI validation smoke did not pass")
+    if inventory_tree(smoke_root) != before_smoke:
+        raise RuntimeError("runtime smoke changed its trusted fixture root")
+    if inventory_tree(frozen_wheelhouse) != frozen_wheelhouse_inventory:
+        raise RuntimeError("frozen runtime wheelhouse changed during installation")
+    validate_runtime_wheelhouse(wheelhouse, manifest)
+    return {
+        "schema_version": "1.0",
+        "fixed_epoch": FIXED_EPOCH,
+        "wheel": dict(kokoro_wheel),
+        "wheelhouse": manifest,
+        "frozen_wheelhouse": frozen_wheelhouse_inventory,
+        "installed": inventory_tree(installed),
+        "smoke": {
+            "passed": True,
+            "module_paths": module_paths,
+            "version_sha256": sha256(version_output.encode("utf-8")).hexdigest(),
+            "validation_sha256": sha256(
+                validation_output.encode("utf-8")
+            ).hexdigest(),
+        },
+    }
 
 
 def build_installed_distribution(

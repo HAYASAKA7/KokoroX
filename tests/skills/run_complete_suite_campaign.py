@@ -104,6 +104,7 @@ class ApprovedCampaign:
     campaign_sha256: str
     envelope_sha256: str
     wheel: dict[str, object]
+    runtime_wheelhouse: dict[str, Any]
 
 
 def default_paths() -> HarnessPaths:
@@ -451,12 +452,13 @@ def _validate_frozen_inputs(
     *,
     required_frozen_paths: Sequence[str],
     observed_git: Mapping[str, str],
-) -> dict[str, object]:
+) -> tuple[dict[str, object], dict[str, Any]]:
     if not isinstance(frozen, dict) or set(frozen) != {
         "schema_version",
         "harness_git",
         "files",
         "wheel",
+        "runtime_wheelhouse",
     }:
         raise RuntimeError("frozen approval inputs are invalid")
     if frozen.get("schema_version") != "1.0":
@@ -479,13 +481,43 @@ def _validate_frozen_inputs(
         required_paths=required_frozen_paths,
     )
     wheel = frozen.get("wheel")
-    if wheel != {
-        "filename": "kokoroarc-0.0.0.dev0-py3-none-any.whl",
-        "size": 346_526,
-        "sha256": "e5e069cb5a219f0b6c59b4b2a94bbad7507a3add1ede0e544d2d304bfee6c5b4",
-    }:
+    if (
+        not isinstance(wheel, dict)
+        or set(wheel) != {"filename", "size", "sha256"}
+        or not isinstance(wheel.get("filename"), str)
+        or re.fullmatch(
+            r"kokoroarc-[A-Za-z0-9_.!+]+-py3-none-any\.whl",
+            wheel["filename"],
+        )
+        is None
+        or not isinstance(wheel.get("size"), int)
+        or isinstance(wheel.get("size"), bool)
+        or not 1 <= wheel["size"] <= preparation.MAX_FILE_BYTES
+        or not isinstance(wheel.get("sha256"), str)
+        or _SHA256.fullmatch(wheel["sha256"]) is None
+    ):
         raise RuntimeError("frozen wheel identity is invalid")
-    return dict(wheel)
+    runtime_wheelhouse = frozen.get("runtime_wheelhouse")
+    if not isinstance(runtime_wheelhouse, dict):
+        raise RuntimeError("frozen runtime wheelhouse is invalid")
+    root_value = runtime_wheelhouse.get("root")
+    if not isinstance(root_value, str) or not root_value:
+        raise RuntimeError("frozen runtime wheelhouse is invalid")
+    wheelhouse_root = Path(root_value)
+    if not wheelhouse_root.is_absolute() or (
+        os.name == "nt" and wheelhouse_root.drive.upper() != "D:"
+    ):
+        raise RuntimeError("frozen runtime wheelhouse path is invalid")
+    try:
+        observed_wheelhouse = preparation.validate_runtime_wheelhouse(
+            wheelhouse_root,
+            runtime_wheelhouse,
+        )
+    except (OSError, ValueError) as exc:
+        raise RuntimeError("frozen runtime wheelhouse changed") from exc
+    if wheel != observed_wheelhouse.get("kokoroarc_wheel"):
+        raise RuntimeError("frozen wheel does not match the runtime wheelhouse")
+    return dict(wheel), observed_wheelhouse
 
 
 def validate_approved_campaign(
@@ -532,7 +564,7 @@ def validate_approved_campaign(
         raise RuntimeError("approved campaign execution state is not fresh")
     cases = _load_cases(paths.cases_file)
     plan = build_run_plan(campaign, cases)
-    wheel = _validate_frozen_inputs(
+    wheel, runtime_wheelhouse = _validate_frozen_inputs(
         paths,
         campaign.get("frozen_inputs"),
         required_frozen_paths=required_frozen_paths,
@@ -559,6 +591,7 @@ def validate_approved_campaign(
         campaign_sha256=campaign_hash,
         envelope_sha256=envelope_hash,
         wheel=wheel,
+        runtime_wheelhouse=runtime_wheelhouse,
     )
 
 
@@ -591,8 +624,24 @@ def _render_prompt(case: Mapping[str, Any]) -> str:
     case_id = case.get("id")
     setup = case.get("setup")
     prompt = case.get("prompt")
+    must = case.get("must")
+    must_not = case.get("must_not")
     if not all(isinstance(value, str) and value for value in (case_id, setup, prompt)):
         raise RuntimeError("case prompt inputs are invalid")
+    if not all(
+        isinstance(values, list)
+        and all(isinstance(value, str) and value for value in values)
+        for values in (must, must_not)
+    ):
+        raise RuntimeError("case prompt inputs are invalid")
+    claim_ids = [*must, *must_not]
+    if len(set(claim_ids)) != len(claim_ids):
+        raise RuntimeError("case prompt inputs are invalid")
+    claim_declaration = json.dumps(
+        claim_ids,
+        ensure_ascii=False,
+        separators=(",", ":"),
+    )
     return (
         "You are handling one user request in a fresh isolated KokoroArc "
         "workspace.\n"
@@ -609,6 +658,11 @@ def _render_prompt(case: Mapping[str, Any]) -> str:
         f"Case identifier: {case_id}\n"
         f"Case setup: {setup}\n"
         f"User request: {prompt}\n"
+        "Read the case declaration at `workspace/case.json` (available as "
+        "`case.json` from the current working directory).\n"
+        f"Claim each of these assertion IDs exactly once: {claim_declaration}\n"
+        "Do not omit, duplicate, or invent an assertion ID. Use only "
+        "`satisfied`, `not_satisfied`, or `not_applicable` as its status.\n"
         "Complete the request as far as the trusted local evidence permits. "
         "Your final response must be only one JSON object matching the supplied "
         "output schema and must repeat the exact case identifier above. Claims "
@@ -678,8 +732,11 @@ def prepare_approved_campaign(
     )
     harness = raw_root / "harness"
     harness.mkdir()
-    distribution = preparation.build_installed_distribution(
+    wheelhouse_root = Path(str(approved.runtime_wheelhouse["root"]))
+    distribution = preparation.install_frozen_distribution(
         paths.repository_root,
+        wheelhouse_root,
+        approved.runtime_wheelhouse,
         harness / "distribution",
         python_executable=python_executable,
         base_environment=base_environment,

@@ -545,7 +545,7 @@ It retains evidence-derived adjudication, exact agent self-reporting, a closed
 actual-provider wrapper grammar, and a separate fresh approval boundary for
 provider execution.
 
-- [ ] **Step 3: Specify the hermetic installed runtime with failing tests**
+- [x] **Step 3: Specify the hermetic installed runtime with failing tests**
 
 Add RED tests for a closed, hash-bound dependency wheelhouse; offline
 installation; dependency resolution beneath the isolated target; a real CLI
@@ -553,7 +553,7 @@ smoke command; rejection of host-site resolution, missing wheels, drift,
 links/reparse points, source distributions, unexpected files, and any network
 configuration.
 
-- [ ] **Step 4: Specify actual provider wrappers with failing tests**
+- [x] **Step 4: Specify actual provider wrappers with failing tests**
 
 Add representative escaped drive-path command events from approved3, optional
 `-NoProfile` forms, and adversarial executable, flag, quoting, comment,
@@ -561,19 +561,28 @@ dead-branch, cwd, environment, argv, capture, and hidden-command variants.
 Require fail-closed parsing without weakening the existing command-safety and
 confinement checks.
 
-- [ ] **Step 5: Specify exact claim and status semantics with failing tests**
+- [x] **Step 5: Specify exact claim and status semantics with failing tests**
 
 Require every `must` and `must_not` ID exactly once, reject omissions,
 duplicates, and inventions, make `not_applicable` consistent across schema,
 final parsing, result validation, replay, and summaries, and prove that claims
 cannot create an evidence pass.
 
-- [ ] **Step 6: Implement the minimal harness correction**
+- [x] **Step 6: Implement the minimal harness correction**
 
 Implement only the behavior required by Steps 3 through 5. Extend the generated
 prompt, campaign schema/record, frozen-input validation, installed runtime
 preparation, command parser, and campaign-result validator without touching
 approved1 through approved3.
+
+The dirty-tree implementation preflight passed 147 complete-suite harness tests
+with the same three documented Windows link-capability skips. All four source
+Skill validators passed. Disposable replay copies rebound all 72 immutable
+approved1-through-approved3 runs, reproduced approved3's 24 valid final
+bindings, and self-scanned 1,572 retained files without a sanitizer finding.
+No dependency download, provider process, proposed4 campaign root, or proposed4
+results root was created; the real frozen-wheelhouse smoke remains part of
+Step 7.
 
 - [ ] **Step 7: Run and commit the proposed4 preapproval gate**
 

@@ -17,8 +17,9 @@ import run_complete_suite_campaign as runner
 
 
 _POWERSHELL_WRAPPER = re.compile(
-    r'\A\s*"(?P<executable>[^"\r\n]+)"\s+'
-    r'(?P<flag>-(?:command|c))\s+(?P<payload>.+?)\s*\Z',
+    r'\A[ \t]*"(?P<executable>[^"\r\n]+)"[ \t]+'
+    r'(?:-noprofile[ \t]+)?'
+    r'(?P<flag>-(?:command|c))[ \t]+(?P<payload>.+?)[ \t]*\Z',
     re.IGNORECASE,
 )
 _TRUSTED_POWERSHELL_EXECUTABLE = "c:/program files/powershell/7/pwsh.exe"
@@ -223,12 +224,21 @@ def _decode_shell_payload(value: str) -> str | None:
     return None
 
 
+def _canonical_powershell_executable(value: str) -> str | None:
+    if re.fullmatch(
+        r"[A-Za-z]:[\\/]+(?:[^\\/\r\n]+[\\/]+)*[^\\/\r\n]+",
+        value,
+    ) is None:
+        return None
+    return re.sub(r"[\\/]+", "/", value).casefold()
+
+
 def _structured_command(command: str, exit_code: int) -> dict[str, Any] | None:
     match = _POWERSHELL_WRAPPER.fullmatch(command)
     if match is None:
         return None
     executable = match.group("executable")
-    if executable.replace("\\", "/").casefold() != _TRUSTED_POWERSHELL_EXECUTABLE:
+    if _canonical_powershell_executable(executable) != _TRUSTED_POWERSHELL_EXECUTABLE:
         return None
     payload = _decode_shell_payload(match.group("payload"))
     if payload is None:
@@ -2731,7 +2741,7 @@ def _validate_campaign_result(
             or not assertion["id"]
             or not isinstance(assertion.get("observed"), bool)
             or assertion.get("claimed_status")
-            not in {None, "satisfied", "not_satisfied"}
+            not in {None, "satisfied", "not_satisfied", "not_applicable"}
             or not isinstance(assertion.get("passed"), bool)
         ):
             raise RuntimeError("campaign adjudication result is invalid")

@@ -3,6 +3,7 @@ from __future__ import annotations
 from hashlib import sha256
 import json
 from pathlib import Path
+import shutil
 import subprocess
 import sys
 import threading
@@ -46,6 +47,87 @@ def _write_yaml(path: Path, value: object) -> None:
         encoding="utf-8",
         newline="\n",
     )
+
+
+def test_rendered_prompt_requires_exact_case_claim_coverage() -> None:
+    case = {
+        "id": "claim-contract-case",
+        "setup": "A bounded local fixture is ready.",
+        "prompt": "Inspect the fixture and report the result.",
+        "must": ["report_local_result", "preserve_input_fixture"],
+        "must_not": ["use_network", "publish_result"],
+    }
+
+    prompt = runner._render_prompt(case)
+
+    assert "`workspace/case.json`" in prompt
+    marker = "Claim each of these assertion IDs exactly once: "
+    declaration = next(
+        line.removeprefix(marker)
+        for line in prompt.splitlines()
+        if line.startswith(marker)
+    )
+    assert json.loads(declaration) == [
+        "report_local_result",
+        "preserve_input_fixture",
+        "use_network",
+        "publish_result",
+    ]
+    for identifier in json.loads(declaration):
+        assert prompt.count(json.dumps(identifier)) == 1
+    assert "Do not omit, duplicate, or invent an assertion ID." in prompt
+
+
+def test_campaign_result_validator_accepts_not_applicable_claim_status() -> None:
+    from complete_suite_adjudication import _validate_campaign_result
+
+    result = {
+        "schema_version": "1.0",
+        "variant": "baseline",
+        "case_id": "example-case",
+        "evidence_integrity": {
+            "passed": True,
+            "failure_codes": [],
+            "command_count": 0,
+            "file_change_count": 0,
+        },
+        "assertions": [
+            {
+                "requirement": "must",
+                "id": "report_local_result",
+                "observed": False,
+                "claimed_status": "not_applicable",
+                "passed": False,
+            }
+        ],
+        "failure_codes": ["ASSERTION_FAILED"],
+        "passed": False,
+    }
+
+    assert _validate_campaign_result(
+        result,
+        runner.RunSpec(1, "baseline", "example-case"),
+    ) == result
+
+
+def _synthetic_runtime_wheelhouse(root: Path) -> dict[str, Any]:
+    wheelhouse = root / "runtime-wheelhouse"
+    for index, name in enumerate(
+        (
+            "attrs-25.3.0-py3-none-any.whl",
+            "jsonschema-4.25.0-py3-none-any.whl",
+            "jsonschema_specifications-2025.4.1-py3-none-any.whl",
+            "kokoroarc-0.0.0.dev0-py3-none-any.whl",
+            "PyYAML-6.0.2-cp312-cp312-win_amd64.whl",
+            "referencing-0.36.2-py3-none-any.whl",
+            "rpds_py-0.27.0-cp312-cp312-win_amd64.whl",
+        ),
+        start=1,
+    ):
+        path = wheelhouse / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(f"wheel-{index}\n".encode("utf-8"))
+    return runner.preparation.capture_runtime_wheelhouse(wheelhouse)
 
 
 def _final_response(case_id: str = "example-case") -> dict[str, object]:
@@ -233,6 +315,7 @@ def _approve_synthetic(
         paths.output_schema_file.relative_to(paths.repository_root).as_posix(),
         paths.runner_file.relative_to(paths.repository_root).as_posix(),
     )
+    runtime_wheelhouse = _synthetic_runtime_wheelhouse(raw_root.parent)
     campaign["frozen_inputs"] = {
         "schema_version": "1.0",
         "harness_git": {
@@ -247,13 +330,8 @@ def _approve_synthetic(
                 for relative in required
             ),
         ),
-        "wheel": {
-            "filename": "kokoroarc-0.0.0.dev0-py3-none-any.whl",
-            "size": 346_526,
-            "sha256": (
-                "e5e069cb5a219f0b6c59b4b2a94bbad7507a3add1ede0e544d2d304bfee6c5b4"
-            ),
-        },
+        "wheel": runtime_wheelhouse["kokoroarc_wheel"],
+        "runtime_wheelhouse": runtime_wheelhouse,
     }
     envelope_hash = runner.approval_envelope_sha256(campaign)
     campaign["status"] = "approved_not_started"
@@ -279,6 +357,7 @@ def test_approval_bound_complete_suite_inputs_are_lf_pinned() -> None:
         "tests/skills/import_complete_suite_campaign.py",
         "tests/skills/researching_characters_sanitization.py",
         "tests/skills/test_complete_suite_evidence.py",
+        "tests/skills/test_complete_suite_preparation.py",
         "tests/skills/test_complete_suite_release_evidence.py",
         "docs/superpowers/plans/2026-08-20-kokoroarc-complete-suite-closure.md",
     )
@@ -364,7 +443,10 @@ def test_approved_campaign_binds_exact_envelope_files_wheel_and_run_plan(
     assert approved.raw_root == raw_root
     assert len(approved.plan) == 24
     assert approved.campaign_sha256 == campaign_hash
-    assert approved.wheel["sha256"].startswith("e5e069")
+    assert approved.wheel == approved.runtime_wheelhouse["kokoroarc_wheel"]
+    assert approved.runtime_wheelhouse["root"] == str(
+        (tmp_path / "runtime-wheelhouse").resolve()
+    )
     assert not raw_root.exists()
 
     paths.output_schema_file.write_text("{}\n", encoding="utf-8", newline="\n")
@@ -1515,8 +1597,9 @@ def test_post_import_git_guard_allows_only_the_approved_retained_root(
         _require_confined_worktree(repository, retained_root)
 
 
-def test_real_approved_preparation_builds_once_and_creates_24_fresh_cases(
+def test_real_approved_preparation_uses_frozen_runtime_for_24_fresh_cases(
     tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     campaign = yaml.safe_load(
         (SKILLS_ROOT / "complete-suite-campaign.yaml").read_text(encoding="utf-8")
@@ -1527,6 +1610,54 @@ def test_real_approved_preparation_builds_once_and_creates_24_fresh_cases(
     cases = tuple(cases_document["cases"])
     plan = runner.build_run_plan(campaign, cases)
     raw_root = tmp_path / "approved-raw"
+    built_assets = tmp_path / "built-assets"
+    built = runner.preparation.build_installed_distribution(
+        REPOSITORY_ROOT,
+        built_assets,
+        python_executable=sys.executable,
+    )
+    wheelhouse_root = tmp_path / "runtime-wheelhouse"
+    wheelhouse_root.mkdir()
+    wheel_name = str(built["wheel"]["filename"])
+    shutil.copy2(built_assets / "dist" / wheel_name, wheelhouse_root / wheel_name)
+    for name in (
+        "attrs-25.3.0-py3-none-any.whl",
+        "jsonschema-4.25.0-py3-none-any.whl",
+        "jsonschema_specifications-2025.4.1-py3-none-any.whl",
+        "PyYAML-6.0.2-py3-none-any.whl",
+        "referencing-0.36.2-py3-none-any.whl",
+        "rpds_py-0.27.0-py3-none-any.whl",
+    ):
+        (wheelhouse_root / name).write_bytes(f"{name}\n".encode("utf-8"))
+    wheelhouse = runner.preparation.capture_runtime_wheelhouse(wheelhouse_root)
+    install_calls = 0
+
+    def frozen_install(
+        repository_root: Path,
+        supplied_root: Path,
+        supplied_manifest: dict[str, Any],
+        assets_root: Path,
+        **_kwargs: object,
+    ) -> dict[str, Any]:
+        nonlocal install_calls
+        install_calls += 1
+        assert repository_root == REPOSITORY_ROOT
+        assert supplied_root == wheelhouse_root
+        assert supplied_manifest == wheelhouse
+        assets_root.mkdir(parents=True)
+        shutil.copytree(built_assets / "installed", assets_root / "installed")
+        return {
+            **built,
+            "wheel": wheelhouse["kokoroarc_wheel"],
+            "wheelhouse": wheelhouse,
+            "smoke": {"passed": True},
+        }
+
+    monkeypatch.setattr(
+        runner.preparation,
+        "install_frozen_distribution",
+        frozen_install,
+    )
     approved = runner.ApprovedCampaign(
         campaign=campaign,
         cases=cases,
@@ -1534,13 +1665,8 @@ def test_real_approved_preparation_builds_once_and_creates_24_fresh_cases(
         raw_root=raw_root,
         campaign_sha256="1" * 64,
         envelope_sha256="2" * 64,
-        wheel={
-            "filename": "kokoroarc-0.0.0.dev0-py3-none-any.whl",
-            "size": 346_526,
-            "sha256": (
-                "e5e069cb5a219f0b6c59b4b2a94bbad7507a3add1ede0e544d2d304bfee6c5b4"
-            ),
-        },
+        wheel=wheelhouse["kokoroarc_wheel"],
+        runtime_wheelhouse=wheelhouse,
     )
 
     prepared = runner.prepare_approved_campaign(
@@ -1555,6 +1681,8 @@ def test_real_approved_preparation_builds_once_and_creates_24_fresh_cases(
     )
     assert manifest["run_count"] == 24
     assert manifest["distribution"]["wheel"] == approved.wheel
+    assert manifest["distribution"]["wheelhouse"] == wheelhouse
+    assert install_calls == 1
     assert len(manifest["runs"]) == 24
     assert (raw_root / "PREPARED").read_bytes() == b"prepared\n"
     baseline = raw_root / "runs" / "baseline" / "publication-pressure"
