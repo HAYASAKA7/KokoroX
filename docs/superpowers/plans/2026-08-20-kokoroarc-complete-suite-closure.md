@@ -525,6 +525,80 @@ before publishing a results tree. Approved3 may never be retried or rewritten;
 any correction requires a proposed4 campaign, unique roots, a new frozen
 envelope, and fresh explicit approval.
 
+## Corrective campaign 4: hermetic runtime and evidence-bound protocol
+
+- [x] **Step 1: Preserve the immutable approved3 harness failure**
+
+Commit `f99b798b8de6907dd26d283d7bc51bdea85599b1` preserves the 542-file
+approved3 retained root and the exact failure record. Raw-to-retained replay,
+final-event rebinding, sanitizer self-scan, and all 24 evaluable ledgers passed.
+The full canonical retained inventory is
+`811c92b0c6e141d511bb67fdffdffbec2e0765f6cb9a5cf520527e8aae40f6d7`;
+no results tree exists. The focused preservation gate passed 124 tests with 3
+documented Windows capability skips.
+
+- [x] **Step 2: Approve the corrective design before implementation**
+
+The user approved the hermetic-runtime design recorded in
+`docs/superpowers/specs/2026-08-20-kokoroarc-complete-suite-campaign-4-design.md`.
+It retains evidence-derived adjudication, exact agent self-reporting, a closed
+actual-provider wrapper grammar, and a separate fresh approval boundary for
+provider execution.
+
+- [ ] **Step 3: Specify the hermetic installed runtime with failing tests**
+
+Add RED tests for a closed, hash-bound dependency wheelhouse; offline
+installation; dependency resolution beneath the isolated target; a real CLI
+smoke command; rejection of host-site resolution, missing wheels, drift,
+links/reparse points, source distributions, unexpected files, and any network
+configuration.
+
+- [ ] **Step 4: Specify actual provider wrappers with failing tests**
+
+Add representative escaped drive-path command events from approved3, optional
+`-NoProfile` forms, and adversarial executable, flag, quoting, comment,
+dead-branch, cwd, environment, argv, capture, and hidden-command variants.
+Require fail-closed parsing without weakening the existing command-safety and
+confinement checks.
+
+- [ ] **Step 5: Specify exact claim and status semantics with failing tests**
+
+Require every `must` and `must_not` ID exactly once, reject omissions,
+duplicates, and inventions, make `not_applicable` consistent across schema,
+final parsing, result validation, replay, and summaries, and prove that claims
+cannot create an evidence pass.
+
+- [ ] **Step 6: Implement the minimal harness correction**
+
+Implement only the behavior required by Steps 3 through 5. Extend the generated
+prompt, campaign schema/record, frozen-input validation, installed runtime
+preparation, command parser, and campaign-result validator without touching
+approved1 through approved3.
+
+- [ ] **Step 7: Run and commit the proposed4 preapproval gate**
+
+Run the focused RED-to-GREEN selection and the complete Task 18 harness gate,
+all four Skill validators, raw replay/final binding for approved1 through
+approved3, inventory and secret scans, package/runtime smoke, exact-range
+whitespace checks, and clean status. Commit the implementation before creating
+an approval envelope.
+
+- [ ] **Step 8: Create and freeze proposed4 without executing it**
+
+Use campaign ID `2026-08-20-proposed4`, raw root
+`D:\tmp\kokoroarc-m9-task18-campaign-20260820-approved4`, and retained root
+`tests/skills/evidence/complete-suite/approved4`. Bind the exact dependency
+wheelhouse manifest, approval-bound file manifest, package wheel, Git identity,
+and 24-run policy. Both proposed4 campaign roots and any results root must be
+absent.
+
+- [ ] **Step 9: Request fresh exact approval, then execute once if approved**
+
+Present the complete frozen envelope. Only a new explicit approval authorizes
+the `approved_not_started` commit and one-shot 24-session execution. The current
+design approval does not authorize provider execution or dependency network
+access.
+
 ## Task 8: Run the settled deterministic release gate
 
 - [ ] **Step 1: Run the complete test collection**
