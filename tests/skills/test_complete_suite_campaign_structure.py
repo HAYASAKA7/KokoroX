@@ -117,7 +117,7 @@ def test_complete_suite_cases_are_closed_ordered_and_bounded() -> None:
     assert observed_coverage == EXPECTED_COVERAGE
 
 
-def test_complete_suite_campaign_is_draft_and_cannot_authorize_spawns() -> None:
+def test_complete_suite_campaign_state_is_closed_and_nonexecuted() -> None:
     document = _load(CAMPAIGN_FILE)
 
     assert set(document) == {
@@ -131,14 +131,44 @@ def test_complete_suite_campaign_is_draft_and_cannot_authorize_spawns() -> None:
     }
     assert document["schema_version"] == "1.0"
     assert document["campaign_id"] == "2026-08-20-proposed1"
-    assert document["status"] == "draft_not_approved"
-    assert document["frozen_inputs"] == {}
-    assert document["user_approval"] is None
+    assert document["status"] in {
+        "draft_not_approved",
+        "approved_not_started",
+    }
     assert document["execution"] == {
         "runs_started": 0,
         "runs_completed": 0,
         "raw_root_created": False,
     }
+
+    if document["status"] == "draft_not_approved":
+        assert document["frozen_inputs"] == {}
+        assert document["user_approval"] is None
+    else:
+        frozen = document["frozen_inputs"]
+        approval = document["user_approval"]
+        assert isinstance(frozen, dict)
+        assert set(frozen) == {
+            "schema_version",
+            "harness_git",
+            "files",
+            "wheel",
+        }
+        assert frozen["schema_version"] == "1.0"
+        assert isinstance(frozen["files"], dict)
+        assert frozen["files"]
+        assert isinstance(approval, dict)
+        assert set(approval) == {
+            "approval_id",
+            "approved_at",
+            "response",
+            "approved_envelope_sha256",
+        }
+        assert approval["response"].strip()
+        assert re.fullmatch(
+            r"[0-9a-f]{64}",
+            approval["approved_envelope_sha256"],
+        )
 
     proposed = document["proposed_approval"]
     assert isinstance(proposed, dict)

@@ -269,12 +269,19 @@ adjudication.
 
 ## Task 5: Freeze and request exact approval
 
-- [ ] **Step 1: Run the complete preapproval gate**
+- [x] **Step 1: Run the complete preapproval gate**
 
 Run structure, runner, sanitizer, importer, adjudicator, package inventory,
 validator, and no-spawn tests. Verify the campaign record is still
 `draft_not_approved`, raw/retained roots do not exist, and no external session
 was launched.
+
+Preapproval checkpoint (2026-08-20): the exact structure, preparation,
+runner, sanitizer, importer, adjudicator, package-inventory, no-spawn, and
+release-evidence selection passed with `123 passed, 3 skipped`. The skips are
+the documented Windows directory-link/symlink capability cases. All four Skill
+validators passed. The campaign remained `draft_not_approved`; the approved
+raw and retained roots did not exist; no external evaluator session ran.
 
 - [ ] **Step 2: Freeze all approval inputs**
 

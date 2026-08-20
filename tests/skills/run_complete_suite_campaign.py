@@ -9,6 +9,7 @@ import json
 import os
 from pathlib import Path
 import re
+import shutil
 import stat
 import subprocess
 import sys
@@ -38,6 +39,35 @@ MAX_WORKERS = 4
 RUN_TIMEOUT_SECONDS = 1_200
 _FROZEN_PATH = re.compile(r"^[A-Za-z0-9_.-]+(?:/[A-Za-z0-9_.-]+)*$")
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
+EXPECTED_CODEX_VERSION = "codex-cli 0.148.0"
+_APPROVAL_BOUND_DIRECTORIES = (
+    "src/kokoroarc",
+    "schemas/v1",
+    "skills/using-kokoroarc",
+    "skills/authoring-character-packs",
+    "skills/researching-characters",
+    "skills/testing-character-packs",
+    "characters/original/rin-aster",
+    "tests/fixtures/authoring",
+)
+_APPROVAL_BOUND_FILES = (
+    "README.md",
+    "MANIFEST.in",
+    "pyproject.toml",
+    "tests/skills/complete-suite-cases.yaml",
+    "tests/skills/complete-suite-output.schema.json",
+    "tests/skills/complete_suite_preparation.py",
+    "tests/skills/run_complete_suite_campaign.py",
+    "tests/skills/import_complete_suite_campaign.py",
+    "tests/skills/complete_suite_adjudication.py",
+    "tests/skills/complete_suite_sanitization.py",
+    "tests/skills/researching_characters_adjudication.py",
+    "tests/skills/researching_characters_sanitization.py",
+    "tests/skills/test_complete_suite_campaign_structure.py",
+    "tests/skills/test_complete_suite_preparation.py",
+    "tests/skills/test_complete_suite_evidence.py",
+    "tests/skills/test_complete_suite_release_evidence.py",
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -84,6 +114,36 @@ def default_paths() -> HarnessPaths:
         output_schema_file=OUTPUT_SCHEMA_FILE,
         runner_file=RUNNER_FILE,
     )
+
+
+def approval_bound_paths(
+    paths: HarnessPaths | None = None,
+) -> tuple[str, ...]:
+    selected = default_paths() if paths is None else paths
+    root = selected.repository_root
+    observed = set(_APPROVAL_BOUND_FILES)
+    for relative_root in _APPROVAL_BOUND_DIRECTORIES:
+        directory = root.joinpath(*relative_root.split("/"))
+        inventory = preparation.inventory_tree(directory)
+        files = inventory.get("files")
+        if not isinstance(files, list):
+            raise RuntimeError("approval-bound inventory is invalid")
+        for entry in files:
+            relative = entry.get("path") if isinstance(entry, dict) else None
+            if not isinstance(relative, str) or not relative:
+                raise RuntimeError("approval-bound inventory is invalid")
+            relative_path = Path(*relative.split("/"))
+            if (
+                "__pycache__" in relative_path.parts
+                or relative_path.suffix.lower() in {".pyc", ".pyo"}
+            ):
+                continue
+            observed.add(f"{relative_root}/{relative}")
+    for relative in observed:
+        _validate_frozen_path(relative)
+        target = root.joinpath(*relative.split("/"))
+        _read_bytes(target, max_bytes=preparation.MAX_FILE_BYTES)
+    return tuple(sorted(observed))
 
 
 def canonical_bytes(value: object) -> bytes:
@@ -1448,11 +1508,301 @@ def _load_yaml_object(path: Path) -> dict[str, Any]:
     return value
 
 
+def _git_identity(repository_root: Path, commit: str) -> dict[str, str]:
+    if re.fullmatch(r"[0-9a-f]{40}", commit) is None:
+        raise RuntimeError("frozen git identity is invalid")
+
+    def resolve(revision: str) -> str:
+        try:
+            completed = subprocess.run(
+                ["git", "rev-parse", "--verify", revision],
+                cwd=repository_root,
+                check=False,
+                capture_output=True,
+                text=True,
+                timeout=30,
+            )
+        except (OSError, subprocess.SubprocessError) as exc:
+            raise RuntimeError("frozen git identity is unavailable") from exc
+        value = completed.stdout.strip().lower()
+        if completed.returncode != 0 or re.fullmatch(r"[0-9a-f]{40}", value) is None:
+            raise RuntimeError("frozen git identity is unavailable")
+        return value
+
+    observed = {
+        "commit": resolve(f"{commit}^{{commit}}"),
+        "tree": resolve(f"{commit}^{{tree}}"),
+        "parent": resolve(f"{commit}^"),
+    }
+    if observed["commit"] != commit:
+        raise RuntimeError("frozen git identity is invalid")
+    return observed
+
+
+def _require_clean_worktree(repository_root: Path) -> None:
+    try:
+        completed = subprocess.run(
+            ["git", "status", "--porcelain=v1", "--untracked-files=all"],
+            cwd=repository_root,
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+    except (OSError, subprocess.SubprocessError) as exc:
+        raise RuntimeError("campaign worktree status is unavailable") from exc
+    if completed.returncode != 0 or completed.stdout:
+        raise RuntimeError("campaign worktree is not clean")
+
+
+def _plain_executable(value: Path | None, *, command: str) -> Path:
+    candidate = value
+    if candidate is None:
+        located = shutil.which(command)
+        if not located:
+            raise RuntimeError(f"{command} executable is unavailable")
+        candidate = Path(located)
+    try:
+        resolved = candidate.resolve(strict=True)
+        if preparation._is_link_or_reparse(resolved) or not resolved.is_file():
+            raise RuntimeError(f"{command} executable is unsafe")
+    except (OSError, ValueError) as exc:
+        raise RuntimeError(f"{command} executable is unavailable") from exc
+    return resolved
+
+
+def _codex_version(
+    executable: Path,
+    environment: Mapping[str, str],
+) -> str:
+    try:
+        completed = subprocess.run(
+            [str(executable), "--version"],
+            check=False,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=30,
+            env=dict(environment),
+        )
+    except (OSError, subprocess.SubprocessError) as exc:
+        raise RuntimeError("codex client version is unavailable") from exc
+    if completed.returncode != 0:
+        raise RuntimeError("codex client version is unavailable")
+    return completed.stdout.strip()
+
+
+def _load_optional_json(path: Path) -> dict[str, Any] | None:
+    if not path.exists() and not path.is_symlink():
+        return None
+    try:
+        return _load_json_object(path, max_bytes=preparation.MAX_FILE_BYTES)
+    except RuntimeError:
+        return None
+
+
+def _valid_launch_record(
+    value: Mapping[str, Any] | None,
+    item: RunSpec,
+) -> bool:
+    return bool(
+        value is not None
+        and value.get("schema_version") == "1.0"
+        and value.get("ordinal") == item.ordinal
+        and value.get("variant") == item.variant
+        and value.get("case_id") == item.case_id
+        and value.get("retry_allowed") is False
+    )
+
+
+def _valid_run_status(
+    value: Mapping[str, Any] | None,
+    item: RunSpec,
+) -> bool:
+    if (
+        value is None
+        or value.get("schema_version") != "1.0"
+        or value.get("ordinal") != item.ordinal
+        or value.get("variant") != item.variant
+        or value.get("case_id") != item.case_id
+        or not isinstance(value.get("lifecycle_passed"), bool)
+    ):
+        return False
+    failures = value.get("failure_codes")
+    if (
+        not isinstance(failures, list)
+        or not all(isinstance(code, str) and code for code in failures)
+        or len(set(failures)) != len(failures)
+        or value["lifecycle_passed"] is not (not failures)
+    ):
+        return False
+    thread_id = value.get("thread_id")
+    return not value["lifecycle_passed"] or (
+        isinstance(thread_id, str) and bool(thread_id)
+    )
+
+
+def _seal_campaign(
+    approved: ApprovedCampaign,
+    *,
+    batch_failed: bool,
+) -> dict[str, Any]:
+    raw_root = approved.raw_root
+    for name in ("campaign-ledger.json", "campaign-completion.json", "COMPLETED"):
+        target = raw_root / name
+        if target.exists() or target.is_symlink():
+            raise RuntimeError("campaign sealing output already exists")
+    deviations: list[dict[str, Any]] = []
+    runs: list[dict[str, Any]] = []
+    thread_ordinals: dict[str, list[int]] = {}
+    started = 0
+    completed = 0
+    for item in approved.plan:
+        case_root = raw_root / "runs" / item.variant / item.case_id
+        raw = case_root / "raw"
+        launch = _load_optional_json(raw / "launch-started.json")
+        status = _load_optional_json(raw / "run-status.json")
+        if _valid_launch_record(launch, item):
+            started += 1
+        else:
+            deviations.append(
+                {
+                    "ordinal": item.ordinal,
+                    "variant": item.variant,
+                    "case_id": item.case_id,
+                    "code": (
+                        "RUN_NOT_STARTED"
+                        if launch is None
+                        else "RUN_LAUNCH_INVALID"
+                    ),
+                }
+            )
+        status_valid = _valid_run_status(status, item)
+        if status_valid:
+            completed += 1
+            assert status is not None
+            thread_id = status.get("thread_id")
+            if isinstance(thread_id, str) and thread_id:
+                thread_ordinals.setdefault(thread_id, []).append(item.ordinal)
+            failure_codes = status.get("failure_codes")
+            if isinstance(failure_codes, list):
+                for code in failure_codes:
+                    if isinstance(code, str) and code:
+                        deviations.append(
+                            {
+                                "ordinal": item.ordinal,
+                                "variant": item.variant,
+                                "case_id": item.case_id,
+                                "code": "RUN_LIFECYCLE_FAILURE",
+                                "source_code": code,
+                            }
+                        )
+        else:
+            deviations.append(
+                {
+                    "ordinal": item.ordinal,
+                    "variant": item.variant,
+                    "case_id": item.case_id,
+                    "code": (
+                        "RUN_STATUS_MISSING"
+                        if status is None
+                        else "RUN_STATUS_INVALID"
+                    ),
+                }
+            )
+        runs.append(
+            {
+                "ordinal": item.ordinal,
+                "variant": item.variant,
+                "case_id": item.case_id,
+                "launch_started": launch,
+                "run_status": status if status_valid else None,
+                "run_status_artifact": _optional_artifact_record(
+                    raw / "run-status.json",
+                    max_bytes=preparation.MAX_FILE_BYTES,
+                ),
+            }
+        )
+    for ordinals in thread_ordinals.values():
+        if len(ordinals) > 1:
+            for ordinal in ordinals:
+                item = approved.plan[ordinal - 1]
+                deviations.append(
+                    {
+                        "ordinal": ordinal,
+                        "variant": item.variant,
+                        "case_id": item.case_id,
+                        "code": "DUPLICATE_THREAD_ID",
+                    }
+                )
+    if batch_failed:
+        deviations.append(
+            {
+                "ordinal": 0,
+                "variant": None,
+                "case_id": None,
+                "code": "RUN_PLAN_FAILED",
+            }
+        )
+    deviations.sort(
+        key=lambda value: (
+            int(value["ordinal"]),
+            str(value["code"]),
+            str(value.get("source_code", "")),
+        )
+    )
+    sealed_at = _utc_timestamp()
+    ledger = {
+        "schema_version": "1.0",
+        "campaign_sha256": approved.campaign_sha256,
+        "approval_envelope_sha256": approved.envelope_sha256,
+        "sealed_at": sealed_at,
+        "raw_root_identity": _directory_identity(raw_root),
+        "runs_authorized": len(approved.plan),
+        "runs_started": started,
+        "runs_completed": completed,
+        "retry_allowed": False,
+        "runs": runs,
+        "deviations": deviations,
+        "sealed": True,
+    }
+    _write_json(raw_root / "campaign-ledger.json", ledger)
+    ledger_hash = _sha256_file(
+        raw_root / "campaign-ledger.json",
+        max_bytes=preparation.MAX_FILE_BYTES,
+    )
+    completion = {
+        "schema_version": "1.0",
+        "campaign_sha256": approved.campaign_sha256,
+        "approval_envelope_sha256": approved.envelope_sha256,
+        "sealed_at": sealed_at,
+        "campaign_ledger_sha256": ledger_hash,
+        "runs_authorized": len(approved.plan),
+        "runs_started": started,
+        "runs_completed": completed,
+        "deviation_count": len(deviations),
+        "retry_allowed": False,
+    }
+    _write_json(raw_root / "campaign-completion.json", completion)
+    with (raw_root / "COMPLETED").open("xb") as handle:
+        handle.write(ledger_hash.encode("ascii") + b"\n")
+    return ledger
+
+
 def execute_campaign(
     paths: HarnessPaths | None = None,
     *,
     approved_campaign_sha256: str,
-) -> None:
+    required_frozen_paths: Sequence[str] | None = None,
+    observed_git: Mapping[str, str] | None = None,
+    codex_executable: Path | None = None,
+    python_executable: Path | None = None,
+    host_environment: Mapping[str, str] | None = None,
+    prepare_factory: Callable[..., Path] | None = None,
+    run_factory: Callable[..., dict[str, Any]] | None = None,
+    version_factory: Callable[[Path, Mapping[str, str]], str] | None = None,
+) -> Path:
     selected = default_paths() if paths is None else paths
     campaign_payload = _read_bytes(
         selected.campaign_file,
@@ -1466,7 +1816,72 @@ def execute_campaign(
     campaign = _load_yaml_object(selected.campaign_file)
     if campaign.get("status") != "approved_not_started":
         raise RuntimeError("campaign is not in the approved-not-started state")
-    raise RuntimeError("approved campaign execution is not yet implemented")
+    required = (
+        approval_bound_paths(selected)
+        if required_frozen_paths is None
+        else tuple(required_frozen_paths)
+    )
+    if observed_git is None:
+        frozen = campaign.get("frozen_inputs")
+        harness = frozen.get("harness_git") if isinstance(frozen, dict) else None
+        if not isinstance(harness, dict):
+            raise RuntimeError("frozen git identity is invalid")
+        observed = _git_identity(
+            selected.repository_root,
+            str(harness.get("commit", "")),
+        )
+        _require_clean_worktree(selected.repository_root)
+    else:
+        observed = dict(observed_git)
+    approved = validate_approved_campaign(
+        selected,
+        approved_campaign_sha256=approved_campaign_sha256,
+        required_frozen_paths=required,
+        observed_git=observed,
+    )
+    environment = dict(os.environ if host_environment is None else host_environment)
+    codex = _plain_executable(codex_executable, command="codex")
+    python = _plain_executable(
+        Path(sys.executable) if python_executable is None else python_executable,
+        command="python",
+    )
+    version_probe = _codex_version if version_factory is None else version_factory
+    if version_probe(codex, environment) != EXPECTED_CODEX_VERSION:
+        raise RuntimeError("codex client version does not match approval")
+    prepare = prepare_approved_campaign if prepare_factory is None else prepare_factory
+    execute_one = run_one if run_factory is None else run_factory
+    prepared = prepare(
+        approved,
+        selected,
+        python_executable=str(python),
+        base_environment=environment,
+    )
+    if prepared != approved.raw_root:
+        raise RuntimeError("prepared campaign root does not match approval")
+
+    def worker(item: RunSpec) -> dict[str, Any]:
+        case_root = approved.raw_root / "runs" / item.variant / item.case_id
+        return execute_one(
+            case_root,
+            item,
+            codex_executable=codex,
+            python_executable=python,
+            host_environment=environment,
+        )
+
+    batch_failed = False
+    try:
+        execute_run_plan(
+            approved.plan,
+            worker,
+            max_workers=MAX_WORKERS,
+        )
+    except BaseException:
+        batch_failed = True
+    ledger = _seal_campaign(approved, batch_failed=batch_failed)
+    if batch_failed or ledger["deviations"]:
+        raise RuntimeError("campaign execution sealed with deviations")
+    return approved.raw_root
 
 
 def main() -> None:

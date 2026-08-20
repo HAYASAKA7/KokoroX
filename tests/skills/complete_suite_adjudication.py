@@ -1,13 +1,19 @@
 from __future__ import annotations
 
+import argparse
 from hashlib import sha256
 import json
 from pathlib import Path, PurePosixPath, PureWindowsPath
 import re
-from typing import Any, Mapping
+import shutil
+import tempfile
+from typing import Any, Callable, Mapping, Sequence
 
+import complete_suite_preparation as preparation
+import import_complete_suite_campaign as campaign_importer
 from import_complete_suite_campaign import replay_run_evidence
 from researching_characters_adjudication import _commands_are_safe, _shell_words
+import run_complete_suite_campaign as runner
 
 
 _POWERSHELL_WRAPPER = re.compile(
@@ -2652,4 +2658,512 @@ def supported_assertions() -> set[str]:
     return set(_SUPPORTED_ASSERTIONS)
 
 
-__all__ = ["adjudicate_run", "supported_assertions", "validate_run_integrity"]
+def _write_canonical_json(path: Path, value: object) -> bytes:
+    payload = runner.canonical_bytes(value) + b"\n"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(payload)
+    if path.read_bytes() != payload:
+        raise RuntimeError("adjudication artifact changed while it was written")
+    return payload
+
+
+def _artifact_record(root: Path, path: Path) -> dict[str, Any]:
+    payload = path.read_bytes()
+    return {
+        "path": path.relative_to(root).as_posix(),
+        "size": len(payload),
+        "sha256": sha256(payload).hexdigest(),
+    }
+
+
+def _validate_campaign_result(
+    value: object,
+    item: runner.RunSpec,
+) -> dict[str, Any]:
+    fields = {
+        "schema_version",
+        "variant",
+        "case_id",
+        "evidence_integrity",
+        "assertions",
+        "failure_codes",
+        "passed",
+    }
+    if not isinstance(value, dict) or set(value) != fields:
+        raise RuntimeError("campaign adjudication result is invalid")
+    failures = value.get("failure_codes")
+    assertions = value.get("assertions")
+    integrity = value.get("evidence_integrity")
+    if (
+        value.get("schema_version") != "1.0"
+        or value.get("variant") != item.variant
+        or value.get("case_id") != item.case_id
+        or not isinstance(value.get("passed"), bool)
+        or not isinstance(failures, list)
+        or not all(isinstance(code, str) and code for code in failures)
+        or len(set(failures)) != len(failures)
+        or not isinstance(assertions, list)
+        or not isinstance(integrity, dict)
+        or set(integrity)
+        != {"passed", "failure_codes", "command_count", "file_change_count"}
+        or not isinstance(integrity.get("passed"), bool)
+        or not isinstance(integrity.get("failure_codes"), list)
+    ):
+        raise RuntimeError("campaign adjudication result is invalid")
+    integrity_failures = integrity["failure_codes"]
+    if (
+        not all(isinstance(code, str) and code for code in integrity_failures)
+        or len(set(integrity_failures)) != len(integrity_failures)
+        or integrity["passed"] is not (not integrity_failures)
+    ):
+        raise RuntimeError("campaign adjudication result is invalid")
+    for count_name in ("command_count", "file_change_count"):
+        count = integrity.get(count_name)
+        if not isinstance(count, int) or isinstance(count, bool) or count < 0:
+            raise RuntimeError("campaign adjudication result is invalid")
+    for assertion in assertions:
+        if (
+            not isinstance(assertion, dict)
+            or set(assertion)
+            != {"requirement", "id", "observed", "claimed_status", "passed"}
+            or assertion.get("requirement") not in {"must", "must_not"}
+            or not isinstance(assertion.get("id"), str)
+            or not assertion["id"]
+            or not isinstance(assertion.get("observed"), bool)
+            or assertion.get("claimed_status")
+            not in {None, "satisfied", "not_satisfied"}
+            or not isinstance(assertion.get("passed"), bool)
+        ):
+            raise RuntimeError("campaign adjudication result is invalid")
+    expected_passed = bool(
+        integrity["passed"]
+        and not failures
+        and all(assertion["passed"] for assertion in assertions)
+    )
+    if value["passed"] is not expected_passed:
+        raise RuntimeError("campaign adjudication result is inconsistent")
+    runner.canonical_bytes(value)
+    return dict(value)
+
+
+def _variant_summary(
+    variant: str,
+    records: Sequence[Mapping[str, Any]],
+) -> dict[str, Any]:
+    passed = sum(record.get("passed") is True for record in records)
+    return {
+        "schema_version": "1.0",
+        "variant": variant,
+        "total": len(records),
+        "passed": passed,
+        "failed": len(records) - passed,
+        "all_cases_passed": passed == len(records),
+        "case_results": [dict(record) for record in records],
+    }
+
+
+def _delta_summary(
+    cases: Sequence[Mapping[str, Any]],
+    results: Mapping[tuple[str, str], bool],
+) -> dict[str, Any]:
+    counts = {
+        "improved": 0,
+        "regressed": 0,
+        "unchanged_fail": 0,
+        "unchanged_pass": 0,
+    }
+    records: list[dict[str, Any]] = []
+    for case in cases:
+        case_id = case.get("id")
+        if not isinstance(case_id, str):
+            raise RuntimeError("campaign case identity is invalid")
+        baseline = results[("baseline", case_id)]
+        enabled = results[("suite-enabled", case_id)]
+        if not baseline and enabled:
+            outcome = "improved"
+        elif baseline and not enabled:
+            outcome = "regressed"
+        elif baseline:
+            outcome = "unchanged_pass"
+        else:
+            outcome = "unchanged_fail"
+        counts[outcome] += 1
+        records.append(
+            {
+                "case_id": case_id,
+                "baseline_passed": baseline,
+                "suite_enabled_passed": enabled,
+                "outcome": outcome,
+            }
+        )
+    return {
+        "schema_version": "1.0",
+        "counts": counts,
+        "cases": records,
+    }
+
+
+def _remove_generated_results(root: Path, parent: Path) -> None:
+    if not root.exists() and not root.is_symlink():
+        return
+    try:
+        resolved_parent = parent.resolve(strict=True)
+        resolved_root = root.resolve(strict=True)
+        resolved_root.relative_to(resolved_parent)
+        if not root.name.startswith(".complete-suite-adjudication-"):
+            raise RuntimeError("generated adjudication root name is invalid")
+        preparation._require_plain_directory(
+            root,
+            label="generated adjudication root",
+        )
+    except (OSError, ValueError) as exc:
+        raise RuntimeError("generated adjudication cleanup is unsafe") from exc
+    shutil.rmtree(root)
+
+
+def _campaign_summary_document(
+    campaign: Mapping[str, Any],
+    import_ledger: Mapping[str, Any],
+    import_path: Path,
+    approved_campaign_sha256: str,
+    plan: Sequence[runner.RunSpec],
+    baseline: Mapping[str, Any],
+    enabled: Mapping[str, Any],
+) -> dict[str, Any]:
+    deviations = import_ledger.get("raw_deviations")
+    if not isinstance(deviations, list):
+        raise RuntimeError("campaign deviation ledger is invalid")
+    suite_deviations: list[dict[str, Any]] = []
+    for value in deviations:
+        if (
+            not isinstance(value, dict)
+            or not isinstance(value.get("ordinal"), int)
+            or isinstance(value.get("ordinal"), bool)
+            or value["ordinal"] < 0
+            or value.get("variant") not in {None, "baseline", "suite-enabled"}
+            or not isinstance(value.get("code"), str)
+            or not value["code"]
+        ):
+            raise RuntimeError("campaign deviation ledger is invalid")
+        if value["ordinal"] == 0 or value["variant"] == "suite-enabled":
+            suite_deviations.append(dict(value))
+    return {
+        "schema_version": "1.0",
+        "campaign_sha256": approved_campaign_sha256,
+        "approval_envelope_sha256": runner.approval_envelope_sha256(campaign),
+        "raw_campaign_ledger_sha256": import_ledger[
+            "raw_campaign_ledger_sha256"
+        ],
+        "import_ledger_sha256": sha256(import_path.read_bytes()).hexdigest(),
+        "run_count": len(plan),
+        "raw_deviations": deviations,
+        "suite_deviations": suite_deviations,
+        "baseline_all_cases_passed": baseline["all_cases_passed"],
+        "suite_enabled_all_cases_passed": enabled["all_cases_passed"],
+        "suite_closure_passed": bool(
+            enabled["all_cases_passed"] and not suite_deviations
+        ),
+    }
+
+
+def adjudicate_campaign(
+    raw_root: Path,
+    retained_root: Path,
+    *,
+    paths: runner.HarnessPaths | None = None,
+    approved_campaign_sha256: str,
+    required_frozen_paths: Sequence[str] | None = None,
+    observed_git: Mapping[str, str] | None = None,
+    replay_factory: Callable[..., None] | None = None,
+    adjudicate_factory: Callable[..., dict[str, Any]] | None = None,
+) -> Path:
+    results_root = retained_root / "results"
+    if results_root.exists() or results_root.is_symlink():
+        raise RuntimeError("campaign adjudication already exists")
+    campaign, cases, plan, ledgers, import_ledger = (
+        campaign_importer.replay_campaign_import(
+            raw_root,
+            retained_root,
+            paths=paths,
+            approved_campaign_sha256=approved_campaign_sha256,
+            required_frozen_paths=required_frozen_paths,
+            observed_git=observed_git,
+            replay_factory=replay_factory,
+        )
+    )
+    case_map: dict[str, dict[str, Any]] = {}
+    for case in cases:
+        case_id = case.get("id")
+        if not isinstance(case_id, str) or case_id in case_map:
+            raise RuntimeError("campaign case identity is invalid")
+        case_map[case_id] = case
+    if set(case_map) != {item.case_id for item in plan}:
+        raise RuntimeError("campaign case plan is invalid")
+    try:
+        preparation._require_plain_directory(
+            retained_root.parent,
+            label="retained campaign parent",
+        )
+    except (OSError, ValueError) as exc:
+        raise RuntimeError("retained campaign parent is unsafe") from exc
+    scratch = Path(
+        tempfile.mkdtemp(
+            prefix=".complete-suite-adjudication-",
+            dir=retained_root.parent,
+        )
+    )
+    adjudicator = adjudicate_run if adjudicate_factory is None else adjudicate_factory
+    try:
+        result_records: list[dict[str, Any]] = []
+        result_passes: dict[tuple[str, str], bool] = {}
+        for item, ledger in zip(plan, ledgers, strict=True):
+            case = case_map[item.case_id]
+            case_bytes = runner.canonical_bytes(case)
+            ledger_bytes = runner.canonical_bytes(ledger)
+            result = _validate_campaign_result(
+                adjudicator(
+                    case,
+                    raw_root / "runs" / item.variant / item.case_id,
+                    retained_root / "runs" / item.variant / item.case_id,
+                    ledger,
+                ),
+                item,
+            )
+            if (
+                runner.canonical_bytes(case) != case_bytes
+                or runner.canonical_bytes(ledger) != ledger_bytes
+            ):
+                raise RuntimeError("campaign adjudication input changed")
+            result_path = scratch / item.variant / item.case_id / "result.json"
+            _write_canonical_json(result_path, result)
+            artifact = _artifact_record(scratch, result_path)
+            result_records.append(
+                {
+                    "ordinal": item.ordinal,
+                    "variant": item.variant,
+                    "case_id": item.case_id,
+                    "passed": result["passed"],
+                    **artifact,
+                }
+            )
+            result_passes[(item.variant, item.case_id)] = result["passed"]
+        by_variant = {
+            variant: [
+                record
+                for record in result_records
+                if record["variant"] == variant
+            ]
+            for variant in ("baseline", "suite-enabled")
+        }
+        baseline = _variant_summary("baseline", by_variant["baseline"])
+        enabled = _variant_summary("suite-enabled", by_variant["suite-enabled"])
+        delta = _delta_summary(cases, result_passes)
+        import_path = retained_root / "import-ledger.json"
+        campaign_summary = _campaign_summary_document(
+            campaign,
+            import_ledger,
+            import_path,
+            approved_campaign_sha256,
+            plan,
+            baseline,
+            enabled,
+        )
+        summaries = (
+            ("baseline-summary.json", baseline),
+            ("suite-enabled-summary.json", enabled),
+            ("baseline-versus-suite-delta.json", delta),
+            ("campaign-summary.json", campaign_summary),
+        )
+        summary_records: list[dict[str, Any]] = []
+        for relative, value in summaries:
+            summary_path = scratch / relative
+            _write_canonical_json(summary_path, value)
+            summary_records.append(_artifact_record(scratch, summary_path))
+        adjudication_ledger = {
+            "schema_version": "1.0",
+            "campaign_sha256": approved_campaign_sha256,
+            "approval_envelope_sha256": runner.approval_envelope_sha256(campaign),
+            "import_ledger_sha256": campaign_summary["import_ledger_sha256"],
+            "run_count": len(plan),
+            "results": result_records,
+            "summaries": summary_records,
+            "suite_closure_passed": campaign_summary["suite_closure_passed"],
+        }
+        _write_canonical_json(
+            scratch / "adjudication-ledger.json",
+            adjudication_ledger,
+        )
+        if results_root.exists() or results_root.is_symlink():
+            raise RuntimeError("campaign adjudication already exists")
+        scratch.rename(results_root)
+    except BaseException:
+        _remove_generated_results(scratch, retained_root.parent)
+        raise
+    return results_root
+
+
+def replay_campaign_adjudication(
+    raw_root: Path,
+    retained_root: Path,
+    *,
+    paths: runner.HarnessPaths | None = None,
+    approved_campaign_sha256: str,
+    required_frozen_paths: Sequence[str] | None = None,
+    observed_git: Mapping[str, str] | None = None,
+    replay_factory: Callable[..., None] | None = None,
+    adjudicate_factory: Callable[..., dict[str, Any]] | None = None,
+) -> dict[str, Any]:
+    results_root = retained_root / "results"
+    try:
+        preparation._require_plain_directory(
+            results_root,
+            label="campaign adjudication results",
+        )
+    except (OSError, ValueError) as exc:
+        raise RuntimeError("campaign adjudication results are unavailable") from exc
+    campaign, cases, plan, ledgers, import_ledger = (
+        campaign_importer.replay_campaign_import(
+            raw_root,
+            retained_root,
+            paths=paths,
+            approved_campaign_sha256=approved_campaign_sha256,
+            required_frozen_paths=required_frozen_paths,
+            observed_git=observed_git,
+            replay_factory=replay_factory,
+        )
+    )
+    case_map = {case.get("id"): case for case in cases}
+    if (
+        len(case_map) != len(cases)
+        or set(case_map) != {item.case_id for item in plan}
+        or not all(isinstance(case_id, str) for case_id in case_map)
+    ):
+        raise RuntimeError("campaign case identity is invalid")
+    adjudicator = adjudicate_run if adjudicate_factory is None else adjudicate_factory
+    result_records: list[dict[str, Any]] = []
+    result_passes: dict[tuple[str, str], bool] = {}
+    expected_paths: set[str] = set()
+    for item, ledger in zip(plan, ledgers, strict=True):
+        case = case_map[item.case_id]
+        case_bytes = runner.canonical_bytes(case)
+        ledger_bytes = runner.canonical_bytes(ledger)
+        result = _validate_campaign_result(
+            adjudicator(
+                case,
+                raw_root / "runs" / item.variant / item.case_id,
+                retained_root / "runs" / item.variant / item.case_id,
+                ledger,
+            ),
+            item,
+        )
+        if (
+            runner.canonical_bytes(case) != case_bytes
+            or runner.canonical_bytes(ledger) != ledger_bytes
+        ):
+            raise RuntimeError("campaign adjudication input changed")
+        relative = f"{item.variant}/{item.case_id}/result.json"
+        result_path = results_root.joinpath(*PurePosixPath(relative).parts)
+        expected_payload = runner.canonical_bytes(result) + b"\n"
+        if campaign_importer._read_text_artifact(result_path) != expected_payload:
+            raise RuntimeError("campaign adjudication result changed")
+        artifact = _artifact_record(results_root, result_path)
+        result_records.append(
+            {
+                "ordinal": item.ordinal,
+                "variant": item.variant,
+                "case_id": item.case_id,
+                "passed": result["passed"],
+                **artifact,
+            }
+        )
+        result_passes[(item.variant, item.case_id)] = result["passed"]
+        expected_paths.add(relative)
+    by_variant = {
+        variant: [
+            record for record in result_records if record["variant"] == variant
+        ]
+        for variant in ("baseline", "suite-enabled")
+    }
+    baseline = _variant_summary("baseline", by_variant["baseline"])
+    enabled = _variant_summary("suite-enabled", by_variant["suite-enabled"])
+    delta = _delta_summary(cases, result_passes)
+    import_path = retained_root / "import-ledger.json"
+    campaign_summary = _campaign_summary_document(
+        campaign,
+        import_ledger,
+        import_path,
+        approved_campaign_sha256,
+        plan,
+        baseline,
+        enabled,
+    )
+    summaries = (
+        ("baseline-summary.json", baseline),
+        ("suite-enabled-summary.json", enabled),
+        ("baseline-versus-suite-delta.json", delta),
+        ("campaign-summary.json", campaign_summary),
+    )
+    summary_records: list[dict[str, Any]] = []
+    for relative, value in summaries:
+        path = results_root / relative
+        expected_payload = runner.canonical_bytes(value) + b"\n"
+        if campaign_importer._read_text_artifact(path) != expected_payload:
+            raise RuntimeError("campaign adjudication summary changed")
+        summary_records.append(_artifact_record(results_root, path))
+        expected_paths.add(relative)
+    expected_ledger = {
+        "schema_version": "1.0",
+        "campaign_sha256": approved_campaign_sha256,
+        "approval_envelope_sha256": runner.approval_envelope_sha256(campaign),
+        "import_ledger_sha256": campaign_summary["import_ledger_sha256"],
+        "run_count": len(plan),
+        "results": result_records,
+        "summaries": summary_records,
+        "suite_closure_passed": campaign_summary["suite_closure_passed"],
+    }
+    ledger_path = results_root / "adjudication-ledger.json"
+    if campaign_importer._read_text_artifact(ledger_path) != (
+        runner.canonical_bytes(expected_ledger) + b"\n"
+    ):
+        raise RuntimeError("campaign adjudication ledger changed")
+    expected_paths.add("adjudication-ledger.json")
+    try:
+        inventory = preparation.inventory_tree(results_root)
+    except (OSError, ValueError) as exc:
+        raise RuntimeError("campaign adjudication layout is invalid") from exc
+    observed_paths = {
+        entry.get("path")
+        for entry in inventory.get("files", [])
+        if isinstance(entry, dict)
+    }
+    if observed_paths != expected_paths:
+        raise RuntimeError("campaign adjudication layout is invalid")
+    return campaign_summary
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("raw_root", type=Path)
+    parser.add_argument("retained_root", type=Path)
+    parser.add_argument("--approved-campaign-sha256", required=True)
+    args = parser.parse_args()
+    results = adjudicate_campaign(
+        args.raw_root,
+        args.retained_root,
+        approved_campaign_sha256=args.approved_campaign_sha256,
+    )
+    summary = _load_json_object(results / "campaign-summary.json")
+    return 0 if summary.get("suite_closure_passed") is True else 1
+
+
+__all__ = [
+    "adjudicate_campaign",
+    "adjudicate_run",
+    "replay_campaign_adjudication",
+    "supported_assertions",
+    "validate_run_integrity",
+]
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
