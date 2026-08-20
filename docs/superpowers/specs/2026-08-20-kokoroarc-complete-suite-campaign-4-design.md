@@ -1,7 +1,7 @@
 # KokoroArc Complete-Suite Corrective Campaign 4 Design
 
 **Date:** 2026-08-20
-**Status:** Approved for implementation; not approved for provider execution
+**Status:** Executed once; sealed preparation failure; superseded by campaign 5
 **Scope:** Task 18 complete-suite behavioral campaign harness only
 
 ## 1. Decision
@@ -181,3 +181,25 @@ campaign sensitive to undeclared packages and user configuration. Removing
 claims from the pass contract was rejected because exact self-reporting is
 useful audit evidence, provided claims remain subordinate to independently
 replayed command, file, state, and final-event evidence.
+
+## 9. Execution outcome
+
+The user later approved the exact proposed4 envelope. Preparation failed
+before provider launch because trusted fixture generation imported KokoroArc
+from the harness process rather than the isolated installed target. The sealed
+campaign authorizes 24 runs but records zero started and zero completed. No
+provider session exists, and approved4 is immutable.
+
+The failure also exposed a separate byte-reproducibility weakness: the frozen
+manifest captured 37 files in a mixed legacy working-tree newline state that a
+fresh checkout did not reproduce. Exact preservation remained possible because
+all 141 raw hashes were independently recovered and verified, but the state is
+not an acceptable successor preapproval baseline.
+
+Campaign 5 must therefore retain this design's runtime, parser, claim, and
+evidence boundaries while adding both requirements below:
+
+1. fixture assets are generated only by a subprocess whose import path is the
+   validated installed frozen runtime; and
+2. every approval-bound raw file is byte-identical in the preparation worktree
+   and a fresh `core.autocrlf=true` checkout before its envelope is presented.

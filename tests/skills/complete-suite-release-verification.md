@@ -158,3 +158,62 @@ rewritten. Repairing the installed runtime, wrapper parser, and output/result
 contract requires a new frozen campaign with unique D:-based raw and retained
 roots and fresh exact user approval. Until a corrective campaign passes, Task
 18 and the standalone suite remain incomplete.
+
+## Approved campaign 4: immutable preparation failure
+
+Status: **sealed before provider launch; suite closure failed**.
+
+The user approved envelope
+`0e6b3e3146b4d3cf6539b14412e0f127c39d60d41048d96ddcad26987100ae64`
+for exactly 24 fresh runs. The approval was recorded in campaign SHA-256
+`3f283f7cec6bb147f819616883c28cd1281f1478e63d869f33cceb457eb1789b`.
+It bound Git commit `778c77dc93a1bfa13537f5d96c31e5ad779b602e`, tree
+`1c5c67d8b7ba29d4ff36a9534440afcead354849`, parent
+`788e86a08af8c94a36bed8d4b33021091201b4a6`, 141 approval files,
+manifest `047a372cabe1f5ec2de84c434bff86fde45e98c257e227625e1c43b62073d9bc`,
+dependency-wheelhouse manifest
+`0753050ecf612684fec5102e993253c74842ec618bfcc086a025f5dee69bbba2`,
+and KokoroArc wheel
+`61ef3a5ff7201eebbcc6d6fb1c88016ce6de8cf74ab38592c0206ed72db4e1e5`.
+The approved-not-started record was committed as
+`4bcd1e4785bad9c73d2e2f0b8b7b972880c048de` before execution.
+
+Preparation installed and validated the frozen runtime, then stopped while
+building the trusted fixture assets. Fixture generation imported
+`kokoroarc.packs.loader` in the harness process instead of the isolated
+installed-runtime subprocess. The normal test environment had masked this
+undeclared `PYTHONPATH` dependency; the clean launch raised
+`ModuleNotFoundError` before any provider process or session was created.
+
+The failure was sealed at `2026-08-20T09:45:43.314Z` with 24 runs authorized,
+zero started, and zero completed. There is no raw `runs` directory. The
+pre-seal snapshot contains 389 files and 6,398,678 bytes at tree SHA-256
+`a82b3a59c9208c49fb6c298785051f2bba9df81bb9b5479b5f08500738b7933f`.
+The bounded failure artifact SHA-256 is
+`86ade7a07e7890b5a34e897acbc3e08035194d37d3a9240d11a5a8c129868558`;
+the raw campaign ledger SHA-256 is
+`a737cfeb13e877bcc6d0da24a7c19a4064b9c9dc12d32eab0ac77ba3728a0202`.
+Its 49 deviations are the campaign preparation failure plus deterministic
+`RUN_NOT_STARTED` and `RUN_STATUS_MISSING` entries for all 24 authorized runs.
+
+Sanitized import retained only the five campaign artifacts and import ledger
+under `tests/skills/evidence/complete-suite/approved4`. The import ledger
+SHA-256 is
+`4a7675f203fb3365a9dc743e4426fb5217da49e27817fea8f5c6a2a7aa9df90e`;
+the six-file retained inventory is 84,056 bytes at tree SHA-256
+`ceac9432c278c9fb74a787745ac34c28411b8ec3c4616c45728bca4ec2cf1292`.
+Exact raw-to-retained replay passed with `run_count=0` and
+`runs_authorized=24`.
+
+The frozen file manifest also exposed a separate checkout-reproducibility
+defect: 37 approval-bound files reflected a mixed legacy working-tree newline
+state rather than the byte form produced by a fresh checkout. Every retained
+claim above was validated against the exact 141 approved hashes; no hash was
+relaxed or replaced. A successor campaign must freeze a fresh-checkout-stable
+manifest in addition to fixing fixture-generation isolation.
+
+No approved4 process may be started or retried, and its raw or retained
+evidence may not be rewritten. Corrective campaign 5 requires a new frozen
+campaign, new raw and retained roots, a fresh exact approval envelope, and a
+new explicit user approval. Until that campaign passes, Task 18 and the
+standalone suite remain incomplete.

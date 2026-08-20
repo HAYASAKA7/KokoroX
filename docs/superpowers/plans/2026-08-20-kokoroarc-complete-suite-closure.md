@@ -634,7 +634,7 @@ the approval envelope SHA-256 is
 Status remains `draft_not_approved`, `user_approval` remains null, all
 execution counters remain zero, and neither proposed4 campaign root exists.
 
-- [ ] **Step 9: Request fresh exact approval, then execute once if approved**
+- [x] **Step 9: Request fresh exact approval, then execute once if approved**
 
 Present the complete frozen envelope. Only a new explicit approval authorizes
 the `approved_not_started` commit and one-shot 24-session execution. The current
@@ -649,6 +649,51 @@ is `2026-08-20T08:54:04Z`. Execution remains blocked until the
 `approved_not_started` record is validated and committed cleanly.
 The validated approved campaign SHA-256 is
 `3f283f7cec6bb147f819616883c28cd1281f1478e63d869f33cceb457eb1789b`.
+
+Approved4 execution outcome (2026-08-20): preparation stopped before provider
+launch with `CAMPAIGN_PREPARATION_FAILED` / `ModuleNotFoundError`. The trusted
+fixture builder imported KokoroArc from the harness process instead of the
+installed frozen target. Runs authorized/started/completed are `24/0/0`; no
+provider session or raw `runs` directory exists. The sealed raw ledger is
+`a737cfeb13e877bcc6d0da24a7c19a4064b9c9dc12d32eab0ac77ba3728a0202`.
+
+- [x] **Step 10: Preserve approved4 and harden the preparation boundary**
+
+Retain the zero-run campaign without inventing run artifacts. Bind the exact
+pre-seal raw snapshot, import only campaign-level artifacts, and prove exact
+replay. Move fixture creation into the isolated installed runtime, and make
+every pre-provider preparation exception seal a bounded zero-run failure.
+
+Implementation commit
+`86d940281612b17a1f593301c01623a76e568449` added isolated fixture creation,
+zero-run failure sealing/import/replay, and regression coverage. Approved4's
+pre-seal snapshot contains 389 files, 6,398,678 bytes, and tree SHA-256
+`a82b3a59c9208c49fb6c298785051f2bba9df81bb9b5479b5f08500738b7933f`.
+Its six retained files have import-ledger SHA-256
+`4a7675f203fb3365a9dc743e4426fb5217da49e27817fea8f5c6a2a7aa9df90e`
+and retained tree SHA-256
+`ceac9432c278c9fb74a787745ac34c28411b8ec3c4616c45728bca4ec2cf1292`.
+
+Post-approval reconstruction also proved that 37 frozen files reflected a
+mixed legacy working-tree newline state. Their exact approved hashes were
+recovered and checked without relaxing validation. Corrective campaign 5 must
+add fresh-checkout byte equality to the preapproval gate.
+
+- [ ] **Step 11: Create, verify, and freeze proposed5 without executing it**
+
+Use campaign ID `2026-08-20-proposed5`, raw root
+`D:\tmp\kokoroarc-m9-task18-campaign-20260820-approved5`, and retained root
+`tests/skills/evidence/complete-suite/approved5`. Normalize every
+approval-bound working-tree file to its declared checkout policy, prove the
+141-file manifest in a fresh `core.autocrlf=true` checkout, rerun the complete
+preapproval gate, and freeze a new draft envelope. Do not create the raw or
+retained campaign root and do not launch a provider process.
+
+- [ ] **Step 12: Request fresh exact proposed5 approval**
+
+Present the complete proposed5 envelope. No earlier design or campaign
+approval authorizes execution. Only a new explicit approval of the exact
+frozen envelope permits an `approved_not_started` commit and one-shot launch.
 
 ## Task 8: Run the settled deterministic release gate
 
