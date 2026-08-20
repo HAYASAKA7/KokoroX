@@ -220,7 +220,7 @@ def test_complete_suite_campaign_state_is_closed_and_nonexecuted() -> None:
         }
         assert runtime["schema_version"] == "1.0"
         assert runtime["root"] == (
-            "D:\\tmp\\kokoroarc-proposed4-wheelhouse-788e86a-01"
+            "D:\\tmp\\kokoroarc-proposed5-wheelhouse-canonical-lf-01"
         )
         assert runtime["distributions"] == [
             "attrs",

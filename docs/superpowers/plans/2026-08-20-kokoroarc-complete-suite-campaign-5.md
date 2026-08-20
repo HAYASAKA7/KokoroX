@@ -282,6 +282,17 @@ Record `commit`, `tree`, and sole `parent`. This commit is the frozen
 only the non-approval-bound campaign YAML and checkpoint documentation may be
 updated when the draft is frozen.
 
+Initial checkpoint, superseded before freeze (2026-08-20): commit
+`54ed269163247b86323f6895890758f03522e530`, tree
+`34925628e691859b0ac1964238cb881c328494da`, sole parent
+`599a338b06208e3740b05252b1706e63f9733822`. The committed seven-file range
+passed `git diff --check`, and the worktree was clean immediately afterward.
+The post-commit audit found one dormant approval-bound structure assertion
+still naming the proposed4 wheelhouse. The assertion is being corrected to
+the approved proposed5 canonical-LF root, so this identity is not the frozen
+`harness_git` identity and all exact-checkout/build bindings must be repeated
+against the corrected commit.
+
 ## Task 4: Prove fresh-checkout raw-byte equality
 
 **Files:**
@@ -324,6 +335,18 @@ python -B -m pytest tests/skills/test_complete_suite_campaign_structure.py -q -p
 Require a clean checkout before and after the test. Preserve the byte-audit
 summary under `D:\tmp`; do not add it to retained campaign evidence.
 
+Superseded-checkpoint fresh-checkout record (2026-08-20): the detached
+`D:\tmp\kokoroarc-proposed5-checkout-01` clone used `core.autocrlf=true` at
+exact commit `54ed269163247b86323f6895890758f03522e530`. The committed structure
+module passed 5/5 in 2.48 seconds. Independent comparison of both 141-path
+allowlists found zero path-set, missing, size, SHA-256, source-CRLF, or
+checkout-CRLF mismatches; both lists were ordinal-sorted and unique. The
+summary is retained at
+`D:\tmp\kokoroarc-proposed5-byte-audit-01\byte-audit-summary.json`. Both source
+and detached checkout remained clean.
+This proves the canonical-LF policy at the superseded checkpoint, but the same
+audit must be repeated against the corrected canonical commit before freeze.
+
 ## Task 5: Revalidate and rebuild frozen distribution inputs
 
 **Files:**
@@ -333,7 +356,7 @@ summary under `D:\tmp`; do not add it to retained campaign evidence.
 - Read: `tests/skills/complete_suite_preparation.py`
 - Read: `D:\tmp\kokoroarc-proposed4-wheelhouse-788e86a-01`
 
-- [ ] **Step 1: Re-capture the immutable source wheelhouse**
+- [x] **Step 1: Re-capture the immutable source wheelhouse**
 
 Call `complete_suite_preparation.capture_runtime_wheelhouse` on the exact
 wheelhouse path. Require seven flat wheels, the exact distribution set, no
@@ -378,6 +401,48 @@ for the already closed dependency set. With repository source absent from
 
 Re-capture the wheelhouse after these smokes and require the manifest to be
 unchanged.
+
+Superseded-checkpoint distribution verification record (2026-08-20): the
+immutable proposed4 source
+wheelhouse re-captured at seven wheels and manifest SHA-256
+`0753050ecf612684fec5102e993253c74842ec618bfcc086a025f5dee69bbba2`.
+Two detached `core.autocrlf=true` checkouts of canonical commit
+`54ed269163247b86323f6895890758f03522e530` built at epoch `1787151982`.
+Their 109-member wheels were byte-identical at 345,607 bytes and SHA-256
+`76ebb700b7bb9c4eb88fd74a2268c077eeff741245cb7d7f6402673e2f02174f`;
+their wheel content-manifest SHA-256 was
+`766c1ceaff7e34d1c9af9a66a21f07e8e02cb7bec3149665fb0c12dbfd2f1b69`.
+The raw sdists were 279,688 and 279,745 bytes at SHA-256
+`ec7f4ce90254b750aa10651168811a412a43e5c61fd2ec6b2227170969f4ca8a`
+and `d3974a9375560543c429758b505233c9239e2eda7958963a64dd9e9975233a3f`.
+Both had 145 members, 116 files, and normalized content-manifest SHA-256
+`761c79a90a56098c31ca7a2921b69782cbb169f8288b6a1e832230e995dd9e81`.
+Each archive contained 54 Python modules, 38 schemas, and 12 Skill files; the
+sdists also contained the plugin manifest.
+
+The new seven-wheel root
+`D:\tmp\kokoroarc-proposed5-wheelhouse-canonical-lf-01` contains the six exact
+third-party predecessor wheels plus only the canonical-LF KokoroArc wheel. It
+has 925,797 bytes, tree SHA-256
+`b189ffa2b280340f47d28bf88eac705c4aa959996f529d207ba22dcff080ac30`,
+inventory SHA-256
+`f3b0c50412bea34b88a64e25ef06cd00c9775791a194c5fca5df476e530c67b4`,
+and full manifest SHA-256
+`c2230d20a1fbe19c39f8c5cb9bf445b18d6b7a3e05e281912ed953d5078f5698`.
+Its canonical manifest is retained outside the wheelhouse at
+`D:\tmp\kokoroarc-proposed5-wheelhouse-audit-01\wheelhouse-manifest.json`.
+
+The offline/no-index installation resolved all seven modules beneath its
+278-file installed target, passed CLI version/help and real Rin validation,
+and built 69 trusted fixture files inside that installed runtime. Fixture
+generation left the installed tree unchanged. The installed tree SHA-256 was
+`9c9e208a05ebe4af2c3f86a81cbd1ea15dc1fcfdea9016fc9c8bbe33c91eef9f`;
+the fixture tree SHA-256 was
+`c98cee7a57fd320deca5c417a7e2c53e9e089b93d45c7131aaba2bf529fbf51e`.
+Re-capture after all smokes reproduced both predecessor and proposed5
+wheelhouse manifest hashes exactly. No download or network client ran.
+These distribution bytes remain useful evidence, but their source-commit
+binding must be repeated after the corrected canonical checkpoint is committed.
 
 ## Task 6: Freeze proposed5 against the canonical checkpoint
 

@@ -694,15 +694,38 @@ KokoroArc wheel because its mixed-newline contents and ZIP timestamps do not
 represent the canonical-LF fixed-epoch build. Do not create the raw or retained
 campaign root and do not launch a provider process.
 
-Campaign 5 pre-checkpoint verification (2026-08-20): the canonical-LF wheel
+Campaign 5 initial-checkpoint verification (2026-08-20): the canonical-LF wheel
 oracle passed at 345,607 bytes and SHA-256
 `76ebb700b7bb9c4eb88fd74a2268c077eeff741245cb7d7f6402673e2f02174f`.
 The complete structure/preparation/evidence/release-evidence partition passed
 151 tests with 3 documented Windows directory-link/symlink capability skips in
 424.34 seconds. The explicit installed-runtime fixture and exact zero-run
 preparation-failure replay regressions passed 2/2. Both proposed5 campaign
-roots remained absent and no provider process was launched. Canonical harness
-commit identity and the newly assembled wheelhouse remain to be recorded.
+roots remained absent and no provider process was launched. Initial checkpoint
+commit `54ed269163247b86323f6895890758f03522e530`, tree
+`34925628e691859b0ac1964238cb881c328494da`, and sole parent
+`599a338b06208e3740b05252b1706e63f9733822` are now fixed. A detached
+`core.autocrlf=true` checkout passed the 5-test structure gate and reproduced
+all 141 approval-bound files with zero path-set, missing, size, SHA-256, or
+CRLF mismatches. Two canonical-commit builds then produced byte-identical
+109-member wheels at 345,607 bytes/SHA-256
+`76ebb700b7bb9c4eb88fd74a2268c077eeff741245cb7d7f6402673e2f02174f`
+and content-identical 116-file normalized sdists at manifest SHA-256
+`761c79a90a56098c31ca7a2921b69782cbb169f8288b6a1e832230e995dd9e81`.
+The new seven-wheel proposed5 wheelhouse has full manifest SHA-256
+`c2230d20a1fbe19c39f8c5cb9bf445b18d6b7a3e05e281912ed953d5078f5698`
+and inventory SHA-256
+`f3b0c50412bea34b88a64e25ef06cd00c9775791a194c5fca5df476e530c67b4`.
+Its offline installed-runtime, module-origin, CLI version/help, Rin validation,
+and isolated 69-file fixture-generation smokes passed without changing either
+wheelhouse or the 278-file installed target.
+
+A post-commit audit then found a dormant approval-bound structure assertion
+that still named the proposed4 wheelhouse. Therefore `54ed269` is superseded,
+not the frozen Campaign 5 harness identity. The assertion is being rebound to
+the approved proposed5 canonical-LF wheelhouse, and the exact checkpoint,
+fresh-checkout, build, wheelhouse, and offline-runtime bindings must be repeated
+before any proposed5 envelope is frozen or presented for approval.
 
 - [ ] **Step 12: Request fresh exact proposed5 approval**
 
