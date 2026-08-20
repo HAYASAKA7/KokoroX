@@ -754,6 +754,36 @@ and approval-envelope SHA-256
 It remains `draft_not_approved` with `user_approval: null`, zero execution,
 both proposed5 roots absent, and no provider launch.
 
+The exact draft metadata is now committed as
+`2d7ce0a1bab429a86d60a7b3305dc820251b9708` (tree
+`26205df60dd79a4ead51c1cd844826f652dc1b10`, sole parent
+`03571d2d37d6643232ff6783e519f6dbb7a0aab5`). Its complete preapproval harness
+selection passed 151 tests with 3 documented Windows capability skips in
+408.99 seconds. Immutable replay reproduced approved1 and approved2 at 24/24
+run ledgers, approved3 at 24/24 evaluable ledgers with every source/retained
+final binding passing, and approved4 at its authorized zero-run preparation
+failure. Comparison to the four original sealing commits found zero mismatch
+across 515, 515, 542, and 6 retained files respectively.
+
+All four Skill validators, plugin validation, archive inventory, bounded secret
+scans, D:-isolated compilation, changed-line length, exact-range whitespace,
+and status gates passed. Fresh detached autocrlf checkout
+`D:\tmp\kokoroarc-proposed5-final-checkout-01` reproduced all 141 frozen files
+with zero path, byte, CRLF, or attribute mismatch and passed the 5-test structure
+gate. It recomputed the exact campaign and envelope hashes above. The wheelhouse
+remained at full manifest SHA-256
+`c2230d20a1fbe19c39f8c5cb9bf445b18d6b7a3e05e281912ed953d5078f5698`;
+the 109-file KokoroArc wheel retained SHA-256
+`76ebb700b7bb9c4eb88fd74a2268c077eeff741245cb7d7f6402673e2f02174f`
+and content-manifest SHA-256
+`766c1ceaff7e34d1c9af9a66a21f07e8e02cb7bec3149665fb0c12dbfd2f1b69`.
+A new no-index install passed installed-module, CLI version/help, Rin validation,
+and 69-file fixture-generation smokes without changing the install or
+wheelhouse. The exact Approved5 raw, retained, and results roots remain absent;
+no provider session was created; all execution counters remain zero; approval
+is null; and the draft status is unchanged. No behavioral or suite-completion
+claim is implied.
+
 - [ ] **Step 12: Request fresh exact proposed5 approval**
 
 Present the complete proposed5 envelope. No earlier design or campaign

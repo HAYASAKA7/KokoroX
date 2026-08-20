@@ -544,7 +544,7 @@ approval-envelope SHA-256 is
 Status remains `draft_not_approved`, approval remains null, execution counters
 remain zero, and both proposed5 roots remain absent.
 
-- [ ] **Step 4: Commit the frozen draft metadata**
+- [x] **Step 4: Commit the frozen draft metadata**
 
 ```powershell
 git diff --check
@@ -557,6 +557,13 @@ Stage the campaign record plus only documentation needed to record the frozen
 identity. The `harness_git` value remains the preceding canonical checkpoint,
 not this metadata commit.
 
+Frozen metadata commit (2026-08-20): commit
+`2d7ce0a1bab429a86d60a7b3305dc820251b9708`, tree
+`26205df60dd79a4ead51c1cd844826f652dc1b10`, sole parent
+`03571d2d37d6643232ff6783e519f6dbb7a0aab5`. The commit changed only the
+draft campaign metadata. The frozen `harness_git` binding remains the corrected
+canonical harness commit `03571d2d37d6643232ff6783e519f6dbb7a0aab5`.
+
 ## Task 7: Run the exact preapproval release gate
 
 **Files:**
@@ -568,7 +575,7 @@ not this metadata commit.
 - Verify: all approved1-through-approved4 retained evidence
 - Verify: all four source Skills and plugin metadata
 
-- [ ] **Step 1: Run the complete Task 18 harness selection**
+- [x] **Step 1: Run the complete Task 18 harness selection**
 
 ```powershell
 python -B -m pytest tests/skills/test_complete_suite_campaign_structure.py tests/skills/test_complete_suite_preparation.py tests/skills/test_complete_suite_evidence.py tests/skills/test_complete_suite_release_evidence.py -q -p no:cacheprovider --basetemp D:\tmp\kokoroarc-proposed5-final-harness-01
@@ -577,7 +584,7 @@ python -B -m pytest tests/skills/test_complete_suite_campaign_structure.py tests
 Record exact pass, skip, duration, stdout, and stderr evidence. Investigate any
 non-capability skip or failure before proceeding.
 
-- [ ] **Step 2: Replay every immutable retained campaign**
+- [x] **Step 2: Replay every immutable retained campaign**
 
 Run the real replay paths for approved1, approved2, approved3, and approved4.
 Require their committed file inventories, import-ledger hashes, raw/retained
@@ -585,7 +592,7 @@ bindings, run counts, final-event bindings, adjudication results, and approved4
 zero-run outcome to reproduce exactly. Use disposable D:-based copies for any
 replay that needs a writable destination. Never write into the retained roots.
 
-- [ ] **Step 3: Run validators and static checks**
+- [x] **Step 3: Run validators and static checks**
 
 Run:
 
@@ -601,7 +608,7 @@ Run:
 
 No validator may rewrite the source or create bytecode in the repository.
 
-- [ ] **Step 4: Repeat the fresh-checkout and wheel smoke on the exact draft**
+- [x] **Step 4: Repeat the fresh-checkout and wheel smoke on the exact draft**
 
 Create another fresh `core.autocrlf=true` D:-based checkout. Re-run the 141
 raw-byte comparisons, focused campaign tests, fixed-wheel manifest audit,
@@ -609,7 +616,7 @@ offline installed CLI/Rin/fixture smokes, exact-range diff check, and clean
 status. Require the computed campaign and envelope hashes to equal the values
 from Task 6.
 
-- [ ] **Step 5: Prove the no-launch boundary**
+- [x] **Step 5: Prove the no-launch boundary**
 
 Require all of the following:
 
@@ -627,6 +634,53 @@ status = draft_not_approved
 Inspect the exact Git diff and status. Any unexpected file or root invalidates
 the draft.
 
+Exact preapproval release-gate record (2026-08-20): the four-module Task 18
+harness selection passed 151 tests with 3 documented Windows filesystem-
+capability skips in 408.99 seconds. Immutable replay used only disposable
+copies below `D:\tmp\kokoroarc-proposed5-replay-audit-03`; the retained roots
+were never written. Approved1 and approved2 each replayed 24/24 run ledgers and
+their sealed adjudication artifacts, retaining their disclosed 25 deviations
+and non-closure outcomes. Approved3 replayed 24/24 evaluable ledgers with 24/24
+source and retained final-event bindings. Approved4 reproduced its authorized
+zero-run `CAMPAIGN_PREPARATION_FAILED` outcome with no run ledger or results
+tree. Direct comparison to each original sealing commit reproduced 515/515,
+515/515, 542/542, and 6/6 retained files with zero byte mismatch.
+
+All four official Skill validators and the plugin validator passed. The package
+archive inventory, bounded retained/source secret scans, D:-isolated
+`compileall`, changed-line 88-column limit, exact Task 18 range whitespace
+check, and clean-status check passed. The retained scan covered 1,578 files and
+13,050,440 bytes with zero finding; all 21 high-confidence source candidates
+were confined to explicit security/sanitizer tests.
+
+Fresh detached checkout
+`D:\tmp\kokoroarc-proposed5-final-checkout-01` used `core.autocrlf=true` at
+exact metadata commit `2d7ce0a1bab429a86d60a7b3305dc820251b9708`. Its 5-test
+structure gate passed in 2.39 seconds. All 141 approval-bound paths were sorted,
+unique, LF-pinned, and byte-identical to the preparation worktree with zero
+missing, extra, size, SHA-256, CRLF, or attribute mismatch. It recomputed
+campaign SHA-256
+`bbc3053485273e8d582c6714838e0f82fa01653b5cbfe336859d6b0bdec95e50`
+and approval-envelope SHA-256
+`53c30f3706a90f36b308a9a6d1367993f151b89bc6268c19c9d2f922d01abe18`.
+The seven-wheel capture remained exactly frozen; the KokoroArc wheel retained
+109 files and content-manifest SHA-256
+`766c1ceaff7e34d1c9af9a66a21f07e8e02cb7bec3149665fb0c12dbfd2f1b69`.
+A new strictly offline install below
+`D:\tmp\kokoroarc-proposed5-final-offline-smoke-01` resolved all seven modules
+from its 278-file target, passed CLI version/help and real Rin validation, and
+reproduced the 69-file fixture tree at SHA-256
+`c98cee7a57fd320deca5c417a7e2c53e9e089b93d45c7131aaba2bf529fbf51e`
+without changing the installed target or wheelhouse.
+
+The exact no-launch audit is retained outside campaign evidence at
+`D:\tmp\kokoroarc-proposed5-no-launch-audit-01\no-launch-summary.json`.
+The proposed5 raw root, retained root, and raw/retained results roots are all
+absent; provider sessions, runs started, and runs completed are zero;
+`raw_root_created` is false; `user_approval` is null; and status remains
+`draft_not_approved`. This record makes no behavioral-success or execution
+claim.
+
 ## Task 8: Record and present the exact envelope
 
 **Files:**
@@ -635,7 +689,7 @@ the draft.
 - Modify: this plan
 - Read: `tests/skills/complete-suite-campaign.yaml`
 
-- [ ] **Step 1: Record verified identities**
+- [x] **Step 1: Record verified identities**
 
 Append the exact frozen checkpoint details to the closure plan and this plan:
 
