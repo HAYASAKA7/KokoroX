@@ -727,6 +727,33 @@ the approved proposed5 canonical-LF wheelhouse, and the exact checkpoint,
 fresh-checkout, build, wheelhouse, and offline-runtime bindings must be repeated
 before any proposed5 envelope is frozen or presented for approval.
 
+Campaign 5 corrected checkpoint and frozen-draft record (2026-08-20): commit
+`03571d2d37d6643232ff6783e519f6dbb7a0aab5`, tree
+`0b2f2797238c55ea9bddc598891a9554de32c486`, sole parent
+`54ed269163247b86323f6895890758f03522e530`, is the canonical harness
+identity. Its corrected pre-checkpoint partition passed 151 tests with 3
+documented capability skips. Two clean detached `core.autocrlf=true` checkouts
+reproduced all 141 approval-bound files with zero path, size, hash, CRLF, or
+attribute mismatch. Corrected-commit builds reproduced the 345,607-byte wheel
+at SHA-256
+`76ebb700b7bb9c4eb88fd74a2268c077eeff741245cb7d7f6402673e2f02174f`
+and the normalized sdist manifest at SHA-256
+`761c79a90a56098c31ca7a2921b69782cbb169f8288b6a1e832230e995dd9e81`.
+The proposed5 wheelhouse remains seven wheels at manifest SHA-256
+`c2230d20a1fbe19c39f8c5cb9bf445b18d6b7a3e05e281912ed953d5078f5698`
+and inventory SHA-256
+`f3b0c50412bea34b88a64e25ef06cd00c9775791a194c5fca5df476e530c67b4`;
+its fresh offline installed-runtime and fixture smokes passed.
+
+The frozen draft binds file-manifest SHA-256
+`23fb66d99aa3f1e671ca8ea7fb51c89c1e712209418b6f5608af293b1aec2e18`,
+campaign SHA-256
+`bbc3053485273e8d582c6714838e0f82fa01653b5cbfe336859d6b0bdec95e50`,
+and approval-envelope SHA-256
+`53c30f3706a90f36b308a9a6d1367993f151b89bc6268c19c9d2f922d01abe18`.
+It remains `draft_not_approved` with `user_approval: null`, zero execution,
+both proposed5 roots absent, and no provider launch.
+
 - [ ] **Step 12: Request fresh exact proposed5 approval**
 
 Present the complete proposed5 envelope. No earlier design or campaign

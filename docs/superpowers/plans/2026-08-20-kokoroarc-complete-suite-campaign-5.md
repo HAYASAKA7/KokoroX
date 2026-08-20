@@ -271,7 +271,7 @@ Confirm approved1-through-approved4 evidence is unchanged and proposed5 roots
 remain absent. Stage only the seven listed logical changes and inspect
 `git diff --cached --check` plus `git diff --cached --stat`.
 
-- [ ] **Step 4: Commit the canonical checkpoint**
+- [x] **Step 4: Commit the canonical checkpoint**
 
 ```powershell
 git commit -m "test: canonicalize complete-suite campaign 5 inputs"
@@ -293,6 +293,16 @@ the approved proposed5 canonical-LF root, so this identity is not the frozen
 `harness_git` identity and all exact-checkout/build bindings must be repeated
 against the corrected commit.
 
+Replacement canonical harness checkpoint (2026-08-20): commit
+`03571d2d37d6643232ff6783e519f6dbb7a0aab5`, tree
+`0b2f2797238c55ea9bddc598891a9554de32c486`, sole parent
+`54ed269163247b86323f6895890758f03522e530`. The corrected four-module
+pre-checkpoint partition passed 151 tests with 3 documented Windows
+directory-link/symlink capability skips in 357.23 seconds. The three-file
+correction passed `git diff --check`; approved1-through-approved4 evidence was
+unchanged; both proposed5 campaign roots remained absent; and the checkpoint
+worktree was clean.
+
 ## Task 4: Prove fresh-checkout raw-byte equality
 
 **Files:**
@@ -301,14 +311,14 @@ against the corrected commit.
 - Read: `.gitattributes`
 - Test: `tests/skills/test_complete_suite_campaign_structure.py`
 
-- [ ] **Step 1: Create a fresh detached D:-based checkout**
+- [x] **Step 1: Create a fresh detached D:-based checkout**
 
 Create a new unique checkout directory below
 `D:\tmp\kokoroarc-proposed5-checkout-01`. Configure that checkout with
 `core.autocrlf=true`, detach it at the canonical harness commit, and require a
 clean status. Do not use the approved4 reconstruction directory.
 
-- [ ] **Step 2: Compare all 141 raw files**
+- [x] **Step 2: Compare all 141 raw files**
 
 From the preparation worktree, compute the sorted allowlist with
 `runner.approval_bound_paths()`. For every path, compare raw size and SHA-256
@@ -326,7 +336,7 @@ CRLF-bearing approval inputs = 0
 Also require `git check-attr text eol` to report `text/set` and `eol/lf` for
 every path in the fresh checkout.
 
-- [ ] **Step 3: Run the focused test in the fresh checkout**
+- [x] **Step 3: Run the focused test in the fresh checkout**
 
 ```powershell
 python -B -m pytest tests/skills/test_complete_suite_campaign_structure.py -q -p no:cacheprovider --basetemp D:\tmp\kokoroarc-proposed5-checkout-tests-01
@@ -347,6 +357,15 @@ and detached checkout remained clean.
 This proves the canonical-LF policy at the superseded checkpoint, but the same
 audit must be repeated against the corrected canonical commit before freeze.
 
+Corrected-checkpoint fresh-checkout record (2026-08-20): detached checkouts
+`D:\tmp\kokoroarc-proposed5-checkout-03` and
+`D:\tmp\kokoroarc-proposed5-checkout-04` both used `core.autocrlf=true` at
+exact commit `03571d2d37d6643232ff6783e519f6dbb7a0aab5` and remained clean. The
+focused structure gate passed 5/5 in 2.04 seconds. Independent source-versus-
+checkout comparison found 141 ordinal-sorted unique paths, zero path-set,
+missing, size, SHA-256, CRLF, or Git-attribute mismatches. The audit summary is
+`D:\tmp\kokoroarc-proposed5-byte-audit-02\byte-audit-summary.json`.
+
 ## Task 5: Revalidate and rebuild frozen distribution inputs
 
 **Files:**
@@ -365,7 +384,7 @@ extra entry, and manifest SHA-256
 This validates immutable predecessor evidence only. It is offline and must not
 invoke pip download or any network client.
 
-- [ ] **Step 2: Rebuild KokoroArc twice at the fixed release epoch**
+- [x] **Step 2: Rebuild KokoroArc twice at the fixed release epoch**
 
 Use two new D:-based source checkouts of the canonical harness commit and the
 fixed Task 17 `SOURCE_DATE_EPOCH`. Build wheel and sdist twice with bytecode and
@@ -374,7 +393,7 @@ byte-identical, 345,607 bytes, and the KokoroArc wheel SHA-256 to equal
 `76ebb700b7bb9c4eb88fd74a2268c077eeff741245cb7d7f6402673e2f02174f`.
 Require normalized sdist contents and package inventories to match.
 
-- [ ] **Step 3: Assemble and close the proposed5 wheelhouse**
+- [x] **Step 3: Assemble and close the proposed5 wheelhouse**
 
 First require
 `D:\tmp\kokoroarc-proposed5-wheelhouse-canonical-lf-01` to be absent. Create
@@ -385,7 +404,7 @@ require seven flat wheels, the exact distribution set, no extra entry, and the
 expected KokoroArc size/SHA-256. Record the newly computed inventory and
 manifest hashes; do not use a placeholder or the proposed4 manifest hash.
 
-- [ ] **Step 4: Prove offline installed-runtime behavior**
+- [x] **Step 4: Prove offline installed-runtime behavior**
 
 Install only from the new closed wheelhouse into a new D:-based target with
 `--no-index`, `--find-links`, `--only-binary=:all:`, `--no-deps` as appropriate
@@ -444,6 +463,33 @@ wheelhouse manifest hashes exactly. No download or network client ran.
 These distribution bytes remain useful evidence, but their source-commit
 binding must be repeated after the corrected canonical checkpoint is committed.
 
+Corrected-checkpoint distribution record (2026-08-20): checkouts 03 and 04
+built at epoch `1787151982`. Their wheels were byte-identical at 345,607 bytes
+and SHA-256
+`76ebb700b7bb9c4eb88fd74a2268c077eeff741245cb7d7f6402673e2f02174f`,
+with 109 files and normalized manifest SHA-256
+`766c1ceaff7e34d1c9af9a66a21f07e8e02cb7bec3149665fb0c12dbfd2f1b69`.
+The raw sdists were 279,692 and 279,745 bytes at SHA-256
+`c82493fe65c045a04965bf4b2f58f03df6dd0081e7e29aaa2178936583536383`
+and `a7b1ad1edb88e1e9ab5db5167742c13d56a900594fd2a945c9d36e4183c3f185`;
+both contained the same 116 files and normalized manifest SHA-256
+`761c79a90a56098c31ca7a2921b69782cbb169f8288b6a1e832230e995dd9e81`.
+Each normalized archive inventory again contained 54 Python modules, 38
+schemas, and 12 Skill files; the sdist contained the plugin manifest.
+
+The new wheelhouse rebind proved the six third-party wheels equal their
+proposed4 predecessors, the canonical wheel equal the corrected build, and the
+proposed4 KokoroArc wheel not reused. Its 7-file/925,797-byte tree, inventory,
+and manifest identities remained
+`b189ffa2b280340f47d28bf88eac705c4aa959996f529d207ba22dcff080ac30`,
+`f3b0c50412bea34b88a64e25ef06cd00c9775791a194c5fca5df476e530c67b4`,
+and `c2230d20a1fbe19c39f8c5cb9bf445b18d6b7a3e05e281912ed953d5078f5698`.
+Fresh offline root `D:\tmp\kokoroarc-proposed5-offline-install-02` resolved all
+seven modules below its 278-file target, passed CLI version/help and real Rin
+validation, and generated the same 69-file fixture tree at SHA-256
+`c98cee7a57fd320deca5c417a7e2c53e9e089b93d45c7131aaba2bf529fbf51e`
+without changing the install or wheelhouse. No network client ran.
+
 ## Task 6: Freeze proposed5 against the canonical checkpoint
 
 **Files:**
@@ -452,7 +498,7 @@ binding must be repeated after the corrected canonical checkpoint is committed.
 - Read: `tests/skills/run_complete_suite_campaign.py`
 - Test: `tests/skills/test_complete_suite_campaign_structure.py`
 
-- [ ] **Step 1: Generate exact frozen inputs from existing pure helpers**
+- [x] **Step 1: Generate exact frozen inputs from existing pure helpers**
 
 Use `runner.approval_bound_paths()` and `runner.freeze_file_entries()` in the
 preparation worktree. Capture schema version `1.0`, the exact canonical
@@ -464,7 +510,7 @@ Before writing the campaign YAML, call `runner.verify_frozen_files()` against
 the preparation worktree and the detached autocrlf checkout. Require exact
 success in both locations.
 
-- [ ] **Step 2: Replace only `frozen_inputs` in the draft record**
+- [x] **Step 2: Replace only `frozen_inputs` in the draft record**
 
 Keep `status: draft_not_approved`, `user_approval: null`, zero execution
 counters, proposed5 identity, and proposed5 roots. Serialize the YAML
@@ -472,7 +518,7 @@ deterministically with the same PyYAML policy used for proposed4. Review that
 the campaign file itself is not returned by `approval_bound_paths()` and that
 no approval-bound file changed after the canonical checkpoint.
 
-- [ ] **Step 3: Validate the frozen draft without launching**
+- [x] **Step 3: Validate the frozen draft without launching**
 
 Run the structure test and directly load the record to compute:
 
@@ -485,6 +531,18 @@ Run the structure test and directly load the record to compute:
 
 Do not call `runner.execute_campaign`, `runner.prepare_approved_campaign`, or
 the provider executable. Both proposed5 roots must still be absent.
+
+Frozen-draft record (2026-08-20): 141 exact approval-bound files produced
+manifest SHA-256
+`23fb66d99aa3f1e671ca8ea7fb51c89c1e712209418b6f5608af293b1aec2e18`.
+Source and detached-checkout verification both passed. The active frozen
+branches passed the 5-test structure gate and disclosed exactly 24 ordinal
+runs: 12 baseline plus 12 suite-enabled over 12 unique cases. Campaign SHA-256
+is `bbc3053485273e8d582c6714838e0f82fa01653b5cbfe336859d6b0bdec95e50`;
+approval-envelope SHA-256 is
+`53c30f3706a90f36b308a9a6d1367993f151b89bc6268c19c9d2f922d01abe18`.
+Status remains `draft_not_approved`, approval remains null, execution counters
+remain zero, and both proposed5 roots remain absent.
 
 - [ ] **Step 4: Commit the frozen draft metadata**
 
