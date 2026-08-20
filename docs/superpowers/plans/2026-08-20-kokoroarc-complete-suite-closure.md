@@ -406,11 +406,21 @@ Both approved2 roots were absent, and the 515-file approved1 inventory
 recomputed to its original SHA-256
 `8eae25e7b6a0bee1929c3405280ff4d900403a34a52d423cfd0390a0aa7bb862`.
 
-- [ ] **Step 5: Freeze proposed2 and request fresh explicit approval**
+- [x] **Step 5: Freeze proposed2 and request fresh explicit approval**
 
 Present the new exact commit/tree/parent, closed file manifest, wheel, campaign
 SHA-256, envelope SHA-256, unchanged 24-run policy, new roots, and disclosed
 approved1 harness correction. Do not launch on the approved1 response.
+
+Approval checkpoint: the user explicitly responded `approve` to proposed2
+envelope
+`4938b9de462b5f81a20fb1c79022290dd6675cfe06facb91e36da35418e4b5f5`.
+It binds the tested harness commit
+`44032b3f897393b7eae04a0bf171e8a94c61636e`, 141-file manifest
+`ebffd439ecdd71b7cc90634b897464beab941e34ee84c43a5f5b7565ab9f4744`,
+wheel `e5e069cb5a219f0b6c59b4b2a94bbad7507a3add1ede0e544d2d304bfee6c5b4`,
+24 one-shot runs, and the unique approved2 roots. Approval ID
+`user-approval-4938b9de462b-02` was recorded at `2026-08-20T03:20:14Z`.
 
 - [ ] **Step 6: Record approval, execute once, import, and adjudicate**
 
