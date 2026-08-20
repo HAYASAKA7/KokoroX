@@ -606,7 +606,7 @@ acquired under D:, closed at manifest SHA-256
 and passed offline isolated imports, CLI version, and Rin validation smokes.
 No provider process or proposed4 campaign/results root was created.
 
-- [ ] **Step 8: Create and freeze proposed4 without executing it**
+- [x] **Step 8: Create and freeze proposed4 without executing it**
 
 Use campaign ID `2026-08-20-proposed4`, raw root
 `D:\tmp\kokoroarc-m9-task18-campaign-20260820-approved4`, and retained root
@@ -614,6 +614,25 @@ Use campaign ID `2026-08-20-proposed4`, raw root
 wheelhouse manifest, approval-bound file manifest, package wheel, Git identity,
 and 24-run policy. Both proposed4 campaign roots and any results root must be
 absent.
+
+Frozen proposed4 checkpoint (2026-08-20): the draft envelope binds harness
+commit `778c77dc93a1bfa13537f5d96c31e5ad779b602e`, tree
+`1c5c67d8b7ba29d4ff36a9534440afcead354849`, parent
+`788e86a08af8c94a36bed8d4b33021091201b4a6`, 141 approval-bound files
+at manifest SHA-256
+`047a372cabe1f5ec2de84c434bff86fde45e98c257e227625e1c43b62073d9bc`,
+frozen-input digest
+`1f3a00ee24b8e9b6e20483b0aba0d888563a2ccd378db6b6ba5e07530034b3e6`,
+wheelhouse manifest
+`0753050ecf612684fec5102e993253c74842ec618bfcc086a025f5dee69bbba2`,
+and KokoroArc wheel
+`61ef3a5ff7201eebbcc6d6fb1c88016ce6de8cf74ab38592c0206ed72db4e1e5`.
+The proposed campaign SHA-256 is
+`524500592534f9438f6b7b741eae6cf639672b28bb949782416088b5efb7a26b`;
+the approval envelope SHA-256 is
+`0e6b3e3146b4d3cf6539b14412e0f127c39d60d41048d96ddcad26987100ae64`.
+Status remains `draft_not_approved`, `user_approval` remains null, all
+execution counters remain zero, and neither proposed4 campaign root exists.
 
 - [ ] **Step 9: Request fresh exact approval, then execute once if approved**
 
