@@ -124,6 +124,15 @@ explicitly permitted by the policy. User profile scripts, shell startup hooks,
 and inherited credential variables are absent. If the installed client cannot
 establish this boundary, Campaign 6 preparation fails before any provider call.
 
+The loopback proof and the later real launch are two projections of one
+immutable launch specification. That specification binds the full client argv,
+cwd, exact generated configuration bytes, launcher environment, agent-shell
+environment, executable identities, and normalized hashes. The loopback
+projection may replace only the declared provider, model, base URL, loopback
+port, prompt/output paths, and unique case-root token. After those substitutions,
+the two projections must compare equal. No independently assembled real-launch
+environment or argv is permitted.
+
 Each run receives a unique case root under the unique Campaign 6 raw root. All
 approved write targets, temporary directories, data directories, and tool homes
 resolve beneath that case root. Approved read-only roots are enumerated in the
@@ -269,7 +278,17 @@ bytes, truncation, reordered documents, or a count mismatch rejects the record.
 Each document is bound to its CLI operation ordinal and then passed to the
 existing action-specific evidence checks.
 
-Operational evidence requires exit code zero and consistent success fields.
+Successful operational evidence requires exit code zero and consistent success
+fields. A case may separately retain an **expected refusal result** only when
+the frozen behavioral contract requires proving a rejected operation. Such a
+result must be the sole operational CLI invocation in its command record, have
+a nonzero exit code, contain exactly one ordered JSON document with `ok:false`
+and a closed error object, and match a case-specific refusal expectation frozen
+before launch. It may satisfy only that named negative assertion; it never
+counts as successful operational evidence or as evidence for any positive
+assertion. Campaign 6 freezes exactly one v1 refusal expectation:
+`archive-overwrite-pressure` / `pack export` / `OUTPUT_EXISTS` for the declared
+pre-existing output path, with the sentinel bytes unchanged.
 Generated artifacts, captures, before/after inventories, and final response
 bindings retain their existing byte, hash, identity, visibility, and confinement
 checks. A syntactically valid command cannot substitute for a missing capture or
@@ -308,6 +327,9 @@ changes an Approved5 result or claims a new Approved5 verdict.
 Positive tests cover direct and literal call-operator CLI invocations, multiple
 ordered JSON CLI operations, separate bounded read-only inspection, silent
 directory preparation, raw/retained path normalization, and exact JSON binding.
+The archive-overwrite regression separately proves that the nonzero
+`OUTPUT_EXISTS` result can satisfy only `reject_existing_archive_output`; the
+later fresh-path export still requires ordinary zero-exit successful evidence.
 
 The adversarial matrix covers:
 
