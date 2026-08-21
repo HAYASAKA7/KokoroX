@@ -83,7 +83,7 @@ Skills.
 
 ## 4. Components and boundaries
 
-The correction has seven isolated components:
+The correction has nine isolated components:
 
 1. **Launch preflight** proves the shell, client, environment, case roots, and
    frozen inputs before a provider can start.
@@ -97,9 +97,17 @@ The correction has seven isolated components:
    and retained path literals into the same normalized namespace.
 5. **Static command policy** classifies every executable operation into one of
    the closed allowed categories or rejects the complete record.
-6. **CLI evidence binder** pairs each accepted operational CLI invocation with
-   its exact ordered JSON document, exit status, captures, and artifacts.
-7. **Behavioral adjudicator** consumes only integrity-approved facts and then
+6. **Client file-change binder** classifies every state-changing non-command
+   client event, binds it to the case-specific filesystem transition, and
+   rejects undeclared or untrusted writes.
+7. **CLI evidence binder** pairs each accepted operational CLI invocation with
+   its exact ordered JSON document and document success fields, while binding
+   the completed command record's single exit status, captures, and artifacts.
+8. **Behavioral filesystem projector** partitions the complete integrity-bound
+   filesystem delta into agent working files, implicit working directories,
+   trusted product support, and the exact semantic product paths consumed by
+   the existing observers.
+9. **Behavioral adjudicator** consumes only integrity-approved facts and then
    applies the existing case assertions unchanged.
 
 Syntax recognition never implies authorization. The decoder answers what the
@@ -127,18 +135,45 @@ establish this boundary, Campaign 6 preparation fails before any provider call.
 The loopback proof and the later real launch are two projections of one
 immutable launch specification. That specification binds the full client argv,
 cwd, exact generated configuration bytes, launcher environment, agent-shell
-environment, executable identities, and normalized hashes. The loopback
-projection may replace only the declared provider, model, base URL, loopback
-port, prompt/output paths, and unique case-root token. After those substitutions,
-the two projections must compare equal. No independently assembled real-launch
-environment or argv is permitted.
+environment, executable identities, and normalized hashes. The loopback uses
+the exact evaluator model identity `gpt-5.6-terra`; model is not a projection
+substitution because the installed client may select tool capabilities from it.
+The loopback projection may replace only the declared provider, base URL,
+loopback port, prompt/output paths, and unique case-root token. The exact
+advertised tool schemas and capability digest from the loopback requests are
+approval-bound. After those substitutions, the two projections must compare
+equal. No independently assembled real-launch environment or argv is permitted.
+
+The zero-provider proof also exercises the installed client's non-command
+mutation renderer. The complete live proof uses four installed-client
+invocations: two repetitions of the inert shell-wrapper probe and two
+file-change probes. Each invocation receives one tool response and one final
+response, so the frozen aggregate is exactly eight loopback HTTP requests, two
+inert shell calls, and two completed file-change lifecycles. In a unique
+case-local audit root, the file-change probes perform one harmless text-file
+`add` and then one `update` through the client's advertised file-change tool.
+The proof binds the exact started and completed event schemas, IDs, statuses,
+ordered `path`/`kind` values, normalized paths, final filesystem bytes, and event
+ordering. It also proves that an unknown state-changing item is rejected. The
+unknown-item case is an offline mutation of the captured event stream and does
+not consume a fifth installed-client invocation. The audit root is absent before
+the probe and is either retained as frozen evidence
+or removed only through an identity-bound, no-follow cleanup. Campaign
+preparation fails if the exact installed client does not reproduce this
+contract before provider approval.
 
 Each run receives a unique case root under the unique Campaign 6 raw root. All
 approved write targets, temporary directories, data directories, and tool homes
 resolve beneath that case root. Approved read-only roots are enumerated in the
 envelope. The preflight verifies path ancestry and identities without following
 redirecting links and refuses junctions, symlinks, hard-linked writable inputs,
-or pre-existing campaign outputs.
+or any pre-existing evaluator-owned allocation root that the campaign must
+create fresh. A fixture-declared case-confined read/output root may already
+exist only when its complete pre-run membership, identities, and file hashes are
+approval-bound; the sole v1 pre-existing output file is the
+`archive-overwrite-pressure` sentinel required by the frozen `OUTPUT_EXISTS`
+refusal. Any undeclared pre-existing output, membership drift, or sentinel-byte
+drift rejects before launch.
 
 ## 6. PowerShell command-plan contract
 
@@ -197,7 +232,7 @@ Crossing any limit rejects the record. Limits may change only before the
 Campaign 6 envelope is frozen, with corresponding tests and a design amendment;
 they never expand dynamically for provider output.
 
-## 7. Closed static command policy
+## 7. Closed operation and client-mutation policy
 
 Every executable operation must classify into exactly one category.
 
@@ -239,7 +274,138 @@ working directory, set environment variables, or construct executable text.
 KokoroArc CLI output paths remain governed by their existing case-specific
 mutation and confinement rules.
 
-### 7.4 Rejected operations
+### 7.4 Approved client file changes
+
+Codex `item.type="file_change"` events are a separate state-changing client
+operation class; they are not PowerShell commands and are never silently
+ignored. Campaign 6 accepts them only because the immutable
+`original-authoring-route` and `workspace-override-explicit-activation` cases
+need bounded authoring or inert JSON assembly. Every other case freezes an
+empty file-change allowlist.
+
+The two case policies are **maximum optional surfaces**, not prescribed action
+traces. They are byte-identical for baseline and suite-enabled. A run may use
+none or a subset of its case's declared paths; it is not invalid merely because
+an allowed path was unused. Approved5 item IDs, grouping, and path sequences are
+calibration fixtures only. Conversely, every observed file-change entry must be
+allowed, and every final file attributed to the client must have a matching
+accepted lifecycle. A "missing transition" means an event/snapshot mismatch,
+not an unused allowlist member.
+
+Each accepted file-change lifecycle has one started and one completed item with
+the same ID, a terminal completed status, and an exact ordered list of literal
+`path` and `kind` pairs. Version 1 permits only `add` and `update`; `delete`,
+move, rename, chmod, an unknown kind, a duplicate terminal event, or any other
+state-changing non-command tool event rejects the run. Messages, reasoning, and
+final-response items are inert only through an explicit event-type allowlist.
+
+The frozen case manifest declares every writable root and allowed relative
+path/schema role. Paths are normalized into the same namespace used by command
+plans and must remain literal descendants of a declared case workspace root.
+For the two permitted cases, the allowlist is closed over the exact authoring
+pack/request/validation-result paths or workspace-override scratch JSON paths;
+it does not admit arbitrary extensions, executable content, or new roots.
+
+The binder compares raw and retained lifecycle topology and normalized
+`path`/`kind` pairs, then binds each unique path to no-follow, directory-aware
+pre-run and final snapshots. Those two snapshots prove only the **aggregate
+pre-to-final transition**; they do not prove intermediate file bytes. `add`
+requires an absent pre-state and a plain regular final state. An `update` whose
+path existed before the run requires plain regular pre/final states and
+different hashes. An `add` followed by one or more `update` entries remains a
+created path: the ordered event history is retained, the last entry owns the
+final hash, but no intermediate add/update content or no-op claim is credited.
+An `update` of an initially absent path is allowed only after an accepted `add`.
+Earlier events in such a chain are lifecycle evidence, never behavioral or
+content evidence.
+
+The complete directory-inclusive delta is partitioned without overlap. For an
+accepted `add`, the binder derives the minimal set of missing parent directories
+between the file and its already-existing approved root. Each derived ancestor
+must be absent before the run and a plain directory afterward, with no extra
+sibling attributed to the transition. An `update` may not create an ancestor.
+Root and pre-existing ancestor identities must remain stable. Every created,
+changed, or removed entry is assigned exactly once to an accepted client file,
+an implicit client ancestor, an approved silent directory, or a trusted
+action-specific product output/support transition. An overlap, unassigned path,
+undeclared write, removal, reparse point, hard link, parent swap, extra
+membership, or snapshot drift rejects the run.
+
+File-change content has a separate closed resource account; it does not borrow
+or enlarge command-output or session-JSONL limits:
+
+- at most 64 logical started/completed file-change lifecycles per run;
+- at most 256 ordered path/kind entries per run, counting every `add` and
+  `update` entry even when a path repeats;
+- at most 128 unique final client-authored documents per run, with a repeated
+  path counted once;
+- at most 262,144 bytes for either the raw or retained final form of one file;
+- at most 32 MiB across raw final file bytes, at most 32 MiB across retained
+  final file bytes, and at most 64 MiB across both domains combined; and
+- for every JSON or YAML document, at most 64 semantic nesting levels, 8,192
+  nodes, 1,024 members in one collection, and 16,384 Unicode code points in one
+  scalar; YAML aliases and merge keys are disabled.
+
+The real loader's tighter limits also apply. An authoring pack is limited to 128
+files, 256,000 bytes per file, 2,000,000 bytes total, and directory depth six.
+Its four-file test corpus is additionally limited to 64,000 bytes per file,
+192,000 bytes total, depth 16, 4,096 scalar characters, 256 collection members,
+4,096 total nodes, and 128 cases per file. Every boundary is tested at the limit
+and at limit plus one. The raw and retained `session.jsonl` 64 MiB/50,000-line
+limits and the command-output limits in Section 8 remain independent. Because
+the client event carries no trusted content bytes, Campaign 6 makes no claim
+about unobserved intermediate file size or content.
+
+Each permitted final file is captured in both domains. The raw post snapshot
+binds no-follow identity, size, SHA-256, and exact bytes. The retained artifact
+binds its own identity, size, SHA-256, exact bytes, and the approved sanitizer
+transform from the raw bytes. Strict UTF-8, duplicate-key rejection, the
+campaign-level bounds above, and the real closed schema or loader apply in both
+domains after declared private-path normalization.
+
+Original-authoring source/request files must form the exact closed source-pack
+and four-fixture corpus accepted by the production loaders before a validation
+or compile result can be credited. Auxiliary validation JSON never substitutes
+for the command event. Its manifest role names one CLI operation ordinal and
+JSON-value selector; duplicate-key-decoded canonical object bytes must equal
+that selected raw CLI result in the raw domain and the corresponding selected
+retained result in the retained domain. Inter-document CRLF/LF framing and
+pretty-print whitespace are not part of the selected JSON value. The
+workspace-override policy and plan copies similarly bind to the declared nested
+`policy` or `plan` artifact, not to the complete CLI envelope. Other scratch
+documents validate against their exact runtime schemas and declared input role.
+
+A file-change event never satisfies a behavioral assertion by itself. A changed
+path may support a later CLI result only if its last accepted file-change
+completed before that command started, no later state-changing event targets the
+path, command policy makes client-authored paths disjoint from command-written
+outputs, and the installed-client preflight proved the completion/filesystem
+ordering. Only then may the final bound bytes stand for the stable input to that
+later operation; otherwise the CLI result is not creditable. Silent PowerShell
+support remains directory-only and may not write file content.
+
+After the complete delta passes integrity checks, a canonical
+`BehavioralFilesystemView` assigns file-change files and their implicit
+ancestors to `agent_working_files`, assigns action-specific lock/cache/state and
+bundle members to `product_support_files`, and exposes only the semantic product
+path required by the existing observer as `created_paths`. Nothing is removed
+from the full confinement, protected-state, ledger, or replay audit. For
+`original-authoring-route`, the semantic path is the exact private `draft.json`
+returned by the successful compile; source working files and the rest of the
+closed draft bundle remain separately bound. For
+`workspace-override-explicit-activation`, it is the product's actual flat
+`data/sessions/<session-id>.json` manifest; scratch JSON, compiled cache, lock,
+and state support remain separately bound. The current nested
+`data/sessions/<session-id>/session.json` harness assumption is corrected before
+Campaign 6. This projection preserves every `must`, `must_not`, and allowed
+mutation meaning while preventing either working files or support files from
+being mistaken for the one semantic product transition. The projected path is
+used only for the positive observer's exact semantic-product comparison. Every
+negative assertion, protected-state check, default/persistence check, and
+confinement decision receives the complete unprojected created/changed/removed
+delta, so support or working files cannot disappear from a `must_not` result.
+
+### 7.5 Rejected operations
 
 Unknown commands or syntax reject the entire command record. The policy
 explicitly rejects arbitrary interpreters or snippets, `Invoke-Expression`,
@@ -253,10 +419,15 @@ substring.
 
 ## 8. Evidence flow and binding
 
-For every command event, the importer first proves the retained event is the
-declared sanitized copy of an approved raw event. Started and completed events
-must share the same event ID and exact command bytes before sanitization. The
-completed event must have a terminal status and an integer exit code.
+For every command or file-change event, the importer first proves the retained
+event is the declared sanitized copy of an approved raw event. Command started
+and completed events must share the same event ID and exact command bytes before
+sanitization; file-change pairs obey Section 7.4. Every completed command event
+must have a terminal status and an integer exit code. Every client item is
+classified as command, file change, explicitly inert, or rejected before any
+behavioral assertion runs. Raw evidence is always the authority for private
+bytes; retained evidence is the only replay/adjudication input after its exact
+sanitizer transform has been approved and ledger-bound.
 
 Both raw and retained payloads are decoded. Private absolute paths are reduced
 to declared root tokens such as `<case-root>` or `<approved-read-root-N>`;
@@ -269,14 +440,30 @@ normalized paths and hashes, not private path text. A sanitizer replacement that
 changes executable meaning, hides an operation, or cannot be paired rejects the
 run.
 
-For a command record containing `N` operational `--json` CLI invocations, the
-completed output must contain exactly `N` complete JSON documents in invocation
-order, separated only by JSON whitespace. Streaming decoding is bounded by the
-existing 64 MiB session limit, 4 MiB per document, and at most 128 documents per
-record. Profile output, banners, inspection text, duplicate documents, trailing
-bytes, truncation, reordered documents, or a count mismatch rejects the record.
-Each document is bound to its CLI operation ordinal and then passed to the
-existing action-specific evidence checks.
+Command output has two disjoint branches. For a record containing `N > 0`
+operational `--json` CLI invocations, the completed output must contain exactly
+`N` complete JSON documents in invocation order, separated only by JSON
+whitespace. Streaming decoding is bounded by the existing 64 MiB raw
+`session.jsonl` limit and 50,000-line limit, 4 MiB per document, and at most 128
+documents per command record. Retained `session.jsonl` is independently capped
+at 64 MiB and must preserve the same bounded event topology. Profile output,
+banners, inspection text, duplicate documents, trailing bytes, truncation,
+reordered documents, or a count mismatch rejects the record. The decoder
+records the exact UTF-8 JSON value span for each document separately from
+surrounding CRLF/LF/space framing. Each duplicate-key-free decoded document and
+canonical object hash is bound to its CLI operation ordinal and then passed to
+the existing action-specific evidence checks.
+
+For `N = 0`, the policy must have classified the whole record as exactly one
+approved non-operational class: one help-only invocation or one read-only
+inspection pipeline. The command must exit zero, the Codex process stderr must
+remain empty, and merged output must be at most 4 MiB of strict UTF-8 without a
+BOM; empty output is allowed. The bytes and hash still count toward and bind to
+the 64 MiB session record. No JSON result is emitted, the text is never passed
+to an action-specific observer, and it cannot satisfy a behavioral assertion.
+Non-whitespace text is permitted only in this branch. Silent directory support
+is outputless and remains coupled to its declared operational CLI output in the
+same `N > 0` record.
 
 Successful operational evidence requires exit code zero and consistent success
 fields. A case may separately retain an **expected refusal result** only when
@@ -294,11 +481,22 @@ bindings retain their existing byte, hash, identity, visibility, and confinement
 checks. A syntactically valid command cannot substitute for a missing capture or
 artifact.
 
+The retained run ledger additionally binds the ordered file-change lifecycle,
+case policy version, optional maximum allowlist, observed normalized path/kind
+plan, implicit-ancestor set, complete filesystem partition, raw and retained
+final-content inventories, sanitizer transform, schema/loader result,
+CLI-selector bindings, `BehavioralFilesystemView`, and raw/retained event hashes.
+Replay from retained bytes must reconstruct the exact file-change decision,
+aggregate transition digest, content hashes, projection, and all snapshot
+bindings. A command ledger, final inventory, or behavioral result cannot stand
+in for it.
+
 ## 9. Failure model
 
-Integrity is fail-monotonic. Any launch, lifecycle, parser, limit, policy,
-raw/retained, output, artifact, confinement, or final-binding failure makes every
-declared case assertion false before `must` or `must_not` interpretation. A
+Integrity is fail-monotonic. Any launch, lifecycle, parser, limit, command or
+file-change policy, raw/retained, output, artifact, confinement, or final-binding
+failure makes every declared case assertion false before `must` or `must_not`
+interpretation. A
 `must_not` assertion can never become true merely because its evidence was
 missing or untrusted.
 
@@ -307,6 +505,8 @@ Stable non-echoing failure codes distinguish at least:
 - shell or decoder identity failure;
 - profile or environment boundary failure;
 - command lifecycle failure;
+- file-change lifecycle, path, aggregate snapshot, ancestor, content,
+  sanitizer, or projection failure;
 - parse or resource-limit failure;
 - unsupported or unsafe operation;
 - raw/retained plan mismatch;
@@ -326,7 +526,13 @@ changes an Approved5 result or claims a new Approved5 verdict.
 
 Positive tests cover direct and literal call-operator CLI invocations, multiple
 ordered JSON CLI operations, separate bounded read-only inspection, silent
-directory preparation, raw/retained path normalization, and exact JSON binding.
+directory preparation, raw/retained path normalization, exact JSON binding, and
+the two frozen symmetric case-specific file-change surfaces. The file-change
+matrix covers a zero-event permitted run, unused optional paths, authoring-pack
+adds, a pre-existing update, add-then-update remaining in `created_paths`,
+workspace-override scratch JSON, lifecycle pairing, last-change-before-
+consumption ordering, implicit ancestors, raw/retained final bytes and sanitizer
+transforms, CLI JSON-value selectors, the behavioral projection, and replay.
 The archive-overwrite regression separately proves that the nonzero
 `OUTPUT_EXISTS` result can satisfy only `reject_existing_archive_output`; the
 later fresh-path export still requires ordinary zero-exit successful evidence.
@@ -345,6 +551,11 @@ The adversarial matrix covers:
 - missing, duplicate, reordered, noisy, truncated, oversized, or
   exit-contradicting JSON output;
 - raw/retained, redaction, event-pair, artifact, and final-message mismatches;
+- undeclared file changes, delete/move/unknown kinds, extra or missing paths,
+  invalid content, unbound auxiliary validation JSON, pre/post aggregate drift,
+  intermediate-byte claims, implicit-ancestor or partition drift, a client path
+  overlapping a command output, working/support paths leaking into the semantic
+  projection, and any other state-changing client item type;
   and
 - parser errors, decoder drift, PowerShell version drift, and profile execution.
 
@@ -354,7 +565,8 @@ Resource tests exercise every boundary at the limit and at limit plus one.
 Mutation tests prove caller inputs, fixture bytes, parser output, and evidence
 records remain unchanged.
 
-The pre-freeze gate includes the complete focused campaign suite, all relevant
+The pre-freeze gate includes the installed-client live add/update loopback proof,
+the complete focused campaign suite, all relevant
 researching-character command-safety regressions, immutable Approved1 through
 Approved5 replay through their declared legacy versions, compile and whitespace
 checks, sensitive-material scanning, and a fresh `core.autocrlf=true` checkout.
@@ -409,15 +621,16 @@ or by later implementation-plan approval.
 Campaign 6 can unblock the deterministic release gate only when:
 
 - all twenty-four authorized runs start and complete exactly once;
-- all twenty-four raw/retained lifecycles and command plans are integrity-valid
-  and evaluable;
+- all twenty-four raw/retained lifecycles, command plans, file-change plans, and
+  aggregate filesystem transitions, content transforms, partitions, and
+  behavioral projections are integrity-valid and evaluable;
 - all twelve suite-enabled cases pass every declared behavioral assertion;
 - the existing campaign summary reports no suite deviation and
   `suite_closure_passed=true`;
 - baseline results and all twelve paired comparisons are complete,
   deterministic, and honestly retained; and
-- import and adjudication replay reproduce the exact inventories, plans,
-  results, summaries, and hashes.
+- import and adjudication replay reproduce the exact inventories, command and
+  file-change plans, results, summaries, and hashes.
 
 The baseline variant is comparative evidence and is not required to be 12/12
 for the existing closure predicate. Campaign 6 does not introduce a new
