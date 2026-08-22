@@ -1,6 +1,6 @@
 # KokoroArc Complete-Suite Corrective Campaign 6 Design
 
-**Date:** 2026-08-21
+**Date:** 2026-08-21; evaluator-identity amendment 2026-08-22
 
 **Status:** Approved design; implementation not started; provider execution not
 approved
@@ -67,12 +67,27 @@ The case set remains:
 11. `named-character-research-route`; and
 12. `release-testing-route`.
 
-The evaluator remains OpenAI through `codex-cli 0.148.0`, model
+The evaluator remains OpenAI through `codex-cli 0.149.0`, model
 `gpt-5.6-terra`, reasoning effort `low`, maximum concurrency four, workspace
 write sandboxing, automatic command review, ignored user configuration and
 rules, and no task network. The exact prompts, setup files, `must`, `must_not`,
 protected-state declarations, route expectations, output schema, four
 suite-enabled Skills, and product distribution identities remain unchanged.
+
+The 2026-08-22 amendment changes only the frozen client distribution identity.
+The previously approved `0.148.0` distribution is no longer available at the
+literal local client root, while that root contains the exact main/platform pair
+`0.149.0`/`0.149.0-win32-x64`. Campaign 6 must capture and bind those two
+manifests and the derived native executable closure without version discovery by
+provider process. The version does not float: another manifest, executable, or
+root change invalidates the plan and every identity-bound audit.
+
+For this client, the operational argv contains exactly one `--approve-for-me`.
+That selector supplies automatic review with the workspace-write sandbox. A
+separate `--sandbox` selector is contract-prohibited as redundant even if the
+installed parser accepts it. This amendment does not change the model,
+reasoning effort, run matrix, task-network denial, or approval boundaries, and
+it does not authorize a provider execution.
 
 Any evaluator-owned meta-skill or shell configuration needed by the client must
 be copied into and frozen inside an approved read-only campaign input root. The
