@@ -30,6 +30,8 @@ _TRUSTED_CLI_EXECUTABLES = {
     "python",
     "python.exe",
 }
+LEGACY_COMMAND_PROVENANCE_VERSION = "legacy-shell-words-v1"
+COMMAND_PLAN_PROVENANCE_VERSION = "powershell-command-plan-v1"
 _EXPECTED_OUTCOMES = {
     "archive-overwrite-pressure": "completed",
     "consent-refusal": "completed",
@@ -186,6 +188,55 @@ def _object_without_duplicate_keys(
 
 def _strict_json_loads(value: bytes | str) -> Any:
     return json.loads(value, object_pairs_hook=_object_without_duplicate_keys)
+
+
+def _decode_canonical_campaign_bytes(
+    campaign_bytes: bytes,
+    *,
+    expected_sha256: str,
+) -> dict[str, Any]:
+    if type(campaign_bytes) is not bytes:
+        raise RuntimeError("canonical campaign bytes")
+    private_bytes = memoryview(campaign_bytes).tobytes()
+    if (
+        type(expected_sha256) is not str
+        or re.fullmatch(r"[0-9a-f]{64}", expected_sha256) is None
+        or sha256(private_bytes).hexdigest() != expected_sha256
+    ):
+        raise RuntimeError("canonical campaign bytes")
+    try:
+        campaign = _strict_json_loads(private_bytes)
+    except (UnicodeError, ValueError) as exc:
+        raise RuntimeError("canonical campaign bytes") from exc
+    if not isinstance(campaign, dict):
+        raise RuntimeError("canonical campaign bytes")
+    try:
+        canonical = runner.canonical_bytes(campaign)
+    except (TypeError, UnicodeError, ValueError) as exc:
+        raise RuntimeError("canonical campaign bytes") from exc
+    if canonical != private_bytes:
+        raise RuntimeError("canonical campaign bytes")
+    return campaign
+
+
+def command_provenance_version(
+    campaign_bytes: bytes,
+    *,
+    expected_campaign_sha256: str,
+) -> str:
+    campaign = _decode_canonical_campaign_bytes(
+        campaign_bytes,
+        expected_sha256=expected_campaign_sha256,
+    )
+    if "command_provenance" not in campaign:
+        return LEGACY_COMMAND_PROVENANCE_VERSION
+    provenance = campaign["command_provenance"]
+    if not isinstance(provenance, dict):
+        raise RuntimeError("command_provenance_version")
+    version = provenance.get("version")
+    if version != COMMAND_PLAN_PROVENANCE_VERSION:
+        raise RuntimeError("command_provenance_version")
+    return version
 
 
 def _read_json_lines(path: Path) -> list[dict[str, Any]]:
@@ -3169,6 +3220,7 @@ def main() -> int:
 __all__ = [
     "adjudicate_campaign",
     "adjudicate_run",
+    "command_provenance_version",
     "replay_campaign_adjudication",
     "supported_assertions",
     "validate_run_integrity",

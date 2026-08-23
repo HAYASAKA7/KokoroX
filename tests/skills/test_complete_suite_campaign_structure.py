@@ -69,6 +69,108 @@ EXPECTED_ROUTES = {
     "release-testing-route": "testing-character-packs",
 }
 STABLE_IDENTIFIER = re.compile(r"^[a-z][a-z0-9_]{2,63}$")
+PINNED_GIT = r"C:\Program Files\Git\mingw64\bin\git.exe"
+PRE_TRUST_GIT_PREFIX = (
+    "--no-pager",
+    "--no-optional-locks",
+    "--no-replace-objects",
+    "--literal-pathspecs",
+    "-c",
+    "core.longpaths=true",
+    "-c",
+    "core.autocrlf=false",
+    "-c",
+    "core.eol=lf",
+    "-c",
+    "core.safecrlf=true",
+    "-c",
+    "core.symlinks=false",
+    "-c",
+    "core.protectNTFS=true",
+    "-c",
+    "core.protectHFS=true",
+    "-c",
+    "core.hooksPath=NUL",
+    "-c",
+    "core.fsmonitor=false",
+    "-c",
+    "core.useReplaceRefs=false",
+    "-c",
+    "core.attributesFile=NUL",
+    "-c",
+    "core.excludesFile=/dev/null",
+    "-c",
+    "commit.gpgSign=false",
+    "-c",
+    "tag.gpgSign=false",
+    "-c",
+    "credential.helper=",
+    "-c",
+    "credential.interactive=never",
+    "-c",
+    "maintenance.auto=false",
+    "-c",
+    "gc.auto=0",
+    "-c",
+    "submodule.recurse=false",
+    "-c",
+    "fetch.recurseSubmodules=false",
+    "-c",
+    "protocol.allow=never",
+    "-c",
+    "protocol.file.allow=never",
+    "-c",
+    "diff.external=",
+    "-c",
+    "core.pager=cat",
+)
+PLANNED_CAMPAIGN6_LF_PATHS = (
+    "tests/skills/test_complete_suite_command_plan.py",
+    "tests/skills/complete_suite_command_plan.py",
+    "tests/skills/complete_suite_command_plan_decoder.ps1",
+    "tests/skills/complete-suite-command-plan.schema.json",
+    "tests/skills/fixtures/complete-suite-command-plan/direct-cli.json",
+    "tests/skills/fixtures/complete-suite-command-plan/call-operator-cli.json",
+    "tests/skills/fixtures/complete-suite-command-plan/compound-cli.json",
+    "tests/skills/fixtures/complete-suite-command-plan/read-pipeline.json",
+    "tests/skills/complete_suite_command_policy.py",
+    "tests/skills/complete_suite_file_change_policy.py",
+    "tests/skills/complete-suite-file-change-ledger.schema.json",
+    "tests/skills/test_complete_suite_command_policy.py",
+    "tests/skills/test_complete_suite_file_change_policy.py",
+    "tests/skills/fixtures/complete-suite-file-change/original-authoring.jsonl",
+    "tests/skills/fixtures/complete-suite-file-change/workspace-override.jsonl",
+    "tests/skills/complete_suite_cli_binding.py",
+    "tests/skills/test_complete_suite_cli_binding.py",
+    "tests/skills/complete_suite_shell_preflight.py",
+    "tests/skills/complete_suite_client_preflight_server.py",
+    "tests/skills/complete_suite_control_plane.ps1",
+    "tests/skills/complete_suite_release_python_bootstrap.py",
+    "tests/skills/complete_suite_artifact_launcher.ps1",
+    "tests/skills/complete_suite_artifact_writer.py",
+    "tests/skills/fixtures/complete-suite-client-evaluation-templates.json",
+    "tests/skills/test_complete_suite_shell_preflight.py",
+    "tests/skills/test_complete_suite_artifact_writer.py",
+    "tests/skills/complete_suite_windows_test_ops.py",
+    "tests/integration/test_standalone_cli_workflow.py",
+    "tests/security/test_authoring_security.py",
+    "tests/security/test_persistence_security.py",
+    "tests/security/test_research_security.py",
+    "docs/superpowers/plans/2026-08-14-kokoroarc-completion.md",
+)
+EXISTING_CAMPAIGN6_LF_PATHS = (
+    "docs/superpowers/specs/2026-08-21-kokoroarc-complete-suite-campaign-6-design.md",
+    "docs/superpowers/plans/2026-08-21-kokoroarc-complete-suite-campaign-6.md",
+)
+REQUIRED_CURRENT_CAMPAIGN6_LF_PATHS = (
+    "tests/skills/test_complete_suite_command_plan.py",
+    "tests/integration/test_standalone_cli_workflow.py",
+    "tests/security/test_authoring_security.py",
+    "tests/security/test_persistence_security.py",
+    "tests/security/test_research_security.py",
+    "docs/superpowers/plans/2026-08-14-kokoroarc-completion.md",
+    *EXISTING_CAMPAIGN6_LF_PATHS,
+)
 
 
 def _load(path: Path) -> dict[str, object]:
@@ -280,35 +382,122 @@ def test_complete_suite_campaign_state_is_closed_and_nonexecuted() -> None:
 
 
 def test_approval_bound_checkout_policy_is_explicit_and_current_bytes_are_lf(
+    monkeypatch,
 ) -> None:
-    relative_paths = runner.approval_bound_paths()
+    approval_bound_paths = runner.approval_bound_paths()
+    assert len(approval_bound_paths) == 141
+    assert approval_bound_paths == tuple(sorted(set(approval_bound_paths)))
+    assert len(PLANNED_CAMPAIGN6_LF_PATHS) == 32
+    assert len(set(PLANNED_CAMPAIGN6_LF_PATHS)) == 32
 
-    assert len(relative_paths) == 141
-    assert relative_paths == tuple(sorted(set(relative_paths)))
+    calls: list[tuple[list[str], dict[str, object]]] = []
+    real_run = subprocess.run
 
-    attributes: dict[str, dict[str, str]] = {}
-    for offset in range(0, len(relative_paths), 32):
-        batch = relative_paths[offset : offset + 32]
-        result = subprocess.run(
-            ["git", "check-attr", "text", "eol", "--", *batch],
-            cwd=REPOSITORY_ROOT,
-            check=True,
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
+    def recorded_run(argv, **kwargs):
+        calls.append((list(argv), dict(kwargs)))
+        return real_run(argv, **kwargs)
+
+    monkeypatch.setattr(subprocess, "run", recorded_run)
+    expected_argv = [
+        PINNED_GIT,
+        *PRE_TRUST_GIT_PREFIX,
+        "check-attr",
+        "text",
+        "eol",
+        "--",
+        *PLANNED_CAMPAIGN6_LF_PATHS,
+    ]
+    result = subprocess.run(
+        expected_argv,
+        cwd=REPOSITORY_ROOT,
+        check=False,
+        capture_output=True,
+        text=False,
+    )
+
+    assert result.returncode == 0
+    assert result.stderr == b""
+    assert calls == [
+        (
+            expected_argv,
+            {
+                "cwd": REPOSITORY_ROOT,
+                "check": False,
+                "capture_output": True,
+                "text": False,
+            },
         )
-        for line in result.stdout.splitlines():
-            relative, attribute, value = line.split(": ", maxsplit=2)
-            attributes.setdefault(relative, {})[attribute] = value
+    ]
+    assert "input" not in calls[0][1]
+    attributes: dict[str, dict[str, str]] = {}
+    for line in result.stdout.decode("utf-8", errors="strict").splitlines():
+        relative, attribute, value = line.split(": ", maxsplit=2)
+        attributes.setdefault(relative, {})[attribute] = value
 
+    assert set(attributes) == set(PLANNED_CAMPAIGN6_LF_PATHS)
+    policy_failures = {
+        relative: attributes[relative]
+        for relative in PLANNED_CAMPAIGN6_LF_PATHS
+        if attributes[relative] != {"text": "set", "eol": "lf"}
+    }
+    assert policy_failures == {}
+    current_paths = dict.fromkeys(
+        (
+            *approval_bound_paths,
+            *PLANNED_CAMPAIGN6_LF_PATHS,
+            *EXISTING_CAMPAIGN6_LF_PATHS,
+        )
+    )
+    for relative in current_paths:
+        path = REPOSITORY_ROOT.joinpath(*relative.split("/"))
+        if (
+            relative in approval_bound_paths
+            or relative in REQUIRED_CURRENT_CAMPAIGN6_LF_PATHS
+        ):
+            raw = runner._read_bytes(
+                path,
+                max_bytes=runner.preparation.MAX_FILE_BYTES,
+            )
+        elif path.exists() or path.is_symlink():
+            raw = runner._read_bytes(
+                path,
+                max_bytes=runner.preparation.MAX_FILE_BYTES,
+            )
+        else:
+            continue
+        assert b"\r\n" not in raw, relative
+        assert b"\r" not in raw, relative
+        assert b"\x00" not in raw, relative
+
+
+def test_frozen_inputs_keep_lf_checkout_attributes() -> None:
+    relative_paths = runner.approval_bound_paths()
+    expected_argv = [
+        PINNED_GIT,
+        *PRE_TRUST_GIT_PREFIX,
+        "check-attr",
+        "text",
+        "eol",
+        "--",
+        *relative_paths,
+    ]
+    result = subprocess.run(
+        expected_argv,
+        cwd=REPOSITORY_ROOT,
+        check=False,
+        capture_output=True,
+        text=False,
+    )
+
+    assert result.returncode == 0
+    assert result.stderr == b""
+    attributes: dict[str, dict[str, str]] = {}
+    for line in result.stdout.decode("utf-8", errors="strict").splitlines():
+        relative, attribute, value = line.split(": ", maxsplit=2)
+        attributes.setdefault(relative, {})[attribute] = value
     assert set(attributes) == set(relative_paths)
     for relative in relative_paths:
-        assert attributes[relative] == {
-            "text": "set",
-            "eol": "lf",
-        }, relative
-        raw = REPOSITORY_ROOT.joinpath(*relative.split("/")).read_bytes()
-        assert b"\r\n" not in raw, relative
+        assert attributes[relative] == {"text": "set", "eol": "lf"}
 
 
 def test_complete_suite_route_matrix_mentions_every_skill() -> None:

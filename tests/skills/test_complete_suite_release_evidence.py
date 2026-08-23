@@ -19,6 +19,229 @@ from complete_suite_sanitization import (  # noqa: E402
 )
 
 
+IMMUTABLE_COMPLETE_SUITE_REPLAY_BINDINGS = {
+    "approved1": (
+        "c7ad268f5a3202449056791871130f88f4f4325038c5e9e0f2490f514d4e6881",
+        "78b0ec5d6c36386352a9e3bd49a93def89d127e0c614159ce0bc55e58d0e2a8a",
+    ),
+    "approved2": (
+        "530ffed0e3e62a950148c4dcf27f2f18abb10b403ec321ea2d2cd5a165079664",
+        "ea6939b6c33e226f135938630e7e451b7e63f24022259953d30b997619327a9d",
+    ),
+    "approved3": (
+        "d8611bc380a7033ccff2928f5e12f5596e779bdf8d55999efc2b831ca24903ab",
+        None,
+    ),
+    "approved4": (
+        "4a7675f203fb3365a9dc743e4426fb5217da49e27817fea8f5c6a2a7aa9df90e",
+        None,
+    ),
+    "approved5": (
+        "6d05a42e4b681b06bbb758df71455f8d97362def6c5c2821e011efd7a1d22141",
+        "f5678c44711c8d98c07348bd6e0f4f6f3398bcdd8f232d29c1dda74d8c88b552",
+    ),
+}
+
+
+def _install_immutable_replay_sentinels(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import builtins
+    import os
+    import shutil
+    import subprocess
+    import tempfile
+
+    def forbidden(*_args: object, **_kwargs: object) -> None:
+        raise AssertionError("immutable_campaign_replay_attempted_write")
+
+    real_builtin_open = builtins.open
+    real_path_open = Path.open
+
+    def guarded_builtin_open(
+        file: object,
+        mode: str = "r",
+        *args: object,
+        **kwargs: object,
+    ):
+        if any(flag in mode for flag in "wax+"):
+            forbidden(file, mode)
+        return real_builtin_open(file, mode, *args, **kwargs)
+
+    def guarded_path_open(
+        path: Path,
+        mode: str = "r",
+        *args: object,
+        **kwargs: object,
+    ):
+        if any(flag in mode for flag in "wax+"):
+            forbidden(path, mode)
+        return real_path_open(path, mode, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "open", guarded_builtin_open)
+    monkeypatch.setattr(Path, "open", guarded_path_open)
+    for name in (
+        "chmod",
+        "hardlink_to",
+        "mkdir",
+        "rename",
+        "replace",
+        "rmdir",
+        "symlink_to",
+        "touch",
+        "unlink",
+        "write_bytes",
+        "write_text",
+    ):
+        monkeypatch.setattr(Path, name, forbidden)
+    for name in (
+        "chmod",
+        "link",
+        "makedirs",
+        "mkdir",
+        "remove",
+        "removedirs",
+        "rename",
+        "renames",
+        "replace",
+        "rmdir",
+        "symlink",
+        "truncate",
+        "unlink",
+        "utime",
+    ):
+        monkeypatch.setattr(os, name, forbidden)
+    for name in (
+        "copy",
+        "copy2",
+        "copyfile",
+        "copytree",
+        "move",
+        "rmtree",
+    ):
+        monkeypatch.setattr(shutil, name, forbidden)
+    for name in ("mkdtemp", "mkstemp", "NamedTemporaryFile", "TemporaryDirectory"):
+        monkeypatch.setattr(tempfile, name, forbidden)
+    for name in ("call", "check_call", "check_output", "Popen", "run"):
+        monkeypatch.setattr(subprocess, name, forbidden)
+
+
+def _replay_retained_entry(
+    root: Path,
+    untrusted: object,
+) -> str | None:
+    from import_complete_suite_campaign import (
+        _read_text_artifact,
+        _validate_ledger_entry,
+    )
+
+    entry = _validate_ledger_entry(untrusted)
+    relative = entry["retained_path"]
+    if relative is None:
+        return None
+    path = root.joinpath(*relative.split("/"))
+    payload = _read_text_artifact(path)
+    assert len(payload) == entry["retained_size"]
+    assert sha256(payload).hexdigest() == entry["retained_sha256"]
+    return relative
+
+
+@pytest.mark.parametrize(
+    ("approval", "replay_binding"),
+    IMMUTABLE_COMPLETE_SUITE_REPLAY_BINDINGS.items(),
+    ids=IMMUTABLE_COMPLETE_SUITE_REPLAY_BINDINGS,
+)
+def test_immutable_campaign_replay_preserves_result_tree_hash(
+    approval: str,
+    replay_binding: tuple[str, str | None],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from complete_suite_preparation import inventory_tree
+    from import_complete_suite_campaign import (
+        _load_json_object,
+        _read_text_artifact,
+        _safe_relative_path,
+    )
+
+    _install_immutable_replay_sentinels(monkeypatch)
+    expected_import_ledger_sha256, expected_result_tree_sha256 = replay_binding
+    retained_root = SKILLS_ROOT / "evidence" / "complete-suite" / approval
+    results_root = retained_root / "results"
+    before = inventory_tree(results_root) if results_root.is_dir() else None
+
+    import_path = retained_root / "import-ledger.json"
+    import_bytes = _read_text_artifact(import_path)
+    assert sha256(import_bytes).hexdigest() == expected_import_ledger_sha256
+    import_ledger = _load_json_object(import_path)
+    campaign_paths = {
+        relative.removeprefix("campaign/")
+        for untrusted in import_ledger["campaign_files"]
+        if (relative := _replay_retained_entry(retained_root, untrusted))
+        is not None
+    }
+    assert {
+        entry["path"] for entry in inventory_tree(retained_root / "campaign")["files"]
+    } == campaign_paths
+    prepared_campaign_path = (
+        retained_root / "campaign" / "prepared-campaign.json"
+    )
+    if "prepared-campaign.json" in campaign_paths:
+        historical_campaign = _load_json_object(prepared_campaign_path)
+        assert "command_provenance" not in historical_campaign
+    else:
+        assert approval == "approved4"
+        assert not prepared_campaign_path.exists()
+        assert not prepared_campaign_path.is_symlink()
+
+    for run in import_ledger["runs"]:
+        ledger_path = retained_root.joinpath(*run["ledger_path"].split("/"))
+        ledger_bytes = _read_text_artifact(ledger_path)
+        assert sha256(ledger_bytes).hexdigest() == run["ledger_sha256"]
+        run_ledger = _load_json_object(ledger_path)
+        assert run_ledger["ordinal"] == run["ordinal"]
+        assert run_ledger["variant"] == run["variant"]
+        assert run_ledger["case_id"] == run["case_id"]
+        run_root = retained_root / "runs" / run["variant"] / run["case_id"]
+        expected_run_paths = {
+            relative
+            for untrusted in run_ledger["files"]
+            if (relative := _replay_retained_entry(run_root, untrusted)) is not None
+        }
+        for relative, binding in run_ledger["derived_files"].items():
+            _safe_relative_path(relative)
+            payload = _read_text_artifact(run_root.joinpath(*relative.split("/")))
+            assert len(payload) == binding["size"]
+            assert sha256(payload).hexdigest() == binding["sha256"]
+            expected_run_paths.add(relative)
+        observed_run_paths = {
+            entry["path"] for entry in inventory_tree(run_root)["files"]
+        }
+        assert observed_run_paths == expected_run_paths
+
+    if expected_result_tree_sha256 is None:
+        assert before is None
+        assert not results_root.exists()
+        assert not results_root.is_symlink()
+        return
+
+    assert before is not None
+    assert before["tree_sha256"] == expected_result_tree_sha256
+    adjudication_path = results_root / "adjudication-ledger.json"
+    adjudication = _load_json_object(adjudication_path)
+    assert adjudication["import_ledger_sha256"] == expected_import_ledger_sha256
+    expected_result_paths = {"adjudication-ledger.json"}
+    for record in (*adjudication["results"], *adjudication["summaries"]):
+        _safe_relative_path(record["path"])
+        payload = _read_text_artifact(
+            results_root.joinpath(*record["path"].split("/"))
+        )
+        assert len(payload) == record["size"]
+        assert sha256(payload).hexdigest() == record["sha256"]
+        expected_result_paths.add(record["path"])
+    assert {entry["path"] for entry in before["files"]} == expected_result_paths
+    assert before == inventory_tree(results_root)
+
+
 def _import_command_run(
     root: Path,
     *,
