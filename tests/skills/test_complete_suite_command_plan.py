@@ -7001,6 +7001,11 @@ def test_canonical_normalized_binding_is_closed_detached_and_self_consistent(
             "COMMAND_PLAN_CANONICAL_INVALID",
             lambda mutation=mutation: replace(bound, **mutation),
         )
+    object.__setattr__(bound, "raw_payload_sha256", "0" * 64)
+    _assert_stable_code(
+        "COMMAND_PLAN_CANONICAL_INVALID",
+        bound.__post_init__,
+    )
 
 
 def _task4_identity(command_plan: object, seed: int) -> object:
@@ -7189,6 +7194,15 @@ def test_canonical_retained_namespace_factory_is_sorted_stable_and_unforgeable(
             ),
         )
     assert decode_calls == 0
+    object.__setattr__(
+        bound[0],
+        "raw_identity",
+        _task4_identity(command_plan, 5002),
+    )
+    _assert_stable_code(
+        "COMMAND_PLAN_CANONICAL_INVALID",
+        lambda: command_plan._authenticate_bound_namespaces(bound),
+    )
 
 
 @pytest.mark.parametrize(

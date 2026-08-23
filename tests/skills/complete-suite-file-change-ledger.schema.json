@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kokoroarc.local/schemas/complete-suite-file-change-ledger.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "records"],
+  "properties": {
+    "version": {
+      "const": "complete-suite-file-change-sanitizer-ledger-v1"
+    },
+    "records": {
+      "type": "array",
+      "maxItems": 128,
+      "uniqueItems": true,
+      "items": {"$ref": "#/$defs/record"}
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "boundedPath": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 4096,
+      "pattern": "^[^\\u0000\\r\\n]+$"
+    },
+    "record": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "normalized_path",
+        "sanitizer_record_path",
+        "sanitizer_record_sha256"
+      ],
+      "properties": {
+        "normalized_path": {"$ref": "#/$defs/boundedPath"},
+        "sanitizer_record_path": {"$ref": "#/$defs/boundedPath"},
+        "sanitizer_record_sha256": {"$ref": "#/$defs/sha256"}
+      }
+    }
+  }
+}
