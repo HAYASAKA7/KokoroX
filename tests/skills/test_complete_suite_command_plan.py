@@ -1,12 +1,13 @@
 from __future__ import annotations
 
-from dataclasses import FrozenInstanceError
+from collections.abc import Sequence
+from dataclasses import FrozenInstanceError, fields, replace
 from hashlib import sha256
 import importlib
 import inspect
 import json
 import os
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 import re
 import subprocess
 import sys
@@ -6656,3 +6657,1371 @@ def test_decoder_ast_property_metadata_order_is_total_for_equal_names() -> None:
     assert sort_source.index("$left.Name") < sort_source.index(tie_breakers[0])
     assert sort_source.index(tie_breakers[0]) < sort_source.index(tie_breakers[2])
     assert sort_source.index(tie_breakers[2]) < sort_source.index(tie_breakers[4])
+
+
+TASK4_DATACLASS_FIELDS = {
+    "PathNamespaceRequest": (
+        "raw_root",
+        "retained_root",
+        "label",
+    ),
+    "FilesystemObjectIdentity": (
+        "device",
+        "inode",
+        "file_type",
+        "reparse_tag",
+        "link_count",
+    ),
+    "BoundPathNamespace": (
+        "raw_root",
+        "retained_root",
+        "label",
+        "raw_identity",
+        "retained_identity",
+        "raw_ancestor_identities",
+        "retained_ancestor_identities",
+        "raw_case_sensitive",
+        "retained_case_sensitive",
+        "canonical_sha256",
+    ),
+    "BoundCommandPlan": (
+        "version",
+        "raw_rendered_utf8_bytes",
+        "raw_rendered_sha256",
+        "retained_rendered_utf8_bytes",
+        "retained_rendered_sha256",
+        "raw_payload_field_utf8_bytes",
+        "raw_payload_field_sha256",
+        "raw_payload_utf8_bytes",
+        "raw_payload_sha256",
+        "retained_payload_field_utf8_bytes",
+        "retained_payload_field_sha256",
+        "retained_payload_utf8_bytes",
+        "retained_payload_sha256",
+        "namespaces",
+        "namespace_manifest_sha256",
+        "normalized_plan_sha256",
+        "normalized_plan_bytes",
+    ),
+}
+
+
+def _task4_decoded_payload(command_plan: object, payload: bytes) -> object:
+    canonical_bytes = _compact_json(
+        _decoder_document(
+            payload,
+            tokens=[_end_of_input_token_entry(payload, index=0)],
+        )
+    )
+    return command_plan.DecodedPowerShellPayload(
+        schema_version=DECODER_SCHEMA_VERSION,
+        canonical_bytes=canonical_bytes,
+        canonical_sha256=sha256(canonical_bytes).hexdigest(),
+        token_count=1,
+        parse_error_count=0,
+    )
+
+
+def test_canonical_normalized_binding_typed_api_is_exact_and_frozen() -> None:
+    command_plan = _command_plan_module()
+    expected_hints = {
+        "PathNamespaceRequest": {
+            "raw_root": str,
+            "retained_root": str,
+            "label": str,
+        },
+        "FilesystemObjectIdentity": {
+            "device": int,
+            "inode": int,
+            "file_type": int,
+            "reparse_tag": int,
+            "link_count": int,
+        },
+        "BoundPathNamespace": {
+            "raw_root": str,
+            "retained_root": str,
+            "label": str,
+            "raw_identity": command_plan.FilesystemObjectIdentity,
+            "retained_identity": command_plan.FilesystemObjectIdentity,
+            "raw_ancestor_identities": tuple[
+                command_plan.FilesystemObjectIdentity, ...
+            ],
+            "retained_ancestor_identities": tuple[
+                command_plan.FilesystemObjectIdentity, ...
+            ],
+            "raw_case_sensitive": bool,
+            "retained_case_sensitive": bool,
+            "canonical_sha256": str,
+        },
+        "BoundCommandPlan": {
+            "version": str,
+            "raw_rendered_utf8_bytes": int,
+            "raw_rendered_sha256": str,
+            "retained_rendered_utf8_bytes": int,
+            "retained_rendered_sha256": str,
+            "raw_payload_field_utf8_bytes": int,
+            "raw_payload_field_sha256": str,
+            "raw_payload_utf8_bytes": int,
+            "raw_payload_sha256": str,
+            "retained_payload_field_utf8_bytes": int,
+            "retained_payload_field_sha256": str,
+            "retained_payload_utf8_bytes": int,
+            "retained_payload_sha256": str,
+            "namespaces": tuple[command_plan.BoundPathNamespace, ...],
+            "namespace_manifest_sha256": str,
+            "normalized_plan_sha256": str,
+            "normalized_plan_bytes": bytes,
+        },
+    }
+    for class_name, expected_fields in TASK4_DATACLASS_FIELDS.items():
+        class_type = getattr(command_plan, class_name)
+        assert tuple(field.name for field in fields(class_type)) == expected_fields
+        assert get_type_hints(class_type) == expected_hints[class_name]
+        assert class_type.__dataclass_params__.frozen is True
+
+    request = command_plan.PathNamespaceRequest(
+        raw_root=r"D:\raw",
+        retained_root=r"D:\retained",
+        label="workspace",
+    )
+    identity = command_plan.FilesystemObjectIdentity(
+        device=1,
+        inode=2,
+        file_type=1,
+        reparse_tag=0,
+        link_count=1,
+    )
+    with pytest.raises(FrozenInstanceError):
+        request.label = "changed"
+    with pytest.raises(FrozenInstanceError):
+        identity.inode = 3
+
+    bind_signature = inspect.signature(command_plan.bind_raw_and_retained_plans)
+    assert tuple(bind_signature.parameters) == (
+        "raw_rendered",
+        "retained_rendered",
+        "shell",
+        "decoder_path",
+        "decoder_sha256",
+        "namespaces",
+    )
+    assert tuple(
+        parameter.kind for parameter in bind_signature.parameters.values()
+    ) == (
+        inspect.Parameter.POSITIONAL_OR_KEYWORD,
+        inspect.Parameter.POSITIONAL_OR_KEYWORD,
+        inspect.Parameter.KEYWORD_ONLY,
+        inspect.Parameter.KEYWORD_ONLY,
+        inspect.Parameter.KEYWORD_ONLY,
+        inspect.Parameter.KEYWORD_ONLY,
+    )
+    assert get_type_hints(command_plan.bind_raw_and_retained_plans) == {
+        "raw_rendered": bytes,
+        "retained_rendered": bytes,
+        "shell": command_plan.ShellIdentity,
+        "decoder_path": Path,
+        "decoder_sha256": str,
+        "namespaces": tuple[command_plan.BoundPathNamespace, ...],
+        "return": command_plan.BoundCommandPlan,
+    }
+
+    namespace_signature = inspect.signature(command_plan.bind_path_namespaces)
+    assert tuple(namespace_signature.parameters) == ("requests",)
+    assert namespace_signature.parameters["requests"].kind is (
+        inspect.Parameter.POSITIONAL_OR_KEYWORD
+    )
+    assert get_type_hints(command_plan.bind_path_namespaces) == {
+        "requests": Sequence[command_plan.PathNamespaceRequest],
+        "return": tuple[command_plan.BoundPathNamespace, ...],
+    }
+
+
+def test_canonical_normalized_binding_is_closed_detached_and_self_consistent(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    command_plan = _command_plan_module()
+    shell = _shell()
+    payload = b""
+    rendered = command_plan.render_powershell_argv(
+        "",
+        shell_path=shell.path,
+        quote_style="single",
+    )
+    decoded = _task4_decoded_payload(command_plan, payload)
+    decode_calls: list[bytes] = []
+
+    def fake_decode(
+        candidate: bytes,
+        *,
+        shell: object,
+        decoder_path: Path,
+        decoder_sha256: str,
+    ) -> object:
+        assert type(candidate) is bytes
+        assert shell is not None
+        assert decoder_path == DECODER_PATH
+        assert decoder_sha256 == "2" * 64
+        decode_calls.append(candidate)
+        return decoded
+
+    monkeypatch.setattr(
+        command_plan,
+        "decode_powershell_payload",
+        fake_decode,
+        raising=True,
+    )
+    bound = command_plan.bind_raw_and_retained_plans(
+        rendered,
+        rendered,
+        shell=shell,
+        decoder_path=DECODER_PATH,
+        decoder_sha256="2" * 64,
+        namespaces=(),
+    )
+    assert type(bound) is command_plan.BoundCommandPlan
+    assert bound.version == "complete-suite-bound-command-plan-v1"
+    assert decode_calls == [payload, payload]
+    assert bound.namespaces == ()
+    assert bound.raw_rendered_utf8_bytes == len(rendered)
+    assert bound.raw_rendered_sha256 == sha256(rendered).hexdigest()
+    assert bound.retained_rendered_utf8_bytes == len(rendered)
+    assert bound.retained_rendered_sha256 == sha256(rendered).hexdigest()
+    assert bound.raw_payload_field_utf8_bytes == 2
+    assert bound.raw_payload_field_sha256 == sha256(b"''").hexdigest()
+    assert bound.raw_payload_utf8_bytes == 0
+    assert bound.raw_payload_sha256 == sha256(payload).hexdigest()
+    assert bound.retained_payload_field_utf8_bytes == 2
+    assert bound.retained_payload_field_sha256 == sha256(b"''").hexdigest()
+    assert bound.retained_payload_utf8_bytes == 0
+    assert bound.retained_payload_sha256 == sha256(payload).hexdigest()
+    assert type(bound.normalized_plan_bytes) is bytes
+    assert bound.normalized_plan_sha256 == sha256(
+        bound.normalized_plan_bytes
+    ).hexdigest()
+    normalized = json.loads(bound.normalized_plan_bytes)
+    assert _compact_json(normalized) == bound.normalized_plan_bytes
+    assert set(normalized) == {
+        "bindings",
+        "command",
+        "decoder",
+        "namespace_manifest_sha256",
+        "namespaces",
+        "shell",
+        "version",
+    }
+    assert normalized["version"] == "complete-suite-bound-command-plan-v1"
+    expected_binding = {
+        "payload": {
+            "sha256": sha256(payload).hexdigest(),
+            "utf8_bytes": 0,
+        },
+        "payload_field": {
+            "sha256": sha256(b"''").hexdigest(),
+            "utf8_bytes": 2,
+        },
+        "rendered": {
+            "sha256": sha256(rendered).hexdigest(),
+            "utf8_bytes": len(rendered),
+        },
+    }
+    assert normalized["bindings"] == {
+        "raw": expected_binding,
+        "retained": expected_binding,
+    }
+    assert normalized["namespaces"] == []
+    manifest = {
+        "namespaces": [],
+        "version": "complete-suite-path-namespace-manifest-v1",
+    }
+    assert bound.namespace_manifest_sha256 == sha256(
+        _compact_json(manifest)
+    ).hexdigest()
+    assert normalized["namespace_manifest_sha256"] == (
+        bound.namespace_manifest_sha256
+    )
+    assert normalized["decoder"] == {
+        "path": DECODER_RELATIVE_PATH,
+        "sha256": "2" * 64,
+    }
+    assert normalized["shell"] == {
+        "edition": shell.edition,
+        "file_version": shell.file_version,
+        "parser_version": shell.parser_version,
+        "path": shell.path,
+        "product_version": shell.product_version,
+        "sha256": shell.sha256,
+    }
+    assert normalized["command"] == {
+        "metrics": {
+            "ast_depth": 1,
+            "ast_nodes": 1,
+            "operations": 0,
+            "pipeline_stages": 0,
+            "statements": 0,
+        },
+        "nodes": [
+            {
+                "ast_type": "ScriptBlockAst",
+                "child_indices": [],
+                "index": 0,
+                "invocation_operator": None,
+                "literal": None,
+                "parent_index": None,
+                "role": "script_block",
+            }
+        ],
+        "tokens": [
+            {
+                "flags": ["ParseModeInvariant"],
+                "index": 0,
+                "kind": "EndOfInput",
+                "literal": None,
+                "text": "",
+            }
+        ],
+    }
+
+    detached = json.loads(bound.normalized_plan_bytes)
+    detached["command"]["nodes"][0]["ast_type"] = "MutatedAst"
+    detached["namespaces"].append({"label": "mutated"})
+    assert sha256(bound.normalized_plan_bytes).hexdigest() == (
+        bound.normalized_plan_sha256
+    )
+    assert json.loads(bound.normalized_plan_bytes)["command"]["nodes"][0][
+        "ast_type"
+    ] == "ScriptBlockAst"
+    for mutation in (
+        {"normalized_plan_sha256": "0" * 64},
+        {"normalized_plan_bytes": bytearray(bound.normalized_plan_bytes)},
+        {"namespace_manifest_sha256": "0" * 64},
+        {"namespaces": []},
+        {"version": "complete-suite-bound-command-plan-v2"},
+    ):
+        _assert_stable_code(
+            "COMMAND_PLAN_CANONICAL_INVALID",
+            lambda mutation=mutation: replace(bound, **mutation),
+        )
+
+
+def _task4_identity(command_plan: object, seed: int) -> object:
+    return command_plan.FilesystemObjectIdentity(
+        device=10 + seed,
+        inode=100 + seed,
+        file_type=1,
+        reparse_tag=0,
+        link_count=1,
+    )
+
+
+def _task4_namespace_observer(
+    command_plan: object,
+    *,
+    case_sensitive: bool = False,
+) -> tuple[object, list[str]]:
+    calls: list[str] = []
+
+    def observe(path: str) -> tuple[str, object, tuple[object, ...], bool]:
+        normalized = str(PureWindowsPath(path))
+        calls.append(normalized)
+        seed = sum(normalized.encode("utf-8"))
+        return (
+            normalized,
+            _task4_identity(command_plan, seed),
+            (
+                _task4_identity(command_plan, seed + 1),
+                _task4_identity(command_plan, seed + 2),
+            ),
+            case_sensitive,
+        )
+
+    return observe, calls
+
+
+def _task4_real_shell(command_plan: object) -> object:
+    shell_path = Path(SHELL_PATH)
+    shell_digest = sha256(shell_path.read_bytes()).hexdigest()
+    assert shell_digest == (
+        "db6dd81183fe57d22e03b911ec9a30a2fd7c40542e97743615355a6fb44f458f"
+    )
+    return command_plan.ShellIdentity(
+        path=SHELL_PATH,
+        sha256=shell_digest,
+        file_version="7.6.4.500",
+        product_version=(
+            "7.6.4 SHA: "
+            "929d27f4e66dcfba8f5f74ff03105705e483a27d+"
+            "929d27f4e66dcfba8f5f74ff03105705e483a27d"
+        ),
+        edition="Core",
+        parser_version="7.6.4",
+    )
+
+
+def _task4_real_decoded_payload(
+    command_plan: object,
+    payload: bytes,
+    *,
+    decoder_test_root: Path,
+) -> object:
+    completed = _run_real_decoder(payload, temp_root=decoder_test_root)
+    assert completed.returncode == 0
+    assert completed.stderr == b""
+    document = json.loads(completed.stdout)
+    canonical_bytes = _compact_json(document)
+    return command_plan.DecodedPowerShellPayload(
+        schema_version=DECODER_SCHEMA_VERSION,
+        canonical_bytes=canonical_bytes,
+        canonical_sha256=sha256(canonical_bytes).hexdigest(),
+        token_count=len(document["tokens"]),
+        parse_error_count=len(document["parse_errors"]),
+    )
+
+
+def _task4_render(command_plan: object, shell: object, payload: str) -> bytes:
+    return command_plan.render_powershell_argv(
+        payload,
+        shell_path=shell.path,
+        quote_style="single",
+    )
+
+
+def test_canonical_retained_namespace_factory_is_sorted_stable_and_unforgeable(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    command_plan = _command_plan_module()
+    observer, calls = _task4_namespace_observer(command_plan)
+    monkeypatch.setattr(
+        command_plan,
+        "_observe_namespace_root",
+        observer,
+        raising=False,
+    )
+    requests = [
+        command_plan.PathNamespaceRequest(
+            raw_root=r"D:/raw-b",
+            retained_root=r"D:/retained-b",
+            label="workspace-b",
+        ),
+        command_plan.PathNamespaceRequest(
+            raw_root=r"D:\raw-a",
+            retained_root=r"D:\retained-a",
+            label="workspace-a",
+        ),
+    ]
+    bound = command_plan.bind_path_namespaces(requests)
+    assert type(bound) is tuple
+    assert tuple(item.label for item in bound) == ("workspace-a", "workspace-b")
+    assert all(type(item) is command_plan.BoundPathNamespace for item in bound)
+    assert all(re.fullmatch(r"[0-9a-f]{64}", item.canonical_sha256) for item in bound)
+    assert len(calls) == 8
+    assert sorted(calls) == sorted(
+        [
+            str(PureWindowsPath(request.raw_root))
+            for request in requests
+            for _ in range(2)
+        ]
+        + [
+            str(PureWindowsPath(request.retained_root))
+            for request in requests
+            for _ in range(2)
+        ]
+    )
+    requests.reverse()
+    requests[0] = command_plan.PathNamespaceRequest(
+        raw_root=r"D:\mutated",
+        retained_root=r"D:\mutated-retained",
+        label="mutated",
+    )
+    assert tuple(item.label for item in bound) == ("workspace-a", "workspace-b")
+
+    shell = _shell()
+    rendered = _task4_render(command_plan, shell, "")
+    decode_calls = 0
+
+    def forbidden_decode(*args: object, **kwargs: object) -> object:
+        nonlocal decode_calls
+        decode_calls += 1
+        raise AssertionError("forged namespace reached decoder")
+
+    monkeypatch.setattr(
+        command_plan,
+        "decode_powershell_payload",
+        forbidden_decode,
+        raising=True,
+    )
+    rejected_namespace_sets = (
+        tuple(reversed(bound)),
+        (replace(bound[0]),),
+        (
+            replace(
+                bound[0],
+                raw_identity=_task4_identity(command_plan, 5000),
+            ),
+        ),
+        (
+            replace(
+                bound[0],
+                raw_ancestor_identities=(
+                    _task4_identity(command_plan, 5001),
+                ),
+            ),
+        ),
+        (
+            replace(
+                bound[0],
+                raw_case_sensitive=not bound[0].raw_case_sensitive,
+            ),
+        ),
+        (replace(bound[0], canonical_sha256="0" * 64),),
+    )
+    for rejected_namespaces in rejected_namespace_sets:
+        _assert_stable_code(
+            "COMMAND_PLAN_CANONICAL_INVALID",
+            lambda rejected_namespaces=rejected_namespaces: (
+                command_plan.bind_raw_and_retained_plans(
+                    rendered,
+                    rendered,
+                    shell=shell,
+                    decoder_path=DECODER_PATH,
+                    decoder_sha256="2" * 64,
+                    namespaces=rejected_namespaces,
+                )
+            ),
+        )
+    assert decode_calls == 0
+
+
+@pytest.mark.parametrize(
+    ("requests", "case_sensitive"),
+    (
+        (
+            (
+                (r"D:\raw", r"D:\retained", "same"),
+                (r"D:\other", r"D:\elsewhere", "same"),
+            ),
+            False,
+        ),
+        (
+            (
+                (r"D:\raw", r"D:\retained", "outer"),
+                (r"D:\raw\child", r"D:\elsewhere", "inner"),
+            ),
+            False,
+        ),
+        (
+            (
+                (r"D:\raw", r"D:\retained", "outer"),
+                (r"D:\other", r"D:\retained\child", "inner"),
+            ),
+            False,
+        ),
+        (
+            (
+                (r"D:\Raw", r"D:\retained-a", "first"),
+                (r"d:\raw", r"D:\retained-b", "second"),
+            ),
+            True,
+        ),
+    ),
+    ids=(
+        "duplicate-label",
+        "overlapping-raw-root",
+        "overlapping-retained-root",
+        "case-only-root-alias",
+    ),
+)
+def test_canonical_retained_namespace_factory_rejects_collisions(
+    monkeypatch: pytest.MonkeyPatch,
+    requests: tuple[tuple[str, str, str], ...],
+    case_sensitive: bool,
+) -> None:
+    command_plan = _command_plan_module()
+    observer, _ = _task4_namespace_observer(
+        command_plan,
+        case_sensitive=case_sensitive,
+    )
+    monkeypatch.setattr(
+        command_plan,
+        "_observe_namespace_root",
+        observer,
+        raising=False,
+    )
+    values = tuple(
+        command_plan.PathNamespaceRequest(
+            raw_root=raw,
+            retained_root=retained,
+            label=label,
+        )
+        for raw, retained, label in requests
+    )
+    _assert_stable_code(
+        "COMMAND_PLAN_CANONICAL_INVALID",
+        lambda: command_plan.bind_path_namespaces(values),
+    )
+
+
+def test_normalized_raw_retained_accepts_only_declared_literal_path_substitution(
+    monkeypatch: pytest.MonkeyPatch,
+    decoder_test_root: Path,
+) -> None:
+    command_plan = _command_plan_module()
+    observer, calls = _task4_namespace_observer(command_plan)
+    monkeypatch.setattr(
+        command_plan,
+        "_observe_namespace_root",
+        observer,
+        raising=False,
+    )
+    namespace = command_plan.bind_path_namespaces(
+        (
+            command_plan.PathNamespaceRequest(
+                raw_root=r"D:\Raw Workspace",
+                retained_root=r"D:\Retained Workspace",
+                label="workspace",
+            ),
+        )
+    )
+    factory_call_count = len(calls)
+    raw_payload = (
+        "kokoro character request validate --input "
+        "'D:\\Raw Workspace\\INPUTS\\Request.JSON' --json"
+    )
+    retained_payload = (
+        "kokoro character request validate --input "
+        "'D:\\Retained Workspace\\inputs\\request.json' --json"
+    )
+    raw_bytes = raw_payload.encode("utf-8")
+    retained_bytes = retained_payload.encode("utf-8")
+    raw_decoded = _task4_real_decoded_payload(
+        command_plan,
+        raw_bytes,
+        decoder_test_root=decoder_test_root,
+    )
+    retained_decoded = _task4_real_decoded_payload(
+        command_plan,
+        retained_bytes,
+        decoder_test_root=decoder_test_root,
+    )
+    decoded_by_payload = {
+        raw_bytes: raw_decoded,
+        retained_bytes: retained_decoded,
+    }
+
+    def fake_decode(candidate: bytes, **kwargs: object) -> object:
+        return decoded_by_payload[candidate]
+
+    monkeypatch.setattr(
+        command_plan,
+        "decode_powershell_payload",
+        fake_decode,
+        raising=True,
+    )
+    raw_semantic = command_plan._semantic_command_view(
+        json.loads(raw_decoded.canonical_bytes),
+        payload=raw_bytes,
+        shell=_task4_real_shell(command_plan),
+        decoder_sha256=sha256(DECODER_PATH.read_bytes()).hexdigest(),
+        namespaces=namespace,
+        side="raw",
+    )
+    retained_semantic = command_plan._semantic_command_view(
+        json.loads(retained_decoded.canonical_bytes),
+        payload=retained_bytes,
+        shell=_task4_real_shell(command_plan),
+        decoder_sha256=sha256(DECODER_PATH.read_bytes()).hexdigest(),
+        namespaces=namespace,
+        side="retained",
+    )
+    assert raw_semantic != retained_semantic
+    assert command_plan._semantic_command_values_equivalent(
+        raw_semantic,
+        retained_semantic,
+        namespaces=namespace,
+    )
+    bound = command_plan.bind_raw_and_retained_plans(
+        _task4_render(command_plan, _task4_real_shell(command_plan), raw_payload),
+        _task4_render(
+            command_plan,
+            _task4_real_shell(command_plan),
+            retained_payload,
+        ),
+        shell=_task4_real_shell(command_plan),
+        decoder_path=DECODER_PATH,
+        decoder_sha256=sha256(DECODER_PATH.read_bytes()).hexdigest(),
+        namespaces=namespace,
+    )
+    assert bound.namespaces is namespace
+    normalized = json.loads(bound.normalized_plan_bytes)
+    normalized_text = bound.normalized_plan_bytes.decode("utf-8")
+    assert "Raw Workspace" not in normalized_text
+    assert normalized["command"]["metrics"]["operations"] == 1
+    assert [item["label"] for item in normalized["namespaces"]] == [
+        "workspace"
+    ]
+    binder_calls = calls[factory_call_count:]
+    assert binder_calls == [
+        str(PureWindowsPath(r"D:\Retained Workspace")),
+        str(PureWindowsPath(r"D:\Retained Workspace")),
+    ]
+
+
+@pytest.mark.parametrize(
+    ("raw_case_sensitive", "retained_case_sensitive"),
+    ((True, False), (False, True), (True, True)),
+    ids=("raw-sensitive", "retained-sensitive", "both-sensitive"),
+)
+def test_normalized_raw_retained_requires_exact_case_when_either_root_sensitive(
+    monkeypatch: pytest.MonkeyPatch,
+    decoder_test_root: Path,
+    raw_case_sensitive: bool,
+    retained_case_sensitive: bool,
+) -> None:
+    command_plan = _command_plan_module()
+
+    def observe(path: str) -> tuple[str, object, tuple[object, ...], bool]:
+        normalized = str(PureWindowsPath(path))
+        seed = sum(normalized.encode("utf-8"))
+        return (
+            normalized,
+            _task4_identity(command_plan, seed),
+            (
+                _task4_identity(command_plan, seed + 1),
+                _task4_identity(command_plan, seed + 2),
+            ),
+            (
+                raw_case_sensitive
+                if normalized == str(PureWindowsPath(r"D:\Raw Workspace"))
+                else retained_case_sensitive
+            ),
+        )
+
+    monkeypatch.setattr(
+        command_plan,
+        "_observe_namespace_root",
+        observe,
+        raising=False,
+    )
+    namespaces = command_plan.bind_path_namespaces(
+        (
+            command_plan.PathNamespaceRequest(
+                raw_root=r"D:\Raw Workspace",
+                retained_root=r"D:\Retained Workspace",
+                label="workspace",
+            ),
+        )
+    )
+    raw_payload = (
+        "kokoro character request validate --input "
+        "'D:\\Raw Workspace\\INPUTS\\Request.JSON' --json"
+    )
+    retained_payload = (
+        "kokoro character request validate --input "
+        "'D:\\Retained Workspace\\inputs\\request.json' --json"
+    )
+    raw_bytes = raw_payload.encode("utf-8")
+    retained_bytes = retained_payload.encode("utf-8")
+    decoded_by_payload = {
+        raw_bytes: _task4_real_decoded_payload(
+            command_plan,
+            raw_bytes,
+            decoder_test_root=decoder_test_root,
+        ),
+        retained_bytes: _task4_real_decoded_payload(
+            command_plan,
+            retained_bytes,
+            decoder_test_root=decoder_test_root,
+        ),
+    }
+
+    def fake_decode(candidate: bytes, **kwargs: object) -> object:
+        return decoded_by_payload[candidate]
+
+    monkeypatch.setattr(
+        command_plan,
+        "decode_powershell_payload",
+        fake_decode,
+        raising=True,
+    )
+    shell = _task4_real_shell(command_plan)
+    _assert_stable_code(
+        "COMMAND_PLAN_RAW_RETAINED_MISMATCH",
+        lambda: command_plan.bind_raw_and_retained_plans(
+            _task4_render(command_plan, shell, raw_payload),
+            _task4_render(command_plan, shell, retained_payload),
+            shell=shell,
+            decoder_path=DECODER_PATH,
+            decoder_sha256=sha256(DECODER_PATH.read_bytes()).hexdigest(),
+            namespaces=namespaces,
+        ),
+    )
+
+
+@pytest.mark.parametrize(
+    ("raw_root", "retained_root", "raw_path", "retained_path"),
+    (
+        (
+            r"D:\RawRoot",
+            r"D:\RetainedRoot",
+            r"D:\RawRoot\ß.txt",
+            r"D:\RetainedRoot\SS.txt",
+        ),
+        (
+            r"D:\ß",
+            r"D:\RetainedRoot",
+            r"D:\SS\case.json",
+            r"D:\RetainedRoot\case.json",
+        ),
+    ),
+    ids=("suffix-expansion", "root-expansion"),
+)
+def test_normalized_raw_retained_uses_windows_ordinal_case_semantics(
+    monkeypatch: pytest.MonkeyPatch,
+    decoder_test_root: Path,
+    raw_root: str,
+    retained_root: str,
+    raw_path: str,
+    retained_path: str,
+) -> None:
+    command_plan = _command_plan_module()
+    observer, _ = _task4_namespace_observer(command_plan)
+    monkeypatch.setattr(
+        command_plan,
+        "_observe_namespace_root",
+        observer,
+        raising=False,
+    )
+    namespaces = command_plan.bind_path_namespaces(
+        (
+            command_plan.PathNamespaceRequest(
+                raw_root=raw_root,
+                retained_root=retained_root,
+                label="workspace",
+            ),
+        )
+    )
+    raw_payload = f"Get-Content -LiteralPath '{raw_path}' -Raw"
+    retained_payload = f"Get-Content -LiteralPath '{retained_path}' -Raw"
+    raw_bytes = raw_payload.encode("utf-8")
+    retained_bytes = retained_payload.encode("utf-8")
+    decoded_by_payload = {
+        raw_bytes: _task4_real_decoded_payload(
+            command_plan,
+            raw_bytes,
+            decoder_test_root=decoder_test_root,
+        ),
+        retained_bytes: _task4_real_decoded_payload(
+            command_plan,
+            retained_bytes,
+            decoder_test_root=decoder_test_root,
+        ),
+    }
+
+    def fake_decode(candidate: bytes, **kwargs: object) -> object:
+        return decoded_by_payload[candidate]
+
+    monkeypatch.setattr(
+        command_plan,
+        "decode_powershell_payload",
+        fake_decode,
+        raising=True,
+    )
+    shell = _task4_real_shell(command_plan)
+    _assert_stable_code(
+        "COMMAND_PLAN_RAW_RETAINED_MISMATCH",
+        lambda: command_plan.bind_raw_and_retained_plans(
+            _task4_render(command_plan, shell, raw_payload),
+            _task4_render(command_plan, shell, retained_payload),
+            shell=shell,
+            decoder_path=DECODER_PATH,
+            decoder_sha256=sha256(DECODER_PATH.read_bytes()).hexdigest(),
+            namespaces=namespaces,
+        ),
+    )
+
+
+@pytest.mark.parametrize(
+    "retained_payload",
+    (
+        "other character request validate --input "
+        "'D:\\Retained Workspace\\inputs\\request.json' --json",
+        "kokoro character request validate --output "
+        "'D:\\Retained Workspace\\inputs\\request.json' --json",
+        "kokoro character request validate --input "
+        "'D:\\Retained Workspace\\inputs\\other.json' --json",
+        "kokoro character request validate --input "
+        "'D:\\Retained WorkspaceX\\inputs\\request.json' --json",
+        "kokoro character request validate --input "
+        "'D:\\Retained Workspace\\inputs\\request.json.secret' --json",
+        "kokoro character request validate --input "
+        "'C:\\Users\\private\\request.json' --json",
+        "kokoro character request validate --input "
+        "'D:\\Retained Workspace\\inputs\\request.json' --json | Out-Null",
+    ),
+    ids=(
+        "changed-command",
+        "changed-option",
+        "changed-path-suffix",
+        "mid-token-root",
+        "placeholder-smuggling",
+        "undeclared-private-root",
+        "changed-pipeline",
+    ),
+)
+def test_normalized_raw_retained_rejects_semantic_and_path_mutants(
+    monkeypatch: pytest.MonkeyPatch,
+    decoder_test_root: Path,
+    retained_payload: str,
+) -> None:
+    command_plan = _command_plan_module()
+    observer, _ = _task4_namespace_observer(command_plan)
+    monkeypatch.setattr(
+        command_plan,
+        "_observe_namespace_root",
+        observer,
+        raising=False,
+    )
+    namespaces = command_plan.bind_path_namespaces(
+        (
+            command_plan.PathNamespaceRequest(
+                raw_root=r"D:\Raw Workspace",
+                retained_root=r"D:\Retained Workspace",
+                label="workspace",
+            ),
+        )
+    )
+    raw_payload = (
+        "kokoro character request validate --input "
+        "'D:\\Raw Workspace\\inputs\\request.json' --json"
+    )
+    raw_bytes = raw_payload.encode("utf-8")
+    retained_bytes = retained_payload.encode("utf-8")
+    decoded_by_payload = {
+        raw_bytes: _task4_real_decoded_payload(
+            command_plan,
+            raw_bytes,
+            decoder_test_root=decoder_test_root,
+        ),
+        retained_bytes: _task4_real_decoded_payload(
+            command_plan,
+            retained_bytes,
+            decoder_test_root=decoder_test_root,
+        ),
+    }
+
+    def fake_decode(candidate: bytes, **kwargs: object) -> object:
+        return decoded_by_payload[candidate]
+
+    monkeypatch.setattr(
+        command_plan,
+        "decode_powershell_payload",
+        fake_decode,
+        raising=True,
+    )
+    shell = _task4_real_shell(command_plan)
+    _assert_stable_code(
+        "COMMAND_PLAN_RAW_RETAINED_MISMATCH",
+        lambda: command_plan.bind_raw_and_retained_plans(
+            _task4_render(command_plan, shell, raw_payload),
+            _task4_render(command_plan, shell, retained_payload),
+            shell=shell,
+            decoder_path=DECODER_PATH,
+            decoder_sha256=sha256(DECODER_PATH.read_bytes()).hexdigest(),
+            namespaces=namespaces,
+        ),
+    )
+
+
+def test_canonical_retained_namespace_real_observer_is_no_follow_and_complete(
+    decoder_test_root: Path,
+) -> None:
+    command_plan = _command_plan_module()
+    raw_root = decoder_test_root / "raw-root"
+    retained_root = decoder_test_root / "retained-root"
+    raw_root.mkdir()
+    retained_root.mkdir()
+    try:
+        namespaces = command_plan.bind_path_namespaces(
+            (
+                command_plan.PathNamespaceRequest(
+                    raw_root=str(raw_root),
+                    retained_root=str(retained_root),
+                    label="workspace",
+                ),
+            )
+        )
+        assert len(namespaces) == 1
+        namespace = namespaces[0]
+        assert PureWindowsPath(namespace.raw_root) == PureWindowsPath(raw_root)
+        assert PureWindowsPath(namespace.retained_root) == PureWindowsPath(
+            retained_root
+        )
+        for identity in (
+            namespace.raw_identity,
+            namespace.retained_identity,
+            *namespace.raw_ancestor_identities,
+            *namespace.retained_ancestor_identities,
+        ):
+            assert type(identity) is command_plan.FilesystemObjectIdentity
+            assert identity.device > 0
+            assert identity.inode > 0
+            assert identity.file_type == 1
+            assert identity.reparse_tag == 0
+            assert identity.link_count > 0
+        assert type(namespace.raw_case_sensitive) is bool
+        assert type(namespace.retained_case_sensitive) is bool
+        source = inspect.getsource(command_plan._observe_namespace_root)
+        for marker in (
+            "CreateFileW",
+            "GetFileInformationByHandle",
+            "GetFileInformationByHandleEx",
+            "GetFinalPathNameByHandleW",
+            "file_flag_open_reparse_point",
+            "file_flag_backup_semantics",
+            "file_case_sensitive_info",
+            "CloseHandle",
+        ):
+            assert marker in source
+    finally:
+        retained_root.rmdir()
+        raw_root.rmdir()
+
+
+def test_canonical_retained_namespace_traversal_holds_relative_parent_handles(
+) -> None:
+    command_plan = _command_plan_module()
+    source = inspect.getsource(command_plan._observe_namespace_root)
+    for marker in (
+        "NtCreateFile",
+        "root_directory",
+        "file_open_reparse_point",
+        "obj_dont_reparse",
+        "for handle in reversed(handles)",
+    ):
+        assert marker in source
+
+
+def test_canonical_retained_namespace_traversal_rejects_case_different_parent(
+    decoder_test_root: Path,
+) -> None:
+    command_plan = _command_plan_module()
+    raw_parent = decoder_test_root / "RawParent"
+    raw_root = raw_parent / "RawRoot"
+    retained_root = decoder_test_root / "RetainedRoot"
+    raw_parent.mkdir()
+    raw_root.mkdir()
+    retained_root.mkdir()
+    case_different_raw_root = (
+        decoder_test_root / "rawparent" / raw_root.name
+    )
+    assert str(case_different_raw_root) != str(raw_root)
+    try:
+        _assert_stable_code(
+            "COMMAND_PLAN_CANONICAL_INVALID",
+            lambda: command_plan.bind_path_namespaces(
+                (
+                    command_plan.PathNamespaceRequest(
+                        raw_root=str(case_different_raw_root),
+                        retained_root=str(retained_root),
+                        label="workspace",
+                    ),
+                )
+            ),
+        )
+    finally:
+        retained_root.rmdir()
+        raw_root.rmdir()
+        raw_parent.rmdir()
+
+
+def test_canonical_retained_namespace_identity_recheck_brackets_decoding(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    command_plan = _command_plan_module()
+    initial_observer, _ = _task4_namespace_observer(command_plan)
+    monkeypatch.setattr(
+        command_plan,
+        "_observe_namespace_root",
+        initial_observer,
+        raising=False,
+    )
+    namespaces = command_plan.bind_path_namespaces(
+        (
+            command_plan.PathNamespaceRequest(
+                raw_root=r"D:\raw-race",
+                retained_root=r"D:\retained-race",
+                label="workspace",
+            ),
+        )
+    )
+    decoded = _task4_decoded_payload(command_plan, b"")
+    decoder_started = False
+    observed_paths: list[str] = []
+
+    def race_observer(
+        path: str,
+    ) -> tuple[str, object, tuple[object, ...], bool]:
+        normalized = str(PureWindowsPath(path))
+        observed_paths.append(normalized)
+        if normalized != namespaces[0].retained_root:
+            raise AssertionError("binder re-observed unavailable raw root")
+        identity = namespaces[0].retained_identity
+        if decoder_started:
+            identity = _task4_identity(command_plan, 9999)
+        return (
+            normalized,
+            identity,
+            namespaces[0].retained_ancestor_identities,
+            namespaces[0].retained_case_sensitive,
+        )
+
+    def fake_decode(candidate: bytes, **kwargs: object) -> object:
+        nonlocal decoder_started
+        decoder_started = True
+        return decoded
+
+    monkeypatch.setattr(
+        command_plan,
+        "_observe_namespace_root",
+        race_observer,
+        raising=True,
+    )
+    monkeypatch.setattr(
+        command_plan,
+        "decode_powershell_payload",
+        fake_decode,
+        raising=True,
+    )
+    shell = _shell()
+    rendered = _task4_render(command_plan, shell, "")
+    _assert_stable_code(
+        "COMMAND_PLAN_CANONICAL_INVALID",
+        lambda: command_plan.bind_raw_and_retained_plans(
+            rendered,
+            rendered,
+            shell=shell,
+            decoder_path=DECODER_PATH,
+            decoder_sha256="2" * 64,
+            namespaces=namespaces,
+        ),
+    )
+    assert observed_paths == [
+        namespaces[0].retained_root,
+        namespaces[0].retained_root,
+    ]
+
+
+TASK4_FIXTURE_VERSION = "complete-suite-command-plan-fixture-v1"
+TASK4_FIXTURE_ROOT = (
+    SKILLS_ROOT / "fixtures" / "complete-suite-command-plan"
+)
+TASK4_FIXTURE_PAYLOADS = {
+    "direct-cli": (
+        "kokoro character request validate "
+        "--input '.\\inputs\\request.json' --json"
+    ),
+    "call-operator-cli": (
+        "& '.tools\\kokoro.cmd' pack validate "
+        "'.\\source-packs\\rin' --json"
+    ),
+    "compound-cli": (
+        "kokoro character request validate "
+        "--input '.\\inputs\\request.json' --json; "
+        "kokoro character draft validate "
+        "--request '.\\inputs\\request.json' "
+        "--pack '.\\source-packs\\rin' --json"
+    ),
+    "read-pipeline": (
+        "Get-Content -LiteralPath '.\\case.json' -Raw | "
+        "Select-Object -First 1"
+    ),
+}
+
+
+def _task4_load_fixture(name: str) -> tuple[bytes, dict[str, object]]:
+    path = TASK4_FIXTURE_ROOT / f"{name}.json"
+    fixture_bytes = path.read_bytes()
+    assert not fixture_bytes.startswith(b"\xef\xbb\xbf")
+    assert b"\r" not in fixture_bytes
+
+    def reject_duplicates(
+        pairs: list[tuple[str, object]],
+    ) -> dict[str, object]:
+        result: dict[str, object] = {}
+        for key, value in pairs:
+            assert key not in result
+            result[key] = value
+        return result
+
+    document = json.loads(
+        fixture_bytes.decode("utf-8", errors="strict"),
+        object_pairs_hook=reject_duplicates,
+    )
+    assert type(document) is dict
+    assert _compact_json(document) == fixture_bytes
+    return fixture_bytes, document
+
+
+@pytest.mark.parametrize("name", tuple(TASK4_FIXTURE_PAYLOADS))
+def test_fixture_canonical_normalized_plan_matches_live_decoder(
+    name: str,
+    decoder_test_root: Path,
+) -> None:
+    command_plan = _command_plan_module()
+    fixture_bytes, document = _task4_load_fixture(name)
+    payload = TASK4_FIXTURE_PAYLOADS[name]
+    payload_bytes = payload.encode("utf-8")
+    assert set(document) == {
+        "decoder_facts",
+        "fixture_version",
+        "name",
+        "normalized_plan",
+        "payload_sha256",
+        "payload_utf8",
+        "payload_utf8_bytes",
+    }
+    assert document["fixture_version"] == TASK4_FIXTURE_VERSION
+    assert document["name"] == name
+    assert document["payload_utf8"] == payload
+    assert document["payload_utf8_bytes"] == len(payload_bytes)
+    assert document["payload_sha256"] == sha256(payload_bytes).hexdigest()
+    decoded = _task4_real_decoded_payload(
+        command_plan,
+        payload_bytes,
+        decoder_test_root=decoder_test_root,
+    )
+    shell = _task4_real_shell(command_plan)
+    decoder_digest = sha256(DECODER_PATH.read_bytes()).hexdigest()
+    normalized = command_plan._semantic_command_view(
+        json.loads(decoded.canonical_bytes),
+        payload=payload_bytes,
+        shell=shell,
+        decoder_sha256=decoder_digest,
+    )
+    normalized_bytes = _compact_json(normalized)
+    assert document["normalized_plan"] == normalized
+    assert document["decoder_facts"] == {
+        "decoder": {
+            "path": DECODER_RELATIVE_PATH,
+            "sha256": decoder_digest,
+        },
+        "decoder_plan_sha256": decoded.canonical_sha256,
+        "normalized_plan_sha256": sha256(normalized_bytes).hexdigest(),
+        "parse_error_count": 0,
+        "schema_version": DECODER_SCHEMA_VERSION,
+        "shell": {
+            "edition": shell.edition,
+            "file_version": shell.file_version,
+            "parser_version": shell.parser_version,
+            "product_version": shell.product_version,
+            "sha256": shell.sha256,
+        },
+        "token_count": decoded.token_count,
+    }
+    forbidden = (
+        b"Approved5",
+        b'"prompt"',
+        b'"final_response"',
+        b'"outcome"',
+        b"C:\\\\Users\\\\",
+        str(decoder_test_root).encode("utf-8"),
+    )
+    for marker in forbidden:
+        assert marker not in fixture_bytes
+
+
+@pytest.mark.parametrize("name", tuple(TASK4_FIXTURE_PAYLOADS))
+def test_fixture_repeatability_uses_ten_separate_decoder_processes(
+    name: str,
+    decoder_test_root: Path,
+) -> None:
+    command_plan = _command_plan_module()
+    _fixture_bytes, fixture = _task4_load_fixture(name)
+    payload = TASK4_FIXTURE_PAYLOADS[name].encode("utf-8")
+    shell = _task4_real_shell(command_plan)
+    decoder_digest = sha256(DECODER_PATH.read_bytes()).hexdigest()
+    decoder_plan_bytes: list[bytes] = []
+    normalized_plan_bytes: list[bytes] = []
+    for _attempt in range(10):
+        decoded = _task4_real_decoded_payload(
+            command_plan,
+            payload,
+            decoder_test_root=decoder_test_root,
+        )
+        decoder_plan_bytes.append(decoded.canonical_bytes)
+        normalized = command_plan._semantic_command_view(
+            json.loads(decoded.canonical_bytes),
+            payload=payload,
+            shell=shell,
+            decoder_sha256=decoder_digest,
+        )
+        normalized_plan_bytes.append(_compact_json(normalized))
+    assert len(decoder_plan_bytes) == 10
+    assert len(set(decoder_plan_bytes)) == 1
+    assert len(set(normalized_plan_bytes)) == 1
+    assert json.loads(normalized_plan_bytes[0]) == fixture["normalized_plan"]
+    assert sha256(decoder_plan_bytes[0]).hexdigest() == fixture[
+        "decoder_facts"
+    ]["decoder_plan_sha256"]
+    assert sha256(normalized_plan_bytes[0]).hexdigest() == fixture[
+        "decoder_facts"
+    ]["normalized_plan_sha256"]
+
+
+def test_repeatability_mutation_changes_or_rejects_shell_decoder_payload(
+    decoder_test_root: Path,
+) -> None:
+    command_plan = _command_plan_module()
+    _fixture_bytes, fixture = _task4_load_fixture("direct-cli")
+    payload = TASK4_FIXTURE_PAYLOADS["direct-cli"].encode("utf-8")
+    shell = _task4_real_shell(command_plan)
+    decoder_digest = sha256(DECODER_PATH.read_bytes()).hexdigest()
+    decoded = _task4_real_decoded_payload(
+        command_plan,
+        payload,
+        decoder_test_root=decoder_test_root,
+    )
+    document = json.loads(decoded.canonical_bytes)
+    baseline = command_plan._semantic_command_view(
+        document,
+        payload=payload,
+        shell=shell,
+        decoder_sha256=decoder_digest,
+    )
+    assert baseline == fixture["normalized_plan"]
+
+    mutated_payload = payload[:-1] + b"x"
+    mutated_decoded = _task4_real_decoded_payload(
+        command_plan,
+        mutated_payload,
+        decoder_test_root=decoder_test_root,
+    )
+    mutated_plan = command_plan._semantic_command_view(
+        json.loads(mutated_decoded.canonical_bytes),
+        payload=mutated_payload,
+        shell=shell,
+        decoder_sha256=decoder_digest,
+    )
+    assert _compact_json(mutated_plan) != _compact_json(baseline)
+
+    changed_shell = replace(shell, parser_version="7.6.5")
+    _assert_stable_code(
+        "COMMAND_DECODER_IDENTITY_MISMATCH",
+        lambda: command_plan._semantic_command_view(
+            document,
+            payload=payload,
+            shell=changed_shell,
+            decoder_sha256=decoder_digest,
+        ),
+    )
+    changed_decoder_digest = (
+        ("0" if decoder_digest[0] != "0" else "1") + decoder_digest[1:]
+    )
+    _assert_stable_code(
+        "COMMAND_DECODER_IDENTITY_MISMATCH",
+        lambda: command_plan._semantic_command_view(
+            document,
+            payload=payload,
+            shell=shell,
+            decoder_sha256=changed_decoder_digest,
+        ),
+    )
