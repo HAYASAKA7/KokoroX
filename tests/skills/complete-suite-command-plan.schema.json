@@ -1,0 +1,421 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kokoroarc.invalid/schemas/complete-suite-command-plan.schema.json",
+  "title": "Complete-suite nonexecuting PowerShell command-plan decoder document",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "payload",
+    "powershell",
+    "decoder",
+    "parse_errors",
+    "tokens",
+    "nodes",
+    "metrics"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "complete-suite-command-plan-decoder-v1"
+    },
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["utf8_bytes", "sha256"],
+      "properties": {
+        "utf8_bytes": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 262144
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "powershell": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "sha256",
+        "file_version",
+        "product_version",
+        "edition",
+        "parser_version"
+      ],
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 4,
+          "maxLength": 32767,
+          "pattern": "^[A-Za-z]:\\\\"
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "file_version": {
+          "$ref": "#/$defs/nonempty_identity"
+        },
+        "product_version": {
+          "$ref": "#/$defs/nonempty_identity"
+        },
+        "edition": {
+          "const": "Core"
+        },
+        "parser_version": {
+          "$ref": "#/$defs/nonempty_identity"
+        }
+      }
+    },
+    "decoder": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256"],
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096,
+          "pattern": "^(?![A-Za-z]:)(?![\\\\/])(?!.*(?:^|[\\\\/])\\.\\.(?:[\\\\/]|$))[A-Za-z0-9._/-]+$"
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "parse_errors": {
+      "type": "array",
+      "maxItems": 256,
+      "items": {
+        "$ref": "#/$defs/parse_error"
+      }
+    },
+    "tokens": {
+      "type": "array",
+      "maxItems": 8192,
+      "items": {
+        "$ref": "#/$defs/token"
+      }
+    },
+    "nodes": {
+      "type": "array",
+      "maxItems": 8192,
+      "items": {
+        "$ref": "#/$defs/node"
+      }
+    },
+    "metrics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ast_nodes",
+        "ast_depth",
+        "statements",
+        "operations",
+        "pipeline_stages"
+      ],
+      "properties": {
+        "ast_nodes": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 8192
+        },
+        "ast_depth": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 64
+        },
+        "statements": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 256
+        },
+        "operations": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 256
+        },
+        "pipeline_stages": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 256
+        }
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "nonempty_identity": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "token_kind": {
+      "enum": [
+        "Unknown", "Variable", "SplattedVariable", "Parameter", "Number",
+        "Label", "Identifier", "Generic", "NewLine", "LineContinuation",
+        "Comment", "EndOfInput", "StringLiteral", "StringExpandable",
+        "HereStringLiteral", "HereStringExpandable", "LParen", "RParen",
+        "LCurly", "RCurly", "LBracket", "RBracket", "AtParen", "AtCurly",
+        "DollarParen", "Semi", "AndAnd", "OrOr", "Ampersand", "Pipe",
+        "Comma", "MinusMinus", "PlusPlus", "DotDot", "ColonColon", "Dot",
+        "Exclaim", "Multiply", "Divide", "Rem", "Plus", "Minus", "Equals",
+        "PlusEquals", "MinusEquals", "MultiplyEquals", "DivideEquals",
+        "RemainderEquals", "Redirection", "RedirectInStd", "Format", "Not",
+        "Bnot", "And", "Or", "Xor", "Band", "Bor", "Bxor", "Join", "Ieq",
+        "Ine", "Ige", "Igt", "Ilt", "Ile", "Ilike", "Inotlike", "Imatch",
+        "Inotmatch", "Ireplace", "Icontains", "Inotcontains", "Iin", "Inotin",
+        "Isplit", "Ceq", "Cne", "Cge", "Cgt", "Clt", "Cle", "Clike",
+        "Cnotlike", "Cmatch", "Cnotmatch", "Creplace", "Ccontains",
+        "Cnotcontains", "Cin", "Cnotin", "Csplit", "Is", "IsNot", "As",
+        "PostfixPlusPlus", "PostfixMinusMinus", "Shl", "Shr", "Colon",
+        "QuestionMark", "QuestionQuestionEquals", "QuestionQuestion",
+        "QuestionDot", "QuestionLBracket", "Begin", "Break", "Catch", "Class",
+        "Continue", "Data", "Define", "Do", "Dynamicparam", "Else", "ElseIf",
+        "End", "Exit", "Filter", "Finally", "For", "Foreach", "From",
+        "Function", "If", "In", "Param", "Process", "Return", "Switch",
+        "Throw", "Trap", "Try", "Until", "Using", "Var", "While", "Workflow",
+        "Parallel", "Sequence", "InlineScript", "Configuration",
+        "DynamicKeyword", "Public", "Private", "Static", "Interface", "Enum",
+        "Namespace", "Module", "Type", "Assembly", "Command", "Hidden", "Base",
+        "Default", "Clean"
+      ]
+    },
+    "token_flag": {
+      "enum": [
+        "None", "BinaryPrecedenceLogical", "BinaryPrecedenceBitwise",
+        "BinaryPrecedenceComparison", "BinaryPrecedenceCoalesce",
+        "BinaryPrecedenceAdd", "BinaryPrecedenceMultiply",
+        "BinaryPrecedenceFormat", "BinaryPrecedenceRange",
+        "BinaryPrecedenceMask", "Keyword", "ScriptBlockBlockName",
+        "BinaryOperator", "UnaryOperator", "CaseSensitiveOperator",
+        "TernaryOperator", "SpecialOperator", "AssignmentOperator",
+        "ParseModeInvariant", "TokenInError", "DisallowedInRestrictedMode",
+        "PrefixOrPostfixOperator", "CommandName", "MemberName", "TypeName",
+        "AttributeName", "CanConstantFold", "StatementDoesntSupportAttributes"
+      ]
+    },
+    "ast_type": {
+      "enum": [
+        "ArrayExpressionAst", "ArrayLiteralAst", "AssignmentStatementAst",
+        "AttributeAst", "AttributeBaseAst", "AttributedExpressionAst",
+        "BaseCtorInvokeMemberExpressionAst", "BinaryExpressionAst",
+        "BlockStatementAst", "BreakStatementAst", "CatchClauseAst",
+        "ChainableAst", "CommandAst", "CommandBaseAst", "CommandElementAst",
+        "CommandExpressionAst", "CommandParameterAst",
+        "CompilerGeneratedMemberFunctionAst", "ConfigurationDefinitionAst",
+        "ConstantExpressionAst", "ContinueStatementAst", "ConvertExpressionAst",
+        "DataStatementAst", "DoUntilStatementAst", "DoWhileStatementAst",
+        "DynamicKeywordStatementAst", "ErrorExpressionAst", "ErrorStatementAst",
+        "ExitStatementAst", "ExpandableStringExpressionAst", "ExpressionAst",
+        "FileRedirectionAst", "ForEachStatementAst", "ForStatementAst",
+        "FunctionDefinitionAst", "FunctionMemberAst", "HashtableAst",
+        "IfStatementAst", "IndexExpressionAst", "InvokeMemberExpressionAst",
+        "LabeledStatementAst", "LoopStatementAst", "MemberAst",
+        "MemberExpressionAst", "MergingRedirectionAst",
+        "NamedAttributeArgumentAst", "NamedBlockAst", "ParamBlockAst",
+        "ParameterAst", "ParenExpressionAst", "PipelineAst", "PipelineBaseAst",
+        "PipelineChainAst", "PropertyMemberAst", "RedirectionAst",
+        "ReturnStatementAst", "ScriptBlockAst", "ScriptBlockExpressionAst",
+        "SequencePointAst", "StatementAst", "StatementBlockAst",
+        "StringConstantExpressionAst", "SubExpressionAst", "SwitchStatementAst",
+        "TernaryExpressionAst", "ThrowStatementAst", "TrapStatementAst",
+        "TryStatementAst", "TypeConstraintAst", "TypeDefinitionAst",
+        "TypeExpressionAst", "UnaryExpressionAst", "UsingExpressionAst",
+        "UsingStatementAst", "AssignmentTarget", "VariableExpressionAst",
+        "WhileStatementAst"
+      ]
+    },
+    "role": {
+      "enum": [
+        "script_block", "statement", "pipeline", "command", "command_element",
+        "redirection", "control_flow", "expression"
+      ]
+    },
+    "literal": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "value", "utf8_bytes", "sha256"],
+      "properties": {
+        "kind": {
+          "enum": ["bare", "single_quoted", "double_quoted"]
+        },
+        "value": {
+          "type": "string",
+          "maxLength": 262144
+        },
+        "utf8_bytes": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 262144
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "nullable_literal": {
+      "oneOf": [
+        {"type": "null"},
+        {"$ref": "#/$defs/literal"}
+      ]
+    },
+    "token": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "index", "kind", "flags", "start_utf16", "end_utf16", "start_utf8",
+        "end_utf8", "text_sha256", "literal"
+      ],
+      "properties": {
+        "index": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 8191
+        },
+        "kind": {
+          "$ref": "#/$defs/token_kind"
+        },
+        "flags": {
+          "type": "array",
+          "maxItems": 28,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/token_flag"
+          }
+        },
+        "start_utf16": {
+          "$ref": "#/$defs/utf16_offset"
+        },
+        "end_utf16": {
+          "$ref": "#/$defs/utf16_offset"
+        },
+        "start_utf8": {
+          "$ref": "#/$defs/utf8_offset"
+        },
+        "end_utf8": {
+          "$ref": "#/$defs/utf8_offset"
+        },
+        "text_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "literal": {
+          "$ref": "#/$defs/nullable_literal"
+        }
+      }
+    },
+    "node": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "index", "ast_type", "role", "parent_index", "child_indices",
+        "start_utf16", "end_utf16", "start_utf8", "end_utf8",
+        "invocation_operator", "literal"
+      ],
+      "properties": {
+        "index": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 8191
+        },
+        "ast_type": {
+          "$ref": "#/$defs/ast_type"
+        },
+        "role": {
+          "$ref": "#/$defs/role"
+        },
+        "parent_index": {
+          "oneOf": [
+            {"type": "null"},
+            {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 8191
+            }
+          ]
+        },
+        "child_indices": {
+          "type": "array",
+          "maxItems": 8192,
+          "uniqueItems": true,
+          "items": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 8191
+          }
+        },
+        "start_utf16": {
+          "$ref": "#/$defs/utf16_offset"
+        },
+        "end_utf16": {
+          "$ref": "#/$defs/utf16_offset"
+        },
+        "start_utf8": {
+          "$ref": "#/$defs/utf8_offset"
+        },
+        "end_utf8": {
+          "$ref": "#/$defs/utf8_offset"
+        },
+        "invocation_operator": {
+          "enum": [null, "none", "call", "dot"]
+        },
+        "literal": {
+          "$ref": "#/$defs/nullable_literal"
+        }
+      }
+    },
+    "parse_error": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "index", "error_id", "incomplete_input", "start_utf16", "end_utf16",
+        "start_utf8", "end_utf8", "message_sha256"
+      ],
+      "properties": {
+        "index": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 255
+        },
+        "error_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256,
+          "pattern": "^[A-Za-z0-9_.:-]+$"
+        },
+        "incomplete_input": {
+          "type": "boolean"
+        },
+        "start_utf16": {
+          "$ref": "#/$defs/utf16_offset"
+        },
+        "end_utf16": {
+          "$ref": "#/$defs/utf16_offset"
+        },
+        "start_utf8": {
+          "$ref": "#/$defs/utf8_offset"
+        },
+        "end_utf8": {
+          "$ref": "#/$defs/utf8_offset"
+        },
+        "message_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "utf16_offset": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 262144
+    },
+    "utf8_offset": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 262144
+    }
+  }
+}
