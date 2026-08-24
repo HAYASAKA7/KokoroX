@@ -2512,9 +2512,12 @@ def test_expected_refusal_binds_code_but_retains_no_raw_message(
     raw_message = r"D:\private\existing.karc already exists"
     raw = {
         "ok": False,
-        "error": {"code": "OUTPUT_EXISTS", "message": raw_message},
+        "error": {"code": "KARC_EXPORT_OUTPUT_EXISTS", "message": raw_message},
     }
-    retained = {"ok": False, "error": {"code": "OUTPUT_EXISTS"}}
+    retained = {
+        "ok": False,
+        "error": {"code": "KARC_EXPORT_OUTPUT_EXISTS"},
+    }
     spec = _refusal_spec(raw_document=raw, retained_document=retained)
     case = _make_case(binding, tmp_path, (spec,))
     evidence = _bind(binding, case)
@@ -2533,13 +2536,20 @@ def test_expected_refusal_binds_code_but_retains_no_raw_message(
     (
         ("success-nonzero", 1, _pack_list_document()),
         ("success-false", 0, {"ok": False, "error": {"code": "OTHER"}}),
-        ("refusal-zero", 0, {"ok": False, "error": {"code": "OUTPUT_EXISTS"}}),
+        (
+            "refusal-zero",
+            0,
+            {"ok": False, "error": {"code": "KARC_EXPORT_OUTPUT_EXISTS"}},
+        ),
         ("refusal-true", 7, {"ok": True}),
         ("refusal-code", 7, {"ok": False, "error": {"code": "OTHER"}}),
         (
             "refusal-open-error",
             7,
-            {"ok": False, "error": {"code": "OUTPUT_EXISTS", "extra": True}},
+            {
+                "ok": False,
+                "error": {"code": "KARC_EXPORT_OUTPUT_EXISTS", "extra": True},
+            },
         ),
     ),
 )
@@ -2566,7 +2576,10 @@ def test_forged_compound_or_wrong_action_refusal_rejects(
     wrong_action: bool,
 ) -> None:
     binding = _binding()
-    refusal = {"ok": False, "error": {"code": "OUTPUT_EXISTS"}}
+    refusal = {
+        "ok": False,
+        "error": {"code": "KARC_EXPORT_OUTPUT_EXISTS"},
+    }
     spec = _refusal_spec(
         raw_document=refusal,
         compound=compound,
@@ -3535,3 +3548,207 @@ def test_session_identity_model_rejects_invalid_exact_types_and_paths(
     case = _make_case(binding, tmp_path, (spec,))
     with pytest.raises(RuntimeError):
         replace(case.raw_identity, **{field: value})
+
+
+def _mixed_operation_spec(document: dict[str, Any]) -> _CommandSpec:
+    argvs = (
+        ("New-Item", "-ItemType", "Directory", "-Path", r"outputs"),
+        ("Out-Null",),
+        ("kokoro", "pack", "export", "--json"),
+    )
+    plan, rendered = _bound_plan(argvs)
+    operations = (
+        command_policy.ApprovedOperation(
+            index=0,
+            statement_index=0,
+            pipeline_index=None,
+            category="silent_directory",
+            argv=argvs[0],
+            operational_json=False,
+            expected_outcome="none",
+            declared_output_paths=(),
+        ),
+        command_policy.ApprovedOperation(
+            index=1,
+            statement_index=1,
+            pipeline_index=None,
+            category="silent_directory",
+            argv=argvs[1],
+            operational_json=False,
+            expected_outcome="none",
+            declared_output_paths=(),
+        ),
+        command_policy.ApprovedOperation(
+            index=2,
+            statement_index=2,
+            pipeline_index=None,
+            category="kokoro_cli",
+            argv=argvs[2],
+            operational_json=True,
+            expected_outcome="success",
+            declared_output_paths=(r"outputs\rin-aster.karc",),
+        ),
+    )
+    decision = command_policy._decision(
+        plan.normalized_plan_sha256,
+        "operational_json",
+        operations,
+    )
+    command_policy._register_command_policy_decision(decision, plan=plan)
+    output = json.dumps(document, ensure_ascii=False, separators=(",", ":"))
+    return _CommandSpec(
+        plan=plan,
+        decision=decision,
+        rendered_command=rendered,
+        raw_output=output,
+        retained_output=output,
+        exit_code=0,
+        event_id="mixed-command",
+    )
+
+
+def test_operation_provenance_covers_every_operation_and_full_session(
+    tmp_path: Path,
+) -> None:
+    binding = _binding()
+    document = _valid_success_documents()[("pack", "export")]
+    read_spec = _nonoperational_spec(
+        "synthetic read output\r\n",
+        help_only=False,
+        event_id="read-command",
+    )
+    mixed_spec = _mixed_operation_spec(document)
+    case = _make_case(binding, tmp_path, (read_spec, mixed_spec))
+
+    evidence = _bind(binding, case)
+    provenance = binding._authenticated_session_operation_provenance(evidence)
+
+    assert provenance.raw_session_sha256 == sha256(
+        case.raw_path.read_bytes()
+    ).hexdigest()
+    assert provenance.retained_session_sha256 == sha256(
+        case.retained_path.read_bytes()
+    ).hexdigest()
+    assert tuple(
+        (
+            operation.command_index,
+            operation.operation_index,
+            operation.argv,
+            operation.category,
+            operation.outcome,
+            operation.declared_output_paths,
+        )
+        for operation in provenance.operations
+    ) == (
+        (0, 0, read_spec.decision.operations[0].argv, "read_only", "none", ()),
+        (
+            1,
+            0,
+            mixed_spec.decision.operations[0].argv,
+            "silent_directory",
+            "none",
+            (),
+        ),
+        (
+            1,
+            1,
+            mixed_spec.decision.operations[1].argv,
+            "silent_directory",
+            "none",
+            (),
+        ),
+        (
+            1,
+            2,
+            mixed_spec.decision.operations[2].argv,
+            "kokoro_cli",
+            "success",
+            (r"outputs\rin-aster.karc",),
+        ),
+    )
+    assert tuple(operation.selected_values for operation in provenance.operations[:-1]) == (
+        (),
+        (),
+        (),
+    )
+    selected = provenance.operations[-1].selected_values
+    assert tuple(value.selector for value in selected) == ((),)
+    expected_document_sha256 = sha256(_canonical(document)).hexdigest()
+    assert selected[0].raw_sha256 == expected_document_sha256
+    assert selected[0].retained_sha256 == expected_document_sha256
+
+
+def test_operation_provenance_hashes_policy_and_plan_members(
+    tmp_path: Path,
+) -> None:
+    binding = _binding()
+    policy_document = _valid_success_documents()[("policy", "compile")]
+    plan_document = _valid_success_documents()[("runtime", "plan")]
+    spec = _operational_spec(
+        (policy_document, plan_document),
+        argvs=(
+            ("kokoro", "policy", "compile", "--json"),
+            ("kokoro", "runtime", "plan", "--json"),
+        ),
+    )
+    provenance = binding._authenticated_session_operation_provenance(
+        _bind(binding, _make_case(binding, tmp_path, (spec,)))
+    )
+
+    for operation, document, member in zip(
+        provenance.operations,
+        (policy_document, plan_document),
+        ("policy", "plan"),
+        strict=True,
+    ):
+        assert tuple(value.selector for value in operation.selected_values) == (
+            (),
+            (member,),
+        )
+        expected = (
+            sha256(_canonical(document)).hexdigest(),
+            sha256(_canonical(document[member])).hexdigest(),
+        )
+        assert tuple(value.raw_sha256 for value in operation.selected_values) == expected
+        assert tuple(value.retained_sha256 for value in operation.selected_values) == expected
+
+
+def test_operation_provenance_is_private_immutable_and_detached(
+    tmp_path: Path,
+) -> None:
+    binding = _binding()
+    document = _valid_success_documents()[("pack", "export")]
+    spec = _mixed_operation_spec(document)
+    evidence = _bind(binding, _make_case(binding, tmp_path, (spec,)))
+
+    provenance = binding._authenticated_session_operation_provenance(evidence)
+    operation = provenance.operations[-1]
+    selected = operation.selected_values[0]
+    assert operation.argv == spec.decision.operations[-1].argv
+    assert operation.argv is not spec.decision.operations[-1].argv
+    assert operation.declared_output_paths is not (
+        spec.decision.operations[-1].declared_output_paths
+    )
+    assert "rin-aster.karc" not in repr(provenance)
+    with pytest.raises(FrozenInstanceError):
+        provenance.raw_session_sha256 = ZERO_SHA256
+    with pytest.raises(FrozenInstanceError):
+        operation.argv = ("replacement",)
+    with pytest.raises(FrozenInstanceError):
+        selected.raw_sha256 = ZERO_SHA256
+    object.__setattr__(operation, "argv", ("forced-caller-mutation",))
+    fresh = binding._authenticated_session_operation_provenance(evidence)
+    assert fresh.operations[-1].argv == spec.decision.operations[-1].argv
+
+
+def test_operation_provenance_rejects_same_valued_evidence_replacement(
+    tmp_path: Path,
+) -> None:
+    binding = _binding()
+    spec = _operational_spec((_pack_list_document(),))
+    evidence = _bind(binding, _make_case(binding, tmp_path, (spec,)))
+
+    replacement = replace(evidence)
+    with pytest.raises(RuntimeError, match=binding.COMMAND_CAPTURE_INVALID):
+        binding._authenticated_session_operation_provenance(replacement)
+    assert binding._authenticated_session_operation_provenance(evidence).operations

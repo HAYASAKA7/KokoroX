@@ -421,7 +421,11 @@ def _context(
         workspace_root=workspace,
         data_root=workspace / "data",
         approved_read_roots=(workspace,),
-        approved_output_roots=(workspace / "outputs", workspace / "data" / "compiled"),
+        approved_output_roots=(
+            workspace / "outputs",
+            workspace / "data" / "compiled",
+            workspace / "data" / "reports",
+        ),
         kokoro_shim=workspace / ".tools" / "kokoro.cmd",
         kokoro_shim_sha256=sha256(b"shim").hexdigest(),
         rg_executable=workspace / ".tools" / "rg.exe",
@@ -442,12 +446,36 @@ def _context_with_outputs(
     *,
     case_id: str = "synthetic-case",
 ) -> command_policy.CommandPolicyContext:
+    base_paths = {
+        str(entry["relative_path"]).casefold() for entry in _base_entries()
+    }
+    directory_paths: set[str] = set()
+    for output in outputs:
+        parent = PureWindowsPath(output).parent
+        while str(parent) not in {"", "."}:
+            rendered = str(parent)
+            if rendered.casefold() not in base_paths:
+                directory_paths.add(rendered)
+            parent = parent.parent
+    ordered_directories = tuple(sorted(directory_paths, key=str.casefold))
     entries = [
-        _entry(path, b"{}", 500 + index)
-        for index, path in enumerate(outputs)
+        *(
+            _entry(path, None, 450 + index)
+            for index, path in enumerate(ordered_directories)
+        ),
+        *(
+            _entry(path, b"{}", 500 + index)
+            for index, path in enumerate(outputs)
+        ),
     ]
     created = tuple(
-        sorted((f"workspace\\{path}" for path in outputs), key=str.casefold)
+        sorted(
+            (
+                f"workspace\\{path}"
+                for path in (*ordered_directories, *outputs)
+            ),
+            key=str.casefold,
+        )
     )
     return _context(
         tmp_path,
@@ -710,6 +738,105 @@ def test_filesystem_evidence_binds_canonical_detached_snapshots(tmp_path: Path) 
     assert type(bound.pre_roots[0].entries) is tuple
 
 
+def test_live_post_filesystem_authentication_rejects_post_snapshot_mutation(
+    tmp_path: Path,
+) -> None:
+    context = _context(tmp_path)
+    command_policy._authenticate_live_post_filesystem(
+        context.filesystem,
+        expected_case_root=context.case_root,
+    )
+
+    (context.workspace_root / "unexpected.txt").write_bytes(b"unexpected")
+    with pytest.raises(RuntimeError, match="COMMAND_POLICY_OPERATION_REJECTED"):
+        command_policy._authenticate_live_post_filesystem(
+            context.filesystem,
+            expected_case_root=context.case_root,
+        )
+
+
+def test_live_post_filesystem_capture_is_immutable_after_handles_close(
+    tmp_path: Path,
+) -> None:
+    context = _context(tmp_path)
+    capture = command_policy._authenticate_live_post_filesystem(
+        context.filesystem,
+        expected_case_root=context.case_root,
+    )
+    request = context.workspace_root / "inputs" / "request.json"
+
+    request.write_bytes(b'{"forged":true}')
+    (context.workspace_root / "inputs" / "untracked.json").write_bytes(b"{}")
+
+    assert command_policy._captured_post_file_bytes(
+        capture, r"workspace\inputs\request.json"
+    ) == b"{}"
+    assert (
+        command_policy._captured_post_file_bytes(
+            capture, r"workspace\inputs\untracked.json"
+        )
+        is None
+    )
+
+
+def test_live_post_filesystem_authentication_enforces_absent_root(
+    tmp_path: Path,
+) -> None:
+    context = _context(tmp_path)
+    workspace_root = context.filesystem.post_roots[0]
+    assert workspace_root.root_identity is not None
+    absent_record: dict[str, object] = {
+        "ancestor_identities": [
+            command_policy._identity_record(identity)
+            for identity in (
+                *workspace_root.ancestor_identities,
+                workspace_root.root_identity,
+            )
+        ],
+        "entries": [],
+        "present": False,
+        "relative_root": r"workspace\absent",
+        "root_identity": None,
+        "root_index": 0,
+    }
+    absent_record["manifest_sha256"] = sha256(
+        _canonical_bytes(absent_record)
+    ).hexdigest()
+    pre = {
+        "policy_filesystem_roots": [absent_record],
+        "schema_version": FILESYSTEM_VERSION,
+    }
+    post = {
+        **pre,
+        "changed_paths": [],
+        "created_paths": [],
+        "removed_paths": [],
+    }
+    filesystem = command_policy.bind_filesystem_evidence(
+        _canonical_bytes(pre),
+        _canonical_bytes(post),
+        case_root=context.case_root,
+    )
+
+    capture = command_policy._authenticate_live_post_filesystem(
+        filesystem,
+        expected_case_root=context.case_root,
+    )
+    (context.workspace_root / "absent").mkdir()
+    (context.workspace_root / "absent" / "forged.json").write_bytes(b"{}")
+    assert (
+        command_policy._captured_post_file_bytes(
+            capture, r"workspace\absent\forged.json"
+        )
+        is None
+    )
+    with pytest.raises(RuntimeError, match="COMMAND_POLICY_OPERATION_REJECTED"):
+        command_policy._authenticate_live_post_filesystem(
+            filesystem,
+            expected_case_root=context.case_root,
+        )
+
+
 def test_snapshot_index_sort_lookup_and_delta_have_bounded_ordinal_comparisons(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -827,7 +954,6 @@ def test_registered_snapshot_indexes_are_reused_only_after_fresh_authentication(
             context.filesystem, "post"
         ) is post
     assert builds == 4
-
     for name, mutate in (
         (
             "root",
@@ -860,6 +986,31 @@ def test_registered_snapshot_indexes_are_reused_only_after_fresh_authentication(
             with pytest.raises(RuntimeError) as caught:
                 forged_context.__post_init__()
         assert str(caught.value) == "COMMAND_POLICY_FILESYSTEM_EVIDENCE_INVALID"
+
+
+def test_command_policy_decision_cannot_gain_filesystem_after_registration(
+    tmp_path: Path,
+) -> None:
+    context = _context(tmp_path / "origin")
+    plan = _bound_plan("Get-Content", r".\inputs\request.json")
+    authorized = command_policy.authorize_command_plan(plan, context=context)
+    unbound = command_policy._decision(
+        authorized.plan_sha256,
+        authorized.record_class,
+        authorized.operations,
+    )
+    command_policy._register_command_policy_decision(unbound, plan=plan)
+
+    assert command_policy._authenticated_command_policy_filesystem(
+        unbound,
+        plan=plan,
+    ) is None
+    with pytest.raises(RuntimeError, match="COMMAND_POLICY_PLAN_INVALID"):
+        command_policy._register_command_policy_decision(
+            unbound,
+            plan=plan,
+            filesystem=context.filesystem,
+        )
 
 
 @pytest.mark.parametrize(
@@ -1107,10 +1258,15 @@ def test_output_policy_accepts_factory_bound_absent_snapshot_root_creation(
         _bound_plan(
             "kokoro",
             "pack",
-            "test",
-            r".\source-packs\rin",
-            "--request",
-            r".\inputs\request.json",
+            "export",
+            "--compiled",
+            r".\inputs\compiled.json",
+            "--promotion",
+            r".\inputs\promotion.json",
+            "--hard-report",
+            r".\inputs\hard.json",
+            "--soft-report",
+            r".\inputs\soft.json",
             "--out",
             r".\outputs\fresh.json",
             "--json",
@@ -1556,11 +1712,11 @@ def test_pack_cli_policy_and_all_other_frozen_kokoro_cli_rows_are_authorized(
         tmp_path,
         (
             r"outputs\export.karc",
-            r"outputs\test.json",
-            r"outputs\soft.json",
-            r"outputs\promoted.json",
-            r"outputs\verified.json",
-            r"outputs\publication.json",
+            r"data\reports\outputs\test.json",
+            r"data\reports\outputs\soft.json",
+            r"data\reports\outputs\promoted.json",
+            r"data\reports\outputs\verified.json",
+            r"data\reports\outputs\publication.json",
             r"outputs\state.json",
         ),
     )
@@ -1573,10 +1729,40 @@ def test_pack_cli_policy_and_all_other_frozen_kokoro_cli_rows_are_authorized(
         assert operation.operational_json is True
         assert operation.expected_outcome == "success"
         if "--out" in argv:
-            expected = argv[argv.index("--out") + 1]
-            assert operation.declared_output_paths == (expected[2:],)
+            expected = argv[argv.index("--out") + 1][2:]
+            if tuple(argv[1:3]) in {
+                ("pack", "test"),
+                ("pack", "soft-eval"),
+                ("pack", "promote"),
+                ("pack", "publication-check"),
+            }:
+                expected = str(PureWindowsPath("data", "reports", expected))
+            assert operation.declared_output_paths == (expected,)
         else:
             assert operation.declared_output_paths == ()
+
+
+def test_report_cli_declared_outputs_follow_product_reports_root(
+    tmp_path: Path,
+) -> None:
+    actual_paths = (
+        r"data\reports\outputs\test.json",
+        r"data\reports\outputs\publication.json",
+    )
+    context = _context_with_outputs(tmp_path, actual_paths)
+    rows = _valid_cli_rows(context)
+
+    for argv, expected in ((rows[7], actual_paths[0]), (rows[11], actual_paths[1])):
+        decision = command_policy.authorize_command_plan(
+            _bound_plan(*argv),
+            context=context,
+        )
+
+        operation = decision.operations[0]
+        assert operation.argv[operation.argv.index("--out") + 1] == (
+            argv[argv.index("--out") + 1][2:]
+        )
+        assert operation.declared_output_paths == (expected,)
 
 
 @pytest.mark.parametrize(
@@ -1848,8 +2034,8 @@ def test_character_cli_policy_research_cli_policy_and_optional_rows(
         tmp_path,
         (
             r"outputs\optional-export.karc",
-            r"outputs\optional-test.json",
-            r"outputs\publication-public.json",
+            r"data\reports\outputs\optional-test.json",
+            r"data\reports\outputs\publication-public.json",
             r"outputs\state-workspace.json",
         ),
     )

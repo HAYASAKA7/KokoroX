@@ -115,10 +115,7 @@ _BOUND_CONTENT_REGISTRY: dict[
     int,
     tuple[weakref.ReferenceType[BoundFileChangeContent], str],
 ] = {}
-_BOUND_DECISION_REGISTRY: dict[
-    int,
-    tuple[weakref.ReferenceType[FileChangePolicyDecision], str],
-] = {}
+_BOUND_DECISION_REGISTRY: dict[int, _RegisteredFileChangePolicyDecision] = {}
 
 
 def _reject(code: str) -> NoReturn:
@@ -535,6 +532,33 @@ def _rule_fingerprint(rule: FileChangePathRule) -> tuple[object, ...]:
     )
 
 
+def _rule_record(rule: FileChangePathRule) -> dict[str, object]:
+    if type(rule) is not FileChangePathRule:
+        _reject(FILE_CHANGE_BOUND_VALUE_INVALID)
+    try:
+        rule.__post_init__()
+        return {
+            "normalized_path": rule.normalized_path,
+            "role": rule.role,
+            "required_schema": rule.required_schema,
+            "producer_action": (
+                None
+                if rule.producer_action is None
+                else list(rule.producer_action)
+            ),
+            "consumer_actions": [
+                list(action) for action in rule.consumer_actions
+            ],
+            "result_selector": (
+                None
+                if rule.result_selector is None
+                else list(rule.result_selector)
+            ),
+        }
+    except (AttributeError, TypeError, ValueError):
+        _reject(FILE_CHANGE_BOUND_VALUE_INVALID)
+
+
 def _context_fingerprint(context: FileChangePolicyContext) -> tuple[object, ...]:
     if type(context) is not FileChangePolicyContext:
         _reject(FILE_CHANGE_POLICY_CONTEXT_INVALID)
@@ -653,6 +677,203 @@ class FileChangePolicyDecision:
             _reject(FILE_CHANGE_BOUND_VALUE_INVALID)
 
 
+@dataclass(frozen=True, repr=False)
+class _FileChangePolicyDecisionOrigin:
+    filesystem_canonical_sha256: str
+    raw_session_sha256: str
+    retained_session_sha256: str
+    workspace_relative_root: str
+    rules: tuple[FileChangePathRule, ...]
+    rule_table_sha256: str
+    canonical_sha256: str
+
+    def __post_init__(self) -> None:
+        try:
+            relative = PureWindowsPath(self.workspace_relative_root)
+            records = [_rule_record(rule) for rule in self.rules]
+            rule_table_sha256 = sha256(
+                _canonical_json_bytes({"rules": records})
+            ).hexdigest()
+            if (
+                any(
+                    not _is_sha256(value)
+                    for value in (
+                        self.filesystem_canonical_sha256,
+                        self.raw_session_sha256,
+                        self.retained_session_sha256,
+                        self.rule_table_sha256,
+                        self.canonical_sha256,
+                    )
+                )
+                or type(self.workspace_relative_root) is not str
+                or not self.workspace_relative_root
+                or relative.is_absolute()
+                or not relative.parts
+                or any(part in {"", ".", ".."} for part in relative.parts)
+                or str(PureWindowsPath(*relative.parts))
+                != self.workspace_relative_root
+                or type(self.rules) is not tuple
+                or any(type(rule) is not FileChangePathRule for rule in self.rules)
+                or self.rule_table_sha256 != rule_table_sha256
+                or sha256(
+                    _canonical_json_bytes(_origin_record(self))
+                ).hexdigest()
+                != self.canonical_sha256
+            ):
+                _reject(FILE_CHANGE_BOUND_VALUE_INVALID)
+        except RuntimeError:
+            _reject(FILE_CHANGE_BOUND_VALUE_INVALID)
+        except (AttributeError, TypeError, ValueError):
+            _reject(FILE_CHANGE_BOUND_VALUE_INVALID)
+
+    def __repr__(self) -> str:
+        return f"<{type(self).__module__}.{type(self).__qualname__}>"
+
+
+@dataclass(frozen=True, repr=False)
+class _PolicyDecisionSnapshot:
+    version: str
+    variant: str
+    case_id: str
+    changes_identity: int
+    changes: tuple[tuple[object, ...], ...]
+    contents_identity: int
+    contents: tuple[tuple[object, ...], ...]
+    implicit_paths_identity: int
+    implicit_ancestor_paths: tuple[str, ...]
+    unique_paths_identity: int
+    unique_final_paths: tuple[str, ...]
+    transition_entries: int
+    raw_content_bytes: int
+    retained_content_bytes: int
+    normalized_plan_sha256: str
+    aggregate_transition_sha256: str
+    content_inventory_sha256: str
+    canonical_sha256: str
+
+
+def _policy_decision_snapshot(
+    value: FileChangePolicyDecision,
+) -> _PolicyDecisionSnapshot:
+    try:
+        changes = value.changes
+        contents = value.contents
+        implicit_paths = value.implicit_ancestor_paths
+        unique_paths = value.unique_final_paths
+        return _PolicyDecisionSnapshot(
+            version=value.version,
+            variant=value.variant,
+            case_id=value.case_id,
+            changes_identity=id(changes),
+            changes=tuple(
+                (
+                    id(change),
+                    change.started_event_ordinal,
+                    change.completed_event_ordinal,
+                    change.event_id,
+                    change.change_ordinal,
+                    change.normalized_path,
+                    change.kind,
+                    change.role,
+                )
+                for change in changes
+            ),
+            contents_identity=id(contents),
+            contents=tuple(
+                (
+                    id(content),
+                    content.normalized_path,
+                    content.raw_size,
+                    content.raw_sha256,
+                    content.retained_size,
+                    content.retained_sha256,
+                    sha256(content.retained_bytes).hexdigest(),
+                    content.raw_document_sha256,
+                    content.retained_document_sha256,
+                    content.sanitizer_record_sha256,
+                    content.role_validation_sha256,
+                )
+                for content in contents
+            ),
+            implicit_paths_identity=id(implicit_paths),
+            implicit_ancestor_paths=tuple(implicit_paths),
+            unique_paths_identity=id(unique_paths),
+            unique_final_paths=tuple(unique_paths),
+            transition_entries=value.transition_entries,
+            raw_content_bytes=value.raw_content_bytes,
+            retained_content_bytes=value.retained_content_bytes,
+            normalized_plan_sha256=value.normalized_plan_sha256,
+            aggregate_transition_sha256=value.aggregate_transition_sha256,
+            content_inventory_sha256=value.content_inventory_sha256,
+            canonical_sha256=value.canonical_sha256,
+        )
+    except (AttributeError, TypeError, ValueError):
+        _reject(FILE_CHANGE_BOUND_VALUE_INVALID)
+
+
+@dataclass(frozen=True, repr=False)
+class _RegisteredFileChangePolicyDecision:
+    reference: weakref.ReferenceType[FileChangePolicyDecision]
+    decision_sha256: str
+    filesystem_reference: weakref.ReferenceType[BoundFilesystemEvidence]
+    filesystem_identity: int
+    filesystem_canonical_sha256: str
+    case_root: Path
+    origin: _FileChangePolicyDecisionOrigin
+    origin_rules: tuple[FileChangePathRule, ...]
+    origin_rule_identities: tuple[int, ...]
+    origin_canonical_sha256: str
+    decision_snapshot: _PolicyDecisionSnapshot
+
+
+def _origin_record(
+    value: _FileChangePolicyDecisionOrigin,
+) -> dict[str, object]:
+    try:
+        return {
+            "filesystem_canonical_sha256": value.filesystem_canonical_sha256,
+            "raw_session_sha256": value.raw_session_sha256,
+            "retained_session_sha256": value.retained_session_sha256,
+            "workspace_relative_root": value.workspace_relative_root,
+            "rules": [_rule_record(rule) for rule in value.rules],
+            "rule_table_sha256": value.rule_table_sha256,
+        }
+    except (AttributeError, TypeError, ValueError):
+        _reject(FILE_CHANGE_BOUND_VALUE_INVALID)
+
+
+def _make_policy_decision_origin(
+    *,
+    context: FileChangePolicyContext,
+    raw_session_sha256: str,
+    retained_session_sha256: str,
+) -> _FileChangePolicyDecisionOrigin:
+    rules = tuple(_detach_rule(rule) for rule in context.rules)
+    rule_table_sha256 = sha256(
+        _canonical_json_bytes({"rules": [_rule_record(rule) for rule in rules]})
+    ).hexdigest()
+    values = {
+        "filesystem_canonical_sha256": context.filesystem.canonical_sha256,
+        "raw_session_sha256": raw_session_sha256,
+        "retained_session_sha256": retained_session_sha256,
+        "workspace_relative_root": _workspace_relative_root(context),
+        "rules": rules,
+        "rule_table_sha256": rule_table_sha256,
+    }
+    canonical_sha256 = sha256(
+        _canonical_json_bytes(
+            {
+                **{name: value for name, value in values.items() if name != "rules"},
+                "rules": [_rule_record(rule) for rule in rules],
+            }
+        )
+    ).hexdigest()
+    return _FileChangePolicyDecisionOrigin(
+        **values,
+        canonical_sha256=canonical_sha256,
+    )
+
+
 def _content_record(value: BoundFileChangeContent) -> dict[str, object]:
     try:
         return {
@@ -672,9 +893,12 @@ def _content_record(value: BoundFileChangeContent) -> dict[str, object]:
 
 
 def _register_bound_value(
-    value: BoundFileChangeContent | FileChangePolicyDecision,
+    value: BoundFileChangeContent,
     *,
-    registry: dict[int, tuple[weakref.ReferenceType[Any], str]],
+    registry: dict[
+        int,
+        tuple[weakref.ReferenceType[BoundFileChangeContent], str],
+    ],
     digest: str,
 ) -> None:
     key = id(value)
@@ -690,6 +914,57 @@ def _register_bound_value(
         if key in registry:
             _reject(FILE_CHANGE_BOUND_VALUE_INVALID)
         registry[key] = (reference, digest)
+
+
+def _register_policy_decision(
+    value: FileChangePolicyDecision,
+    *,
+    digest: str,
+    filesystem: BoundFilesystemEvidence,
+    case_root: Path,
+    origin: _FileChangePolicyDecisionOrigin,
+) -> None:
+    if (
+        type(value) is not FileChangePolicyDecision
+        or not _is_sha256(digest)
+        or type(filesystem) is not BoundFilesystemEvidence
+        or not isinstance(case_root, Path)
+        or type(origin) is not _FileChangePolicyDecisionOrigin
+    ):
+        _reject(FILE_CHANGE_BOUND_VALUE_INVALID)
+    _validate_policy_decision(value)
+    origin.__post_init__()
+    _authenticate_filesystem_evidence(
+        filesystem,
+        expected_case_root=case_root,
+    )
+    key = id(value)
+
+    def cleanup(reference: weakref.ReferenceType[FileChangePolicyDecision]) -> None:
+        with _BOUND_REGISTRY_LOCK:
+            registered = _BOUND_DECISION_REGISTRY.get(key)
+            if registered is not None and registered.reference is reference:
+                del _BOUND_DECISION_REGISTRY[key]
+
+    reference = weakref.ref(value, cleanup)
+    filesystem_reference = weakref.ref(filesystem)
+    registered = _RegisteredFileChangePolicyDecision(
+        reference=reference,
+        decision_sha256=digest,
+        filesystem_reference=filesystem_reference,
+        filesystem_identity=id(filesystem),
+        filesystem_canonical_sha256=filesystem.canonical_sha256,
+        case_root=Path(str(case_root)),
+        origin=origin,
+        origin_rules=origin.rules,
+        origin_rule_identities=tuple(id(rule) for rule in origin.rules),
+        origin_canonical_sha256=origin.canonical_sha256,
+        decision_snapshot=_policy_decision_snapshot(value),
+    )
+    with _BOUND_REGISTRY_LOCK:
+        if key in _BOUND_DECISION_REGISTRY:
+            _reject(FILE_CHANGE_BOUND_VALUE_INVALID)
+        _BOUND_DECISION_REGISTRY[key] = registered
 
 
 def _authenticate_bound_content(value: BoundFileChangeContent) -> None:
@@ -1169,9 +1444,8 @@ _AUTHORING_RULES = (
             "authoring_source",
             "test-corpus" if relative.startswith("tests\\") else "character-source",
             consumers=(
-                ("pack", "validate"),
-                ("pack", "compile"),
-                ("pack", "test"),
+                ("character", "draft", "validate"),
+                ("character", "draft", "compile"),
             ),
         )
         for relative in _AUTHORING_SOURCE_RELATIVES
@@ -1223,6 +1497,7 @@ _WORKSPACE_RULES = (
         "language_policy",
         "language-policy",
         producer=("policy", "compile"),
+        consumers=(("runtime", "plan"),),
         selector=("policy",),
     ),
     _rule(
@@ -1285,6 +1560,8 @@ def _make_bound_decision(
     normalized_plan_sha256: str,
     aggregate_transition_sha256: str,
     content_inventory_sha256: str,
+    raw_session_sha256: str,
+    retained_session_sha256: str,
 ) -> FileChangePolicyDecision:
     for content in contents:
         _authenticate_bound_content(content)
@@ -1346,10 +1623,17 @@ def _make_bound_decision(
     ):
         object.__setattr__(decision, name, value)
     digest = sha256(_canonical_json_bytes(document)).hexdigest()
-    _register_bound_value(
+    origin = _make_policy_decision_origin(
+        context=context,
+        raw_session_sha256=raw_session_sha256,
+        retained_session_sha256=retained_session_sha256,
+    )
+    _register_policy_decision(
         decision,
-        registry=_BOUND_DECISION_REGISTRY,
         digest=digest,
+        filesystem=context.filesystem,
+        case_root=context.case_root,
+        origin=origin,
     )
     _authenticate_policy_decision(decision)
     return decision
@@ -1489,19 +1773,166 @@ def _validate_policy_decision(value: FileChangePolicyDecision) -> None:
         _reject(FILE_CHANGE_BOUND_VALUE_INVALID)
 
 
+def _registered_policy_decision(
+    value: FileChangePolicyDecision,
+    *,
+    digest: str,
+) -> _RegisteredFileChangePolicyDecision:
+    with _BOUND_REGISTRY_LOCK:
+        registered = _BOUND_DECISION_REGISTRY.get(id(value))
+    if (
+        registered is None
+        or type(registered) is not _RegisteredFileChangePolicyDecision
+        or registered.reference() is not value
+        or registered.decision_sha256 != digest
+        or value.canonical_sha256 != digest
+        or type(registered.filesystem_identity) is not int
+        or registered.filesystem_identity <= 0
+        or not _is_sha256(registered.filesystem_canonical_sha256)
+        or not isinstance(registered.case_root, Path)
+        or type(registered.origin) is not _FileChangePolicyDecisionOrigin
+        or registered.origin.rules is not registered.origin_rules
+        or tuple(id(rule) for rule in registered.origin.rules)
+        != registered.origin_rule_identities
+        or registered.origin_canonical_sha256
+        != registered.origin.canonical_sha256
+        or registered.origin.filesystem_canonical_sha256
+        != registered.filesystem_canonical_sha256
+        or registered.decision_snapshot != _policy_decision_snapshot(value)
+    ):
+        _reject(FILE_CHANGE_BOUND_VALUE_INVALID)
+    registered.origin.__post_init__()
+    try:
+        expected_rules = _file_change_rules_for_case(
+            value.case_id,
+            variant=value.variant,
+        )
+    except RuntimeError:
+        _reject(FILE_CHANGE_BOUND_VALUE_INVALID)
+    if registered.origin.rules != expected_rules:
+        _reject(FILE_CHANGE_BOUND_VALUE_INVALID)
+    with _BOUND_REGISTRY_LOCK:
+        if _BOUND_DECISION_REGISTRY.get(id(value)) is not registered:
+            _reject(FILE_CHANGE_BOUND_VALUE_INVALID)
+    return registered
+
+
 def _authenticate_policy_decision(value: FileChangePolicyDecision) -> None:
     _validate_policy_decision(value)
     document = _decision_record(value)
     digest = sha256(_canonical_json_bytes(document)).hexdigest()
+    _registered_policy_decision(value, digest=digest)
+
+
+def _authenticated_policy_decision_origin(
+    value: FileChangePolicyDecision,
+    *,
+    filesystem: BoundFilesystemEvidence,
+) -> _FileChangePolicyDecisionOrigin:
+    _authenticate_policy_decision(value)
+    digest = sha256(
+        _canonical_json_bytes(_decision_record(value))
+    ).hexdigest()
+    registered = _registered_policy_decision(value, digest=digest)
+    if (
+        type(filesystem) is not BoundFilesystemEvidence
+        or registered.filesystem_reference() is not filesystem
+        or registered.filesystem_identity != id(filesystem)
+        or registered.filesystem_canonical_sha256
+        != filesystem.canonical_sha256
+    ):
+        _reject(FILE_CHANGE_BOUND_VALUE_INVALID)
+    try:
+        _authenticate_filesystem_evidence(
+            filesystem,
+            expected_case_root=registered.case_root,
+        )
+    except RuntimeError:
+        _reject(FILE_CHANGE_BOUND_VALUE_INVALID)
+    _authenticate_policy_decision(value)
+    current = _registered_policy_decision(value, digest=digest)
+    if (
+        current is not registered
+        or current.filesystem_reference() is not filesystem
+        or current.filesystem_identity != id(filesystem)
+        or current.filesystem_canonical_sha256
+        != filesystem.canonical_sha256
+        or current.origin is not registered.origin
+    ):
+        _reject(FILE_CHANGE_BOUND_VALUE_INVALID)
+    return registered.origin
+
+
+def _policy_decision_failure_class(
+    value: FileChangePolicyDecision,
+    *,
+    filesystem: BoundFilesystemEvidence,
+) -> Literal["lifecycle", "raw_retained", "policy", "path", "content"]:
+    """Classify drift from the exact registered decision without echoing data."""
+
+    if type(value) is not FileChangePolicyDecision:
+        return "policy"
     with _BOUND_REGISTRY_LOCK:
         registered = _BOUND_DECISION_REGISTRY.get(id(value))
-        if (
-            registered is None
-            or registered[0]() is not value
-            or registered[1] != digest
-            or value.canonical_sha256 != digest
-        ):
-            _reject(FILE_CHANGE_BOUND_VALUE_INVALID)
+    if (
+        registered is None
+        or type(registered) is not _RegisteredFileChangePolicyDecision
+        or registered.reference() is not value
+    ):
+        return "policy"
+    if (
+        type(filesystem) is not BoundFilesystemEvidence
+        or registered.filesystem_reference() is not filesystem
+        or registered.filesystem_identity != id(filesystem)
+        or registered.filesystem_canonical_sha256
+        != getattr(filesystem, "canonical_sha256", None)
+    ):
+        return "path"
+    try:
+        current = _policy_decision_snapshot(value)
+    except RuntimeError:
+        return "policy"
+    expected = registered.decision_snapshot
+    if (
+        current.changes_identity != expected.changes_identity
+        or len(current.changes) != len(expected.changes)
+    ):
+        return "lifecycle"
+    for observed, retained in zip(
+        current.changes,
+        expected.changes,
+        strict=True,
+    ):
+        if observed[:5] != retained[:5] or observed[6] != retained[6]:
+            return "lifecycle"
+        if observed[5] != retained[5]:
+            return "raw_retained"
+        if observed[7] != retained[7]:
+            return "policy"
+    if (
+        current.contents_identity != expected.contents_identity
+        or current.contents != expected.contents
+        or current.raw_content_bytes != expected.raw_content_bytes
+        or current.retained_content_bytes != expected.retained_content_bytes
+        or current.content_inventory_sha256
+        != expected.content_inventory_sha256
+    ):
+        return "content"
+    if current.transition_entries != expected.transition_entries:
+        return "lifecycle"
+    if current.normalized_plan_sha256 != expected.normalized_plan_sha256:
+        return "raw_retained"
+    if (
+        current.implicit_paths_identity != expected.implicit_paths_identity
+        or current.implicit_ancestor_paths
+        != expected.implicit_ancestor_paths
+        or current.unique_paths_identity != expected.unique_paths_identity
+        or current.unique_final_paths != expected.unique_final_paths
+        or current.aggregate_transition_sha256
+        != expected.aggregate_transition_sha256
+    ):
+        return "path"
+    return "policy"
 
 
 def _bindings_for_sources(
@@ -2721,9 +3152,10 @@ def _bind_transitions(
     actual_changed = set(snapshot_indexes.changed_paths)
     actual_removed = set(snapshot_indexes.removed_paths)
     if (
-        actual_created != expected_created
-        or actual_changed != expected_changed
-        or actual_removed
+        not expected_created <= actual_created
+        or not expected_changed <= actual_changed
+        or expected_created & (actual_changed | actual_removed)
+        or expected_changed & (actual_created | actual_removed)
         or actual_created & actual_changed
         or actual_created & actual_removed
         or actual_changed & actual_removed
@@ -3720,4 +4152,6 @@ def authorize_file_change_events(
         normalized_plan_sha256=normalized_plan_sha256,
         aggregate_transition_sha256=aggregate_sha256,
         content_inventory_sha256=inventory_sha256,
+        raw_session_sha256=sha256(raw_session_bytes).hexdigest(),
+        retained_session_sha256=sha256(retained_session_bytes).hexdigest(),
     )

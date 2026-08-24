@@ -808,6 +808,38 @@ def test_case_policy_rule_values_are_exact_and_symmetric_across_variants() -> No
     ) == ()
 
 
+def test_authoring_source_rules_follow_the_real_directory_consumers() -> None:
+    policy = _policy()
+    rules = policy._file_change_rules_for_case(
+        "original-authoring-route",
+        variant="baseline",
+    )
+
+    source_rules = tuple(rule for rule in rules if rule.role == "authoring_source")
+
+    assert len(source_rules) == 16
+    assert {
+        rule.consumer_actions for rule in source_rules
+    } == {
+        (
+            ("character", "draft", "validate"),
+            ("character", "draft", "compile"),
+        )
+    }
+
+
+def test_language_policy_rule_is_consumed_by_exact_runtime_plan_action() -> None:
+    policy = _policy()
+    rules = policy._file_change_rules_for_case(
+        "workspace-override-explicit-activation",
+        variant="baseline",
+    )
+    language_policy = next(rule for rule in rules if rule.role == "language_policy")
+    assert language_policy.producer_action == ("policy", "compile")
+    assert language_policy.consumer_actions == (("runtime", "plan"),)
+    assert language_policy.result_selector == ("policy",)
+
+
 def test_zero_event_authorization_returns_factory_decision_without_content(
     tmp_path: Path,
 ) -> None:
@@ -2573,15 +2605,29 @@ def test_transition_rejects_absent_final_physical_source(tmp_path: Path) -> None
         )
 
 
-def test_transition_rejects_extra_delta_missing_source_and_identity_drift(tmp_path: Path) -> None:
+def test_transition_retains_extra_delta_for_authenticated_run_partition(
+    tmp_path: Path,
+) -> None:
     policy, context, source, session, _target = _authorized_setup(
         tmp_path / "extra",
         extra_created=(r"workspace\data\extra.json",),
     )
-    with pytest.raises(RuntimeError, match="FILE_CHANGE_TRANSITION_INVALID"):
-        policy.authorize_file_change_events(
-            session, session, (source,), context=context
-        )
+    decision = policy.authorize_file_change_events(
+        session, session, (source,), context=context
+    )
+
+    assert decision.unique_final_paths == (
+        r"<workspace>\data\authoring\mika-moongear\request.json",
+    )
+    assert context.filesystem.created_paths == (
+        r"workspace\data\authoring\mika-moongear\request.json",
+        r"workspace\data\extra.json",
+    )
+    origin = policy._authenticated_policy_decision_origin(
+        decision,
+        filesystem=context.filesystem,
+    )
+    assert origin.filesystem_canonical_sha256 == context.filesystem.canonical_sha256
 
 
 def test_forged_filesystem_evidence_rejects_at_context_and_authorizer(
@@ -3358,6 +3404,151 @@ def test_bound_decision_and_content_are_immutable_and_detached(tmp_path: Path) -
         decision.case_id = "mutated"
     with pytest.raises(FrozenInstanceError):
         decision.contents[0].retained_bytes = b"mutated"
+
+
+def test_policy_decision_origin_binds_sessions_filesystem_root_and_detached_rules(
+    tmp_path: Path,
+) -> None:
+    policy, context, source, retained_session, _target = _authorized_setup(tmp_path)
+    raw_session = retained_session.replace(b'":', b'": ')
+    assert raw_session != retained_session
+    decision = policy.authorize_file_change_events(
+        raw_session,
+        retained_session,
+        (source,),
+        context=context,
+    )
+
+    origin = policy._authenticated_policy_decision_origin(
+        decision,
+        filesystem=context.filesystem,
+    )
+
+    assert origin.filesystem_canonical_sha256 == context.filesystem.canonical_sha256
+    assert origin.raw_session_sha256 == sha256(raw_session).hexdigest()
+    assert origin.retained_session_sha256 == sha256(retained_session).hexdigest()
+    assert origin.workspace_relative_root == "workspace"
+    assert origin.rules == context.rules
+    assert origin.rules is not context.rules
+    assert all(
+        detached is not original
+        for detached, original in zip(origin.rules, context.rules, strict=True)
+    )
+    assert len(origin.rule_table_sha256) == 64
+    assert len(origin.canonical_sha256) == 64
+    assert repr(origin) == (
+        "<complete_suite_file_change_policy."
+        "_FileChangePolicyDecisionOrigin>"
+    )
+    with pytest.raises(FrozenInstanceError):
+        origin.workspace_relative_root = "other"
+
+
+def test_policy_decision_origin_rejects_same_valued_and_swapped_filesystems(
+    tmp_path: Path,
+) -> None:
+    policy, context, source, session, _target = _authorized_setup(
+        tmp_path / "original"
+    )
+    decision = policy.authorize_file_change_events(
+        session,
+        session,
+        (source,),
+        context=context,
+    )
+    same_valued_replacement = replace(context.filesystem)
+    assert same_valued_replacement == context.filesystem
+    assert same_valued_replacement is not context.filesystem
+    with pytest.raises(RuntimeError, match="FILE_CHANGE_BOUND_VALUE_INVALID"):
+        policy._authenticated_policy_decision_origin(
+            decision,
+            filesystem=same_valued_replacement,
+        )
+
+    _other_policy, other_context, _other_source, _other_session, _other_target = (
+        _authorized_setup(tmp_path / "other")
+    )
+    with pytest.raises(RuntimeError, match="FILE_CHANGE_BOUND_VALUE_INVALID"):
+        policy._authenticated_policy_decision_origin(
+            decision,
+            filesystem=other_context.filesystem,
+        )
+
+
+def test_policy_decision_origin_is_registry_authenticated_and_non_echoing(
+    tmp_path: Path,
+) -> None:
+    marker = "SYNTHETIC-PRIVATE-SESSION-MARKER"
+    policy, context, source, session, _target = _authorized_setup(tmp_path)
+    marked_session = _jsonl(
+        [
+            {
+                "type": "item.completed",
+                "item": {
+                    "id": "m-origin",
+                    "type": "agent_message",
+                    "text": marker,
+                },
+            },
+            *_paired_events(
+                [{"path": str(_target), "kind": "add"}],
+            ),
+        ]
+    )
+    decision = policy.authorize_file_change_events(
+        marked_session,
+        marked_session,
+        (source,),
+        context=context,
+    )
+    origin = policy._authenticated_policy_decision_origin(
+        decision,
+        filesystem=context.filesystem,
+    )
+    assert marker not in repr(origin)
+    assert marker not in str(origin)
+    assert all(type(value) is not bytes for value in vars(origin).values())
+
+    object.__setattr__(origin, "raw_session_sha256", ZERO_SHA256)
+    with pytest.raises(RuntimeError, match="FILE_CHANGE_BOUND_VALUE_INVALID"):
+        policy._authenticated_policy_decision_origin(
+            decision,
+            filesystem=context.filesystem,
+        )
+
+
+@pytest.mark.parametrize("replacement_kind", ("tuple", "rules"))
+def test_policy_decision_origin_rejects_same_valued_rule_table_substitution(
+    tmp_path: Path,
+    replacement_kind: str,
+) -> None:
+    policy, context, source, session, _target = _authorized_setup(
+        tmp_path / replacement_kind
+    )
+    decision = policy.authorize_file_change_events(
+        session,
+        session,
+        (source,),
+        context=context,
+    )
+    origin = policy._authenticated_policy_decision_origin(
+        decision,
+        filesystem=context.filesystem,
+    )
+    replacement_rules = (
+        tuple([*origin.rules])
+        if replacement_kind == "tuple"
+        else tuple(replace(rule) for rule in origin.rules)
+    )
+    assert replacement_rules == origin.rules
+    assert replacement_rules is not origin.rules
+    object.__setattr__(origin, "rules", replacement_rules)
+
+    with pytest.raises(RuntimeError, match="FILE_CHANGE_BOUND_VALUE_INVALID"):
+        policy._authenticated_policy_decision_origin(
+            decision,
+            filesystem=context.filesystem,
+        )
 
 
 def test_populated_direct_policy_decision_forge_is_not_authenticated(

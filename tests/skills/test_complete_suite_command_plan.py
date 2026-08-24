@@ -1437,6 +1437,138 @@ def test_campaign6_command_provenance_requires_exact_version() -> None:
     ) == COMMAND_PLAN_PROVENANCE
 
 
+def test_provenance_v1_api_surface_is_exact() -> None:
+    import complete_suite_adjudication as adjudication
+
+    expected_fields = {
+        adjudication.AdjudicationCommandRecord: (
+            "provenance_version",
+            "command_index",
+            "event_id",
+            "started_event_ordinal",
+            "completed_event_ordinal",
+            "plan_sha256",
+            "operation_index",
+            "argv",
+            "exit_code",
+            "outcome",
+            "result_bytes",
+            "raw_result_sha256",
+            "retained_result_sha256",
+        ),
+        adjudication.ResolvedFileChangeOperationBinding: (
+            "normalized_path",
+            "role",
+            "last_change_completed_ordinal",
+            "producer_command_index",
+            "producer_operation_index",
+            "consumer_command_indices",
+            "consumer_operation_indices",
+            "raw_selected_value_sha256",
+            "retained_selected_value_sha256",
+            "canonical_sha256",
+        ),
+        adjudication.BehavioralFilesystemView: (
+            "full_created_paths",
+            "full_changed_paths",
+            "full_removed_paths",
+            "agent_working_files",
+            "implicit_working_directories",
+            "product_support_paths",
+            "semantic_created_paths",
+            "canonical_sha256",
+        ),
+        adjudication.IntegrityApprovedRunEvidence: (
+            "version",
+            "provenance",
+            "report_sha256",
+            "commands",
+            "file_changes_sha256",
+            "operation_bindings",
+            "command_records",
+            "filesystem_view",
+            "canonical_bytes",
+            "canonical_sha256",
+        ),
+    }
+    for model, expected in expected_fields.items():
+        assert tuple(field.name for field in fields(model)) == expected
+        assert model.__dataclass_params__.frozen is True
+    assert adjudication.IntegrityApprovedRunEvidence.__dataclass_params__.repr is False
+
+    records_signature = inspect.signature(adjudication.command_records_for_run)
+    assert tuple(records_signature.parameters) == (
+        "report_bytes",
+        "expected_report_sha256",
+        "provenance",
+        "operation_evidence",
+    )
+    assert records_signature.parameters["report_bytes"].kind is inspect.Parameter.POSITIONAL_OR_KEYWORD
+    assert all(
+        parameter.kind is inspect.Parameter.KEYWORD_ONLY
+        for parameter in tuple(records_signature.parameters.values())[1:]
+    )
+    binding_signature = inspect.signature(adjudication.bind_run_operation_evidence)
+    assert tuple(binding_signature.parameters) == (
+        "provenance",
+        "report_bytes",
+        "expected_report_sha256",
+        "case_id",
+        "filesystem",
+        "commands",
+        "file_changes",
+    )
+    assert all(
+        parameter.kind is inspect.Parameter.KEYWORD_ONLY
+        for parameter in binding_signature.parameters.values()
+    )
+    assert {
+        "AdjudicationCommandRecord",
+        "ResolvedFileChangeOperationBinding",
+        "BehavioralFilesystemView",
+        "IntegrityApprovedRunEvidence",
+        "bind_run_operation_evidence",
+        "command_records_for_run",
+    } <= set(adjudication.__all__)
+
+
+def test_provenance_v1_failure_code_enum_is_closed() -> None:
+    from complete_suite_adjudication import PROVENANCE_V1_FAILURE_CODES
+
+    assert PROVENANCE_V1_FAILURE_CODES == frozenset(
+        {
+            "COMMAND_WRAPPER_INVALID",
+            "COMMAND_WRAPPER_IDENTITY_MISMATCH",
+            "COMMAND_PAYLOAD_LIMIT_EXCEEDED",
+            "COMMAND_EVENT_LIFECYCLE_INVALID",
+            "COMMAND_EVENT_PAIR_MISMATCH",
+            "FILE_CHANGE_EVENT_LIFECYCLE_INVALID",
+            "FILE_CHANGE_RAW_RETAINED_MISMATCH",
+            "FILE_CHANGE_POLICY_DENIED",
+            "FILE_CHANGE_PATH_UNSAFE",
+            "FILE_CHANGE_CONTENT_INVALID",
+            "FILE_CHANGE_OPERATION_BINDING_INVALID",
+            "FILE_CHANGE_PROJECTION_INVALID",
+            "COMMAND_DECODER_IDENTITY_MISMATCH",
+            "COMMAND_DECODER_PARSE_INVALID",
+            "COMMAND_DECODER_LIMIT_EXCEEDED",
+            "COMMAND_PLAN_SCHEMA_INVALID",
+            "COMMAND_PLAN_CANONICAL_INVALID",
+            "COMMAND_PLAN_RAW_RETAINED_MISMATCH",
+            "COMMAND_POLICY_DENIED",
+            "COMMAND_PATH_UNSAFE",
+            "COMMAND_CAPTURE_INVALID",
+            "COMMAND_OUTPUT_LIMIT_EXCEEDED",
+            "COMMAND_JSON_INVALID",
+            "COMMAND_JSON_COUNT_MISMATCH",
+            "COMMAND_RESULT_INCONSISTENT",
+            "COMMAND_ARTIFACT_BINDING_INVALID",
+            "COMMAND_CONFINEMENT_INVALID",
+            "COMMAND_FINAL_BINDING_INVALID",
+        }
+    )
+
+
 @pytest.mark.parametrize(
     "value",
     [None, "", "powershell-command-plan-v0", "powershell-command-plan-v2", 1],
