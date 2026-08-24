@@ -116,6 +116,14 @@ _BOUND_CONTENT_REGISTRY: dict[
     tuple[weakref.ReferenceType[BoundFileChangeContent], str],
 ] = {}
 _BOUND_DECISION_REGISTRY: dict[int, _RegisteredFileChangePolicyDecision] = {}
+_DECODED_PLAN_REGISTRY: dict[
+    int,
+    tuple[
+        weakref.ReferenceType[DecodedFileChangePlan],
+        tuple[object, ...],
+        str,
+    ],
+] = {}
 
 
 def _reject(code: str) -> NoReturn:
@@ -682,6 +690,7 @@ class _FileChangePolicyDecisionOrigin:
     filesystem_canonical_sha256: str
     raw_session_sha256: str
     retained_session_sha256: str
+    sanitizer_ledger_sha256: str
     workspace_relative_root: str
     rules: tuple[FileChangePathRule, ...]
     rule_table_sha256: str
@@ -701,6 +710,7 @@ class _FileChangePolicyDecisionOrigin:
                         self.filesystem_canonical_sha256,
                         self.raw_session_sha256,
                         self.retained_session_sha256,
+                        self.sanitizer_ledger_sha256,
                         self.rule_table_sha256,
                         self.canonical_sha256,
                     )
@@ -834,6 +844,7 @@ def _origin_record(
             "filesystem_canonical_sha256": value.filesystem_canonical_sha256,
             "raw_session_sha256": value.raw_session_sha256,
             "retained_session_sha256": value.retained_session_sha256,
+            "sanitizer_ledger_sha256": value.sanitizer_ledger_sha256,
             "workspace_relative_root": value.workspace_relative_root,
             "rules": [_rule_record(rule) for rule in value.rules],
             "rule_table_sha256": value.rule_table_sha256,
@@ -856,6 +867,7 @@ def _make_policy_decision_origin(
         "filesystem_canonical_sha256": context.filesystem.canonical_sha256,
         "raw_session_sha256": raw_session_sha256,
         "retained_session_sha256": retained_session_sha256,
+        "sanitizer_ledger_sha256": context.sanitizer_ledger_sha256,
         "workspace_relative_root": _workspace_relative_root(context),
         "rules": rules,
         "rule_table_sha256": rule_table_sha256,
@@ -1247,6 +1259,132 @@ def _change_record(change: DecodedFileChange) -> dict[str, object]:
     }
 
 
+def _decoded_file_change_plan_documents(
+    value: DecodedFileChangePlan,
+) -> tuple[dict[str, object], dict[str, object]]:
+    try:
+        value.__post_init__()
+        for change in value.changes:
+            change.__post_init__()
+        topology = {
+            "version": _PLAN_VERSION,
+            "lifecycles": value.lifecycles,
+            "transition_entries": value.transition_entries,
+            "changes": [
+                {
+                    "lifecycle_index": change.lifecycle_index,
+                    "event_id": change.event_id,
+                    "started_event_ordinal": change.started_event_ordinal,
+                    "completed_event_ordinal": change.completed_event_ordinal,
+                    "change_ordinal": change.change_ordinal,
+                    "normalized_path": change.normalized_path,
+                    "kind": change.kind,
+                }
+                for change in value.changes
+            ],
+        }
+        canonical = {
+            **topology,
+            "domain": value.domain,
+            "topology_sha256": value.topology_sha256,
+            "changes": [_change_record(change) for change in value.changes],
+        }
+    except (AttributeError, TypeError, ValueError):
+        _reject(FILE_CHANGE_SESSION_INVALID)
+    if (
+        sha256(_canonical_json_bytes(topology)).hexdigest()
+        != value.topology_sha256
+        or sha256(_canonical_json_bytes(canonical)).hexdigest()
+        != value.canonical_sha256
+    ):
+        _reject(FILE_CHANGE_SESSION_INVALID)
+    return topology, canonical
+
+
+def _decoded_file_change_plan_snapshot(
+    value: DecodedFileChangePlan,
+) -> tuple[object, ...]:
+    _topology, canonical = _decoded_file_change_plan_documents(value)
+    return (
+        value.domain,
+        value.lifecycles,
+        value.transition_entries,
+        tuple(
+            (
+                change.lifecycle_index,
+                change.event_id,
+                change.started_event_ordinal,
+                change.completed_event_ordinal,
+                change.change_ordinal,
+                change.path,
+                change.normalized_path,
+                change.kind,
+                change.started_sha256,
+                change.completed_sha256,
+            )
+            for change in value.changes
+        ),
+        value.topology_sha256,
+        value.canonical_sha256,
+        sha256(_canonical_json_bytes(canonical)).hexdigest(),
+    )
+
+
+def _register_decoded_file_change_plan(
+    value: DecodedFileChangePlan,
+    *,
+    session_sha256: str,
+) -> None:
+    if not _is_sha256(session_sha256):
+        _reject(FILE_CHANGE_SESSION_INVALID)
+    snapshot = _decoded_file_change_plan_snapshot(value)
+    key = id(value)
+
+    def cleanup(reference: weakref.ReferenceType[DecodedFileChangePlan]) -> None:
+        with _BOUND_REGISTRY_LOCK:
+            registered = _DECODED_PLAN_REGISTRY.get(key)
+            if registered is not None and registered[0] is reference:
+                del _DECODED_PLAN_REGISTRY[key]
+
+    reference = weakref.ref(value, cleanup)
+    with _BOUND_REGISTRY_LOCK:
+        if key in _DECODED_PLAN_REGISTRY:
+            _reject(FILE_CHANGE_SESSION_INVALID)
+        _DECODED_PLAN_REGISTRY[key] = (
+            reference,
+            snapshot,
+            session_sha256,
+        )
+
+
+def _authenticate_decoded_file_change_plan(
+    value: DecodedFileChangePlan,
+    *,
+    expected_domain: Literal["raw", "retained", "preflight"],
+    expected_session_sha256: str,
+) -> None:
+    if (
+        type(value) is not DecodedFileChangePlan
+        or expected_domain not in {"raw", "retained", "preflight"}
+        or not _is_sha256(expected_session_sha256)
+    ):
+        _reject(FILE_CHANGE_SESSION_INVALID)
+    snapshot = _decoded_file_change_plan_snapshot(value)
+    with _BOUND_REGISTRY_LOCK:
+        registered = _DECODED_PLAN_REGISTRY.get(id(value))
+    if (
+        registered is None
+        or registered[0]() is not value
+        or registered[1] != snapshot
+        or registered[2] != expected_session_sha256
+        or value.domain != expected_domain
+    ):
+        _reject(FILE_CHANGE_SESSION_INVALID)
+    with _BOUND_REGISTRY_LOCK:
+        if _DECODED_PLAN_REGISTRY.get(id(value)) is not registered:
+            _reject(FILE_CHANGE_SESSION_INVALID)
+
+
 def decode_file_change_lifecycles(
     session_bytes: bytes,
     *,
@@ -1379,7 +1517,7 @@ def decode_file_change_lifecycles(
         "topology_sha256": topology_sha256,
         "changes": [_change_record(change) for change in frozen],
     }
-    return DecodedFileChangePlan(
+    result = DecodedFileChangePlan(
         domain=domain,
         lifecycles=lifecycle_count,
         transition_entries=transition_entries,
@@ -1387,6 +1525,16 @@ def decode_file_change_lifecycles(
         topology_sha256=topology_sha256,
         canonical_sha256=sha256(_canonical_json_bytes(canonical_document)).hexdigest(),
     )
+    _register_decoded_file_change_plan(
+        result,
+        session_sha256=sha256(session_bytes).hexdigest(),
+    )
+    _authenticate_decoded_file_change_plan(
+        result,
+        expected_domain=domain,
+        expected_session_sha256=sha256(session_bytes).hexdigest(),
+    )
+    return result
 
 
 def _rule(
@@ -3200,6 +3348,63 @@ _SANITIZER_RECORD_FIELDS = {
     "redaction_count",
     "redaction_classes",
 }
+
+
+def validate_retained_file_change_ledger_bytes(
+    payload: bytes,
+    *,
+    expected_sha256: str,
+) -> dict[str, Any]:
+    """Validate the detached retained-ledger schema branch and canonical bytes."""
+
+    if (
+        type(payload) is not bytes
+        or not payload.endswith(b"\n")
+        or b"\r" in payload
+        or len(payload) > 64 * 1024 * 1024
+        or not _is_sha256(expected_sha256)
+        or sha256(payload).hexdigest() != expected_sha256
+    ):
+        _reject(FILE_CHANGE_BOUND_VALUE_INVALID)
+    document = _decode_canonical_json_file(
+        payload[:-1],
+        code=FILE_CHANGE_BOUND_VALUE_INVALID,
+    )
+    try:
+        schema_bytes = _LEDGER_SCHEMA_PATH.read_bytes()
+        if len(schema_bytes) > 1024 * 1024:
+            _reject(FILE_CHANGE_BOUND_VALUE_INVALID)
+        schema = json.loads(schema_bytes.decode("utf-8", errors="strict"))
+        branch = {
+            "$schema": schema["$schema"],
+            "$defs": schema["$defs"],
+            "$ref": "#/$defs/retainedFileChangeLedger",
+        }
+        Draft202012Validator.check_schema(branch)
+        errors = tuple(Draft202012Validator(branch).iter_errors(document))
+    except RuntimeError:
+        raise
+    except (
+        KeyError,
+        OSError,
+        UnicodeError,
+        json.JSONDecodeError,
+        TypeError,
+        ValueError,
+    ):
+        _reject(FILE_CHANGE_BOUND_VALUE_INVALID)
+    if errors:
+        _reject(FILE_CHANGE_BOUND_VALUE_INVALID)
+    _enforce_semantic_bounds(
+        document,
+        max_nodes=262_144,
+        max_members=4096,
+        max_scalar_chars=33_554_432,
+    )
+    return _decode_canonical_json_file(
+        bytes(payload[:-1]),
+        code=FILE_CHANGE_BOUND_VALUE_INVALID,
+    )
 
 
 def _load_sanitizer_membership(

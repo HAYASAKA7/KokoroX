@@ -144,7 +144,7 @@ def _unique_pairs(pairs: list[tuple[str, object]]) -> dict[str, object]:
 def test_closed_ledger_schema_contract() -> None:
     schema = json.loads(SCHEMA.read_bytes(), object_pairs_hook=_unique_pairs)
     Draft202012Validator.check_schema(schema)
-    assert schema == {
+    assert {name: value for name, value in schema.items() if name != "$defs"} == {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "$id": (
             "https://kokoroarc.local/schemas/"
@@ -164,37 +164,78 @@ def test_closed_ledger_schema_contract() -> None:
                 "items": {"$ref": "#/$defs/record"},
             },
         },
-        "$defs": {
-            "sha256": {
-                "type": "string",
-                "pattern": "^[0-9a-f]{64}$",
-            },
-            "boundedPath": {
-                "type": "string",
-                "minLength": 1,
-                "maxLength": 4096,
-                "pattern": "^[^\\u0000\\r\\n]+$",
-            },
-            "record": {
-                "type": "object",
-                "additionalProperties": False,
-                "required": [
-                    "normalized_path",
-                    "sanitizer_record_path",
-                    "sanitizer_record_sha256",
-                ],
-                "properties": {
-                    "normalized_path": {"$ref": "#/$defs/boundedPath"},
-                    "sanitizer_record_path": {
-                        "$ref": "#/$defs/boundedPath"
-                    },
-                    "sanitizer_record_sha256": {
-                        "$ref": "#/$defs/sha256"
-                    },
-                },
+    }
+    assert {name: schema["$defs"][name] for name in ("sha256", "boundedPath", "record")} == {
+        "sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$",
+        },
+        "boundedPath": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096,
+            "pattern": "^[^\\u0000\\r\\n]+$",
+        },
+        "record": {
+            "type": "object",
+            "additionalProperties": False,
+            "required": [
+                "normalized_path",
+                "sanitizer_record_path",
+                "sanitizer_record_sha256",
+            ],
+            "properties": {
+                "normalized_path": {"$ref": "#/$defs/boundedPath"},
+                "sanitizer_record_path": {"$ref": "#/$defs/boundedPath"},
+                "sanitizer_record_sha256": {"$ref": "#/$defs/sha256"},
             },
         },
     }
+    assert set(schema["$defs"]) == {
+        "sha256",
+        "boundedPath",
+        "record",
+        "nonNegativeInteger",
+        "boundedIdentifier",
+        "filesystemIdentity",
+        "sessionIdentity",
+        "snapshotEntry",
+        "snapshotRoot",
+        "filesystemEvidenceRecord",
+        "filesystemEvidenceWrapper",
+        "decisionChange",
+        "decisionContent",
+        "decisionRecord",
+        "decisionWrapper",
+        "pathsBinding",
+        "deltaPartition",
+        "aggregateTransition",
+        "retainedCounts",
+        "postState",
+        "retainedContent",
+        "operationBindingRecord",
+        "operationBindingWrapper",
+        "filesystemViewRecord",
+        "filesystemViewWrapper",
+        "adjudicationCommandRecord",
+        "integrityOperationBinding",
+        "integrityFilesystemView",
+        "integrityRecord",
+        "integrityWrapper",
+        "filePlanChange",
+        "filePlanDomain",
+        "filePlanRecord",
+        "entrySource",
+        "entryPolicy",
+        "entryCounts",
+        "retainedFileChangeLedgerEntry",
+        "retainedEvidencePaths",
+        "retainedFileChangeLedger",
+    }
+    for definition in schema["$defs"].values():
+        if definition.get("type") == "object":
+            assert definition["additionalProperties"] is False
+            assert set(definition["required"]) == set(definition["properties"])
 
 
 def test_policy_model_has_exact_immutable_public_shape() -> None:

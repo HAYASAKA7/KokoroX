@@ -301,6 +301,7 @@ def _import_command_run(
     generated_directories: tuple[str, ...] = (),
     completed_statuses: Mapping[int, str] | None = None,
     completed_metadata: Mapping[int, Mapping[str, Any]] | None = None,
+    operation_artifacts: Mapping[str, bytes] | None = None,
 ) -> tuple[Path, Path, dict[str, Any]]:
     import run_complete_suite_campaign as runner
     from import_complete_suite_campaign import retain_run_evidence
@@ -448,9 +449,18 @@ def _import_command_run(
         host_environment={"SYSTEMROOT": r"C:\Windows"},
         popen_factory=RecordedProcess,
     )
+    if operation_artifacts is not None:
+        raw_root = case_root / "raw"
+        for name, payload in operation_artifacts.items():
+            (raw_root / name).write_bytes(payload)
     retained_run = root / "retained" / variant / case_id
     retained_run.mkdir(parents=True)
-    ledger = retain_run_evidence(case_root, retained_run, item)
+    ledger = retain_run_evidence(
+        case_root,
+        retained_run,
+        item,
+        operation_artifacts=operation_artifacts,
+    )
     return case_root, retained_run, ledger
 
 
@@ -509,6 +519,589 @@ def _registered_provenance_v1_bundle(tmp_path: Path):
         file_changes=file_changes,
     )
     return adjudication, report_bytes, report_sha256, bundle
+
+
+def _task8_bound_operation_inputs(tmp_path: Path) -> dict[str, object]:
+    import complete_suite_adjudication as adjudication
+    import complete_suite_cli_binding as cli_binding
+    import complete_suite_file_change_policy as file_policy
+    import run_complete_suite_campaign as runner
+    from test_complete_suite_cli_binding import (
+        _bind,
+        _make_case,
+        _operational_spec,
+        _pack_list_document,
+    )
+
+    bound_case = _make_case(
+        cli_binding,
+        tmp_path / "session",
+        (_operational_spec((_pack_list_document(),)),),
+    )
+    filesystem, file_changes = _empty_file_change_evidence_for_session(
+        tmp_path / "origin",
+        bound_case,
+        case_id="archive-overwrite-pressure",
+    )
+    _bind_case_command_filesystem(bound_case, filesystem)
+    commands = _bind(cli_binding, bound_case)
+    root_bindings = (
+        file_policy.FileChangeRootBinding(
+            token="<workspace>",
+            literal_root=r"C:\synthetic\workspace",
+        ),
+    )
+    raw_plan = file_policy.decode_file_change_lifecycles(
+        bound_case.raw_path.read_bytes(),
+        domain="raw",
+        root_bindings=root_bindings,
+    )
+    retained_plan = file_policy.decode_file_change_lifecycles(
+        bound_case.retained_path.read_bytes(),
+        domain="retained",
+        root_bindings=root_bindings,
+    )
+    report_bytes = runner.canonical_bytes(
+        {
+            "case_id": "archive-overwrite-pressure",
+            "session_id": commands.session_id,
+        }
+    )
+    report_sha256 = sha256(report_bytes).hexdigest()
+    integrity = adjudication.bind_run_operation_evidence(
+        provenance=adjudication.COMMAND_PLAN_PROVENANCE_VERSION,
+        report_bytes=report_bytes,
+        expected_report_sha256=report_sha256,
+        case_id="archive-overwrite-pressure",
+        filesystem=filesystem,
+        commands=commands,
+        file_changes=file_changes,
+    )
+    return {
+        "variant": "baseline",
+        "case_id": "archive-overwrite-pressure",
+        "command_captures": bound_case.commands,
+        "filesystem": filesystem,
+        "session_evidence": commands,
+        "raw_file_change_plan": raw_plan,
+        "retained_file_change_plan": retained_plan,
+        "file_changes": file_changes,
+        "integrity_evidence": integrity,
+    }
+
+
+def _task8_nonempty_operation_inputs(tmp_path: Path) -> dict[str, object]:
+    import complete_suite_adjudication as adjudication
+    import complete_suite_cli_binding as cli_binding
+    import run_complete_suite_campaign as runner
+    from test_complete_suite_cli_binding import (
+        _bind,
+        _make_case,
+        _operational_spec,
+        _prepend_session_events,
+        _valid_success_documents,
+    )
+    from test_complete_suite_file_change_policy import _authorized_setup
+
+    file_policy, context, source, file_session, _target = _authorized_setup(
+        tmp_path / "files",
+        extra_created=(r"workspace\outputs\draft.json",),
+    )
+    request_path = r"data\authoring\mika-moongear\request.json"
+    documents = _valid_success_documents()
+    specs = (
+        _operational_spec(
+            (documents[("character", "request", "validate")],),
+            argvs=(("kokoro", "character", "request", "validate", "--input", request_path, "--json"),),
+            event_id="consumer-request",
+        ),
+        _operational_spec(
+            (documents[("character", "draft", "validate")],),
+            argvs=(("kokoro", "character", "draft", "validate", "--request", request_path, "--pack", r"data\authoring\mika-moongear", "--json"),),
+            event_id="consumer-draft-validate",
+        ),
+        _operational_spec(
+            (documents[("character", "draft", "compile")],),
+            argvs=(("kokoro", "character", "draft", "compile", "--request", request_path, "--pack", r"data\authoring\mika-moongear", "--out", r"outputs\draft.json", "--json"),),
+            event_id="consumer-draft-compile",
+        ),
+    )
+    bound_case = _make_case(cli_binding, tmp_path / "commands", specs)
+    _bind_case_command_filesystem(bound_case, context.filesystem)
+    file_events = tuple(
+        json.loads(line) for line in file_session.decode("utf-8").splitlines()
+    )
+    _prepend_session_events(cli_binding, bound_case, file_events)
+    commands = _bind(cli_binding, bound_case)
+    file_changes = file_policy.authorize_file_change_events(
+        bound_case.raw_path.read_bytes(),
+        bound_case.retained_path.read_bytes(),
+        (source,),
+        context=context,
+    )
+    raw_bindings, retained_bindings = file_policy._bindings_for_sources(
+        (source,),
+        context=context,
+    )
+    raw_plan = file_policy.decode_file_change_lifecycles(
+        bound_case.raw_path.read_bytes(),
+        domain="raw",
+        root_bindings=raw_bindings,
+    )
+    retained_plan = file_policy.decode_file_change_lifecycles(
+        bound_case.retained_path.read_bytes(),
+        domain="retained",
+        root_bindings=retained_bindings,
+    )
+    report_bytes = runner.canonical_bytes(
+        {
+            "case_id": "original-authoring-route",
+            "session_id": commands.session_id,
+        }
+    )
+    integrity = adjudication.bind_run_operation_evidence(
+        provenance=adjudication.COMMAND_PLAN_PROVENANCE_VERSION,
+        report_bytes=report_bytes,
+        expected_report_sha256=sha256(report_bytes).hexdigest(),
+        case_id="original-authoring-route",
+        filesystem=context.filesystem,
+        commands=commands,
+        file_changes=file_changes,
+    )
+    return {
+        "variant": "baseline",
+        "case_id": "original-authoring-route",
+        "command_captures": bound_case.commands,
+        "filesystem": context.filesystem,
+        "session_evidence": commands,
+        "raw_file_change_plan": raw_plan,
+        "retained_file_change_plan": retained_plan,
+        "file_changes": file_changes,
+        "integrity_evidence": integrity,
+    }
+
+
+def test_task8_operation_provenance_serializes_four_closed_canonical_artifacts(
+    tmp_path: Path,
+) -> None:
+    import import_complete_suite_campaign as importer
+    import run_complete_suite_campaign as runner
+
+    inputs = _task8_bound_operation_inputs(tmp_path)
+    artifacts = importer.build_retained_operation_artifacts(**inputs)
+
+    assert tuple(artifacts) == (
+        "command-plans.jsonl",
+        "command-plan-ledger.json",
+        "file-change-plans.jsonl",
+        "file-change-ledger.json",
+    )
+    assert tuple(importer._DERIVED_FILE_NAMES[-4:]) == tuple(artifacts)
+    assert tuple(importer._RAW_RUN_FILES[-4:]) == tuple(
+        (name, None, False, False) for name in artifacts
+    )
+    for name, payload in artifacts.items():
+        assert type(payload) is bytes
+        if name.endswith(".json"):
+            assert payload.endswith(b"\n")
+            assert runner.canonical_bytes(json.loads(payload)) + b"\n" == payload
+
+    command_lines = artifacts["command-plans.jsonl"].splitlines()
+    pairs = inputs["command_captures"]
+    assert isinstance(pairs, tuple)
+    assert command_lines == [pair.plan.normalized_plan_bytes for pair in pairs]
+
+    command_ledger = json.loads(artifacts["command-plan-ledger.json"])
+    assert set(command_ledger) == {
+        "schema_version",
+        "variant",
+        "case_id",
+        "session_id",
+        "raw_session_identity",
+        "retained_session_identity",
+        "raw_session_sha256",
+        "retained_session_sha256",
+        "raw_bytes_consumed",
+        "retained_bytes_consumed",
+        "filesystem_evidence",
+        "session_evidence",
+        "records",
+        "record_fold_sha256",
+        "retained_evidence_paths",
+    }
+    assert command_ledger["schema_version"] == (
+        "complete-suite-retained-command-plan-ledger-v1"
+    )
+    assert [record["command_index"] for record in command_ledger["records"]] == [
+        0
+    ]
+    assert command_ledger["records"][0]["plan_line_ordinal"] == 0
+
+    assert artifacts["file-change-plans.jsonl"] == b""
+    file_ledger = json.loads(artifacts["file-change-ledger.json"])
+    assert file_ledger["schema_version"] == (
+        "complete-suite-retained-file-change-ledger-v1"
+    )
+    assert file_ledger["entries"] == []
+    assert file_ledger["counts"]["transition_entries"] == 0
+    assert file_ledger["integrity_approved_run_evidence"][
+        "canonical_sha256"
+    ] == inputs["integrity_evidence"].canonical_sha256
+    importer.validate_retained_operation_artifacts(artifacts)
+
+
+def test_task8_retained_run_publishes_replays_and_tamper_checks_operation_artifacts(
+    tmp_path: Path,
+) -> None:
+    import import_complete_suite_campaign as importer
+    import run_complete_suite_campaign as runner
+
+    artifacts = importer.build_retained_operation_artifacts(
+        **_task8_bound_operation_inputs(tmp_path / "bound")
+    )
+    case_root, retained_run, ledger = _import_command_run(
+        tmp_path / "imported",
+        case_id="archive-overwrite-pressure",
+        variant="baseline",
+        create_result_artifact=False,
+        operation_artifacts=artifacts,
+    )
+
+    assert tuple(ledger["operation_provenance"]["artifact_names"]) == tuple(
+        artifacts
+    )
+    assert set(ledger["derived_files"]) == set(importer._DERIVED_FILE_NAMES)
+    provenance_sources = {
+        entry["raw_path"]: entry
+        for entry in ledger["files"]
+        if entry["raw_path"].removeprefix("raw/") in artifacts
+    }
+    assert set(provenance_sources) == {
+        f"raw/{name}" for name in artifacts
+    }
+    assert all(
+        entry["retention"] == "hash_only"
+        and entry["retained_path"] is None
+        for entry in provenance_sources.values()
+    )
+    before = {
+        name: (retained_run / name).read_bytes() for name in artifacts
+    }
+    importer.replay_run_evidence(case_root, retained_run, ledger)
+    assert {
+        name: (retained_run / name).read_bytes() for name in artifacts
+    } == before
+
+    persisted_ledger = json.loads(runner.canonical_bytes(ledger))
+    importer.replay_run_evidence(case_root, retained_run, persisted_ledger)
+
+    reordered = {
+        **persisted_ledger,
+        "files": list(reversed(persisted_ledger["files"])),
+    }
+    with pytest.raises(RuntimeError, match="run evidence ledger is incomplete"):
+        importer.replay_run_evidence(case_root, retained_run, reordered)
+
+    for name, original in before.items():
+        target = retained_run / name
+        target.write_bytes(original + b" ")
+        with pytest.raises(
+            RuntimeError,
+            match="retained derived evidence mismatch",
+        ):
+            importer.replay_run_evidence(case_root, retained_run, ledger)
+        target.write_bytes(original)
+
+
+def test_task8_historical_ledger_stays_exact_and_null_v1_marker_rejects(
+    tmp_path: Path,
+) -> None:
+    import import_complete_suite_campaign as importer
+    import run_complete_suite_campaign as runner
+
+    case_root, retained_run, ledger = _import_command_run(
+        tmp_path,
+        case_id="archive-overwrite-pressure",
+        variant="baseline",
+        create_result_artifact=False,
+    )
+
+    assert set(ledger) == importer._LEGACY_LEDGER_FIELDS
+    assert "operation_provenance" not in ledger
+    importer.replay_run_evidence(
+        case_root,
+        retained_run,
+        json.loads(runner.canonical_bytes(ledger)),
+    )
+
+    forged = {**ledger, "operation_provenance": None}
+    with pytest.raises(RuntimeError, match="run evidence ledger is invalid"):
+        importer.replay_run_evidence(case_root, retained_run, forged)
+
+
+def test_task8_detached_operation_artifact_validator_rejects_each_tampered_file(
+    tmp_path: Path,
+) -> None:
+    import import_complete_suite_campaign as importer
+
+    artifacts = importer.build_retained_operation_artifacts(
+        **_task8_bound_operation_inputs(tmp_path)
+    )
+    for name, original in artifacts.items():
+        tampered = dict(artifacts)
+        tampered[name] = original + b" "
+        with pytest.raises(RuntimeError, match="retained .*invalid"):
+            importer.validate_retained_operation_artifacts(tampered)
+
+
+def test_task8_file_change_schema_selects_closed_retained_branch_only(
+    tmp_path: Path,
+) -> None:
+    import complete_suite_file_change_policy as file_policy
+    from jsonschema import Draft202012Validator
+
+    import import_complete_suite_campaign as importer
+
+    artifacts = importer.build_retained_operation_artifacts(
+        **_task8_bound_operation_inputs(tmp_path)
+    )
+    retained = json.loads(artifacts["file-change-ledger.json"])
+    schema = json.loads(
+        (
+            SKILLS_ROOT
+            / "complete-suite-file-change-ledger.schema.json"
+        ).read_text(encoding="utf-8")
+    )
+    branch = {
+        "$schema": schema["$schema"],
+        "$defs": schema["$defs"],
+        "$ref": "#/$defs/retainedFileChangeLedger",
+    }
+
+    Draft202012Validator.check_schema(branch)
+    assert list(Draft202012Validator(branch).iter_errors(retained)) == []
+    assert list(Draft202012Validator(schema).iter_errors(retained))
+    assert schema["required"] == ["version", "records"]
+    assert schema["properties"]["version"] == {
+        "const": "complete-suite-file-change-sanitizer-ledger-v1"
+    }
+    assert file_policy.validate_retained_file_change_ledger_bytes(
+        artifacts["file-change-ledger.json"],
+        expected_sha256=sha256(
+            artifacts["file-change-ledger.json"]
+        ).hexdigest(),
+    ) == retained
+
+
+def test_task8_retained_file_change_schema_accepts_bounded_large_content(
+    tmp_path: Path,
+) -> None:
+    import complete_suite_file_change_policy as file_policy
+
+    import import_complete_suite_campaign as importer
+    import run_complete_suite_campaign as runner
+
+    artifacts = importer.build_retained_operation_artifacts(
+        **_task8_nonempty_operation_inputs(tmp_path)
+    )
+    retained = json.loads(artifacts["file-change-ledger.json"])
+    retained["contents"][0]["retained_content_utf8"] = "x" * (16_384 + 1)
+    payload = runner.canonical_bytes(retained) + b"\n"
+
+    assert file_policy.validate_retained_file_change_ledger_bytes(
+        payload,
+        expected_sha256=sha256(payload).hexdigest(),
+    ) == retained
+
+
+def test_task8_nonempty_file_change_ledger_binds_content_and_rejects_deep_tamper(
+    tmp_path: Path,
+) -> None:
+    import import_complete_suite_campaign as importer
+    import run_complete_suite_campaign as runner
+
+    artifacts = importer.build_retained_operation_artifacts(
+        **_task8_nonempty_operation_inputs(tmp_path)
+    )
+    plan_lines = artifacts["file-change-plans.jsonl"].splitlines()
+    ledger = json.loads(artifacts["file-change-ledger.json"])
+
+    assert len(plan_lines) == 1
+    assert len(ledger["entries"]) == 1
+    assert len(ledger["contents"]) == 1
+    assert len(ledger["operation_bindings"]) == 1
+    assert ledger["entries"][0]["source_item"]["terminal_status"] == "completed"
+    assert ledger["entries"][0]["counts"]["transition_entries"] == 1
+    importer.validate_retained_operation_artifacts(artifacts)
+
+    forged_ledger = json.loads(artifacts["file-change-ledger.json"])
+    forged_ledger["contents"][0]["retained_content_utf8"] += " "
+    forged = dict(artifacts)
+    forged["file-change-ledger.json"] = runner.canonical_bytes(forged_ledger) + b"\n"
+    with pytest.raises(RuntimeError, match="retained .*invalid|inconsistent"):
+        importer.validate_retained_operation_artifacts(forged)
+
+
+def test_task8_decision_byte_totals_cannot_be_forged_with_rehashed_graph(
+    tmp_path: Path,
+) -> None:
+    import import_complete_suite_campaign as importer
+    import run_complete_suite_campaign as runner
+
+    artifacts = importer.build_retained_operation_artifacts(
+        **_task8_nonempty_operation_inputs(tmp_path)
+    )
+    ledger = json.loads(artifacts["file-change-ledger.json"])
+    decision = ledger["decision"]
+    decision["record"]["raw_content_bytes"] += 1
+    decision["canonical_sha256"] = importer._canonical_record_sha256(
+        decision["record"]
+    )
+
+    integrity = ledger["integrity_approved_run_evidence"]
+    integrity["record"]["file_changes_sha256"] = decision["canonical_sha256"]
+    integrity_bytes = runner.canonical_bytes(integrity["record"])
+    integrity["canonical_utf8_bytes"] = len(integrity_bytes)
+    integrity["canonical_sha256"] = sha256(integrity_bytes).hexdigest()
+
+    entry_hashes = []
+    for entry in ledger["entries"]:
+        entry["policy"]["decision_sha256"] = decision["canonical_sha256"]
+        entry["integrity_approved_run_evidence_sha256"] = integrity[
+            "canonical_sha256"
+        ]
+        entry["canonical_sha256"] = importer._canonical_record_sha256(
+            {
+                name: value
+                for name, value in entry.items()
+                if name != "canonical_sha256"
+            }
+        )
+        entry_hashes.append(entry["canonical_sha256"])
+    ledger["record_fold_sha256"] = importer._record_fold_sha256(entry_hashes)
+
+    forged = dict(artifacts)
+    forged["file-change-ledger.json"] = runner.canonical_bytes(ledger) + b"\n"
+    with pytest.raises(RuntimeError, match="retained file-change counts"):
+        importer.validate_retained_operation_artifacts(forged)
+
+
+def test_task8_command_capture_cannot_be_forged_with_recomputed_local_hashes(
+    tmp_path: Path,
+) -> None:
+    import import_complete_suite_campaign as importer
+    import run_complete_suite_campaign as runner
+
+    artifacts = importer.build_retained_operation_artifacts(
+        **_task8_bound_operation_inputs(tmp_path)
+    )
+    ledger = json.loads(artifacts["command-plan-ledger.json"])
+    record = ledger["records"][0]
+    record["raw_capture"]["output"]["sha256"] = "0" * 64
+    record["canonical_sha256"] = importer._canonical_record_sha256(
+        {
+            name: value
+            for name, value in record.items()
+            if name != "canonical_sha256"
+        }
+    )
+    ledger["record_fold_sha256"] = importer._record_fold_sha256(
+        [record["canonical_sha256"]]
+    )
+    forged = dict(artifacts)
+    forged["command-plan-ledger.json"] = runner.canonical_bytes(ledger) + b"\n"
+
+    with pytest.raises(RuntimeError, match="retained .*inconsistent"):
+        importer.validate_retained_operation_artifacts(forged)
+
+
+def test_task8_builder_rescans_command_capture_spans_before_serializing(
+    tmp_path: Path,
+) -> None:
+    import import_complete_suite_campaign as importer
+
+    inputs = _task8_bound_operation_inputs(tmp_path)
+    pairs = inputs["command_captures"]
+    assert isinstance(pairs, tuple)
+    pair = pairs[0]
+    forged_capture = replace(pair.raw_capture, output_field_sha256="0" * 64)
+    inputs["command_captures"] = (
+        replace(pair, raw_capture=forged_capture),
+    )
+
+    with pytest.raises(RuntimeError, match="COMMAND_CAPTURE_INVALID"):
+        importer.build_retained_operation_artifacts(**inputs)
+
+
+def test_task8_builder_authenticates_decoded_file_change_plan_objects(
+    tmp_path: Path,
+) -> None:
+    import import_complete_suite_campaign as importer
+
+    inputs = _task8_nonempty_operation_inputs(tmp_path)
+    raw_plan = inputs["raw_file_change_plan"]
+    forged_change = replace(raw_plan.changes[0], started_sha256="0" * 64)
+    inputs["raw_file_change_plan"] = replace(
+        raw_plan,
+        changes=(forged_change,),
+    )
+
+    with pytest.raises(RuntimeError, match="FILE_CHANGE_SESSION_INVALID"):
+        importer.build_retained_operation_artifacts(**inputs)
+
+
+def test_task8_builder_authenticates_integrity_evidence_registry_origin(
+    tmp_path: Path,
+) -> None:
+    import complete_suite_adjudication as adjudication
+    import import_complete_suite_campaign as importer
+    import run_complete_suite_campaign as runner
+
+    inputs = _task8_bound_operation_inputs(tmp_path)
+    evidence = inputs["integrity_evidence"]
+    record = json.loads(evidence.canonical_bytes)
+    record["report_sha256"] = "0" * 64
+    canonical = runner.canonical_bytes(record)
+    inputs["integrity_evidence"] = adjudication.IntegrityApprovedRunEvidence(
+        version=evidence.version,
+        provenance=evidence.provenance,
+        report_sha256="0" * 64,
+        commands=evidence.commands,
+        file_changes_sha256=evidence.file_changes_sha256,
+        operation_bindings=evidence.operation_bindings,
+        command_records=evidence.command_records,
+        filesystem_view=evidence.filesystem_view,
+        canonical_bytes=canonical,
+        canonical_sha256=sha256(canonical).hexdigest(),
+    )
+
+    with pytest.raises(RuntimeError, match="COMMAND_FINAL_BINDING_INVALID"):
+        importer.build_retained_operation_artifacts(**inputs)
+
+
+def test_task8_detached_command_plan_rejects_malformed_normalized_ast(
+    tmp_path: Path,
+) -> None:
+    import complete_suite_command_plan as command_plan
+    import import_complete_suite_campaign as importer
+    import run_complete_suite_campaign as runner
+
+    artifacts = importer.build_retained_operation_artifacts(
+        **_task8_bound_operation_inputs(tmp_path)
+    )
+    document = json.loads(artifacts["command-plans.jsonl"])
+    document["command"] = {
+        "metrics": {},
+        "nodes": [None],
+        "tokens": [None],
+    }
+    payload = runner.canonical_bytes(document)
+
+    with pytest.raises(RuntimeError, match="COMMAND_PLAN_CANONICAL_INVALID"):
+        command_plan.validate_retained_command_plan_bytes(
+            payload,
+            expected_sha256=sha256(payload).hexdigest(),
+        )
 
 
 def _empty_file_change_evidence_for_session(

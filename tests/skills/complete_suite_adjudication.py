@@ -6883,10 +6883,56 @@ def adjudicate_campaign(
     observed_git: Mapping[str, str] | None = None,
     replay_factory: Callable[..., None] | None = None,
     adjudicate_factory: Callable[..., dict[str, Any]] | None = None,
+    import_authorization: Path | None = None,
+    expected_import_authorization_sha256: str | None = None,
+    expected_import_authorization_prompt_sha256: str | None = None,
+    sealed_campaign_audit: Path | None = None,
+    expected_sealed_campaign_audit_sha256: str | None = None,
+    approved_envelope_sha256: str | None = None,
+    provider_approval_sha256: str | None = None,
+    expected_raw_seal_sha256: str | None = None,
+    expected_raw_inventory_sha256: str | None = None,
+    expected_retained_root: Path | None = None,
 ) -> Path:
     results_root = retained_root / "results"
     if results_root.exists() or results_root.is_symlink():
         raise RuntimeError("campaign adjudication already exists")
+    selected = runner.default_paths() if paths is None else paths
+    campaign_bytes = campaign_importer._read_text_artifact(
+        selected.campaign_file
+    )
+    if sha256(campaign_bytes).hexdigest() != approved_campaign_sha256:
+        raise RuntimeError("approved campaign changed")
+    campaign_document = runner._load_yaml_object(selected.campaign_file)
+    authorization = campaign_importer._validate_import_authorization_arguments(
+        campaign_document,
+        raw_root,
+        retained_root,
+        approved_campaign_sha256=approved_campaign_sha256,
+        import_authorization=import_authorization,
+        expected_import_authorization_sha256=(
+            expected_import_authorization_sha256
+        ),
+        expected_import_authorization_prompt_sha256=(
+            expected_import_authorization_prompt_sha256
+        ),
+        sealed_campaign_audit=sealed_campaign_audit,
+        expected_sealed_campaign_audit_sha256=(
+            expected_sealed_campaign_audit_sha256
+        ),
+        approved_envelope_sha256=approved_envelope_sha256,
+        provider_approval_sha256=provider_approval_sha256,
+        expected_raw_seal_sha256=expected_raw_seal_sha256,
+        expected_raw_inventory_sha256=expected_raw_inventory_sha256,
+        expected_retained_root=expected_retained_root,
+        require_retained_root_absent=False,
+    )
+    if authorization is not None and (
+        replay_factory is not None or adjudicate_factory is not None
+    ):
+        raise RuntimeError(
+            "authorized adjudication callback is unavailable"
+        )
     campaign, cases, plan, ledgers, import_ledger = (
         campaign_importer.replay_campaign_import(
             raw_root,
@@ -6896,6 +6942,22 @@ def adjudicate_campaign(
             required_frozen_paths=required_frozen_paths,
             observed_git=observed_git,
             replay_factory=replay_factory,
+            import_authorization=import_authorization,
+            expected_import_authorization_sha256=(
+                expected_import_authorization_sha256
+            ),
+            expected_import_authorization_prompt_sha256=(
+                expected_import_authorization_prompt_sha256
+            ),
+            sealed_campaign_audit=sealed_campaign_audit,
+            expected_sealed_campaign_audit_sha256=(
+                expected_sealed_campaign_audit_sha256
+            ),
+            approved_envelope_sha256=approved_envelope_sha256,
+            provider_approval_sha256=provider_approval_sha256,
+            expected_raw_seal_sha256=expected_raw_seal_sha256,
+            expected_raw_inventory_sha256=expected_raw_inventory_sha256,
+            expected_retained_root=expected_retained_root,
         )
     )
     case_map: dict[str, dict[str, Any]] = {}
@@ -7019,7 +7081,53 @@ def replay_campaign_adjudication(
     observed_git: Mapping[str, str] | None = None,
     replay_factory: Callable[..., None] | None = None,
     adjudicate_factory: Callable[..., dict[str, Any]] | None = None,
+    import_authorization: Path | None = None,
+    expected_import_authorization_sha256: str | None = None,
+    expected_import_authorization_prompt_sha256: str | None = None,
+    sealed_campaign_audit: Path | None = None,
+    expected_sealed_campaign_audit_sha256: str | None = None,
+    approved_envelope_sha256: str | None = None,
+    provider_approval_sha256: str | None = None,
+    expected_raw_seal_sha256: str | None = None,
+    expected_raw_inventory_sha256: str | None = None,
+    expected_retained_root: Path | None = None,
 ) -> dict[str, Any]:
+    selected = runner.default_paths() if paths is None else paths
+    campaign_bytes = campaign_importer._read_text_artifact(
+        selected.campaign_file
+    )
+    if sha256(campaign_bytes).hexdigest() != approved_campaign_sha256:
+        raise RuntimeError("approved campaign changed")
+    campaign_document = runner._load_yaml_object(selected.campaign_file)
+    authorization = campaign_importer._validate_import_authorization_arguments(
+        campaign_document,
+        raw_root,
+        retained_root,
+        approved_campaign_sha256=approved_campaign_sha256,
+        import_authorization=import_authorization,
+        expected_import_authorization_sha256=(
+            expected_import_authorization_sha256
+        ),
+        expected_import_authorization_prompt_sha256=(
+            expected_import_authorization_prompt_sha256
+        ),
+        sealed_campaign_audit=sealed_campaign_audit,
+        expected_sealed_campaign_audit_sha256=(
+            expected_sealed_campaign_audit_sha256
+        ),
+        approved_envelope_sha256=approved_envelope_sha256,
+        provider_approval_sha256=provider_approval_sha256,
+        expected_raw_seal_sha256=expected_raw_seal_sha256,
+        expected_raw_inventory_sha256=expected_raw_inventory_sha256,
+        expected_retained_root=expected_retained_root,
+        require_retained_root_absent=False,
+    )
+    if authorization is not None and (
+        replay_factory is not None or adjudicate_factory is not None
+    ):
+        raise RuntimeError(
+            "authorized adjudication replay callback is unavailable"
+        )
     results_root = retained_root / "results"
     try:
         preparation._require_plain_directory(
@@ -7037,6 +7145,22 @@ def replay_campaign_adjudication(
             required_frozen_paths=required_frozen_paths,
             observed_git=observed_git,
             replay_factory=replay_factory,
+            import_authorization=import_authorization,
+            expected_import_authorization_sha256=(
+                expected_import_authorization_sha256
+            ),
+            expected_import_authorization_prompt_sha256=(
+                expected_import_authorization_prompt_sha256
+            ),
+            sealed_campaign_audit=sealed_campaign_audit,
+            expected_sealed_campaign_audit_sha256=(
+                expected_sealed_campaign_audit_sha256
+            ),
+            approved_envelope_sha256=approved_envelope_sha256,
+            provider_approval_sha256=provider_approval_sha256,
+            expected_raw_seal_sha256=expected_raw_seal_sha256,
+            expected_raw_inventory_sha256=expected_raw_inventory_sha256,
+            expected_retained_root=expected_retained_root,
         )
     )
     case_map = {case.get("id"): case for case in cases}
@@ -7152,12 +7276,47 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("raw_root", type=Path)
     parser.add_argument("retained_root", type=Path)
+    parser.add_argument("--expected-retained-root", type=Path, required=True)
+    parser.add_argument("--import-authorization", type=Path, required=True)
+    parser.add_argument(
+        "--expected-import-authorization-sha256",
+        required=True,
+    )
+    parser.add_argument(
+        "--expected-import-authorization-prompt-sha256",
+        required=True,
+    )
+    parser.add_argument("--sealed-campaign-audit", type=Path, required=True)
+    parser.add_argument(
+        "--expected-sealed-campaign-audit-sha256",
+        required=True,
+    )
     parser.add_argument("--approved-campaign-sha256", required=True)
+    parser.add_argument("--approved-envelope-sha256", required=True)
+    parser.add_argument("--provider-approval-sha256", required=True)
+    parser.add_argument("--expected-raw-seal-sha256", required=True)
+    parser.add_argument("--expected-raw-inventory-sha256", required=True)
     args = parser.parse_args()
     results = adjudicate_campaign(
         args.raw_root,
         args.retained_root,
+        expected_retained_root=args.expected_retained_root,
+        import_authorization=args.import_authorization,
+        expected_import_authorization_sha256=(
+            args.expected_import_authorization_sha256
+        ),
+        expected_import_authorization_prompt_sha256=(
+            args.expected_import_authorization_prompt_sha256
+        ),
+        sealed_campaign_audit=args.sealed_campaign_audit,
+        expected_sealed_campaign_audit_sha256=(
+            args.expected_sealed_campaign_audit_sha256
+        ),
         approved_campaign_sha256=args.approved_campaign_sha256,
+        approved_envelope_sha256=args.approved_envelope_sha256,
+        provider_approval_sha256=args.provider_approval_sha256,
+        expected_raw_seal_sha256=args.expected_raw_seal_sha256,
+        expected_raw_inventory_sha256=args.expected_raw_inventory_sha256,
     )
     summary = _load_json_object(results / "campaign-summary.json")
     return 0 if summary.get("suite_closure_passed") is True else 1

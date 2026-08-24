@@ -39,6 +39,622 @@
         "sanitizer_record_path": {"$ref": "#/$defs/boundedPath"},
         "sanitizer_record_sha256": {"$ref": "#/$defs/sha256"}
       }
+    },
+    "nonNegativeInteger": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "boundedIdentifier": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256,
+      "pattern": "^[^\\u0000\\r\\n]+$"
+    },
+    "filesystemIdentity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["device", "inode", "file_type", "reparse_tag", "link_count"],
+      "properties": {
+        "device": {"$ref": "#/$defs/nonNegativeInteger"},
+        "inode": {"$ref": "#/$defs/nonNegativeInteger"},
+        "file_type": {"type": "integer", "minimum": 1},
+        "reparse_tag": {"$ref": "#/$defs/nonNegativeInteger"},
+        "link_count": {"type": "integer", "minimum": 1}
+      }
+    },
+    "sessionIdentity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "relative_path", "device", "inode", "size", "modified_ns",
+        "file_type", "link_count"
+      ],
+      "properties": {
+        "relative_path": {"$ref": "#/$defs/boundedPath"},
+        "device": {"$ref": "#/$defs/nonNegativeInteger"},
+        "inode": {"$ref": "#/$defs/nonNegativeInteger"},
+        "size": {"$ref": "#/$defs/nonNegativeInteger"},
+        "modified_ns": {"$ref": "#/$defs/nonNegativeInteger"},
+        "file_type": {"type": "integer", "minimum": 1},
+        "link_count": {"type": "integer", "minimum": 1}
+      }
+    },
+    "snapshotEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["identity", "kind", "link_count", "relative_path", "sha256", "size"],
+      "properties": {
+        "identity": {"$ref": "#/$defs/filesystemIdentity"},
+        "kind": {"enum": ["file", "directory"]},
+        "link_count": {"type": "integer", "minimum": 1},
+        "relative_path": {"$ref": "#/$defs/boundedPath"},
+        "sha256": {
+          "anyOf": [
+            {"$ref": "#/$defs/sha256"},
+            {"type": "null"}
+          ]
+        },
+        "size": {"$ref": "#/$defs/nonNegativeInteger"}
+      }
+    },
+    "snapshotRoot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ancestor_identities", "entries", "manifest_sha256", "present",
+        "relative_root", "root_identity", "root_index"
+      ],
+      "properties": {
+        "ancestor_identities": {
+          "type": "array",
+          "maxItems": 64,
+          "items": {"$ref": "#/$defs/filesystemIdentity"}
+        },
+        "entries": {
+          "type": "array",
+          "maxItems": 4096,
+          "items": {"$ref": "#/$defs/snapshotEntry"}
+        },
+        "manifest_sha256": {"$ref": "#/$defs/sha256"},
+        "present": {"type": "boolean"},
+        "relative_root": {"$ref": "#/$defs/boundedPath"},
+        "root_identity": {
+          "anyOf": [
+            {"$ref": "#/$defs/filesystemIdentity"},
+            {"type": "null"}
+          ]
+        },
+        "root_index": {"$ref": "#/$defs/nonNegativeInteger"}
+      }
+    },
+    "filesystemEvidenceRecord": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "changed_paths", "created_paths", "post_roots",
+        "post_run_state_sha256", "pre_roots", "pre_run_state_sha256",
+        "removed_paths", "version"
+      ],
+      "properties": {
+        "changed_paths": {"type": "array", "maxItems": 4096, "items": {"$ref": "#/$defs/boundedPath"}},
+        "created_paths": {"type": "array", "maxItems": 4096, "items": {"$ref": "#/$defs/boundedPath"}},
+        "post_roots": {"type": "array", "maxItems": 64, "items": {"$ref": "#/$defs/snapshotRoot"}},
+        "post_run_state_sha256": {"$ref": "#/$defs/sha256"},
+        "pre_roots": {"type": "array", "maxItems": 64, "items": {"$ref": "#/$defs/snapshotRoot"}},
+        "pre_run_state_sha256": {"$ref": "#/$defs/sha256"},
+        "removed_paths": {"type": "array", "maxItems": 4096, "items": {"$ref": "#/$defs/boundedPath"}},
+        "version": {"const": "complete-suite-policy-filesystem-state-v1"}
+      }
+    },
+    "filesystemEvidenceWrapper": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["record", "canonical_sha256"],
+      "properties": {
+        "record": {"$ref": "#/$defs/filesystemEvidenceRecord"},
+        "canonical_sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "decisionChange": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "started_event_ordinal", "completed_event_ordinal", "event_id",
+        "change_ordinal", "normalized_path", "kind", "role"
+      ],
+      "properties": {
+        "started_event_ordinal": {"$ref": "#/$defs/nonNegativeInteger"},
+        "completed_event_ordinal": {"$ref": "#/$defs/nonNegativeInteger"},
+        "event_id": {"$ref": "#/$defs/boundedIdentifier"},
+        "change_ordinal": {"$ref": "#/$defs/nonNegativeInteger"},
+        "normalized_path": {"$ref": "#/$defs/boundedPath"},
+        "kind": {"enum": ["add", "update"]},
+        "role": {"$ref": "#/$defs/boundedIdentifier"}
+      }
+    },
+    "decisionContent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "normalized_path", "raw_size", "raw_sha256", "retained_size",
+        "retained_sha256", "retained_document_sha256",
+        "raw_document_sha256", "sanitizer_record_sha256",
+        "role_validation_sha256"
+      ],
+      "properties": {
+        "normalized_path": {"$ref": "#/$defs/boundedPath"},
+        "raw_size": {"$ref": "#/$defs/nonNegativeInteger"},
+        "raw_sha256": {"$ref": "#/$defs/sha256"},
+        "retained_size": {"$ref": "#/$defs/nonNegativeInteger"},
+        "retained_sha256": {"$ref": "#/$defs/sha256"},
+        "retained_document_sha256": {"$ref": "#/$defs/sha256"},
+        "raw_document_sha256": {"$ref": "#/$defs/sha256"},
+        "sanitizer_record_sha256": {"$ref": "#/$defs/sha256"},
+        "role_validation_sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "decisionRecord": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "version", "variant", "case_id", "changes", "contents",
+        "implicit_ancestor_paths", "unique_final_paths", "transition_entries",
+        "raw_content_bytes", "retained_content_bytes",
+        "normalized_plan_sha256", "aggregate_transition_sha256",
+        "content_inventory_sha256"
+      ],
+      "properties": {
+        "version": {"const": "complete-suite-file-change-policy-v1"},
+        "variant": {"enum": ["baseline", "suite-enabled"]},
+        "case_id": {"$ref": "#/$defs/boundedIdentifier"},
+        "changes": {"type": "array", "maxItems": 256, "items": {"$ref": "#/$defs/decisionChange"}},
+        "contents": {"type": "array", "maxItems": 128, "items": {"$ref": "#/$defs/decisionContent"}},
+        "implicit_ancestor_paths": {"type": "array", "maxItems": 4096, "items": {"$ref": "#/$defs/boundedPath"}},
+        "unique_final_paths": {"type": "array", "maxItems": 128, "items": {"$ref": "#/$defs/boundedPath"}},
+        "transition_entries": {"type": "integer", "minimum": 0, "maximum": 256},
+        "raw_content_bytes": {"type": "integer", "minimum": 0, "maximum": 33554432},
+        "retained_content_bytes": {"type": "integer", "minimum": 0, "maximum": 33554432},
+        "normalized_plan_sha256": {"$ref": "#/$defs/sha256"},
+        "aggregate_transition_sha256": {"$ref": "#/$defs/sha256"},
+        "content_inventory_sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "decisionWrapper": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["record", "canonical_sha256"],
+      "properties": {
+        "record": {"$ref": "#/$defs/decisionRecord"},
+        "canonical_sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "pathsBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["paths", "canonical_sha256"],
+      "properties": {
+        "paths": {"type": "array", "maxItems": 4096, "items": {"$ref": "#/$defs/boundedPath"}},
+        "canonical_sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "deltaPartition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["created", "changed", "removed", "implicit_ancestors", "unique_final_paths", "canonical_sha256"],
+      "properties": {
+        "created": {"$ref": "#/$defs/pathsBinding"},
+        "changed": {"$ref": "#/$defs/pathsBinding"},
+        "removed": {"$ref": "#/$defs/pathsBinding"},
+        "implicit_ancestors": {"$ref": "#/$defs/pathsBinding"},
+        "unique_final_paths": {"$ref": "#/$defs/pathsBinding"},
+        "canonical_sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "aggregateTransition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "normalized_plan_sha256", "aggregate_transition_sha256",
+        "created_paths_sha256", "changed_paths_sha256", "removed_paths_sha256"
+      ],
+      "properties": {
+        "normalized_plan_sha256": {"$ref": "#/$defs/sha256"},
+        "aggregate_transition_sha256": {"$ref": "#/$defs/sha256"},
+        "created_paths_sha256": {"$ref": "#/$defs/sha256"},
+        "changed_paths_sha256": {"$ref": "#/$defs/sha256"},
+        "removed_paths_sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "retainedCounts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "lifecycles", "transition_entries", "unique_files", "raw_bytes",
+        "retained_bytes", "combined_bytes", "operational_documents"
+      ],
+      "properties": {
+        "lifecycles": {"type": "integer", "minimum": 0, "maximum": 64},
+        "transition_entries": {"type": "integer", "minimum": 0, "maximum": 256},
+        "unique_files": {"type": "integer", "minimum": 0, "maximum": 128},
+        "raw_bytes": {"type": "integer", "minimum": 0, "maximum": 33554432},
+        "retained_bytes": {"type": "integer", "minimum": 0, "maximum": 33554432},
+        "combined_bytes": {"type": "integer", "minimum": 0, "maximum": 67108864},
+        "operational_documents": {"type": "integer", "minimum": 0, "maximum": 128}
+      }
+    },
+    "postState": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "root_index", "root_manifest_sha256", "root_identity",
+        "root_ancestor_identities", "entry"
+      ],
+      "properties": {
+        "root_index": {"$ref": "#/$defs/nonNegativeInteger"},
+        "root_manifest_sha256": {"$ref": "#/$defs/sha256"},
+        "root_identity": {
+          "anyOf": [
+            {"$ref": "#/$defs/filesystemIdentity"},
+            {"type": "null"}
+          ]
+        },
+        "root_ancestor_identities": {"type": "array", "maxItems": 64, "items": {"$ref": "#/$defs/filesystemIdentity"}},
+        "entry": {"$ref": "#/$defs/snapshotEntry"}
+      }
+    },
+    "retainedContent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "normalized_path", "role", "raw_size", "raw_sha256",
+        "retained_size", "retained_sha256", "retained_content_utf8",
+        "retained_content_sha256", "raw_document_sha256",
+        "retained_document_sha256", "sanitizer_record_sha256",
+        "role_validation_sha256", "post_state"
+      ],
+      "properties": {
+        "normalized_path": {"$ref": "#/$defs/boundedPath"},
+        "role": {"$ref": "#/$defs/boundedIdentifier"},
+        "raw_size": {"$ref": "#/$defs/nonNegativeInteger"},
+        "raw_sha256": {"$ref": "#/$defs/sha256"},
+        "retained_size": {"$ref": "#/$defs/nonNegativeInteger"},
+        "retained_sha256": {"$ref": "#/$defs/sha256"},
+        "retained_content_utf8": {"type": "string", "maxLength": 33554432},
+        "retained_content_sha256": {"$ref": "#/$defs/sha256"},
+        "raw_document_sha256": {"$ref": "#/$defs/sha256"},
+        "retained_document_sha256": {"$ref": "#/$defs/sha256"},
+        "sanitizer_record_sha256": {"$ref": "#/$defs/sha256"},
+        "role_validation_sha256": {"$ref": "#/$defs/sha256"},
+        "post_state": {"$ref": "#/$defs/postState"}
+      }
+    },
+    "operationBindingRecord": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "normalized_path", "role", "last_change_completed_ordinal",
+        "producer_command_index", "producer_operation_index",
+        "consumer_command_indices", "consumer_operation_indices",
+        "raw_selected_value_sha256", "retained_selected_value_sha256"
+      ],
+      "properties": {
+        "normalized_path": {"$ref": "#/$defs/boundedPath"},
+        "role": {"$ref": "#/$defs/boundedIdentifier"},
+        "last_change_completed_ordinal": {"$ref": "#/$defs/nonNegativeInteger"},
+        "producer_command_index": {"anyOf": [{"$ref": "#/$defs/nonNegativeInteger"}, {"type": "null"}]},
+        "producer_operation_index": {"anyOf": [{"$ref": "#/$defs/nonNegativeInteger"}, {"type": "null"}]},
+        "consumer_command_indices": {"type": "array", "maxItems": 128, "items": {"$ref": "#/$defs/nonNegativeInteger"}},
+        "consumer_operation_indices": {"type": "array", "maxItems": 128, "items": {"$ref": "#/$defs/nonNegativeInteger"}},
+        "raw_selected_value_sha256": {"anyOf": [{"$ref": "#/$defs/sha256"}, {"type": "null"}]},
+        "retained_selected_value_sha256": {"anyOf": [{"$ref": "#/$defs/sha256"}, {"type": "null"}]}
+      }
+    },
+    "operationBindingWrapper": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["record", "canonical_sha256"],
+      "properties": {
+        "record": {"$ref": "#/$defs/operationBindingRecord"},
+        "canonical_sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "filesystemViewRecord": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "full_created_paths", "full_changed_paths", "full_removed_paths",
+        "agent_working_files", "implicit_working_directories",
+        "product_support_paths", "semantic_created_paths"
+      ],
+      "properties": {
+        "full_created_paths": {"type": "array", "maxItems": 4096, "items": {"$ref": "#/$defs/boundedPath"}},
+        "full_changed_paths": {"type": "array", "maxItems": 4096, "items": {"$ref": "#/$defs/boundedPath"}},
+        "full_removed_paths": {"type": "array", "maxItems": 4096, "items": {"$ref": "#/$defs/boundedPath"}},
+        "agent_working_files": {"type": "array", "maxItems": 4096, "items": {"$ref": "#/$defs/boundedPath"}},
+        "implicit_working_directories": {"type": "array", "maxItems": 4096, "items": {"$ref": "#/$defs/boundedPath"}},
+        "product_support_paths": {"type": "array", "maxItems": 4096, "items": {"$ref": "#/$defs/boundedPath"}},
+        "semantic_created_paths": {"type": "array", "maxItems": 4096, "items": {"$ref": "#/$defs/boundedPath"}}
+      }
+    },
+    "filesystemViewWrapper": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["record", "canonical_sha256"],
+      "properties": {
+        "record": {"$ref": "#/$defs/filesystemViewRecord"},
+        "canonical_sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "adjudicationCommandRecord": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "provenance_version", "command_index", "event_id",
+        "started_event_ordinal", "completed_event_ordinal", "plan_sha256",
+        "operation_index", "argv", "exit_code", "outcome", "result_size",
+        "result_sha256", "raw_result_sha256", "retained_result_sha256"
+      ],
+      "properties": {
+        "provenance_version": {"const": "powershell-command-plan-v1"},
+        "command_index": {"$ref": "#/$defs/nonNegativeInteger"},
+        "event_id": {"$ref": "#/$defs/boundedIdentifier"},
+        "started_event_ordinal": {"$ref": "#/$defs/nonNegativeInteger"},
+        "completed_event_ordinal": {"$ref": "#/$defs/nonNegativeInteger"},
+        "plan_sha256": {"$ref": "#/$defs/sha256"},
+        "operation_index": {"$ref": "#/$defs/nonNegativeInteger"},
+        "argv": {"type": "array", "minItems": 1, "maxItems": 256, "items": {"type": "string", "maxLength": 4096}},
+        "exit_code": {"type": "integer"},
+        "outcome": {"enum": ["success", "expected_refusal", "none"]},
+        "result_size": {"anyOf": [{"$ref": "#/$defs/nonNegativeInteger"}, {"type": "null"}]},
+        "result_sha256": {"anyOf": [{"$ref": "#/$defs/sha256"}, {"type": "null"}]},
+        "raw_result_sha256": {"anyOf": [{"$ref": "#/$defs/sha256"}, {"type": "null"}]},
+        "retained_result_sha256": {"anyOf": [{"$ref": "#/$defs/sha256"}, {"type": "null"}]}
+      }
+    },
+    "integrityOperationBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "normalized_path", "role", "last_change_completed_ordinal",
+        "producer_command_index", "producer_operation_index",
+        "consumer_command_indices", "consumer_operation_indices",
+        "raw_selected_value_sha256", "retained_selected_value_sha256",
+        "canonical_sha256"
+      ],
+      "properties": {
+        "normalized_path": {"$ref": "#/$defs/boundedPath"},
+        "role": {"$ref": "#/$defs/boundedIdentifier"},
+        "last_change_completed_ordinal": {"$ref": "#/$defs/nonNegativeInteger"},
+        "producer_command_index": {"anyOf": [{"$ref": "#/$defs/nonNegativeInteger"}, {"type": "null"}]},
+        "producer_operation_index": {"anyOf": [{"$ref": "#/$defs/nonNegativeInteger"}, {"type": "null"}]},
+        "consumer_command_indices": {"type": "array", "maxItems": 128, "items": {"$ref": "#/$defs/nonNegativeInteger"}},
+        "consumer_operation_indices": {"type": "array", "maxItems": 128, "items": {"$ref": "#/$defs/nonNegativeInteger"}},
+        "raw_selected_value_sha256": {"anyOf": [{"$ref": "#/$defs/sha256"}, {"type": "null"}]},
+        "retained_selected_value_sha256": {"anyOf": [{"$ref": "#/$defs/sha256"}, {"type": "null"}]},
+        "canonical_sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "integrityFilesystemView": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "full_created_paths", "full_changed_paths", "full_removed_paths",
+        "agent_working_files", "implicit_working_directories",
+        "product_support_paths", "semantic_created_paths", "canonical_sha256"
+      ],
+      "properties": {
+        "full_created_paths": {"type": "array", "maxItems": 4096, "items": {"$ref": "#/$defs/boundedPath"}},
+        "full_changed_paths": {"type": "array", "maxItems": 4096, "items": {"$ref": "#/$defs/boundedPath"}},
+        "full_removed_paths": {"type": "array", "maxItems": 4096, "items": {"$ref": "#/$defs/boundedPath"}},
+        "agent_working_files": {"type": "array", "maxItems": 4096, "items": {"$ref": "#/$defs/boundedPath"}},
+        "implicit_working_directories": {"type": "array", "maxItems": 4096, "items": {"$ref": "#/$defs/boundedPath"}},
+        "product_support_paths": {"type": "array", "maxItems": 4096, "items": {"$ref": "#/$defs/boundedPath"}},
+        "semantic_created_paths": {"type": "array", "maxItems": 4096, "items": {"$ref": "#/$defs/boundedPath"}},
+        "canonical_sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "integrityRecord": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "version", "provenance", "report_sha256", "commands_sha256",
+        "file_changes_sha256", "operation_bindings", "command_records",
+        "filesystem_view"
+      ],
+      "properties": {
+        "version": {"const": "complete-suite-integrity-approved-run-v1"},
+        "provenance": {"const": "powershell-command-plan-v1"},
+        "report_sha256": {"$ref": "#/$defs/sha256"},
+        "commands_sha256": {"$ref": "#/$defs/sha256"},
+        "file_changes_sha256": {"$ref": "#/$defs/sha256"},
+        "operation_bindings": {"type": "array", "maxItems": 128, "items": {"$ref": "#/$defs/integrityOperationBinding"}},
+        "command_records": {"type": "array", "maxItems": 128, "items": {"$ref": "#/$defs/adjudicationCommandRecord"}},
+        "filesystem_view": {"$ref": "#/$defs/integrityFilesystemView"}
+      }
+    },
+    "integrityWrapper": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["record", "canonical_utf8_bytes", "canonical_sha256"],
+      "properties": {
+        "record": {"$ref": "#/$defs/integrityRecord"},
+        "canonical_utf8_bytes": {"$ref": "#/$defs/nonNegativeInteger"},
+        "canonical_sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "filePlanChange": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["change_ordinal", "normalized_path", "kind"],
+      "properties": {
+        "change_ordinal": {"$ref": "#/$defs/nonNegativeInteger"},
+        "normalized_path": {"$ref": "#/$defs/boundedPath"},
+        "kind": {"enum": ["add", "update"]}
+      }
+    },
+    "filePlanDomain": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["started_item_sha256", "completed_item_sha256", "changes"],
+      "properties": {
+        "started_item_sha256": {"$ref": "#/$defs/sha256"},
+        "completed_item_sha256": {"$ref": "#/$defs/sha256"},
+        "changes": {"type": "array", "minItems": 1, "maxItems": 256, "items": {"$ref": "#/$defs/filePlanChange"}}
+      }
+    },
+    "filePlanRecord": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version", "lifecycle_index", "event_id",
+        "started_event_ordinal", "completed_event_ordinal", "terminal_status",
+        "raw", "retained", "topology_sha256", "canonical_sha256"
+      ],
+      "properties": {
+        "schema_version": {"const": "complete-suite-retained-file-change-plan-v1"},
+        "lifecycle_index": {"$ref": "#/$defs/nonNegativeInteger"},
+        "event_id": {"$ref": "#/$defs/boundedIdentifier"},
+        "started_event_ordinal": {"$ref": "#/$defs/nonNegativeInteger"},
+        "completed_event_ordinal": {"$ref": "#/$defs/nonNegativeInteger"},
+        "terminal_status": {"const": "completed"},
+        "raw": {"$ref": "#/$defs/filePlanDomain"},
+        "retained": {"$ref": "#/$defs/filePlanDomain"},
+        "topology_sha256": {"$ref": "#/$defs/sha256"},
+        "canonical_sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "entrySource": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "lifecycle_index", "event_id", "started_event_ordinal",
+        "completed_event_ordinal", "terminal_status", "topology_sha256"
+      ],
+      "properties": {
+        "lifecycle_index": {"$ref": "#/$defs/nonNegativeInteger"},
+        "event_id": {"$ref": "#/$defs/boundedIdentifier"},
+        "started_event_ordinal": {"$ref": "#/$defs/nonNegativeInteger"},
+        "completed_event_ordinal": {"$ref": "#/$defs/nonNegativeInteger"},
+        "terminal_status": {"const": "completed"},
+        "topology_sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "entryPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["version", "variant", "case_id", "case_policy_sha256", "normalized_plan_sha256", "decision_sha256"],
+      "properties": {
+        "version": {"const": "complete-suite-file-change-policy-v1"},
+        "variant": {"enum": ["baseline", "suite-enabled"]},
+        "case_id": {"$ref": "#/$defs/boundedIdentifier"},
+        "case_policy_sha256": {"$ref": "#/$defs/sha256"},
+        "normalized_plan_sha256": {"$ref": "#/$defs/sha256"},
+        "decision_sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "entryCounts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["transition_entries", "unique_files", "raw_bytes", "retained_bytes"],
+      "properties": {
+        "transition_entries": {"type": "integer", "minimum": 1, "maximum": 256},
+        "unique_files": {"type": "integer", "minimum": 1, "maximum": 128},
+        "raw_bytes": {"type": "integer", "minimum": 0, "maximum": 33554432},
+        "retained_bytes": {"type": "integer", "minimum": 0, "maximum": 33554432}
+      }
+    },
+    "retainedFileChangeLedgerEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "entry_index", "plan_line_ordinal", "plan_sha256", "source_item",
+        "raw_plan", "retained_plan", "policy", "raw_session_identity",
+        "retained_session_identity", "sanitizer_ledger_sha256",
+        "aggregate_transition", "contents", "counts", "operation_bindings",
+        "filesystem_evidence_sha256", "delta_partition_sha256",
+        "behavioral_filesystem_view_sha256",
+        "integrity_approved_run_evidence_sha256", "retained_plan_record",
+        "canonical_sha256"
+      ],
+      "properties": {
+        "entry_index": {"$ref": "#/$defs/nonNegativeInteger"},
+        "plan_line_ordinal": {"$ref": "#/$defs/nonNegativeInteger"},
+        "plan_sha256": {"$ref": "#/$defs/sha256"},
+        "source_item": {"$ref": "#/$defs/entrySource"},
+        "raw_plan": {"$ref": "#/$defs/filePlanDomain"},
+        "retained_plan": {"$ref": "#/$defs/filePlanDomain"},
+        "policy": {"$ref": "#/$defs/entryPolicy"},
+        "raw_session_identity": {"$ref": "#/$defs/sessionIdentity"},
+        "retained_session_identity": {"$ref": "#/$defs/sessionIdentity"},
+        "sanitizer_ledger_sha256": {"$ref": "#/$defs/sha256"},
+        "aggregate_transition": {"$ref": "#/$defs/aggregateTransition"},
+        "contents": {"type": "array", "maxItems": 128, "items": {"$ref": "#/$defs/retainedContent"}},
+        "counts": {"$ref": "#/$defs/entryCounts"},
+        "operation_bindings": {"type": "array", "maxItems": 128, "items": {"$ref": "#/$defs/operationBindingWrapper"}},
+        "filesystem_evidence_sha256": {"$ref": "#/$defs/sha256"},
+        "delta_partition_sha256": {"$ref": "#/$defs/sha256"},
+        "behavioral_filesystem_view_sha256": {"$ref": "#/$defs/sha256"},
+        "integrity_approved_run_evidence_sha256": {"$ref": "#/$defs/sha256"},
+        "retained_plan_record": {"$ref": "#/$defs/filePlanRecord"},
+        "canonical_sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "retainedEvidencePaths": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["command_plans", "command_plan_ledger", "file_change_plans", "file_change_ledger"],
+      "properties": {
+        "command_plans": {"const": "command-plans.jsonl"},
+        "command_plan_ledger": {"const": "command-plan-ledger.json"},
+        "file_change_plans": {"const": "file-change-plans.jsonl"},
+        "file_change_ledger": {"const": "file-change-ledger.json"}
+      }
+    },
+    "retainedFileChangeLedger": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version", "variant", "case_id", "policy_version",
+        "case_policy_sha256", "raw_session_identity",
+        "retained_session_identity", "raw_session_sha256",
+        "retained_session_sha256", "sanitizer_ledger_sha256",
+        "filesystem_evidence", "raw_plan_sha256", "retained_plan_sha256",
+        "topology_sha256", "normalized_plan_sha256", "decision",
+        "aggregate_transition", "content_inventory_sha256",
+        "delta_partition", "counts", "contents", "entries",
+        "record_fold_sha256", "operation_bindings",
+        "behavioral_filesystem_view", "integrity_approved_run_evidence",
+        "retained_evidence_paths"
+      ],
+      "properties": {
+        "schema_version": {"const": "complete-suite-retained-file-change-ledger-v1"},
+        "variant": {"enum": ["baseline", "suite-enabled"]},
+        "case_id": {"$ref": "#/$defs/boundedIdentifier"},
+        "policy_version": {"const": "complete-suite-file-change-policy-v1"},
+        "case_policy_sha256": {"$ref": "#/$defs/sha256"},
+        "raw_session_identity": {"$ref": "#/$defs/sessionIdentity"},
+        "retained_session_identity": {"$ref": "#/$defs/sessionIdentity"},
+        "raw_session_sha256": {"$ref": "#/$defs/sha256"},
+        "retained_session_sha256": {"$ref": "#/$defs/sha256"},
+        "sanitizer_ledger_sha256": {"$ref": "#/$defs/sha256"},
+        "filesystem_evidence": {"$ref": "#/$defs/filesystemEvidenceWrapper"},
+        "raw_plan_sha256": {"$ref": "#/$defs/sha256"},
+        "retained_plan_sha256": {"$ref": "#/$defs/sha256"},
+        "topology_sha256": {"$ref": "#/$defs/sha256"},
+        "normalized_plan_sha256": {"$ref": "#/$defs/sha256"},
+        "decision": {"$ref": "#/$defs/decisionWrapper"},
+        "aggregate_transition": {"$ref": "#/$defs/aggregateTransition"},
+        "content_inventory_sha256": {"$ref": "#/$defs/sha256"},
+        "delta_partition": {"$ref": "#/$defs/deltaPartition"},
+        "counts": {"$ref": "#/$defs/retainedCounts"},
+        "contents": {"type": "array", "maxItems": 128, "items": {"$ref": "#/$defs/retainedContent"}},
+        "entries": {"type": "array", "maxItems": 64, "items": {"$ref": "#/$defs/retainedFileChangeLedgerEntry"}},
+        "record_fold_sha256": {"$ref": "#/$defs/sha256"},
+        "operation_bindings": {"type": "array", "maxItems": 128, "items": {"$ref": "#/$defs/operationBindingWrapper"}},
+        "behavioral_filesystem_view": {"$ref": "#/$defs/filesystemViewWrapper"},
+        "integrity_approved_run_evidence": {"$ref": "#/$defs/integrityWrapper"},
+        "retained_evidence_paths": {"$ref": "#/$defs/retainedEvidencePaths"}
+      }
     }
   }
 }

@@ -3279,3 +3279,209 @@ def bind_raw_and_retained_plans(
         normalized_plan_sha256=sha256(normalized_bytes).hexdigest(),
         normalized_plan_bytes=normalized_bytes,
     )
+
+
+def validate_retained_command_plan_bytes(
+    plan_bytes: bytes,
+    *,
+    expected_sha256: str,
+) -> dict[str, Any]:
+    """Validate a detached retained normalized-plan record.
+
+    This authenticates the closed canonical record and its internal digest
+    topology.  It intentionally does not claim that recorded raw filesystem
+    identities have been observed again; approved-raw replay must use the live
+    binders for that stronger assertion.
+    """
+
+    if (
+        type(plan_bytes) is not bytes
+        or not plan_bytes
+        or len(plan_bytes) > _DECODER_LIMITS.plan_bytes
+        or type(expected_sha256) is not str
+        or _LOWER_SHA256.fullmatch(expected_sha256) is None
+        or sha256(plan_bytes).hexdigest() != expected_sha256
+    ):
+        _reject(COMMAND_PLAN_CANONICAL_INVALID)
+    document = _decode_single_json_object(plan_bytes)
+    if _canonical_json_bytes(document) != plan_bytes or set(document) != {
+        "bindings",
+        "command",
+        "decoder",
+        "namespace_manifest_sha256",
+        "namespaces",
+        "shell",
+        "version",
+    }:
+        _reject(COMMAND_PLAN_CANONICAL_INVALID)
+    if document.get("version") != _BOUND_COMMAND_PLAN_VERSION:
+        _reject(COMMAND_PLAN_CANONICAL_INVALID)
+
+    def digest_record(value: object) -> bool:
+        return (
+            type(value) is dict
+            and set(value) == {"sha256", "utf8_bytes"}
+            and type(value.get("utf8_bytes")) is int
+            and value["utf8_bytes"] >= 0
+            and type(value.get("sha256")) is str
+            and _LOWER_SHA256.fullmatch(value["sha256"]) is not None
+        )
+
+    bindings = document.get("bindings")
+    if type(bindings) is not dict or set(bindings) != {"raw", "retained"}:
+        _reject(COMMAND_PLAN_CANONICAL_INVALID)
+    for domain in ("raw", "retained"):
+        binding = bindings[domain]
+        if (
+            type(binding) is not dict
+            or set(binding) != {"rendered", "payload_field", "payload"}
+            or not all(digest_record(binding[name]) for name in binding)
+        ):
+            _reject(COMMAND_PLAN_CANONICAL_INVALID)
+
+    shell = document.get("shell")
+    if (
+        type(shell) is not dict
+        or set(shell)
+        != {
+            "path",
+            "sha256",
+            "file_version",
+            "product_version",
+            "edition",
+            "parser_version",
+        }
+        or any(
+            type(shell.get(name)) is not str or not shell[name]
+            for name in (
+                "path",
+                "file_version",
+                "product_version",
+                "edition",
+                "parser_version",
+            )
+        )
+        or type(shell.get("sha256")) is not str
+        or _LOWER_SHA256.fullmatch(shell["sha256"]) is None
+    ):
+        _reject(COMMAND_PLAN_CANONICAL_INVALID)
+
+    decoder = document.get("decoder")
+    decoder_path = decoder.get("path") if type(decoder) is dict else None
+    try:
+        detached_decoder_path = PureWindowsPath(decoder_path)
+    except (TypeError, ValueError):
+        detached_decoder_path = PureWindowsPath(".")
+    if (
+        type(decoder) is not dict
+        or set(decoder) != {"path", "sha256"}
+        or type(decoder_path) is not str
+        or not decoder_path
+        or detached_decoder_path.is_absolute()
+        or detached_decoder_path.anchor
+        or not detached_decoder_path.parts
+        or any(part in {"", ".", ".."} for part in detached_decoder_path.parts)
+        or detached_decoder_path.suffix.casefold() != ".ps1"
+        or type(decoder.get("sha256")) is not str
+        or _LOWER_SHA256.fullmatch(decoder["sha256"]) is None
+    ):
+        _reject(COMMAND_PLAN_CANONICAL_INVALID)
+
+    identity_fields = {
+        "device",
+        "inode",
+        "file_type",
+        "reparse_tag",
+        "link_count",
+    }
+
+    def identity_record(value: object) -> bool:
+        return (
+            type(value) is dict
+            and set(value) == identity_fields
+            and all(type(item) is int and item >= 0 for item in value.values())
+            and value["file_type"] != 0
+            and value["link_count"] != 0
+        )
+
+    namespaces = document.get("namespaces")
+    if (
+        type(namespaces) is not list
+        or len(namespaces) > _PATH_NAMESPACE_LIMIT
+    ):
+        _reject(COMMAND_PLAN_CANONICAL_INVALID)
+    labels: list[str] = []
+    for namespace in namespaces:
+        if (
+            type(namespace) is not dict
+            or set(namespace)
+            != {
+                "label",
+                "raw_root_sha256",
+                "retained_root",
+                "raw_identity",
+                "retained_identity",
+                "raw_ancestor_identities",
+                "retained_ancestor_identities",
+                "raw_case_sensitive",
+                "retained_case_sensitive",
+                "canonical_sha256",
+            }
+            or type(namespace.get("label")) is not str
+            or _PATH_NAMESPACE_LABEL.fullmatch(namespace["label"]) is None
+            or type(namespace.get("retained_root")) is not str
+            or not namespace["retained_root"]
+            or any(
+                type(namespace.get(name)) is not str
+                or _LOWER_SHA256.fullmatch(namespace[name]) is None
+                for name in ("raw_root_sha256", "canonical_sha256")
+            )
+            or not identity_record(namespace.get("raw_identity"))
+            or not identity_record(namespace.get("retained_identity"))
+            or any(
+                type(namespace.get(name)) is not list
+                or len(namespace[name]) > 64
+                or not all(identity_record(value) for value in namespace[name])
+                for name in (
+                    "raw_ancestor_identities",
+                    "retained_ancestor_identities",
+                )
+            )
+            or type(namespace.get("raw_case_sensitive")) is not bool
+            or type(namespace.get("retained_case_sensitive")) is not bool
+        ):
+            _reject(COMMAND_PLAN_CANONICAL_INVALID)
+        labels.append(namespace["label"])
+    if len(labels) != len(set(labels)):
+        _reject(COMMAND_PLAN_CANONICAL_INVALID)
+    manifest = {
+        "version": _PATH_NAMESPACE_MANIFEST_VERSION,
+        "namespaces": namespaces,
+    }
+    manifest_sha256 = document.get("namespace_manifest_sha256")
+    if (
+        type(manifest_sha256) is not str
+        or _LOWER_SHA256.fullmatch(manifest_sha256) is None
+        or sha256(_canonical_json_bytes(manifest)).hexdigest()
+        != manifest_sha256
+    ):
+        _reject(COMMAND_PLAN_CANONICAL_INVALID)
+
+    command = document.get("command")
+    if (
+        type(command) is not dict
+        or set(command) != {"metrics", "nodes", "tokens"}
+        or type(command.get("metrics")) is not dict
+        or type(command.get("nodes")) is not list
+        or type(command.get("tokens")) is not list
+        or len(command["nodes"]) > _DECODER_LIMITS.ast_nodes
+        or len(command["tokens"]) > _DECODER_LIMITS.tokens
+    ):
+        _reject(COMMAND_PLAN_CANONICAL_INVALID)
+    try:
+        import complete_suite_command_policy as command_policy
+
+        command_policy._validate_normalized_command(document)
+    except RuntimeError:
+        _reject(COMMAND_PLAN_CANONICAL_INVALID)
+    return _decode_single_json_object(bytes(plan_bytes))

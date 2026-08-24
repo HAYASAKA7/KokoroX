@@ -49,6 +49,541 @@ def _write_yaml(path: Path, value: object) -> None:
     )
 
 
+def _task8_import_authorization_fixture(
+    root: Path,
+    *,
+    campaign_sha256: str | None = None,
+    envelope_sha256: str | None = None,
+    raw_root: Path | None = None,
+    retained_root: Path | None = None,
+    retained_root_record: Path | None = None,
+) -> tuple[bytes, dict[str, object], dict[str, object]]:
+    authorization_id = "0123456789abcdef0123456789abcdef"
+    campaign_sha256 = "1" * 64 if campaign_sha256 is None else campaign_sha256
+    envelope_sha256 = "2" * 64 if envelope_sha256 is None else envelope_sha256
+    provider_approval_sha256 = "3" * 64
+    raw_seal_sha256 = "4" * 64
+    raw_inventory_sha256 = "5" * 64
+    raw_root = (
+        (root / "sealed-raw-campaign").resolve()
+        if raw_root is None
+        else raw_root.resolve()
+    )
+    raw_root.mkdir(parents=True, exist_ok=True)
+    retained_root = (
+        (root / "repository" / "retained" / "approved6").resolve()
+        if retained_root is None
+        else retained_root.resolve()
+    )
+    retained_root_record = (
+        retained_root if retained_root_record is None else retained_root_record
+    )
+    retained_root_text = (
+        str(retained_root_record)
+        if retained_root_record.is_absolute()
+        else retained_root_record.as_posix()
+    )
+    authorization_root = (
+        root / f"kokoroarc-c6-import-authorization-{authorization_id}"
+    ).resolve()
+    authorization_root.mkdir(parents=True)
+    sealed_audit_path = (root / "sealed-audit" / "audit.json").resolve()
+    sealed_audit = {
+        "schema_version": "complete-suite-sealed-campaign-audit-v1",
+        "result_class": "sealed_24_run",
+        "campaign_sha256": campaign_sha256,
+        "approval_envelope_sha256": envelope_sha256,
+        "provider_approval_sha256": provider_approval_sha256,
+        "raw_root": str(raw_root),
+        "raw_seal_sha256": raw_seal_sha256,
+        "raw_inventory_sha256": raw_inventory_sha256,
+        "run_count": 24,
+        "retained_root": retained_root_text,
+        "retained_root_state": "absent",
+        "retry_allowed": False,
+    }
+    _write_json(sealed_audit_path, sealed_audit)
+    sealed_audit_sha256 = sha256(sealed_audit_path.read_bytes()).hexdigest()
+    prompt_path = authorization_root / "import-authorization-prompt.txt"
+    prompt = (
+        "KOKOROARC CAMPAIGN 6 IMPORT AUTHORIZATION v1\n"
+        f"authorization_id={authorization_id}\n"
+        "campaign_id=2026-08-21-proposed6\n"
+        f"campaign_sha256={campaign_sha256}\n"
+        f"approval_envelope_sha256={envelope_sha256}\n"
+        f"provider_approval_sha256={provider_approval_sha256}\n"
+        f"sealed_campaign_audit_record={sealed_audit_path}\n"
+        f"sealed_campaign_audit_sha256={sealed_audit_sha256}\n"
+        "sealed_campaign_result_class=sealed_24_run\n"
+        f"raw_root={raw_root}\n"
+        f"raw_seal_sha256={raw_seal_sha256}\n"
+        f"raw_inventory_sha256={raw_inventory_sha256}\n"
+        "run_count=24\n"
+        f"retained_root={retained_root_text}\n"
+        "retained_root_state=absent\n"
+        "actions=adjudicate,import,sanitize\n"
+        "retry_allowed=false\n"
+        "authorization=import sanitize adjudicate\n"
+        "reply_grammar=APPROVE CAMPAIGN 6 IMPORT SANITIZE ADJUDICATE "
+        "<sealed-campaign-audit-sha256> <authorization-prompt-sha256>\n"
+    ).encode("utf-8")
+    prompt_path.write_bytes(prompt)
+    prompt_sha256 = sha256(prompt).hexdigest()
+    response_text = (
+        "APPROVE CAMPAIGN 6 IMPORT SANITIZE ADJUDICATE "
+        f"{sealed_audit_sha256} {prompt_sha256}"
+    )
+    record = {
+        "schema_version": "complete-suite-import-authorization-v2",
+        "capture_method": "codex-conversation-operator-attestation-v1",
+        "user_event_authentication": "operator-attested-not-cryptographic",
+        "authorization_id": authorization_id,
+        "observed_at": "2026-08-24T00:00:00Z",
+        "authorization_prompt_record": str(prompt_path),
+        "authorization_prompt_sha256": prompt_sha256,
+        "response_text": response_text,
+        "response_sha256": sha256(response_text.encode("utf-8")).hexdigest(),
+        "campaign_id": "2026-08-21-proposed6",
+        "campaign_sha256": campaign_sha256,
+        "approval_envelope_sha256": envelope_sha256,
+        "provider_approval_sha256": provider_approval_sha256,
+        "sealed_campaign_audit_record": str(sealed_audit_path),
+        "sealed_campaign_audit_sha256": sealed_audit_sha256,
+        "raw_root": str(raw_root),
+        "raw_seal_sha256": raw_seal_sha256,
+        "raw_inventory_sha256": raw_inventory_sha256,
+        "run_count": 24,
+        "retained_root": retained_root_text,
+        "actions": ["adjudicate", "import", "sanitize"],
+        "retry_allowed": False,
+    }
+    record_bytes = _canonical_bytes(record) + b"\n"
+    expected = {
+        "expected_record_sha256": sha256(record_bytes).hexdigest(),
+        "expected_import_authorization_prompt_sha256": prompt_sha256,
+        "expected_campaign_sha256": campaign_sha256,
+        "expected_envelope_sha256": envelope_sha256,
+        "expected_provider_approval_sha256": provider_approval_sha256,
+        "expected_sealed_campaign_audit_sha256": sealed_audit_sha256,
+        "expected_raw_root": raw_root,
+        "expected_raw_seal_sha256": raw_seal_sha256,
+        "expected_raw_inventory_sha256": raw_inventory_sha256,
+        "expected_retained_root": retained_root_record,
+    }
+    return record_bytes, expected, record
+
+
+def test_import_authorization_accepts_exact_task15_record(tmp_path: Path) -> None:
+    from import_complete_suite_campaign import validate_import_authorization
+
+    record_bytes, expected, record = _task8_import_authorization_fixture(tmp_path)
+
+    authorization = validate_import_authorization(record_bytes, **expected)
+
+    assert authorization.authorization_id == record["authorization_id"]
+    assert authorization.actions == ("adjudicate", "import", "sanitize")
+    assert authorization.canonical_bytes == record_bytes
+    assert authorization.canonical_sha256 == expected["expected_record_sha256"]
+
+
+def _task8_prompt_from_authorization(record: dict[str, object]) -> bytes:
+    return (
+        "KOKOROARC CAMPAIGN 6 IMPORT AUTHORIZATION v1\n"
+        f"authorization_id={record['authorization_id']}\n"
+        "campaign_id=2026-08-21-proposed6\n"
+        f"campaign_sha256={record['campaign_sha256']}\n"
+        "approval_envelope_sha256="
+        f"{record['approval_envelope_sha256']}\n"
+        "provider_approval_sha256="
+        f"{record['provider_approval_sha256']}\n"
+        "sealed_campaign_audit_record="
+        f"{record['sealed_campaign_audit_record']}\n"
+        "sealed_campaign_audit_sha256="
+        f"{record['sealed_campaign_audit_sha256']}\n"
+        "sealed_campaign_result_class=sealed_24_run\n"
+        f"raw_root={record['raw_root']}\n"
+        f"raw_seal_sha256={record['raw_seal_sha256']}\n"
+        "raw_inventory_sha256="
+        f"{record['raw_inventory_sha256']}\n"
+        "run_count=24\n"
+        f"retained_root={record['retained_root']}\n"
+        "retained_root_state=absent\n"
+        "actions=adjudicate,import,sanitize\n"
+        "retry_allowed=false\n"
+        "authorization=import sanitize adjudicate\n"
+        "reply_grammar=APPROVE CAMPAIGN 6 IMPORT SANITIZE ADJUDICATE "
+        "<sealed-campaign-audit-sha256> <authorization-prompt-sha256>\n"
+    ).encode("utf-8")
+
+
+def _task8_reseal_authorization(
+    record: dict[str, object],
+    expected: dict[str, object],
+) -> tuple[bytes, dict[str, object]]:
+    prompt = _task8_prompt_from_authorization(record)
+    Path(str(record["authorization_prompt_record"])).write_bytes(prompt)
+    prompt_sha256 = sha256(prompt).hexdigest()
+    record["authorization_prompt_sha256"] = prompt_sha256
+    expected["expected_import_authorization_prompt_sha256"] = prompt_sha256
+    response = (
+        "APPROVE CAMPAIGN 6 IMPORT SANITIZE ADJUDICATE "
+        f"{record['sealed_campaign_audit_sha256']} {prompt_sha256}"
+    )
+    record["response_text"] = response
+    record["response_sha256"] = sha256(response.encode("utf-8")).hexdigest()
+    record_bytes = _canonical_bytes(record) + b"\n"
+    expected["expected_record_sha256"] = sha256(record_bytes).hexdigest()
+    return record_bytes, expected
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    (
+        "noncanonical-record",
+        "duplicate-key",
+        "wrong-record-hash",
+        "unknown-field",
+        "reordered-actions",
+        "wrong-prompt-hash",
+        "wrong-authorization-id",
+        "wrong-response",
+        "wrong-campaign",
+        "wrong-raw-seal",
+        "wrong-raw-inventory",
+        "wrong-retained-root",
+        "wrong-audit-class",
+    ),
+)
+def test_import_authorization_rejects_closed_tamper_matrix(
+    tmp_path: Path,
+    mutation: str,
+) -> None:
+    from import_complete_suite_campaign import validate_import_authorization
+
+    record_bytes, expected, record = _task8_import_authorization_fixture(tmp_path)
+    if mutation == "noncanonical-record":
+        record_bytes = b"{ " + record_bytes[1:]
+        expected["expected_record_sha256"] = sha256(record_bytes).hexdigest()
+    elif mutation == "duplicate-key":
+        record_bytes = (
+            b'{"schema_version":"complete-suite-import-authorization-v2",'
+            + record_bytes[1:]
+        )
+        expected["expected_record_sha256"] = sha256(record_bytes).hexdigest()
+    elif mutation == "wrong-record-hash":
+        expected["expected_record_sha256"] = "f" * 64
+    elif mutation == "unknown-field":
+        record["unexpected"] = True
+        record_bytes = _canonical_bytes(record) + b"\n"
+        expected["expected_record_sha256"] = sha256(record_bytes).hexdigest()
+    elif mutation == "reordered-actions":
+        record["actions"] = ["import", "sanitize", "adjudicate"]
+        record_bytes = _canonical_bytes(record) + b"\n"
+        expected["expected_record_sha256"] = sha256(record_bytes).hexdigest()
+    elif mutation == "wrong-prompt-hash":
+        record["authorization_prompt_sha256"] = "e" * 64
+        expected["expected_import_authorization_prompt_sha256"] = "e" * 64
+        record_bytes = _canonical_bytes(record) + b"\n"
+        expected["expected_record_sha256"] = sha256(record_bytes).hexdigest()
+    elif mutation == "wrong-authorization-id":
+        record["authorization_id"] = "f" * 32
+        record_bytes = _canonical_bytes(record) + b"\n"
+        expected["expected_record_sha256"] = sha256(record_bytes).hexdigest()
+    elif mutation == "wrong-response":
+        record["response_text"] = "APPROVE CAMPAIGN 6 IMPORT"
+        record["response_sha256"] = sha256(
+            str(record["response_text"]).encode("utf-8")
+        ).hexdigest()
+        record_bytes = _canonical_bytes(record) + b"\n"
+        expected["expected_record_sha256"] = sha256(record_bytes).hexdigest()
+    elif mutation == "wrong-campaign":
+        record["campaign_sha256"] = "d" * 64
+        record_bytes = _canonical_bytes(record) + b"\n"
+        expected["expected_record_sha256"] = sha256(record_bytes).hexdigest()
+    elif mutation == "wrong-raw-seal":
+        record["raw_seal_sha256"] = "c" * 64
+        record_bytes = _canonical_bytes(record) + b"\n"
+        expected["expected_record_sha256"] = sha256(record_bytes).hexdigest()
+    elif mutation == "wrong-raw-inventory":
+        record["raw_inventory_sha256"] = "b" * 64
+        record_bytes = _canonical_bytes(record) + b"\n"
+        expected["expected_record_sha256"] = sha256(record_bytes).hexdigest()
+    elif mutation == "wrong-retained-root":
+        record["retained_root"] = str(tmp_path / "other-retained")
+        record_bytes = _canonical_bytes(record) + b"\n"
+        expected["expected_record_sha256"] = sha256(record_bytes).hexdigest()
+    else:
+        audit_path = Path(str(record["sealed_campaign_audit_record"]))
+        audit = json.loads(audit_path.read_text(encoding="utf-8"))
+        audit["result_class"] = "sealed_zero_run_failure"
+        _write_json(audit_path, audit)
+        audit_sha256 = sha256(audit_path.read_bytes()).hexdigest()
+        record["sealed_campaign_audit_sha256"] = audit_sha256
+        expected["expected_sealed_campaign_audit_sha256"] = audit_sha256
+        record_bytes, expected = _task8_reseal_authorization(record, expected)
+
+    with pytest.raises(RuntimeError):
+        validate_import_authorization(record_bytes, **expected)
+
+
+def test_import_authorization_rejects_preexisting_retained_root(
+    tmp_path: Path,
+) -> None:
+    from import_complete_suite_campaign import validate_import_authorization
+
+    record_bytes, expected, _record = _task8_import_authorization_fixture(tmp_path)
+    retained_root = expected["expected_retained_root"]
+    assert isinstance(retained_root, Path)
+    retained_root.mkdir(parents=True)
+
+    with pytest.raises(RuntimeError, match="already exists"):
+        validate_import_authorization(record_bytes, **expected)
+
+
+@pytest.mark.parametrize("mode", ("missing", "changed"))
+def test_importer_authorization_failure_precedes_parent_or_stage_creation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    mode: str,
+) -> None:
+    import import_complete_suite_campaign as importer
+
+    raw_root = tmp_path / "raw-campaign"
+    paths = _paths(tmp_path / "repository", raw_root)
+    campaign = yaml.safe_load(paths.campaign_file.read_text(encoding="utf-8"))
+    campaign["campaign_id"] = "2026-08-21-proposed6"
+    _write_yaml(paths.campaign_file, campaign)
+    campaign_hash, required = _approve_synthetic(paths, raw_root)
+    observed_git = {
+        "commit": "1" * 40,
+        "tree": "2" * 40,
+        "parent": "3" * 40,
+    }
+    runner.execute_campaign(
+        paths,
+        approved_campaign_sha256=campaign_hash,
+        required_frozen_paths=required,
+        observed_git=observed_git,
+        codex_executable=Path(sys.executable),
+        python_executable=Path(sys.executable),
+        host_environment={"PATH": "synthetic"},
+        prepare_factory=_prepare_synthetic_approved_campaign,
+        run_factory=lambda case_root, item, **_kwargs: _synthetic_run_status(
+            case_root,
+            item,
+        ),
+        version_factory=lambda _path, _environment: "codex-cli 0.148.0",
+    )
+    retained_repository = tmp_path / "retained-repository"
+    retained_repository.mkdir()
+    expected_retained_root = (
+        retained_repository
+        / "tests"
+        / "skills"
+        / "evidence"
+        / "complete-suite"
+        / "approved2"
+    )
+    retained_parent = expected_retained_root.parent
+    campaign = yaml.safe_load(paths.campaign_file.read_text(encoding="utf-8"))
+    envelope_sha256 = runner.approval_envelope_sha256(campaign)
+    record_bytes, expected, record = _task8_import_authorization_fixture(
+        tmp_path / "authorization-fixture",
+        campaign_sha256=campaign_hash,
+        envelope_sha256=envelope_sha256,
+        raw_root=raw_root,
+        retained_root=expected_retained_root,
+    )
+    authorization_path = (
+        Path(str(record["authorization_prompt_record"])).parent
+        / "import-authorization.json"
+    )
+    authorization_path.write_bytes(record_bytes + b" ")
+
+    def forbid_staging(*_args: object, **_kwargs: object) -> str:
+        pytest.fail("authorization failure reached importer staging")
+
+    monkeypatch.setattr(importer.tempfile, "mkdtemp", forbid_staging)
+    arguments: dict[str, object] = {}
+    if mode == "changed":
+        arguments = {
+            "import_authorization": authorization_path,
+            "expected_import_authorization_sha256": expected[
+                "expected_record_sha256"
+            ],
+            "expected_import_authorization_prompt_sha256": expected[
+                "expected_import_authorization_prompt_sha256"
+            ],
+            "sealed_campaign_audit": Path(
+                str(record["sealed_campaign_audit_record"])
+            ),
+            "expected_sealed_campaign_audit_sha256": expected[
+                "expected_sealed_campaign_audit_sha256"
+            ],
+            "approved_envelope_sha256": envelope_sha256,
+            "provider_approval_sha256": expected[
+                "expected_provider_approval_sha256"
+            ],
+            "expected_raw_seal_sha256": expected[
+                "expected_raw_seal_sha256"
+            ],
+            "expected_raw_inventory_sha256": expected[
+                "expected_raw_inventory_sha256"
+            ],
+            "expected_retained_root": expected_retained_root,
+        }
+
+    with pytest.raises(RuntimeError, match="authorization"):
+        importer.import_campaign(
+            raw_root,
+            paths=paths,
+            retained_repository_root=retained_repository,
+            approved_campaign_sha256=campaign_hash,
+            required_frozen_paths=required,
+            observed_git=observed_git,
+            retain_factory=lambda *_args, **_kwargs: pytest.fail(
+                "authorization failure reached run retention"
+            ),
+            **arguments,
+        )
+
+    assert not retained_parent.exists()
+    assert not expected_retained_root.exists()
+
+
+def test_import_and_adjudication_cli_are_consumer_only(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import inspect
+
+    import complete_suite_adjudication as adjudication
+    import import_complete_suite_campaign as importer
+
+    raw_root = tmp_path / "raw"
+    retained_root = tmp_path / "retained"
+    declared_retained_root = Path(
+        "tests/skills/evidence/complete-suite/approved6"
+    )
+    authorization_path = tmp_path / "authorization.json"
+    sealed_audit_path = tmp_path / "sealed-audit.json"
+    hashes = {
+        "campaign": "1" * 64,
+        "authorization": "2" * 64,
+        "prompt": "3" * 64,
+        "audit": "4" * 64,
+        "envelope": "5" * 64,
+        "provider": "6" * 64,
+        "seal": "7" * 64,
+        "inventory": "8" * 64,
+    }
+    common_argv = [
+        "--import-authorization",
+        str(authorization_path),
+        "--expected-import-authorization-sha256",
+        hashes["authorization"],
+        "--expected-import-authorization-prompt-sha256",
+        hashes["prompt"],
+        "--sealed-campaign-audit",
+        str(sealed_audit_path),
+        "--expected-sealed-campaign-audit-sha256",
+        hashes["audit"],
+        "--approved-campaign-sha256",
+        hashes["campaign"],
+        "--approved-envelope-sha256",
+        hashes["envelope"],
+        "--provider-approval-sha256",
+        hashes["provider"],
+        "--expected-raw-seal-sha256",
+        hashes["seal"],
+        "--expected-raw-inventory-sha256",
+        hashes["inventory"],
+        "--expected-retained-root",
+        declared_retained_root.as_posix(),
+    ]
+    imported: dict[str, object] = {}
+
+    def fake_import(raw: Path, **kwargs: object) -> Path:
+        imported.update({"raw_root": raw, **kwargs})
+        return retained_root
+
+    monkeypatch.setattr(importer, "import_campaign", fake_import)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "import_complete_suite_campaign.py",
+            str(raw_root),
+            *common_argv,
+        ],
+    )
+    importer.main()
+    assert imported == {
+        "raw_root": raw_root,
+        "expected_retained_root": declared_retained_root,
+        "import_authorization": authorization_path,
+        "expected_import_authorization_sha256": hashes["authorization"],
+        "expected_import_authorization_prompt_sha256": hashes["prompt"],
+        "sealed_campaign_audit": sealed_audit_path,
+        "expected_sealed_campaign_audit_sha256": hashes["audit"],
+        "approved_campaign_sha256": hashes["campaign"],
+        "approved_envelope_sha256": hashes["envelope"],
+        "provider_approval_sha256": hashes["provider"],
+        "expected_raw_seal_sha256": hashes["seal"],
+        "expected_raw_inventory_sha256": hashes["inventory"],
+    }
+
+    adjudicated: dict[str, object] = {}
+    results_root = retained_root / "results"
+
+    def fake_adjudicate(raw: Path, retained: Path, **kwargs: object) -> Path:
+        adjudicated.update(
+            {"raw_root": raw, "retained_root": retained, **kwargs}
+        )
+        return results_root
+
+    monkeypatch.setattr(adjudication, "adjudicate_campaign", fake_adjudicate)
+    monkeypatch.setattr(
+        adjudication,
+        "_load_json_object",
+        lambda _path: {"suite_closure_passed": True},
+    )
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "complete_suite_adjudication.py",
+            str(raw_root),
+            str(retained_root),
+            *common_argv,
+        ],
+    )
+    assert adjudication.main() == 0
+    assert adjudicated == {
+        "raw_root": raw_root,
+        "retained_root": retained_root,
+        "expected_retained_root": declared_retained_root,
+        "import_authorization": authorization_path,
+        "expected_import_authorization_sha256": hashes["authorization"],
+        "expected_import_authorization_prompt_sha256": hashes["prompt"],
+        "sealed_campaign_audit": sealed_audit_path,
+        "expected_sealed_campaign_audit_sha256": hashes["audit"],
+        "approved_campaign_sha256": hashes["campaign"],
+        "approved_envelope_sha256": hashes["envelope"],
+        "provider_approval_sha256": hashes["provider"],
+        "expected_raw_seal_sha256": hashes["seal"],
+        "expected_raw_inventory_sha256": hashes["inventory"],
+    }
+    for validator in (
+        importer.validate_import_authorization,
+        importer._validate_import_authorization_arguments,
+    ):
+        source = inspect.getsource(validator)
+        assert ".write_" not in source
+        assert ".mkdir(" not in source
+        assert "mkdtemp" not in source
+
+
 def test_rendered_prompt_requires_exact_case_claim_coverage() -> None:
     case = {
         "id": "claim-contract-case",
@@ -343,6 +878,106 @@ def _approve_synthetic(
     }
     _write_yaml(paths.campaign_file, campaign)
     return sha256(paths.campaign_file.read_bytes()).hexdigest(), required
+
+
+def _task8_authorized_synthetic_campaign(
+    root: Path,
+) -> tuple[
+    Path,
+    runner.HarnessPaths,
+    str,
+    tuple[str, ...],
+    dict[str, str],
+    Path,
+    Path,
+    dict[str, object],
+]:
+    raw_root = root / "raw-campaign"
+    paths = _paths(root / "repository", raw_root)
+    campaign = yaml.safe_load(paths.campaign_file.read_text(encoding="utf-8"))
+    campaign["campaign_id"] = "2026-08-21-proposed6"
+    _write_yaml(paths.campaign_file, campaign)
+    campaign_hash, required = _approve_synthetic(paths, raw_root)
+    observed_git = {
+        "commit": "1" * 40,
+        "tree": "2" * 40,
+        "parent": "3" * 40,
+    }
+    runner.execute_campaign(
+        paths,
+        approved_campaign_sha256=campaign_hash,
+        required_frozen_paths=required,
+        observed_git=observed_git,
+        codex_executable=Path(sys.executable),
+        python_executable=Path(sys.executable),
+        host_environment={"PATH": "synthetic"},
+        prepare_factory=_prepare_synthetic_approved_campaign,
+        run_factory=lambda case_root, item, **_kwargs: _synthetic_run_status(
+            case_root,
+            item,
+        ),
+        version_factory=lambda _path, _environment: "codex-cli 0.148.0",
+    )
+    retained_repository = paths.repository_root
+    retained_root = (
+        retained_repository
+        / "tests"
+        / "skills"
+        / "evidence"
+        / "complete-suite"
+        / "approved2"
+    )
+    campaign = yaml.safe_load(paths.campaign_file.read_text(encoding="utf-8"))
+    envelope_sha256 = runner.approval_envelope_sha256(campaign)
+    record_bytes, expected, record = _task8_import_authorization_fixture(
+        root / "authorization-fixture",
+        campaign_sha256=campaign_hash,
+        envelope_sha256=envelope_sha256,
+        raw_root=raw_root,
+        retained_root=retained_root,
+        retained_root_record=Path(
+            "tests/skills/evidence/complete-suite/approved2"
+        ),
+    )
+    authorization_path = (
+        Path(str(record["authorization_prompt_record"])).parent
+        / "import-authorization.json"
+    )
+    authorization_path.write_bytes(record_bytes)
+    authorization_arguments: dict[str, object] = {
+        "import_authorization": authorization_path,
+        "expected_import_authorization_sha256": expected[
+            "expected_record_sha256"
+        ],
+        "expected_import_authorization_prompt_sha256": expected[
+            "expected_import_authorization_prompt_sha256"
+        ],
+        "sealed_campaign_audit": Path(
+            str(record["sealed_campaign_audit_record"])
+        ),
+        "expected_sealed_campaign_audit_sha256": expected[
+            "expected_sealed_campaign_audit_sha256"
+        ],
+        "approved_envelope_sha256": envelope_sha256,
+        "provider_approval_sha256": expected[
+            "expected_provider_approval_sha256"
+        ],
+        "expected_raw_seal_sha256": expected["expected_raw_seal_sha256"],
+        "expected_raw_inventory_sha256": expected[
+            "expected_raw_inventory_sha256"
+        ],
+        "expected_retained_root": expected["expected_retained_root"],
+    }
+    return (
+        raw_root,
+        paths,
+        campaign_hash,
+        required,
+        observed_git,
+        retained_repository,
+        retained_root,
+        authorization_arguments,
+    )
 
 
 def test_approval_bound_complete_suite_inputs_are_lf_pinned() -> None:
@@ -1198,6 +1833,299 @@ def test_preparation_failure_import_is_zero_run_and_exactly_replayable(
             observed_git=observed_git,
             retained_repository_root=retained_repository,
         )
+
+
+def test_authorized_campaign_rejects_callback_provenance_bypass_before_staging(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import import_complete_suite_campaign as importer
+
+    (
+        raw_root,
+        paths,
+        campaign_hash,
+        required,
+        observed_git,
+        retained_repository,
+        retained_root,
+        authorization_arguments,
+    ) = _task8_authorized_synthetic_campaign(tmp_path)
+
+    calls: list[str] = []
+
+    def forbidden_retain(*_args: object, **_kwargs: object) -> dict[str, object]:
+        calls.append("retain")
+        return {}
+
+    def forbidden_replay(*_args: object, **_kwargs: object) -> None:
+        calls.append("replay")
+
+    def forbid_staging(*_args: object, **_kwargs: object) -> str:
+        pytest.fail("callback provenance bypass reached import staging")
+
+    monkeypatch.setattr(importer.tempfile, "mkdtemp", forbid_staging)
+    with pytest.raises(
+        RuntimeError,
+        match="operation provenance source unavailable",
+    ):
+        importer.import_campaign(
+            raw_root,
+            paths=paths,
+            retained_repository_root=retained_repository,
+            approved_campaign_sha256=campaign_hash,
+            required_frozen_paths=required,
+            observed_git=observed_git,
+            retain_factory=forbidden_retain,
+            replay_factory=forbidden_replay,
+            **authorization_arguments,
+        )
+    assert calls == []
+    assert authorization_arguments["expected_retained_root"] == Path(
+        "tests/skills/evidence/complete-suite/approved2"
+    )
+    assert not retained_root.exists()
+
+
+def test_authorized_campaign_replay_rejects_callback_bypass_before_layout(
+    tmp_path: Path,
+) -> None:
+    from import_complete_suite_campaign import replay_campaign_import
+
+    (
+        raw_root,
+        paths,
+        campaign_hash,
+        required,
+        observed_git,
+        retained_repository,
+        retained_root,
+        authorization_arguments,
+    ) = _task8_authorized_synthetic_campaign(tmp_path)
+    retained_root.mkdir(parents=True)
+    replay_calls = 0
+
+    def forbidden_replay(*_args: object, **_kwargs: object) -> None:
+        nonlocal replay_calls
+        replay_calls += 1
+
+    with pytest.raises(RuntimeError, match="callback"):
+        replay_campaign_import(
+            raw_root,
+            retained_root,
+            paths=paths,
+            retained_repository_root=retained_repository,
+            approved_campaign_sha256=campaign_hash,
+            required_frozen_paths=required,
+            observed_git=observed_git,
+            replay_factory=forbidden_replay,
+            **authorization_arguments,
+        )
+    assert replay_calls == 0
+
+
+def test_authorized_adjudication_rejects_behavior_callback_before_import_replay(
+    tmp_path: Path,
+) -> None:
+    import complete_suite_adjudication as adjudication
+
+    (
+        raw_root,
+        paths,
+        campaign_hash,
+        required,
+        observed_git,
+        _retained_repository,
+        retained_root,
+        authorization_arguments,
+    ) = _task8_authorized_synthetic_campaign(tmp_path)
+    retained_root.mkdir(parents=True)
+    behavior_calls = 0
+
+    def forbidden_behavior(*_args: object, **_kwargs: object) -> dict[str, object]:
+        nonlocal behavior_calls
+        behavior_calls += 1
+        return {}
+
+    with pytest.raises(RuntimeError, match="callback"):
+        adjudication.adjudicate_campaign(
+            raw_root,
+            retained_root,
+            paths=paths,
+            approved_campaign_sha256=campaign_hash,
+            required_frozen_paths=required,
+            observed_git=observed_git,
+            adjudicate_factory=forbidden_behavior,
+            **authorization_arguments,
+        )
+    assert behavior_calls == 0
+    assert not (retained_root / "results").exists()
+
+
+def test_authorized_adjudication_replay_rejects_behavior_callback_before_layout(
+    tmp_path: Path,
+) -> None:
+    import complete_suite_adjudication as adjudication
+
+    (
+        raw_root,
+        paths,
+        campaign_hash,
+        required,
+        observed_git,
+        _retained_repository,
+        retained_root,
+        authorization_arguments,
+    ) = _task8_authorized_synthetic_campaign(tmp_path)
+    behavior_calls = 0
+
+    def forbidden_behavior(*_args: object, **_kwargs: object) -> dict[str, object]:
+        nonlocal behavior_calls
+        behavior_calls += 1
+        return {}
+
+    with pytest.raises(RuntimeError, match="callback"):
+        adjudication.replay_campaign_adjudication(
+            raw_root,
+            retained_root,
+            paths=paths,
+            approved_campaign_sha256=campaign_hash,
+            required_frozen_paths=required,
+            observed_git=observed_git,
+            adjudicate_factory=forbidden_behavior,
+            **authorization_arguments,
+        )
+    assert behavior_calls == 0
+    assert not retained_root.exists()
+
+
+def test_authorized_default_import_requires_operation_provenance_before_staging(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import import_complete_suite_campaign as importer
+
+    (
+        raw_root,
+        paths,
+        campaign_hash,
+        required,
+        observed_git,
+        retained_repository,
+        retained_root,
+        authorization_arguments,
+    ) = _task8_authorized_synthetic_campaign(tmp_path)
+
+    def forbid_staging(*_args: object, **_kwargs: object) -> str:
+        pytest.fail("missing operation provenance reached import staging")
+
+    monkeypatch.setattr(importer.tempfile, "mkdtemp", forbid_staging)
+    with pytest.raises(
+        RuntimeError,
+        match="operation provenance source unavailable",
+    ):
+        importer.import_campaign(
+            raw_root,
+            paths=paths,
+            retained_repository_root=retained_repository,
+            approved_campaign_sha256=campaign_hash,
+            required_frozen_paths=required,
+            observed_git=observed_git,
+            **authorization_arguments,
+        )
+    assert not retained_root.exists()
+
+
+def test_adjudicator_revalidates_authorization_before_stage_or_behavior(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import complete_suite_adjudication as adjudication
+
+    (
+        raw_root,
+        paths,
+        campaign_hash,
+        required,
+        observed_git,
+        retained_repository,
+        retained_root,
+        authorization_arguments,
+    ) = _task8_authorized_synthetic_campaign(tmp_path)
+
+    retained_root.mkdir(parents=True)
+    authorization_path = authorization_arguments["import_authorization"]
+    assert isinstance(authorization_path, Path)
+    authorization_path.write_bytes(authorization_path.read_bytes() + b" ")
+    behavior_calls = 0
+
+    def forbidden_behavior(*_args: object, **_kwargs: object) -> dict[str, object]:
+        nonlocal behavior_calls
+        behavior_calls += 1
+        return {}
+
+    def forbid_staging(*_args: object, **_kwargs: object) -> str:
+        pytest.fail("authorization failure reached adjudication staging")
+
+    monkeypatch.setattr(adjudication.tempfile, "mkdtemp", forbid_staging)
+    with pytest.raises(RuntimeError, match="authorization"):
+        adjudication.adjudicate_campaign(
+            raw_root,
+            retained_root,
+            paths=paths,
+            approved_campaign_sha256=campaign_hash,
+            required_frozen_paths=required,
+            observed_git=observed_git,
+            replay_factory=lambda *_args: None,
+            adjudicate_factory=forbidden_behavior,
+            **authorization_arguments,
+        )
+    assert behavior_calls == 0
+    assert not (retained_root / "results").exists()
+
+
+def test_adjudication_replay_revalidates_authorization_before_behavior(
+    tmp_path: Path,
+) -> None:
+    import complete_suite_adjudication as adjudication
+
+    (
+        raw_root,
+        paths,
+        campaign_hash,
+        required,
+        observed_git,
+        retained_repository,
+        retained_root,
+        authorization_arguments,
+    ) = _task8_authorized_synthetic_campaign(tmp_path)
+
+    (retained_root / "results").mkdir(parents=True)
+    authorization_path = authorization_arguments["import_authorization"]
+    assert isinstance(authorization_path, Path)
+    authorization_path.write_bytes(authorization_path.read_bytes() + b" ")
+    behavior_calls = 0
+
+    def forbidden_behavior(*_args: object, **_kwargs: object) -> dict[str, object]:
+        nonlocal behavior_calls
+        behavior_calls += 1
+        return {}
+
+    with pytest.raises(RuntimeError, match="authorization"):
+        adjudication.replay_campaign_adjudication(
+            raw_root,
+            retained_root,
+            paths=paths,
+            approved_campaign_sha256=campaign_hash,
+            required_frozen_paths=required,
+            observed_git=observed_git,
+            replay_factory=lambda *_args: pytest.fail(
+                "authorization failure reached import replay"
+            ),
+            adjudicate_factory=forbidden_behavior,
+            **authorization_arguments,
+        )
+    assert behavior_calls == 0
 
 
 def test_sealed_campaign_imports_once_and_replays_every_run(
