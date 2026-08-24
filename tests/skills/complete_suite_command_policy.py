@@ -41,6 +41,28 @@ _FILESYSTEM_AGGREGATE_BYTES = 64 * 1024 * 1024
 _LITERAL_UTF8_LIMIT = 4096
 _LOWER_SHA256 = re.compile(r"[0-9a-f]{64}")
 _IDENTIFIER = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}")
+_WINDOWS_RESERVED_OUTPUT_NAMES = frozenset(
+    {
+        "aux",
+        "con",
+        "nul",
+        "prn",
+        *(f"com{number}" for number in range(1, 10)),
+        *(f"lpt{number}" for number in range(1, 10)),
+    }
+)
+_COMMAND_POLICY_DECISION_REGISTRY_LOCK = threading.Lock()
+_COMMAND_POLICY_DECISION_REGISTRY: dict[
+    int,
+    tuple[
+        weakref.ReferenceType[CommandPolicyDecision],
+        weakref.ReferenceType[BoundCommandPlan],
+        tuple[object, ...],
+        tuple[object, ...],
+        BoundFilesystemEvidence | None,
+        tuple[object, ...] | None,
+    ],
+] = {}
 
 
 def _reject(code: str) -> NoReturn:
@@ -451,6 +473,24 @@ def _authenticate_filesystem_evidence(
         _reject(COMMAND_POLICY_FILESYSTEM_EVIDENCE_INVALID)
 
 
+def _authenticated_filesystem_case_root(
+    evidence: BoundFilesystemEvidence,
+) -> Path:
+    """Authenticate an exact registered filesystem object and detach its root."""
+
+    if type(evidence) is not BoundFilesystemEvidence:
+        _reject(COMMAND_POLICY_FILESYSTEM_EVIDENCE_INVALID)
+    registered = _registered_filesystem_evidence(evidence)
+    case_root = Path(str(registered.case_root))
+    _authenticate_filesystem_evidence(
+        evidence,
+        expected_case_root=case_root,
+    )
+    if _registered_filesystem_evidence(evidence) is not registered:
+        _reject(COMMAND_POLICY_FILESYSTEM_EVIDENCE_INVALID)
+    return case_root
+
+
 @dataclass(frozen=True)
 class CommandPolicyContext:
     case_id: str
@@ -566,6 +606,59 @@ class _CommandPolicyContextView:
     shell_pathext: tuple[str, ...]
     shell_environment_sha256: str
     filesystem: _AuthorizationFilesystemView
+
+
+@dataclass(frozen=True)
+class _FilesystemLiveContext:
+    case_root: Path
+    filesystem: BoundFilesystemEvidence
+
+
+@dataclass(frozen=True)
+class _AuthenticatedPostFilesystemCapture:
+    files: tuple[tuple[str, bytes], ...]
+
+    def __post_init__(self) -> None:
+        if type(self.files) is not tuple:
+            _reject(COMMAND_POLICY_FILESYSTEM_EVIDENCE_INVALID)
+        paths: list[str] = []
+        total_bytes = 0
+        for item in self.files:
+            if (
+                type(item) is not tuple
+                or len(item) != 2
+                or type(item[0]) is not str
+                or type(item[1]) is not bytes
+            ):
+                _reject(COMMAND_POLICY_FILESYSTEM_EVIDENCE_INVALID)
+            normalized = _normalize_relative_path(item[0], allow_dot=False)
+            if normalized != item[0]:
+                _reject(COMMAND_POLICY_FILESYSTEM_EVIDENCE_INVALID)
+            paths.append(item[0])
+            total_bytes += len(item[1])
+        if (
+            total_bytes > _FILESYSTEM_AGGREGATE_BYTES
+            or not _windows_unique(tuple(paths))
+            or tuple(paths) != _windows_sorted(tuple(paths))
+        ):
+            _reject(COMMAND_POLICY_FILESYSTEM_EVIDENCE_INVALID)
+
+
+def _captured_post_file_bytes(
+    capture: _AuthenticatedPostFilesystemCapture,
+    relative_path: str,
+) -> bytes | None:
+    if type(capture) is not _AuthenticatedPostFilesystemCapture:
+        _reject(COMMAND_POLICY_FILESYSTEM_EVIDENCE_INVALID)
+    normalized = _normalize_relative_path(relative_path, allow_dot=False)
+    matches = tuple(
+        payload
+        for path, payload in capture.files
+        if _windows_path_equal(path, normalized)
+    )
+    if len(matches) > 1:
+        _reject(COMMAND_POLICY_FILESYSTEM_EVIDENCE_INVALID)
+    return None if not matches else matches[0]
 
 
 def _copy_snapshot_entry(entry: FilesystemSnapshotEntry) -> FilesystemSnapshotEntry:
@@ -992,6 +1085,147 @@ def _decision_canonical_record(
         "topology_sha256": topology_sha256,
         "version": COMMAND_POLICY_VERSION,
     }
+
+
+def _approved_operation_fingerprint(
+    operation: ApprovedOperation,
+) -> tuple[object, ...]:
+    if type(operation) is not ApprovedOperation:
+        _reject(COMMAND_POLICY_PLAN_INVALID)
+    return (
+        id(operation),
+        operation.index,
+        operation.statement_index,
+        operation.pipeline_index,
+        operation.category,
+        id(operation.argv),
+        tuple(operation.argv),
+        operation.operational_json,
+        operation.expected_outcome,
+        id(operation.declared_output_paths),
+        tuple(operation.declared_output_paths),
+    )
+
+
+def _command_policy_decision_fingerprint(
+    decision: CommandPolicyDecision,
+) -> tuple[object, ...]:
+    if type(decision) is not CommandPolicyDecision:
+        _reject(COMMAND_POLICY_PLAN_INVALID)
+    try:
+        return (
+            id(decision),
+            decision.version,
+            decision.plan_sha256,
+            decision.record_class,
+            id(decision.operations),
+            tuple(
+                _approved_operation_fingerprint(operation)
+                for operation in decision.operations
+            ),
+            decision.topology_sha256,
+            decision.canonical_sha256,
+        )
+    except (AttributeError, TypeError, ValueError):
+        _reject(COMMAND_POLICY_PLAN_INVALID)
+
+
+def _register_command_policy_decision(
+    decision: CommandPolicyDecision,
+    *,
+    plan: BoundCommandPlan,
+    filesystem: BoundFilesystemEvidence | None = None,
+) -> None:
+    if type(decision) is not CommandPolicyDecision or type(plan) is not BoundCommandPlan:
+        _reject(COMMAND_POLICY_PLAN_INVALID)
+    decision_fingerprint = _command_policy_decision_fingerprint(decision)
+    plan_fingerprint = _plan_authorization_fingerprint(plan)
+    filesystem_fingerprint: tuple[object, ...] | None = None
+    if filesystem is not None:
+        try:
+            _registered_filesystem_evidence(filesystem)
+            filesystem_fingerprint = _filesystem_authorization_fingerprint(
+                filesystem
+            )
+        except Exception:
+            _reject(COMMAND_POLICY_PLAN_INVALID)
+    key = id(decision)
+
+    def cleanup(reference: weakref.ReferenceType[CommandPolicyDecision]) -> None:
+        with _COMMAND_POLICY_DECISION_REGISTRY_LOCK:
+            registered = _COMMAND_POLICY_DECISION_REGISTRY.get(key)
+            if registered is not None and registered[0] is reference:
+                del _COMMAND_POLICY_DECISION_REGISTRY[key]
+
+    decision_reference = weakref.ref(decision, cleanup)
+    plan_reference = weakref.ref(plan)
+    with _COMMAND_POLICY_DECISION_REGISTRY_LOCK:
+        if key in _COMMAND_POLICY_DECISION_REGISTRY:
+            _reject(COMMAND_POLICY_PLAN_INVALID)
+        _COMMAND_POLICY_DECISION_REGISTRY[key] = (
+            decision_reference,
+            plan_reference,
+            decision_fingerprint,
+            plan_fingerprint,
+            filesystem,
+            filesystem_fingerprint,
+        )
+
+
+def _authenticate_command_policy_decision(
+    decision: CommandPolicyDecision,
+    *,
+    plan: BoundCommandPlan,
+) -> None:
+    if type(decision) is not CommandPolicyDecision or type(plan) is not BoundCommandPlan:
+        _reject(COMMAND_POLICY_PLAN_INVALID)
+    try:
+        decision.__post_init__()
+        plan.__post_init__()
+        _authenticate_bound_namespaces(plan.namespaces)
+        if decision.plan_sha256 != plan.normalized_plan_sha256:
+            _reject(COMMAND_POLICY_PLAN_INVALID)
+        decision_fingerprint = _command_policy_decision_fingerprint(decision)
+        plan_fingerprint = _plan_authorization_fingerprint(plan)
+    except Exception:
+        _reject(COMMAND_POLICY_PLAN_INVALID)
+    with _COMMAND_POLICY_DECISION_REGISTRY_LOCK:
+        registered = _COMMAND_POLICY_DECISION_REGISTRY.get(id(decision))
+        if (
+            registered is None
+            or registered[0]() is not decision
+            or registered[1]() is not plan
+            or registered[2] != decision_fingerprint
+            or registered[3] != plan_fingerprint
+        ):
+            _reject(COMMAND_POLICY_PLAN_INVALID)
+
+
+def _authenticated_command_policy_filesystem(
+    decision: CommandPolicyDecision,
+    *,
+    plan: BoundCommandPlan,
+) -> BoundFilesystemEvidence | None:
+    _authenticate_command_policy_decision(decision, plan=plan)
+    with _COMMAND_POLICY_DECISION_REGISTRY_LOCK:
+        registered = _COMMAND_POLICY_DECISION_REGISTRY.get(id(decision))
+    if registered is None:
+        _reject(COMMAND_POLICY_PLAN_INVALID)
+    filesystem = registered[4]
+    expected_fingerprint = registered[5]
+    if filesystem is None:
+        if expected_fingerprint is not None:
+            _reject(COMMAND_POLICY_PLAN_INVALID)
+        return None
+    try:
+        filesystem.__post_init__()
+        _registered_filesystem_evidence(filesystem)
+        fingerprint = _filesystem_authorization_fingerprint(filesystem)
+    except Exception:
+        _reject(COMMAND_POLICY_PLAN_INVALID)
+    if fingerprint != expected_fingerprint:
+        _reject(COMMAND_POLICY_PLAN_INVALID)
+    return filesystem
 
 
 def _entry_record(entry: FilesystemSnapshotEntry) -> dict[str, object]:
@@ -1883,9 +2117,10 @@ def _containing_root_snapshot(
 
 def _expected_live_parent_identities(
     candidate: Path,
-    context: CommandPolicyContext,
+    context: CommandPolicyContext | _FilesystemLiveContext,
     *,
     allow_created: bool,
+    allow_missing_root: bool = False,
 ) -> tuple[FilesystemObjectIdentity, ...]:
     pre = _context_snapshot_index(context, "pre")
     post = _context_snapshot_index(context, "post")
@@ -1893,13 +2128,13 @@ def _expected_live_parent_identities(
         context.filesystem.pre_roots,
         candidate,
         context,
-        permit_absent=allow_created,
+        permit_absent=allow_created or allow_missing_root,
     )
     post_root = _containing_root_snapshot(
         context.filesystem.post_roots,
         candidate,
         context,
-        permit_absent=False,
+        permit_absent=allow_missing_root,
     )
     if (
         not _windows_path_equal(
@@ -1908,6 +2143,23 @@ def _expected_live_parent_identities(
         or pre_root.ancestor_identities != post_root.ancestor_identities
     ):
         _reject(COMMAND_POLICY_OPERATION_REJECTED)
+    root_path = context.case_root.joinpath(
+        *PureWindowsPath(post_root.relative_root).parts
+    )
+    if not post_root.present:
+        if (
+            not allow_missing_root
+            or not _windows_path_equal(candidate, root_path)
+            or (
+                pre_root.present
+                and not any(
+                    _windows_path_equal(path, post_root.relative_root)
+                    for path in context.filesystem.removed_paths
+                )
+            )
+        ):
+            _reject(COMMAND_POLICY_OPERATION_REJECTED)
+        return tuple(post_root.ancestor_identities)
     root_created = any(
         _windows_path_equal(path, post_root.relative_root)
         for path in context.filesystem.created_paths
@@ -1918,9 +2170,6 @@ def _expected_live_parent_identities(
     elif not allow_created or not root_created:
         _reject(COMMAND_POLICY_OPERATION_REJECTED)
     expected = list(post_root.ancestor_identities)
-    root_path = context.case_root.joinpath(
-        *PureWindowsPath(post_root.relative_root).parts
-    )
     parent = candidate.parent
     if not _is_below(parent, root_path):
         return tuple(expected)
@@ -1954,13 +2203,15 @@ def _expected_live_parent_identities(
 
 def _component_relative_live_observation(
     candidate: Path,
-    context: CommandPolicyContext,
+    context: CommandPolicyContext | _FilesystemLiveContext,
     *,
     expected_record: _SnapshotRecord | None,
     expected_sha256: str | None,
     allow_created_ancestors: bool,
     allow_missing: bool,
+    allow_missing_root: bool = False,
     scan_paths: list[str] | None = None,
+    retained_files: dict[str, bytes] | None = None,
 ) -> tuple[_LiveHandleObservation, str | None] | None:
     parsed = PureWindowsPath(str(candidate))
     if not parsed.is_absolute() or not parsed.anchor or len(parsed.parts) < 2:
@@ -1969,6 +2220,7 @@ def _component_relative_live_observation(
         candidate,
         context,
         allow_created=allow_created_ancestors,
+        allow_missing_root=allow_missing_root,
     )
     kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
     ntdll = ctypes.WinDLL("ntdll", use_last_error=True)
@@ -2127,6 +2379,7 @@ def _component_relative_live_observation(
             _reject(COMMAND_POLICY_OPERATION_REJECTED)
         digest = sha256()
         total = 0
+        chunks: list[bytes] | None = [] if retained_files is not None else None
         buffer = ctypes.create_string_buffer(64 * 1024)
         while total < observation.size:
             amount = wintypes.DWORD()
@@ -2138,8 +2391,11 @@ def _component_relative_live_observation(
                 None,
             ) or amount.value == 0:
                 _reject(COMMAND_POLICY_OPERATION_REJECTED)
+            chunk = buffer.raw[: amount.value]
             total += amount.value
-            digest.update(buffer.raw[: amount.value])
+            digest.update(chunk)
+            if chunks is not None:
+                chunks.append(chunk)
         amount = wintypes.DWORD()
         if not read_file(
             handle,
@@ -2152,6 +2408,28 @@ def _component_relative_live_observation(
         value = digest.hexdigest()
         if value != record[3] or _query_live_handle(handle, path) != observation:
             _reject(COMMAND_POLICY_OPERATION_REJECTED)
+        if chunks is not None:
+            payload = b"".join(chunks)
+            if len(payload) != record[2]:
+                _reject(COMMAND_POLICY_OPERATION_REJECTED)
+            matching_keys = tuple(
+                retained_path
+                for retained_path in retained_files
+                if _windows_path_equal(retained_path, record[0])
+            )
+            if len(matching_keys) > 1:
+                _reject(COMMAND_POLICY_OPERATION_REJECTED)
+            if matching_keys:
+                if retained_files[matching_keys[0]] != payload:
+                    _reject(COMMAND_POLICY_OPERATION_REJECTED)
+            else:
+                if (
+                    sum(len(item) for item in retained_files.values())
+                    + len(payload)
+                    > _FILESYSTEM_AGGREGATE_BYTES
+                ):
+                    _reject(COMMAND_POLICY_LIMIT_EXCEEDED)
+                retained_files[record[0]] = payload
         return value
 
     def scan_directory(
@@ -2418,6 +2696,103 @@ def _component_relative_live_observation(
                 close_failed = True
         if close_failed:
             _reject(COMMAND_POLICY_OPERATION_REJECTED)
+
+
+def _authenticate_live_post_filesystem(
+    evidence: BoundFilesystemEvidence,
+    *,
+    expected_case_root: Path,
+) -> _AuthenticatedPostFilesystemCapture:
+    """Capture the complete authenticated post-run inventory using held handles."""
+
+    _authenticate_filesystem_evidence(
+        evidence,
+        expected_case_root=expected_case_root,
+    )
+    registered = _registered_filesystem_evidence(evidence)
+    context = _FilesystemLiveContext(
+        case_root=Path(str(expected_case_root)),
+        filesystem=evidence,
+    )
+    inventory = registered.post_index
+    retained_files: dict[str, bytes] = {}
+    for root in evidence.post_roots:
+        root_path = context.case_root.joinpath(
+            *PureWindowsPath(root.relative_root).parts
+        )
+        if not root.present:
+            observed = _component_relative_live_observation(
+                root_path,
+                context,
+                expected_record=None,
+                expected_sha256=None,
+                allow_created_ancestors=False,
+                allow_missing=True,
+                allow_missing_root=True,
+            )
+            if observed is not None:
+                _reject(COMMAND_POLICY_OPERATION_REJECTED)
+            continue
+
+        root_record = _snapshot_lookup(inventory, root.relative_root)
+        if root_record is None or root_record[1] != "directory":
+            _reject(COMMAND_POLICY_OPERATION_REJECTED)
+        scanned_paths: list[str] = []
+        observed = _component_relative_live_observation(
+            root_path,
+            context,
+            expected_record=root_record,
+            expected_sha256=None,
+            allow_created_ancestors=any(
+                _windows_path_equal(path, root.relative_root)
+                for path in evidence.created_paths
+            ),
+            allow_missing=False,
+            scan_paths=scanned_paths,
+            retained_files=retained_files,
+        )
+        if observed is None or observed[0].kind != "directory":
+            _reject(COMMAND_POLICY_OPERATION_REJECTED)
+        expected_paths = _windows_sorted(
+            tuple(
+                record[0]
+                for record in inventory.records
+                if _is_below(record[0], root.relative_root)
+                and not _windows_path_equal(record[0], root.relative_root)
+            )
+        )
+        actual_paths = _windows_sorted(tuple(scanned_paths))
+        if len(actual_paths) != len(expected_paths) or any(
+            not _windows_path_equal(actual, expected)
+            for actual, expected in zip(
+                actual_paths,
+                expected_paths,
+                strict=True,
+            )
+        ):
+            _reject(COMMAND_POLICY_OPERATION_REJECTED)
+    expected_file_paths = _windows_sorted(
+        tuple(record[0] for record in inventory.records if record[1] == "file")
+    )
+    retained_file_paths = _windows_sorted(tuple(retained_files))
+    if len(expected_file_paths) != len(retained_file_paths) or any(
+        not _windows_path_equal(expected, retained)
+        for expected, retained in zip(
+            expected_file_paths,
+            retained_file_paths,
+            strict=True,
+        )
+    ):
+        _reject(COMMAND_POLICY_OPERATION_REJECTED)
+    _authenticate_filesystem_evidence(
+        evidence,
+        expected_case_root=expected_case_root,
+    )
+    if _registered_filesystem_evidence(evidence) is not registered:
+        _reject(COMMAND_POLICY_FILESYSTEM_EVIDENCE_INVALID)
+    return _AuthenticatedPostFilesystemCapture(
+        tuple((path, retained_files[path]) for path in retained_file_paths)
+    )
 
 
 def _validate_live_snapshot_path(
@@ -3209,6 +3584,71 @@ def _cursor_output_option(
     return _cli_output(cursor, context, allow_existing=allow_existing)
 
 
+def _cli_report_output(
+    cursor: _CliCursor,
+    context: CommandPolicyContext,
+    *,
+    allow_existing: bool,
+) -> tuple[_CliCursor, str, bool]:
+    if cursor.index >= len(cursor.tokens):
+        _reject(COMMAND_POLICY_OPERATION_REJECTED)
+    raw_value = _bounded_literal(cursor.tokens[cursor.index])
+    supplied = PureWindowsPath(raw_value.replace("/", "\\"))
+    if (
+        supplied.is_absolute()
+        or supplied.drive
+        or supplied.anchor
+        or not supplied.parts
+        or any(part in {"", ".."} for part in supplied.parts)
+        or supplied.suffix.casefold() != ".json"
+        or any(
+            part.rstrip(" .") != part
+            or ":" in part
+            or any(ord(character) < 32 for character in part)
+            or part.split(".", 1)[0].casefold()
+            in _WINDOWS_RESERVED_OUTPUT_NAMES
+            for part in supplied.parts
+        )
+    ):
+        _reject(COMMAND_POLICY_OPERATION_REJECTED)
+    emitted_value = str(PureWindowsPath(*supplied.parts))
+    candidate = context.workspace_root.joinpath(
+        "data",
+        "reports",
+        *supplied.parts,
+    )
+    relative = _case_relative(candidate, context)
+    preexisting = (
+        _snapshot_lookup(_context_snapshot_index(context, "pre"), relative)
+        is not None
+    )
+    actual_value = _bind_path_operand(
+        str(candidate),
+        context,
+        path_class="output",
+        allow_existing_output=allow_existing,
+    )
+    return (
+        _CliCursor(
+            cursor.tokens,
+            cursor.index + 1,
+            (*cursor.emitted, emitted_value),
+        ),
+        actual_value,
+        preexisting,
+    )
+
+
+def _cursor_report_output_option(
+    cursor: _CliCursor,
+    context: CommandPolicyContext,
+    *,
+    allow_existing: bool,
+) -> tuple[_CliCursor, str, bool]:
+    cursor = _cursor_keyword(cursor, "--out")
+    return _cli_report_output(cursor, context, allow_existing=allow_existing)
+
+
 def _help_action(tokens: tuple[str, ...]) -> tuple[str, ...] | None:
     if not tokens:
         return ()
@@ -3324,12 +3764,12 @@ def _authorize_kokoro_cli(
         cursor, _research = _cursor_optional_option_value(
             cursor, "--research-bundle", read_file
         )
-        cursor, output, output_preexisting = _cursor_output_option(
+        cursor, output, output_preexisting = _cursor_report_output_option(
             cursor, context, allow_existing=False
         )
     elif action == ("pack", "soft-eval"):
         cursor, _input = _cursor_value(cursor, read_file)
-        cursor, output, output_preexisting = _cursor_output_option(
+        cursor, output, output_preexisting = _cursor_report_output_option(
             cursor, context, allow_existing=False
         )
     elif action == ("pack", "promote"):
@@ -3350,7 +3790,7 @@ def _authorize_kokoro_cli(
         cursor, _research = _cursor_optional_option_value(
             cursor, "--research-bundle", read_file
         )
-        cursor, output, output_preexisting = _cursor_output_option(
+        cursor, output, output_preexisting = _cursor_report_output_option(
             cursor, context, allow_existing=False
         )
     elif action == ("pack", "publication-check"):
@@ -3371,7 +3811,7 @@ def _authorize_kokoro_cli(
         cursor, _compliance = _cursor_optional_option_value(
             cursor, "--compliance", read_file
         )
-        cursor, output, output_preexisting = _cursor_output_option(
+        cursor, output, output_preexisting = _cursor_report_output_option(
             cursor, context, allow_existing=False
         )
     elif action == ("character", "request", "validate"):
@@ -4186,7 +4626,14 @@ def _final_authorization_decision(
         plan_fingerprint=plan_fingerprint,
         context_fingerprint=context_fingerprint,
     )
-    return _decision(plan_sha256, record_class, operations)
+    decision = _decision(plan_sha256, record_class, operations)
+    _register_command_policy_decision(
+        decision,
+        plan=plan,
+        filesystem=context.filesystem,
+    )
+    _authenticate_command_policy_decision(decision, plan=plan)
+    return decision
 
 
 def authorize_command_plan(
