@@ -12,27 +12,30 @@ import pytest
 REPOSITORY_ROOT = Path.cwd().resolve()
 PLUGIN_MANIFEST = REPOSITORY_ROOT / ".codex-plugin" / "plugin.json"
 SOURCE_SKILLS = REPOSITORY_ROOT / "skills"
+EXPECTED_AGENT_PROFILES = (
+    "openai",
+    "claude",
+    "codex",
+    "cursor",
+    "gemini",
+    "copilot",
+    "kimi",
+    "deepseek",
+    "qwen",
+    "generic",
+)
+_AGENT_PROFILE_FILES = {
+    f"agents/{profile_name}.yaml" for profile_name in EXPECTED_AGENT_PROFILES
+}
 EXPECTED_SKILL_FILES = {
-    "using-kokoroarc": {
-        "SKILL.md",
-        "agents/openai.yaml",
-        "references/runtime-contract.md",
-    },
-    "authoring-character-packs": {
-        "SKILL.md",
-        "agents/openai.yaml",
-        "references/authoring-contract.md",
-    },
-    "researching-characters": {
-        "SKILL.md",
-        "agents/openai.yaml",
-        "references/research-contract.md",
-    },
-    "testing-character-packs": {
-        "SKILL.md",
-        "agents/openai.yaml",
-        "references/testing-contract.md",
-    },
+    "using-kokoroarc": {"SKILL.md", "references/runtime-contract.md"}
+    | _AGENT_PROFILE_FILES,
+    "authoring-character-packs": {"SKILL.md", "references/authoring-contract.md"}
+    | _AGENT_PROFILE_FILES,
+    "researching-characters": {"SKILL.md", "references/research-contract.md"}
+    | _AGENT_PROFILE_FILES,
+    "testing-character-packs": {"SKILL.md", "references/testing-contract.md"}
+    | _AGENT_PROFILE_FILES,
 }
 
 
@@ -120,7 +123,9 @@ def test_distribution_suite_exposes_the_frozen_public_surface() -> None:
     distribution = importlib.import_module("kokoroarc.distribution")
 
     assert suite.SKILL_SUITE_NAMES == tuple(EXPECTED_SKILL_FILES)
-    assert suite.SkillSuiteLimits().max_files == 12
+    assert suite.SkillSuiteLimits().max_files == sum(
+        len(files) for files in EXPECTED_SKILL_FILES.values()
+    )
     assert suite.SkillSuiteLimits().max_file_bytes == 512 * 1024
     assert suite.SkillSuiteLimits().max_total_bytes == 2 * 1024 * 1024
     assert callable(suite.resolve_skill_suite_source)

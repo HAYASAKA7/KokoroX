@@ -48,6 +48,32 @@ returns four `unchanged` actions; a different pre-existing Skill fails closed
 instead of being overwritten. The wheel carries the Skill files as package
 data, but `pip install` alone does not copy them into a host Skill root.
 
+## Use the suite in many agents
+
+The suite is agent-neutral. It installs into the vendor-neutral
+`.agents/skills` root rather than any single vendor's directory, so several
+agents can discover the same installation:
+
+- user scope installs to `~/.agents/skills`;
+- repository scope installs to `<repo>/.agents/skills`.
+
+To install into a specific agent's own Skill directory, pass `--skills-root`:
+
+```powershell
+kokoro suite install --skills-root 'D:\Agents\some-agent\skills' --json
+```
+
+Each Skill also ships a per-agent interface profile under `agents/<agent>.yaml`
+carrying that host's `display_name`, `short_description`, and `default_prompt`.
+Profiles are provided for `openai`, `claude`, `codex`, `cursor`, `gemini`,
+`copilot`, `kimi`, `deepseek`, `qwen`, and a `generic` fallback. A host that
+reads its profile gets a ready-made invocation prompt; a host that ignores them
+is unaffected.
+
+An agent that cannot load Skills at all can still drive the entire suite through
+the `kokoro` CLI, which exposes every documented operation and depends on no
+model provider.
+
 ## Global-first Character Pack operation
 
 The following uses a verified `rin-aster.karc` archive as an example. Repository

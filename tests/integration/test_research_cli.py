@@ -104,6 +104,21 @@ REQUIRED_STANDALONE_SCHEMAS = {
         "state-migration-plan",
     )
 }
+EXPECTED_AGENT_PROFILES = (
+    "openai",
+    "claude",
+    "codex",
+    "cursor",
+    "gemini",
+    "copilot",
+    "kimi",
+    "deepseek",
+    "qwen",
+    "generic",
+)
+_AGENT_PROFILE_FILES = {
+    f"agents/{profile_name}.yaml" for profile_name in EXPECTED_AGENT_PROFILES
+}
 REQUIRED_SKILL_FILES = {
     f"{skill}/{relative}"
     for skill, contract in (
@@ -114,7 +129,7 @@ REQUIRED_SKILL_FILES = {
     )
     for relative in (
         "SKILL.md",
-        "agents/openai.yaml",
+        *(f"agents/{profile_name}.yaml" for profile_name in EXPECTED_AGENT_PROFILES),
         f"references/{contract}",
     )
 }
@@ -707,7 +722,7 @@ def test_built_archives_and_installed_research_cli_are_complete(
                 "assert callable(resolve_skill_suite_source)\n"
                 "assert callable(set_character_default)\n"
                 "assert len(SKILL_SUITE_NAMES) == 4\n"
-                "assert SkillSuiteLimits().max_files == 12\n"
+                f"assert SkillSuiteLimits().max_files == {len(REQUIRED_SKILL_FILES)}\n"
             ),
         ],
         check=False,

@@ -24,35 +24,33 @@ SKILL_SUITE_NAMES = (
     "testing-character-packs",
 )
 
+AGENT_PROFILE_NAMES = (
+    "openai",
+    "claude",
+    "codex",
+    "cursor",
+    "gemini",
+    "copilot",
+    "kimi",
+    "deepseek",
+    "qwen",
+    "generic",
+)
+
+_SKILL_REFERENCE_FILES = {
+    "using-kokoroarc": "references/runtime-contract.md",
+    "authoring-character-packs": "references/authoring-contract.md",
+    "researching-characters": "references/research-contract.md",
+    "testing-character-packs": "references/testing-contract.md",
+}
+
+_AGENT_PROFILE_FILES = frozenset(
+    f"agents/{profile_name}.yaml" for profile_name in AGENT_PROFILE_NAMES
+)
+
 _SKILL_FILES = {
-    "using-kokoroarc": frozenset(
-        {
-            "SKILL.md",
-            "agents/openai.yaml",
-            "references/runtime-contract.md",
-        }
-    ),
-    "authoring-character-packs": frozenset(
-        {
-            "SKILL.md",
-            "agents/openai.yaml",
-            "references/authoring-contract.md",
-        }
-    ),
-    "researching-characters": frozenset(
-        {
-            "SKILL.md",
-            "agents/openai.yaml",
-            "references/research-contract.md",
-        }
-    ),
-    "testing-character-packs": frozenset(
-        {
-            "SKILL.md",
-            "agents/openai.yaml",
-            "references/testing-contract.md",
-        }
-    ),
+    skill_name: frozenset({"SKILL.md", reference_file} | _AGENT_PROFILE_FILES)
+    for skill_name, reference_file in _SKILL_REFERENCE_FILES.items()
 }
 _EXPECTED_FILES = frozenset(
     f"{skill_name}/{relative}"
@@ -86,7 +84,7 @@ _LOCK_CONTENTION_WINERRORS = frozenset({32, 33})
 
 @dataclass(frozen=True, slots=True)
 class SkillSuiteLimits:
-    max_files: int = 12
+    max_files: int = len(_EXPECTED_FILES)
     max_file_bytes: int = 512 * 1024
     max_total_bytes: int = 2 * 1024 * 1024
 
@@ -640,26 +638,27 @@ def _validate_skill_metadata(
         or ">" in description
     ):
         raise _source_error("SKILL.md description is invalid.")
-    agent_path = f"{skill_name}/agents/openai.yaml"
-    try:
-        agent = parse_yaml_bytes(payloads[agent_path])
-    except KokoroError as error:
-        raise _source_error("Skill agent metadata is invalid.") from error
-    interface = agent.get("interface")
-    if set(agent) - {"interface", "policy", "dependencies"}:
-        raise _source_error("Skill agent metadata contains unknown fields.")
-    if not isinstance(interface, dict):
-        raise _source_error("Skill agent interface metadata is invalid.")
-    if set(interface) != {
-        "display_name",
-        "short_description",
-        "default_prompt",
-    }:
-        raise _source_error("Skill agent interface metadata is invalid.")
-    for field in ("display_name", "short_description", "default_prompt"):
-        value = interface.get(field)
-        if not isinstance(value, str) or not value.strip():
+    for profile_name in AGENT_PROFILE_NAMES:
+        agent_path = f"{skill_name}/agents/{profile_name}.yaml"
+        try:
+            agent = parse_yaml_bytes(payloads[agent_path])
+        except KokoroError as error:
+            raise _source_error("Skill agent metadata is invalid.") from error
+        interface = agent.get("interface")
+        if set(agent) - {"interface", "policy", "dependencies"}:
+            raise _source_error("Skill agent metadata contains unknown fields.")
+        if not isinstance(interface, dict):
             raise _source_error("Skill agent interface metadata is invalid.")
+        if set(interface) != {
+            "display_name",
+            "short_description",
+            "default_prompt",
+        }:
+            raise _source_error("Skill agent interface metadata is invalid.")
+        for field in ("display_name", "short_description", "default_prompt"):
+            value = interface.get(field)
+            if not isinstance(value, str) or not value.strip():
+                raise _source_error("Skill agent interface metadata is invalid.")
 
 
 def _resolve_skills_root(
