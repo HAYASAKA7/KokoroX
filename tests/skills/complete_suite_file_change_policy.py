@@ -2227,6 +2227,611 @@ def _after_component_relative_handles_closed(_path: Path) -> None:
     """Test interposition point after the held component chain is closed."""
 
 
+def _before_held_remove_file(_path: Path) -> None:
+    """Test interposition point immediately before a held relative delete open."""
+
+
+class _HeldNoFollowCreationSession:
+    """Create one fresh tree relative to identity-bound Windows directory handles."""
+
+    _FILE_READ_DATA = 0x00000001
+    _FILE_WRITE_DATA = 0x00000002
+    _FILE_LIST_DIRECTORY = 0x00000001
+    _FILE_READ_ATTRIBUTES = 0x00000080
+    _DELETE = 0x00010000
+    _FILE_TRAVERSE = 0x00000020
+    _SYNCHRONIZE = 0x00100000
+    _FILE_SHARE_READ = 0x00000001
+    _FILE_SHARE_WRITE = 0x00000002
+    _OPEN_EXISTING = 3
+    _FILE_CREATE = 2
+    _FILE_ATTRIBUTE_DIRECTORY = 0x00000010
+    _FILE_ATTRIBUTE_REPARSE_POINT = 0x00000400
+    _FILE_FLAG_OPEN_REPARSE_POINT = 0x00200000
+    _FILE_FLAG_BACKUP_SEMANTICS = 0x02000000
+    _FILE_DIRECTORY_FILE = 0x00000001
+    _FILE_NON_DIRECTORY_FILE = 0x00000040
+    _FILE_SYNCHRONOUS_IO_NONALERT = 0x00000020
+    _FILE_OPEN_FOR_BACKUP_INTENT = 0x00004000
+    _FILE_OPEN_REPARSE_POINT = 0x00200000
+    _OBJ_DONT_REPARSE = 0x00001000
+    _FILE_ATTRIBUTE_TAG_INFO = 9
+    _FILE_DISPOSITION_INFO = 4
+
+    def __init__(self, parent: Path, *, code: str) -> None:
+        if os.name != "nt" or not isinstance(parent, Path) or not parent.is_absolute():
+            _reject(code)
+        self.code = code
+        self.closed = False
+        self.invalid_handle = ctypes.c_void_p(-1).value
+        kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+        ntdll = ctypes.WinDLL("ntdll", use_last_error=True)
+        self._create_file = kernel32.CreateFileW
+        self._create_file.argtypes = (
+            wintypes.LPCWSTR,
+            wintypes.DWORD,
+            wintypes.DWORD,
+            wintypes.LPVOID,
+            wintypes.DWORD,
+            wintypes.DWORD,
+            wintypes.HANDLE,
+        )
+        self._create_file.restype = wintypes.HANDLE
+        self._nt_create_file = ntdll.NtCreateFile
+        self._nt_create_file.argtypes = (
+            ctypes.POINTER(wintypes.HANDLE),
+            wintypes.DWORD,
+            ctypes.POINTER(_ObjectAttributes),
+            ctypes.POINTER(_IoStatusBlock),
+            wintypes.LPVOID,
+            wintypes.ULONG,
+            wintypes.ULONG,
+            wintypes.ULONG,
+            wintypes.ULONG,
+            wintypes.LPVOID,
+            wintypes.ULONG,
+        )
+        self._nt_create_file.restype = ctypes.c_long
+        self._get_information = kernel32.GetFileInformationByHandle
+        self._get_information.argtypes = (
+            wintypes.HANDLE,
+            ctypes.POINTER(_ByHandleFileInformation),
+        )
+        self._get_information.restype = wintypes.BOOL
+        self._get_information_ex = kernel32.GetFileInformationByHandleEx
+        self._get_information_ex.argtypes = (
+            wintypes.HANDLE,
+            ctypes.c_int,
+            wintypes.LPVOID,
+            wintypes.DWORD,
+        )
+        self._get_information_ex.restype = wintypes.BOOL
+        self._get_final_path = kernel32.GetFinalPathNameByHandleW
+        self._get_final_path.argtypes = (
+            wintypes.HANDLE,
+            wintypes.LPWSTR,
+            wintypes.DWORD,
+            wintypes.DWORD,
+        )
+        self._get_final_path.restype = wintypes.DWORD
+        self._write_file = kernel32.WriteFile
+        self._write_file.argtypes = (
+            wintypes.HANDLE,
+            wintypes.LPVOID,
+            wintypes.DWORD,
+            ctypes.POINTER(wintypes.DWORD),
+            wintypes.LPVOID,
+        )
+        self._write_file.restype = wintypes.BOOL
+        self._read_file = kernel32.ReadFile
+        self._read_file.argtypes = (
+            wintypes.HANDLE,
+            wintypes.LPVOID,
+            wintypes.DWORD,
+            ctypes.POINTER(wintypes.DWORD),
+            wintypes.LPVOID,
+        )
+        self._read_file.restype = wintypes.BOOL
+        self._flush_file_buffers = kernel32.FlushFileBuffers
+        self._flush_file_buffers.argtypes = (wintypes.HANDLE,)
+        self._flush_file_buffers.restype = wintypes.BOOL
+        self._set_file_information = kernel32.SetFileInformationByHandle
+        self._set_file_information.argtypes = (
+            wintypes.HANDLE,
+            ctypes.c_int,
+            wintypes.LPVOID,
+            wintypes.DWORD,
+        )
+        self._set_file_information.restype = wintypes.BOOL
+        self._close_handle = kernel32.CloseHandle
+        self._close_handle.argtypes = (wintypes.HANDLE,)
+        self._close_handle.restype = wintypes.BOOL
+        self._handles: list[object] = []
+        self._directories: dict[Path, object] = {}
+        self._directory_identities: dict[Path, FilesystemObjectIdentity] = {}
+        try:
+            self._hold_existing_parent(parent)
+        except BaseException:
+            self.close()
+            raise
+
+    def _valid(self, handle: object) -> bool:
+        return getattr(handle, "value", handle) not in (None, self.invalid_handle)
+
+    def _open_anchor(self, anchor: str) -> object:
+        handle = self._create_file(
+            anchor,
+            self._FILE_LIST_DIRECTORY
+            | self._FILE_READ_ATTRIBUTES
+            | self._FILE_TRAVERSE
+            | self._SYNCHRONIZE,
+            self._FILE_SHARE_READ | self._FILE_SHARE_WRITE,
+            None,
+            self._OPEN_EXISTING,
+            self._FILE_FLAG_OPEN_REPARSE_POINT | self._FILE_FLAG_BACKUP_SEMANTICS,
+            None,
+        )
+        if not self._valid(handle):
+            _reject(self.code)
+        return handle
+
+    def _open_relative(
+        self,
+        parent_handle: object,
+        component: str,
+        *,
+        directory: bool,
+        create_new: bool,
+        writable: bool = False,
+        deletable: bool = False,
+    ) -> object:
+        if (
+            type(component) is not str
+            or not component
+            or component in (".", "..")
+            or any(character in component for character in ("\\", "/", "\x00"))
+            or component.endswith((" ", "."))
+            or any(ord(character) < 32 for character in component)
+            or any(character in component for character in '<>:"|?*')
+            or component.split(".", 1)[0].casefold() in _WINDOWS_RESERVED
+        ):
+            _reject(self.code)
+        try:
+            encoded = component.encode("utf-16-le", errors="strict")
+        except UnicodeEncodeError:
+            _reject(self.code)
+        if len(encoded) > 510:
+            _reject(self.code)
+        name_buffer = ctypes.create_unicode_buffer(component)
+        unicode_name = _UnicodeString(
+            length=len(encoded),
+            maximum_length=len(encoded) + 2,
+            buffer=ctypes.cast(name_buffer, wintypes.LPWSTR),
+        )
+        attributes = _ObjectAttributes(
+            length=ctypes.sizeof(_ObjectAttributes),
+            root_directory=parent_handle,
+            object_name=ctypes.pointer(unicode_name),
+            attributes=self._OBJ_DONT_REPARSE,
+            security_descriptor=None,
+            security_quality_of_service=None,
+        )
+        io_status = _IoStatusBlock()
+        handle = wintypes.HANDLE()
+        desired = self._FILE_READ_ATTRIBUTES | self._SYNCHRONIZE
+        if deletable:
+            desired |= self._DELETE
+        options = self._FILE_SYNCHRONOUS_IO_NONALERT | self._FILE_OPEN_REPARSE_POINT
+        share = self._FILE_SHARE_READ
+        if directory:
+            desired |= self._FILE_LIST_DIRECTORY | self._FILE_TRAVERSE
+            options |= self._FILE_DIRECTORY_FILE | self._FILE_OPEN_FOR_BACKUP_INTENT
+            share |= self._FILE_SHARE_WRITE
+        else:
+            desired |= self._FILE_READ_DATA
+            if writable:
+                desired |= self._FILE_WRITE_DATA
+            options |= self._FILE_NON_DIRECTORY_FILE
+        status = self._nt_create_file(
+            ctypes.byref(handle),
+            desired,
+            ctypes.byref(attributes),
+            ctypes.byref(io_status),
+            None,
+            0,
+            share,
+            self._FILE_CREATE if create_new else 1,
+            options,
+            None,
+            0,
+        )
+        if status < 0 or not self._valid(handle):
+            if self._valid(handle):
+                self._close_handle(handle)
+            _reject(self.code)
+        return handle
+
+    @staticmethod
+    def _normalize_final_path(value: str) -> str:
+        if value.startswith("\\\\?\\UNC\\"):
+            return "\\\\" + value[8:]
+        if value.startswith("\\\\?\\"):
+            return value[4:]
+        return value
+
+    def _snapshot(
+        self,
+        handle: object,
+        *,
+        path: Path,
+        directory: bool,
+        expected_link_count: int = 1,
+    ) -> tuple[FilesystemObjectIdentity, int]:
+        information = _ByHandleFileInformation()
+        tag_information = _FileAttributeTagInformation()
+        if not self._get_information(handle, ctypes.byref(information)):
+            _reject(self.code)
+        if not self._get_information_ex(
+            handle,
+            self._FILE_ATTRIBUTE_TAG_INFO,
+            ctypes.byref(tag_information),
+            ctypes.sizeof(tag_information),
+        ):
+            _reject(self.code)
+        attributes = int(information.file_attributes)
+        tag_attributes = int(tag_information.file_attributes)
+        is_directory = bool(attributes & self._FILE_ATTRIBUTE_DIRECTORY)
+        if (
+            type(expected_link_count) is not int
+            or expected_link_count < 1
+            or is_directory is not directory
+            or bool(tag_attributes & self._FILE_ATTRIBUTE_DIRECTORY) is not directory
+            or bool(attributes & self._FILE_ATTRIBUTE_REPARSE_POINT)
+            or bool(tag_attributes & self._FILE_ATTRIBUTE_REPARSE_POINT)
+            or int(tag_information.reparse_tag) != 0
+            or int(information.number_of_links) != expected_link_count
+        ):
+            _reject(self.code)
+        required = int(self._get_final_path(handle, None, 0, 0))
+        if required <= 0 or required > 32_767:
+            _reject(self.code)
+        final_buffer = ctypes.create_unicode_buffer(required + 1)
+        length = int(
+            self._get_final_path(handle, final_buffer, len(final_buffer), 0)
+        )
+        if length <= 0 or length >= len(final_buffer):
+            _reject(self.code)
+        final_path = PureWindowsPath(self._normalize_final_path(final_buffer.value))
+        expected_path = PureWindowsPath(str(path))
+        if not _windows_path_parts_equal(
+            final_path.parts,
+            expected_path.parts,
+            ignore_case=True,
+        ):
+            _reject(self.code)
+        identity = FilesystemObjectIdentity(
+            device=int(information.volume_serial_number),
+            inode=(int(information.file_index_high) << 32)
+            | int(information.file_index_low),
+            file_type=1,
+            reparse_tag=int(tag_information.reparse_tag),
+            link_count=int(information.number_of_links),
+        )
+        size = (int(information.file_size_high) << 32) | int(
+            information.file_size_low
+        )
+        return identity, 0 if directory else size
+
+    def _hold_existing_parent(self, parent: Path) -> None:
+        parsed = PureWindowsPath(str(parent))
+        if not parsed.is_absolute() or not parsed.anchor or len(parsed.parts) < 1:
+            _reject(self.code)
+        expected_chain = _path_ancestor_chain(
+            parent / "__held_creation_leaf__",
+            code=self.code,
+        )
+        handle = self._open_anchor(parsed.anchor)
+        self._handles.append(handle)
+        current = Path(parsed.anchor)
+        identity, _size = self._snapshot(handle, path=current, directory=True)
+        self._directories[current] = handle
+        self._directory_identities[current] = identity
+        for component in parsed.parts[1:]:
+            current = current / component
+            handle = self._open_relative(
+                self._handles[-1],
+                component,
+                directory=True,
+                create_new=False,
+            )
+            self._handles.append(handle)
+            identity, _size = self._snapshot(handle, path=current, directory=True)
+            self._directories[current] = handle
+            self._directory_identities[current] = identity
+        held = tuple(self._directory_identities[path] for path in self._directories)
+        expected = tuple(identity for _name, identity in expected_chain)
+        if held != expected:
+            _reject(self.code)
+
+    def create_directory(self, path: Path) -> FilesystemObjectIdentity:
+        if self.closed or path in self._directories:
+            _reject(self.code)
+        parent_handle = self._directories.get(path.parent)
+        if parent_handle is None:
+            _reject(self.code)
+        handle = self._open_relative(
+            parent_handle,
+            path.name,
+            directory=True,
+            create_new=True,
+            deletable=True,
+        )
+        try:
+            identity, size = self._snapshot(handle, path=path, directory=True)
+            if size != 0:
+                _reject(self.code)
+        except BaseException:
+            self._close_handle(handle)
+            raise
+        self._handles.append(handle)
+        self._directories[path] = handle
+        self._directory_identities[path] = identity
+        return identity
+
+    def hold_directory(self, path: Path) -> FilesystemObjectIdentity:
+        if self.closed or path in self._directories:
+            _reject(self.code)
+        parent_handle = self._directories.get(path.parent)
+        if parent_handle is None:
+            _reject(self.code)
+        handle = self._open_relative(
+            parent_handle,
+            path.name,
+            directory=True,
+            create_new=False,
+            deletable=True,
+        )
+        try:
+            identity, size = self._snapshot(handle, path=path, directory=True)
+            if size != 0:
+                _reject(self.code)
+        except BaseException:
+            self._close_handle(handle)
+            raise
+        self._handles.append(handle)
+        self._directories[path] = handle
+        self._directory_identities[path] = identity
+        return identity
+
+    def create_file(self, path: Path) -> object:
+        if self.closed or path.parent not in self._directories:
+            _reject(self.code)
+        return self._open_relative(
+            self._directories[path.parent],
+            path.name,
+            directory=False,
+            create_new=True,
+            writable=True,
+        )
+
+    def snapshot_file(
+        self,
+        handle: object,
+        *,
+        path: Path,
+        expected_link_count: int = 1,
+    ) -> tuple[FilesystemObjectIdentity, int]:
+        if self.closed:
+            _reject(self.code)
+        return self._snapshot(
+            handle,
+            path=path,
+            directory=False,
+            expected_link_count=expected_link_count,
+        )
+
+    def write(self, handle: object, payload: bytes) -> None:
+        if self.closed or type(payload) is not bytes or len(payload) > 64 * 1024:
+            _reject(self.code)
+        if not payload:
+            return
+        buffer = (ctypes.c_ubyte * len(payload)).from_buffer_copy(payload)
+        offset = 0
+        while offset < len(payload):
+            written = wintypes.DWORD()
+            if not self._write_file(
+                handle,
+                ctypes.c_void_p(ctypes.addressof(buffer) + offset),
+                len(payload) - offset,
+                ctypes.byref(written),
+                None,
+            ):
+                _reject(self.code)
+            count = int(written.value)
+            if count <= 0 or count > len(payload) - offset:
+                _reject(self.code)
+            offset += count
+
+    def finish_file(
+        self,
+        handle: object,
+        *,
+        path: Path,
+        expected_size: int,
+    ) -> FilesystemObjectIdentity:
+        try:
+            if not self._flush_file_buffers(handle):
+                _reject(self.code)
+            identity, size = self._snapshot(handle, path=path, directory=False)
+            if size != expected_size:
+                _reject(self.code)
+            return identity
+        finally:
+            if not self._close_handle(handle):
+                _reject(self.code)
+
+    def close_file(self, handle: object) -> None:
+        if self._valid(handle) and not self._close_handle(handle):
+            _reject(self.code)
+
+    def revalidate_directories(self) -> None:
+        if self.closed:
+            _reject(self.code)
+        for path, handle in self._directories.items():
+            identity, size = self._snapshot(handle, path=path, directory=True)
+            if size != 0 or identity != self._directory_identities[path]:
+                _reject(self.code)
+
+    def remove_file(
+        self,
+        path: Path,
+        *,
+        expected_parent_identity: FilesystemObjectIdentity,
+        expected_identity: FilesystemObjectIdentity,
+        expected_size: int,
+        expected_sha256: str,
+    ) -> None:
+        if (
+            self.closed
+            or type(expected_parent_identity) is not FilesystemObjectIdentity
+            or type(expected_identity) is not FilesystemObjectIdentity
+            or type(expected_size) is not int
+            or expected_size < 0
+            or not _is_sha256(expected_sha256)
+        ):
+            _reject(self.code)
+        parent_handle = self._directories.get(path.parent)
+        if parent_handle is None:
+            _reject(self.code)
+        parent_identity, parent_size = self._snapshot(
+            parent_handle,
+            path=path.parent,
+            directory=True,
+        )
+        if parent_size != 0 or parent_identity != expected_parent_identity:
+            _reject(self.code)
+        _before_held_remove_file(path)
+        handle = self._open_relative(
+            parent_handle,
+            path.name,
+            directory=False,
+            create_new=False,
+            deletable=True,
+        )
+        delete_requested = False
+        try:
+            identity, size = self._snapshot(handle, path=path, directory=False)
+            if identity != expected_identity or size != expected_size:
+                _reject(self.code)
+            digest = sha256()
+            total = 0
+            buffer = ctypes.create_string_buffer(64 * 1024)
+            while True:
+                read = wintypes.DWORD()
+                if not self._read_file(
+                    handle,
+                    buffer,
+                    len(buffer),
+                    ctypes.byref(read),
+                    None,
+                ):
+                    _reject(self.code)
+                count = int(read.value)
+                if count == 0:
+                    break
+                total += count
+                if total > expected_size:
+                    _reject(self.code)
+                digest.update(buffer.raw[:count])
+            final_identity, final_size = self._snapshot(
+                handle,
+                path=path,
+                directory=False,
+            )
+            if (
+                total != expected_size
+                or digest.hexdigest() != expected_sha256
+                or final_identity != expected_identity
+                or final_size != expected_size
+            ):
+                _reject(self.code)
+            disposition = ctypes.c_ubyte(1)
+            if not self._set_file_information(
+                handle,
+                self._FILE_DISPOSITION_INFO,
+                ctypes.byref(disposition),
+                ctypes.sizeof(disposition),
+            ):
+                _reject(self.code)
+            delete_requested = True
+        finally:
+            close_ok = bool(self._close_handle(handle))
+            if not close_ok:
+                _reject(self.code)
+        if not delete_requested or os.path.lexists(path):
+            _reject(self.code)
+
+    def remove_directory(
+        self,
+        path: Path,
+        *,
+        expected_parent_identity: FilesystemObjectIdentity,
+        expected_identity: FilesystemObjectIdentity,
+    ) -> None:
+        if (
+            self.closed
+            or type(expected_parent_identity) is not FilesystemObjectIdentity
+            or type(expected_identity) is not FilesystemObjectIdentity
+            or path not in self._directories
+            or path.parent not in self._directories
+            or any(
+                candidate != path and candidate.parent == path
+                for candidate in self._directories
+            )
+        ):
+            _reject(self.code)
+        parent_identity, parent_size = self._snapshot(
+            self._directories[path.parent],
+            path=path.parent,
+            directory=True,
+        )
+        handle = self._directories[path]
+        identity, size = self._snapshot(handle, path=path, directory=True)
+        if (
+            parent_size != 0
+            or parent_identity != expected_parent_identity
+            or size != 0
+            or identity != expected_identity
+        ):
+            _reject(self.code)
+        disposition = ctypes.c_ubyte(1)
+        if not self._set_file_information(
+            handle,
+            self._FILE_DISPOSITION_INFO,
+            ctypes.byref(disposition),
+            ctypes.sizeof(disposition),
+        ):
+            _reject(self.code)
+        self._handles.remove(handle)
+        del self._directories[path]
+        del self._directory_identities[path]
+        if not self._close_handle(handle) or os.path.lexists(path):
+            _reject(self.code)
+
+    def close(self) -> None:
+        if self.closed:
+            return
+        self.closed = True
+        close_failed = False
+        for handle in reversed(self._handles):
+            if self._valid(handle) and not self._close_handle(handle):
+                close_failed = True
+        self._handles.clear()
+        self._directories.clear()
+        if close_failed:
+            _reject(self.code)
+
+
 def _windows_component_relative_read(
     path: Path,
     *,

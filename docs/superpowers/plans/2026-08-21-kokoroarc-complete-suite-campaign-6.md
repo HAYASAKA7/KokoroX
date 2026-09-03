@@ -3868,6 +3868,7 @@ Create:
 - `tests/skills/complete_suite_file_change_policy.py`
 - `tests/skills/complete-suite-file-change-ledger.schema.json`
 - `tests/skills/complete_suite_cli_binding.py`
+- `tests/skills/complete_suite_approved_operation_policy.py`
 - `tests/skills/complete_suite_shell_preflight.py`
 - `tests/skills/complete_suite_client_preflight_server.py`
 - `tests/skills/complete_suite_control_plane.ps1`
@@ -3889,7 +3890,7 @@ Create:
 - `tests/skills/fixtures/complete-suite-file-change/workspace-override.jsonl`
 - `tests/skills/fixtures/complete-suite-client-evaluation-templates.json`
 
-Pre-trust plan/checkpoint artifacts outside the Task 9 eighteen-leaf
+Pre-trust plan/checkpoint artifacts outside the Task 9 nineteen-leaf
 implementation allowlist:
 
 - `docs/superpowers/plans/2026-08-21-kokoroarc-complete-suite-campaign-6-task9-transition.ps1`
@@ -6409,6 +6410,7 @@ subject: feat: retain complete-suite operation provenance
 
 **Files:**
 
+- Create: `tests/skills/complete_suite_approved_operation_policy.py`
 - Create: `tests/skills/complete_suite_shell_preflight.py`
 - Create: `tests/skills/complete_suite_client_preflight_server.py`
 - Create: `tests/skills/complete_suite_control_plane.ps1`
@@ -7605,6 +7607,7 @@ class LaunchPreflight:
     frozen_meta_root: str
     frozen_meta_manifest_sha256: str
     loopback_contract_sha256: str
+    loopback_transcript_manifest_sha256: str
     rendered_event_utf8_bytes: int
     rendered_event_sha256: str
     advertised_tools_sha256: str
@@ -8263,12 +8266,77 @@ mutants, then creates this fixture from the immutable design table and commits
 it; neither preflight nor later campaign code derives templates by implicitly
 reading a campaign or repository path. Task 10 requires the campaign policy
 object to bind the same template-manifest hash.
+
+Plan amendment (2026-08-25, closing the reviewed serialization omissions): the
+evaluation-template fixture is exactly one duplicate-key-free canonical JSON
+object with keys `records` and `version`, no BOM, LF, or trailing bytes.
+`version` is the literal
+`complete-suite-client-evaluation-template-fixture-v1`; `records` is the
+ordered 24-element array above. Each array element is exactly the serialized
+`ClientEvaluationEnvelope` payload (all fields from
+`_client_evaluation_payload`, excluding wrapper-only `canonical_bytes` and
+`canonical_sha256`) and must independently canonicalize to the bytes retained
+for that template. Unknown/missing/reordered wrapper keys, any alternate
+version, noncanonical bytes, or a record whose payload/order differs rejects.
+
+The detached `client-preflight-audit` PASS result is exactly one
+duplicate-key-free canonical JSON object, also with no BOM, LF, or trailing
+bytes. Its top-level keys are `bundle`, `record`, `status`, and `version`;
+`version` is `complete-suite-client-preflight-audit-v1` and `status` is
+`PASS`. `record` has exactly `identity`, `path`, `sha256`, and `size` for the
+reopened canonical bundle record. `bundle` has exactly
+`byte_count`, `codex_client_canonical_sha256`, `entry_count`,
+`guarded_python_canonical_sha256`, `manifest_sha256`,
+`preflight_binding_sha256`, `root`, `root_identity`, and `version`, all copied
+from or recomputed against the detached successfully validated bundle. No
+failure result is published: malformed, stale, changed, noncanonical, linked,
+or mismatched input exits nonzero before output creation.
 The root retains the two shell JSONL captures, separate add and update JSONL
 captures, all 28 canonical client evaluation-envelope records (four loopback plus
 24 nonspawnable real case templates) with paths/identities/sizes/bytes/hashes and an
 ordered aggregate manifest, prompts/schema/config, bounded loopback request/response transcripts,
 the three file-change snapshot manifests, the complete private guarded-Python
 installation and manifest, and the identity-bound audit root.
+
+Plan amendment (2026-08-25, closing the retained-transcript layout omission):
+the bounded wire evidence is exactly the directory
+`loopback-transcripts` containing the five fixed plain files `manifest.json`,
+`shell-01.bin`, `shell-02.bin`, `file-add.bin`, and `file-update.bin`. The four
+`.bin` leaves are, in that order, the exact `LoopbackTranscript.raw_bytes`
+produced by invocations 1 through 4. They retain the existing
+`complete-suite-loopback-transcript-v1` length-framed fields byte-for-byte; no
+normalized projection is stored as a second authority.
+
+`manifest.json` is one duplicate-key-free canonical JSON object with no BOM,
+LF, or trailing byte. Its exact top-level keys are
+`loopback_contract_sha256`, `records`, and `version`; `version` is
+`complete-suite-loopback-transcript-manifest-v1`. `records` contains exactly
+four ordered objects for `(1,"shell","loopback-transcripts/shell-01.bin")`,
+`(2,"shell","loopback-transcripts/shell-02.bin")`,
+`(3,"file_add","loopback-transcripts/file-add.bin")`, and
+`(4,"file_update","loopback-transcripts/file-update.bin")`. Each record has
+exactly `exchange_digests`, `invocation_ordinal`, `normalized_byte_count`,
+`normalized_sha256`, `raw_byte_count`, `raw_sha256`, `relative_path`,
+`scenario`, `shell_repeat_normalized_byte_count`, and
+`shell_repeat_normalized_sha256`. `exchange_digests` has exactly two ordered
+records whose exact keys are `ordinal`, `request_byte_count`, `request_sha256`,
+`response_byte_count`, and `response_sha256`. The two shell-repeat fields are
+nonnegative integer/64-lowercase-hex values only for the shell records and are
+JSON null for both file-change records. The two shell-repeat-normalized byte
+streams must be identical.
+
+`LaunchPreflight.loopback_transcript_manifest_sha256` is the SHA-256 of those
+exact canonical manifest bytes. The manifest's loopback-contract digest must
+equal both `LaunchPreflight.loopback_contract_sha256` and the independently
+reconstructed server contract. Offline recapture strictly parses the framed
+leaves, reconstructs detached `LoopbackTranscript` values, recomputes every
+raw/exchange/ordinary-normalized/shell-repeat-normalized byte count and digest,
+cross-binds the four scenarios and item IDs to their corresponding client JSONL
+captures, and inventories the transcript directory before and after semantic
+validation. Missing, extra, reordered, renamed, duplicate, hard-linked,
+reparse, noncanonical, trailing, oversized, identity-drifted, or one-byte-
+mutated transcript or manifest bytes reject.
+
 The bundle inventory includes every plain directory and regular file with
 identity/size/hash; no secret, profile path, provider output, or mutable mapping
 is retained. The canonical bundle record is written by the runner to a distinct
@@ -8656,9 +8724,14 @@ and their canonical digest. The fixture contains no provider/model output,
 credentials, or private data. Its normalized request schemas, response bytes,
 harmless payloads, file bytes, and server module are separately hashed. The
 network-transcript projection may normalize only the ephemeral port, harness-
-owned Responses call IDs, and unique case-root token. A separate repeated-shell
-projection may normalize the two shell item IDs. File-change item IDs, raw event
-bytes, statuses, change arrays, and raw paths are never normalized: each
+owned Responses call IDs, unique case-root token, and the dynamic request-header
+values `x-client-request-id`, `traceparent`, and `tracestate`. When body
+normalization changes its byte length, `Content-Length` is deterministically
+recomputed to that normalized length; this framing repair is not a fourth
+caller-selected value. Credential, cookie, proxy-authorization, certificate,
+and every other security-sensitive header is rejected rather than normalized.
+A separate repeated-shell projection may normalize the two shell item IDs.
+File-change item IDs, raw event bytes, statuses, change arrays, and raw paths are never normalized: each
 started/completed pair has its own exact approval-bound digest. An offline
 captured-event mutant replaces one completed item type with an
 unknown state-changing type and must reject without another client invocation.
@@ -8865,7 +8938,7 @@ evidence. Historical provenance remains byte-identical and exempt. Run the Task
 Freeze this exact future `_APPROVAL_BOUND_FILES` extension now, but do not add
 the Task 10 helper early or make Task 9's preflight depend on a nonexistent
 path. In Task 10, after the helper exists and the three fixtures are refactored,
-extend `_APPROVAL_BOUND_FILES` atomically with these exact 31 additions: the 27
+extend `_APPROVAL_BOUND_FILES` atomically with these exact 32 additions: the 28
 created paths, the existing installed-artifact workflow test that Task 11 will
 strengthen, and the three process-free junction-fixture tests:
 
@@ -8877,6 +8950,7 @@ tests/skills/complete_suite_command_policy.py
 tests/skills/complete_suite_file_change_policy.py
 tests/skills/complete-suite-file-change-ledger.schema.json
 tests/skills/complete_suite_cli_binding.py
+tests/skills/complete_suite_approved_operation_policy.py
 tests/skills/complete_suite_shell_preflight.py
 tests/skills/complete_suite_client_preflight_server.py
 tests/skills/complete_suite_control_plane.ps1
@@ -8903,11 +8977,11 @@ tests/security/test_persistence_security.py
 tests/security/test_research_security.py
 ```
 
-This displayed order is the authoritative 31-path suffix. Appending it to the
-existing 16-entry prefix must produce an exact 47-entry raw tuple with ordinal
-uniqueness; resolving the closed directory members must produce exactly 172
-unique paths. REDs reject a 30-path partial suffix, a 46-entry raw tuple, a
-171-path resolved set, any duplicate, reordering, substitution, or extra path,
+This displayed order is the authoritative 32-path suffix. Appending it to the
+existing 16-entry prefix must produce an exact 48-entry raw tuple with ordinal
+uniqueness; resolving the closed directory members must produce exactly 173
+unique paths. REDs reject a 31-path partial suffix, a 47-entry raw tuple, a
+172-path resolved set, any duplicate, reordering, substitution, or extra path,
 and any implementation that validates only a set instead of the ordered suffix.
 
 `frozen_inputs` binds:
@@ -8927,7 +9001,8 @@ metadata identities, exact distribution closure, `_pth`/`sys.path` roles, member
 inventory, resource counts, and aggregate manifest
 closed environment names and safe-value digest
 frozen meta-input inventory and SHA-256
-loopback server/config/request/response contract digest
+loopback server/config/request/response contract digest plus the exact four-leaf
+wire-transcript manifest digest
 evaluation-template fixture path/identity/size/SHA-256, exact ordered 24-record
 template manifest, and truthful four loopback plus 24 real-template client-
 evaluation envelope bytes/digests
@@ -9183,7 +9258,7 @@ transaction use managed elevation.
 
 1. With the closed Git reads, require HEAD to be the exact Task 8 commit, the
    regular index to equal its tree, and the worktree delta to equal the literal
-   18-leaf Task 9 allowlist.
+   19-leaf Task 9 allowlist.
 2. For each changed leaf, invoke direct `git.exe hash-object -w --no-filters --
    <literal leaf>`, compare the blob to the working bytes, and invoke direct
    `git.exe update-index --add --cacheinfo
@@ -14751,6 +14826,7 @@ invented operation chain. No repository/test code writes these records.
 The exact Task 9 allowlist is:
 
 ```text
+tests/skills/complete_suite_approved_operation_policy.py
 tests/skills/complete_suite_shell_preflight.py
 tests/skills/complete_suite_client_preflight_server.py
 tests/skills/complete_suite_control_plane.ps1
@@ -15083,12 +15159,12 @@ Require:
 
 Before constructing the campaign, create the test-operations helper and refactor
 the three junction fixtures under the closed process-free contract below. Then
-append the exact ordered 31-path suffix frozen in Task 9 to the existing
-16-entry prefix. Require the raw tuple to have exactly 47 ordinal-unique entries
-and the closed resolved approval-bound set to have exactly 172 unique paths;
+append the exact ordered 32-path suffix frozen in Task 9 to the existing
+16-entry prefix. Require the raw tuple to have exactly 48 ordinal-unique entries
+and the closed resolved approval-bound set to have exactly 173 unique paths;
 make the RED assert order, uniqueness, existence, LF policy, and current byte
-capture for every member. No task may accept a partial 30-path suffix, a
-46-entry raw tuple, or a 171-path resolved set.
+capture for every member. No task may accept a partial 31-path suffix, a
+47-entry raw tuple, or a 172-path resolved set.
 
 ```yaml
 campaign_id: 2026-08-21-proposed6
@@ -17444,11 +17520,11 @@ valid; require zero launcher calls and a safely sealed
 
 Require the Task 1 `text eol=lf` rules to cover every new Python, PowerShell,
 JSON Schema, JSON fixture, test, design, and plan file. Extend the
-approval-bound path test with the exact ordered 31-entry Task 9 suffix; require
-the combined raw tuple to contain exactly 47 ordinal-unique entries and the
-resolved set exactly 172 unique paths, with explicit LF attributes and current
+approval-bound path test with the exact ordered 32-entry Task 9 suffix; require
+the combined raw tuple to contain exactly 48 ordinal-unique entries and the
+resolved set exactly 173 unique paths, with explicit LF attributes and current
 LF bytes. REDs remove the last suffix entry or resolved member and require the
-30/46/171 partial forms to fail, in addition to duplicate/reorder/substitution.
+31/47/172 partial forms to fail, in addition to duplicate/reorder/substitution.
 
 - [ ] **Step 3: Run RED**
 

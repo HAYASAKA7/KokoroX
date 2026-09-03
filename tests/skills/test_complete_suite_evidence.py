@@ -20,6 +20,7 @@ REPOSITORY_ROOT = SKILLS_ROOT.parents[1]
 sys.path.insert(0, str(SKILLS_ROOT))
 
 import run_complete_suite_campaign as runner  # noqa: E402
+import complete_suite_command_policy as command_policy  # noqa: E402
 
 
 OUTPUT_SCHEMA = SKILLS_ROOT / "complete-suite-output.schema.json"
@@ -683,7 +684,11 @@ def _final_response(case_id: str = "example-case") -> dict[str, object]:
     }
 
 
-def _prepared_case(root: Path) -> Path:
+def _prepared_case(
+    root: Path,
+    *,
+    seed_policy_artifacts: bool = False,
+) -> Path:
     case_root = root / "case"
     workspace = case_root / "workspace"
     raw = case_root / "raw"
@@ -708,6 +713,15 @@ def _prepared_case(root: Path) -> Path:
     )
     _write_json(workspace / "case.json", {"id": "example-case"})
     _write_json(workspace / "inputs" / "setup.json", {"input": "fixed"})
+    if seed_policy_artifacts:
+        (workspace / "data" / "compiled" / "changed-dir").mkdir(parents=True)
+        (
+            workspace / "data" / "compiled" / "changed-dir" / "value.txt"
+        ).write_bytes(b"before\n")
+        (workspace / "data" / "reports" / "removed-dir").mkdir(parents=True)
+        (
+            workspace / "data" / "reports" / "removed-dir" / "old.txt"
+        ).write_bytes(b"remove me\n")
     (workspace / ".tools" / "kokoro.cmd").write_bytes(
         b"@echo off\r\npython -m kokoroarc.cli %*\r\n"
     )
@@ -733,6 +747,18 @@ def _prepared_case(root: Path) -> Path:
             workspace / "outputs",
             allow_missing=True,
         ),
+        "policy_filesystem_roots": [
+            command_policy._root_record(snapshot)
+            for snapshot in runner.preparation.capture_policy_filesystem_roots(
+                case_root=case_root,
+                approved_roots=(
+                    workspace,
+                    workspace / "data" / "compiled",
+                    workspace / "data" / "reports",
+                    workspace / "outputs",
+                ),
+            )
+        ],
     }
     _write_json(raw / "pre-run-state.json", pre_run)
     return case_root
@@ -2978,13 +3004,191 @@ def test_codex_argv_and_shell_environment_are_literal_and_fail_closed(
     assert spec.shell_environment["TMP"] == str(case_root / "workspace" / "tmp")
 
 
-def test_one_shot_run_retains_raw_evidence_and_post_run_inventory(
+def test_directory_artifact_approved_policy_filesystem_roots_are_exact(
+    tmp_path: Path,
+) -> None:
+    case_root = tmp_path / "case"
+    workspace = case_root / "workspace"
+
+    assert runner._approved_policy_filesystem_roots(case_root) == (
+        workspace,
+        workspace / "data" / "compiled",
+        workspace / "data" / "reports",
+        workspace / "outputs",
+    )
+
+
+def test_directory_artifact_pre_and_post_state_keys_are_closed_v1(
     tmp_path: Path,
 ) -> None:
     case_root = _prepared_case(tmp_path)
+    raw = case_root / "raw"
+    pre_path = raw / "pre-run-state.json"
+    pre = json.loads(pre_path.read_text(encoding="utf-8"))
+    expected_pre_keys = {
+        "schema_version",
+        "ordinal",
+        "variant",
+        "case_id",
+        "case_root_identity",
+        "workspace_root_identity",
+        "runtime_root_identity",
+        "raw_root_identity",
+        "prompt_sha256",
+        "output_schema_sha256",
+        "workspace_before",
+        "immutable_before",
+        "preexisting_outputs",
+        "policy_filesystem_roots",
+    }
+    assert set(pre) == expected_pre_keys
+
+    pre["unexpected"] = True
+    with pytest.raises(RuntimeError, match="closed v1"):
+        runner._validate_pre_run_state(
+            case_root,
+            runner.RunSpec(1, "baseline", "example-case"),
+            pre,
+        )
+
+    post = {
+        "schema_version": "1.0",
+        "variant": "baseline",
+        "case_id": "example-case",
+        "workspace_after": {},
+        "immutable_after": {},
+        "preexisting_outputs_after": {},
+        "root_identities_after": {},
+        "policy_filesystem_roots": [],
+        "created_paths": [],
+        "changed_paths": [],
+        "removed_paths": [],
+        "raw_inputs_before": {},
+        "raw_inputs_after": {},
+        "raw_inputs_unchanged": True,
+    }
+    expected_post_keys = set(post)
+    runner._validate_post_run_state(post)
+    post["unexpected"] = True
+    with pytest.raises(RuntimeError, match="closed v1"):
+        runner._validate_post_run_state(post)
+    assert expected_post_keys == {
+        "schema_version",
+        "variant",
+        "case_id",
+        "workspace_after",
+        "immutable_after",
+        "preexisting_outputs_after",
+        "root_identities_after",
+        "policy_filesystem_roots",
+        "created_paths",
+        "changed_paths",
+        "removed_paths",
+        "raw_inputs_before",
+        "raw_inputs_after",
+        "raw_inputs_unchanged",
+    }
+
+
+def test_directory_artifact_snapshot_capture_brackets_all_runner_root_identities(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    case_root = tmp_path / "case"
+    identities = {
+        "case_root_identity": {"inode": 1},
+        "workspace_root_identity": {"inode": 2},
+        "runtime_root_identity": {"inode": 3},
+        "raw_root_identity": {"inode": 4},
+    }
+    calls: list[str] = []
+
+    def capture_identities(observed_case_root: Path) -> dict[str, object]:
+        assert observed_case_root == case_root
+        calls.append("identities")
+        return dict(identities)
+
+    def capture_roots(observed_case_root: Path) -> tuple[object, ...]:
+        assert observed_case_root == case_root
+        calls.append("snapshot")
+        return ()
+
+    monkeypatch.setattr(runner, "_runner_root_identities", capture_identities)
+    monkeypatch.setattr(runner, "_capture_policy_filesystem_roots", capture_roots)
+
+    for _ in range(2):
+        snapshots, observed = runner._capture_bracketed_policy_filesystem_roots(
+            case_root
+        )
+        assert snapshots == ()
+        assert observed == identities
+
+    assert calls == [
+        "identities",
+        "snapshot",
+        "identities",
+        "identities",
+        "snapshot",
+        "identities",
+    ]
+
+
+def test_directory_artifact_snapshot_capture_rejects_bracketed_identity_drift(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    case_root = tmp_path / "case"
+    identities = [
+        {
+            "case_root_identity": {"inode": 1},
+            "workspace_root_identity": {"inode": 2},
+            "runtime_root_identity": {"inode": 3},
+            "raw_root_identity": {"inode": 4},
+        },
+        {
+            "case_root_identity": {"inode": 1},
+            "workspace_root_identity": {"inode": 2},
+            "runtime_root_identity": {"inode": 3},
+            "raw_root_identity": {"inode": 5},
+        },
+    ]
+
+    monkeypatch.setattr(
+        runner,
+        "_runner_root_identities",
+        lambda _case_root: identities.pop(0),
+    )
+    monkeypatch.setattr(
+        runner,
+        "_capture_policy_filesystem_roots",
+        lambda _case_root: (),
+    )
+
+    with pytest.raises(RuntimeError, match="identity changed during capture"):
+        runner._capture_bracketed_policy_filesystem_roots(case_root)
+
+
+def test_directory_artifact_one_shot_run_retains_raw_evidence_and_policy_filesystem_roots(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    case_root = _prepared_case(tmp_path, seed_policy_artifacts=True)
     workspace = case_root / "workspace"
     response_text = _canonical_bytes(_final_response()).decode("utf-8")
     popen_calls = 0
+    bracket_calls = 0
+    original_bracketed_capture = runner._capture_bracketed_policy_filesystem_roots
+
+    def traced_bracketed_capture(case: Path):
+        nonlocal bracket_calls
+        bracket_calls += 1
+        return original_bracketed_capture(case)
+
+    monkeypatch.setattr(
+        runner,
+        "_capture_bracketed_policy_filesystem_roots",
+        traced_bracketed_capture,
+    )
 
     class FakeProcess:
         returncode = 0
@@ -2995,6 +3199,37 @@ def test_one_shot_run_retains_raw_evidence_and_post_run_inventory(
             self.command = command
             self.stdout = kwargs["stdout"]
             self.stderr = kwargs["stderr"]
+            pre = json.loads(
+                (case_root / "raw" / "pre-run-state.json").read_text(
+                    encoding="utf-8"
+                )
+            )
+            assert tuple(
+                root["relative_root"] for root in pre["policy_filesystem_roots"]
+            ) == (
+                "workspace",
+                r"workspace\data\compiled",
+                r"workspace\data\reports",
+                r"workspace\outputs",
+            )
+            assert pre["policy_filesystem_roots"][-1]["present"] is False
+            assert set(pre) == {
+                "schema_version",
+                "ordinal",
+                "variant",
+                "case_id",
+                "case_root_identity",
+                "workspace_root_identity",
+                "runtime_root_identity",
+                "raw_root_identity",
+                "prompt_sha256",
+                "output_schema_sha256",
+                "workspace_before",
+                "immutable_before",
+                "preexisting_outputs",
+                "policy_filesystem_roots",
+            }
+            assert not (case_root / "raw" / "post-run-state.json").exists()
 
         def communicate(
             self,
@@ -3005,6 +3240,12 @@ def test_one_shot_run_retains_raw_evidence_and_post_run_inventory(
             assert timeout == runner.RUN_TIMEOUT_SECONDS
             (workspace / "outputs").mkdir()
             _write_json(workspace / "outputs" / "result.json", {"ok": True})
+            (workspace / "outputs" / "nested").mkdir()
+            (workspace / "outputs" / "nested" / "new.txt").write_bytes(b"new\n")
+            (
+                workspace / "data" / "compiled" / "changed-dir" / "value.txt"
+            ).write_bytes(b"after\n")
+            shutil.rmtree(workspace / "data" / "reports" / "removed-dir")
             events = (
                 {"type": "thread.started", "thread_id": "thread-one-shot-01"},
                 {"type": "turn.started"},
@@ -3050,6 +3291,7 @@ def test_one_shot_run_retains_raw_evidence_and_post_run_inventory(
     )
 
     assert popen_calls == 1
+    assert bracket_calls == 2
     assert status["thread_id"] == "thread-one-shot-01"
     assert status["exit_code"] == 0
     assert status["timed_out"] is False
@@ -3072,7 +3314,44 @@ def test_one_shot_run_retains_raw_evidence_and_post_run_inventory(
     ):
         assert (raw / name).is_file(), name
     post = json.loads((raw / "post-run-state.json").read_text(encoding="utf-8"))
-    assert "outputs/result.json" in post["created_paths"]
+    assert tuple(
+        root["relative_root"] for root in post["policy_filesystem_roots"]
+    ) == (
+        "workspace",
+        r"workspace\data\compiled",
+        r"workspace\data\reports",
+        r"workspace\outputs",
+    )
+    assert post["policy_filesystem_roots"][-1]["present"] is True
+    assert {
+        r"workspace\outputs",
+        r"workspace\outputs\nested",
+        r"workspace\outputs\nested\new.txt",
+        r"workspace\outputs\result.json",
+    }.issubset(post["created_paths"])
+    assert post["changed_paths"] == [
+        r"workspace\data\compiled\changed-dir\value.txt"
+    ]
+    assert post["removed_paths"] == [
+        r"workspace\data\reports\removed-dir",
+        r"workspace\data\reports\removed-dir\old.txt",
+    ]
+    assert set(post) == {
+        "schema_version",
+        "variant",
+        "case_id",
+        "workspace_after",
+        "immutable_after",
+        "preexisting_outputs_after",
+        "root_identities_after",
+        "policy_filesystem_roots",
+        "created_paths",
+        "changed_paths",
+        "removed_paths",
+        "raw_inputs_before",
+        "raw_inputs_after",
+        "raw_inputs_unchanged",
+    }
     declaration = json.loads((raw / "command.json").read_text(encoding="utf-8"))
     assert declaration["argv"][0] == "<CODEX>"
     private = json.loads(
@@ -3080,6 +3359,32 @@ def test_one_shot_run_retains_raw_evidence_and_post_run_inventory(
     )
     assert private["argv"][0] == r"D:\tools\codex.exe"
     assert private["launcher_environment"]["TMP"].startswith(str(case_root))
+
+
+def test_policy_filesystem_roots_reject_unexpected_preexisting_output_before_spawn(
+    tmp_path: Path,
+) -> None:
+    case_root = _prepared_case(tmp_path)
+    (case_root / "workspace" / "outputs").mkdir()
+    called = False
+
+    def forbidden_popen(*_args: object, **_kwargs: object) -> object:
+        nonlocal called
+        called = True
+        raise AssertionError("drifted policy root attempted to spawn")
+
+    with pytest.raises(RuntimeError, match="changed before launch"):
+        runner.run_one(
+            case_root,
+            runner.RunSpec(1, "baseline", "example-case"),
+            codex_executable=Path(r"D:\tools\codex.exe"),
+            python_executable=Path(r"C:\Python314\python.exe"),
+            host_environment={"SYSTEMROOT": r"C:\Windows"},
+            popen_factory=forbidden_popen,
+        )
+
+    assert called is False
+    assert not (case_root / "raw" / "launch-started.json").exists()
 
 
 def test_one_shot_run_marks_immutable_drift_and_refuses_retry(

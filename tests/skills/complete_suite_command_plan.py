@@ -574,6 +574,47 @@ class _WindowsNativeVector:
     command_line: str = field(repr=False)
 
 
+_WINDOWS_NATIVE_VECTOR_TYPE = _WindowsNativeVector
+_WINDOWS_NATIVE_VECTOR_TYPE_GETATTRIBUTE = type.__getattribute__
+_WINDOWS_NATIVE_VECTOR_OBJECT_NEW = object.__new__
+_WINDOWS_NATIVE_VECTOR_NAMESPACE = tuple(
+    type.__getattribute__(_WindowsNativeVector, "__dict__").items()
+)
+_WINDOWS_NATIVE_VECTOR_BASES = type.__getattribute__(_WindowsNativeVector, "__bases__")
+_WINDOWS_NATIVE_VECTOR_MRO = type.__getattribute__(_WindowsNativeVector, "__mro__")
+_WINDOWS_NATIVE_VECTOR_CONSTRUCTOR = type.__getattribute__(
+    _WindowsNativeVector, "__dict__"
+).get("__init__")
+_WINDOWS_NATIVE_VECTOR_CONSTRUCTOR_CODE = _WINDOWS_NATIVE_VECTOR_CONSTRUCTOR.__code__
+_WINDOWS_NATIVE_VECTOR_CONSTRUCTOR_CLOSURE = tuple(
+    cell.cell_contents for cell in _WINDOWS_NATIVE_VECTOR_CONSTRUCTOR.__closure__
+)
+_WINDOWS_NATIVE_VECTOR_BASIS_A = (
+    "COMMAND_DECODER_IDENTITY_MISMATCH",
+    RuntimeError,
+    type,
+    len,
+    any,
+    zip,
+    tuple,
+    UnicodeEncodeError,
+    _WindowsNativeVector,
+    type.__getattribute__,
+    object.__new__,
+    _WINDOWS_NATIVE_VECTOR_NAMESPACE,
+    _WINDOWS_NATIVE_VECTOR_BASES,
+    _WINDOWS_NATIVE_VECTOR_MRO,
+    _WINDOWS_NATIVE_VECTOR_CONSTRUCTOR,
+    _WINDOWS_NATIVE_VECTOR_CONSTRUCTOR_CODE,
+    _WINDOWS_NATIVE_VECTOR_CONSTRUCTOR_CLOSURE,
+    PureWindowsPath,
+    sha256,
+    "COMMAND_DECODER_LIMIT_EXCEEDED",
+)
+_WINDOWS_NATIVE_VECTOR_BASIS_B = _WINDOWS_NATIVE_VECTOR_BASIS_A
+_WINDOWS_NATIVE_VECTOR_BASIS_C = _WINDOWS_NATIVE_VECTOR_BASIS_A
+
+
 @dataclass(frozen=True)
 class _PlainFileObservation:
     normalized_path: str
@@ -1518,32 +1559,268 @@ def _quote_windows_native_argument(value: str) -> str:
     return "".join(rendered)
 
 
+_WINDOWS_NATIVE_VECTOR_BASIS_A = _WINDOWS_NATIVE_VECTOR_BASIS_A + (
+    _validate_native_string,
+    _quote_windows_native_argument,
+    _reject,
+    _validate_native_string.__code__,
+    _validate_native_string.__defaults__,
+    _validate_native_string.__kwdefaults__,
+    _validate_native_string.__closure__,
+    _validate_native_string.__globals__,
+    _quote_windows_native_argument.__code__,
+    _quote_windows_native_argument.__defaults__,
+    _quote_windows_native_argument.__kwdefaults__,
+    _quote_windows_native_argument.__closure__,
+    _quote_windows_native_argument.__globals__,
+    _reject.__code__,
+    _reject.__defaults__,
+    _reject.__kwdefaults__,
+    _reject.__closure__,
+    _reject.__globals__,
+    PureWindowsPath.is_absolute,
+    PureWindowsPath.is_absolute.__code__,
+    PureWindowsPath.is_absolute.__defaults__,
+    PureWindowsPath.is_absolute.__kwdefaults__,
+    PureWindowsPath.is_absolute.__closure__,
+    PureWindowsPath.is_absolute.__globals__,
+)
+_WINDOWS_NATIVE_VECTOR_BASIS_B = _WINDOWS_NATIVE_VECTOR_BASIS_A
+_WINDOWS_NATIVE_VECTOR_BASIS_C = _WINDOWS_NATIVE_VECTOR_BASIS_A
+
+
 def _windows_native_vector(
     executable: str,
     arguments: tuple[str, ...],
 ) -> _WindowsNativeVector:
-    executable_text = _validate_native_string(executable)
-    if not executable_text or not PureWindowsPath(executable_text).is_absolute():
-        _reject(COMMAND_DECODER_IDENTITY_MISMATCH)
-    if type(arguments) is not tuple:
-        _reject(COMMAND_DECODER_IDENTITY_MISMATCH)
-    serialized = [_quote_windows_native_argument(executable_text)]
+    if _WINDOWS_NATIVE_VECTOR_BASIS_A is _WINDOWS_NATIVE_VECTOR_BASIS_B:
+        basis = _WINDOWS_NATIVE_VECTOR_BASIS_A
+    elif _WINDOWS_NATIVE_VECTOR_BASIS_A is _WINDOWS_NATIVE_VECTOR_BASIS_C:
+        basis = _WINDOWS_NATIVE_VECTOR_BASIS_A
+    else:
+        basis = _WINDOWS_NATIVE_VECTOR_BASIS_B
+    if (
+        _WINDOWS_NATIVE_VECTOR_BASIS_A is not basis
+        or _WINDOWS_NATIVE_VECTOR_BASIS_B is not basis
+        or _WINDOWS_NATIVE_VECTOR_BASIS_C is not basis
+        or COMMAND_DECODER_IDENTITY_MISMATCH is not basis[0]
+        or RuntimeError is not basis[1]
+        or type is not basis[2]
+        or len is not basis[3]
+        or any is not basis[4]
+        or zip is not basis[5]
+        or tuple is not basis[6]
+        or UnicodeEncodeError is not basis[7]
+        or _WINDOWS_NATIVE_VECTOR_TYPE is not basis[8]
+        or _WINDOWS_NATIVE_VECTOR_TYPE_GETATTRIBUTE is not basis[9]
+        or _WINDOWS_NATIVE_VECTOR_OBJECT_NEW is not basis[10]
+        or _WINDOWS_NATIVE_VECTOR_NAMESPACE is not basis[11]
+        or _WINDOWS_NATIVE_VECTOR_BASES is not basis[12]
+        or _WINDOWS_NATIVE_VECTOR_MRO is not basis[13]
+        or _WINDOWS_NATIVE_VECTOR_CONSTRUCTOR is not basis[14]
+        or _WINDOWS_NATIVE_VECTOR_CONSTRUCTOR_CODE is not basis[15]
+        or _WINDOWS_NATIVE_VECTOR_CONSTRUCTOR_CLOSURE is not basis[16]
+        or PureWindowsPath is not basis[17]
+        or sha256 is not basis[18]
+        or COMMAND_DECODER_LIMIT_EXCEEDED is not basis[19]
+        or _validate_native_string is not basis[20]
+        or _quote_windows_native_argument is not basis[21]
+        or _reject is not basis[22]
+    ):
+        raise basis[1](basis[0])
+    trusted_runtime_error = basis[1]
+    trusted_type_fn = basis[2]
+    trusted_len = basis[3]
+    trusted_any = basis[4]
+    trusted_zip = basis[5]
+    trusted_tuple = basis[6]
+    trusted_unicode_encode_error = basis[7]
+    trusted_type = basis[8]
+    trusted_type_getattribute = basis[9]
+    trusted_object_new = basis[10]
+    trusted_namespace = basis[11]
+    trusted_bases = basis[12]
+    trusted_mro = basis[13]
+    trusted_constructor = basis[14]
+    trusted_constructor_code = basis[15]
+    trusted_constructor_closure = basis[16]
+    trusted_path_type = basis[17]
+    trusted_sha256 = basis[18]
+    raw_namespace = trusted_type_getattribute(trusted_type, "__dict__")
+    if (
+        _WindowsNativeVector is not trusted_type
+        or sha256 is not trusted_sha256
+        or _WINDOWS_NATIVE_VECTOR_TYPE_GETATTRIBUTE is not trusted_type_getattribute
+        or _WINDOWS_NATIVE_VECTOR_OBJECT_NEW is not trusted_object_new
+        or trusted_len(raw_namespace) != trusted_len(trusted_namespace)
+        or trusted_any(raw_namespace.get(name) is not value for name, value in trusted_namespace)
+        or raw_namespace.get("__init__") is not trusted_constructor
+        or raw_namespace.get("__new__") is not None
+        or trusted_type_getattribute(trusted_type, "__bases__") is not trusted_bases
+        or trusted_type_getattribute(trusted_type, "__mro__") is not trusted_mro
+        or trusted_constructor.__code__ is not trusted_constructor_code
+        or trusted_constructor.__defaults__ is not None
+        or trusted_constructor.__kwdefaults__ is not None
+        or trusted_constructor.__closure__ is None
+        or trusted_len(trusted_constructor.__closure__) != trusted_len(trusted_constructor_closure)
+        or trusted_any(
+            cell.cell_contents is not value
+            for cell, value in trusted_zip(
+                trusted_constructor.__closure__, trusted_constructor_closure
+            )
+        )
+    ):
+        raise trusted_runtime_error(basis[0])
+    trusted_validate = basis[20]
+    trusted_quote = basis[21]
+    trusted_reject = basis[22]
+    trusted_path_is_absolute = basis[38]
+
+    def helpers_valid() -> bool:
+        return (
+            _validate_native_string is trusted_validate
+            and trusted_validate.__code__ is basis[23]
+            and trusted_validate.__defaults__ is basis[24]
+            and trusted_validate.__kwdefaults__ is basis[25]
+            and trusted_validate.__closure__ is basis[26]
+            and trusted_validate.__globals__ is basis[27]
+            and _quote_windows_native_argument is trusted_quote
+            and trusted_quote.__code__ is basis[28]
+            and trusted_quote.__defaults__ is basis[29]
+            and trusted_quote.__kwdefaults__ is basis[30]
+            and trusted_quote.__closure__ is basis[31]
+            and trusted_quote.__globals__ is basis[32]
+            and _reject is trusted_reject
+            and trusted_reject.__code__ is basis[33]
+            and trusted_reject.__defaults__ is basis[34]
+            and trusted_reject.__kwdefaults__ is basis[35]
+            and trusted_reject.__closure__ is basis[36]
+            and trusted_reject.__globals__ is basis[37]
+            and PureWindowsPath.is_absolute is trusted_path_is_absolute
+            and trusted_path_is_absolute.__code__ is basis[39]
+            and trusted_path_is_absolute.__defaults__ is basis[40]
+            and trusted_path_is_absolute.__kwdefaults__ is basis[41]
+            and trusted_path_is_absolute.__closure__ is basis[42]
+            and trusted_path_is_absolute.__globals__ is basis[43]
+        )
+
+    if not helpers_valid():
+        raise trusted_runtime_error(basis[0])
+    executable_text = trusted_validate(executable)
+    if (
+        not helpers_valid()
+        or sha256 is not trusted_sha256
+        or type is not trusted_type_fn
+        or len is not trusted_len
+        or any is not trusted_any
+        or zip is not trusted_zip
+        or tuple is not trusted_tuple
+        or UnicodeEncodeError is not trusted_unicode_encode_error
+        or RuntimeError is not trusted_runtime_error
+        or PureWindowsPath is not trusted_path_type
+    ):
+        raise trusted_runtime_error(basis[0])
+    trusted_path = trusted_path_type(executable_text)
+    if not helpers_valid():
+        raise trusted_runtime_error(basis[0])
+    path_is_absolute = executable_text != "" and trusted_path_is_absolute(trusted_path)
+    if (
+        not helpers_valid()
+        or RuntimeError is not trusted_runtime_error
+        or PureWindowsPath is not trusted_path_type
+        or sha256 is not trusted_sha256
+    ):
+        raise trusted_runtime_error(basis[0])
+    if not path_is_absolute:
+        if not helpers_valid():
+            raise trusted_runtime_error(basis[0])
+        trusted_reject(basis[0])
+    if trusted_type_fn(arguments) is not trusted_tuple:
+        if not helpers_valid():
+            raise trusted_runtime_error(basis[0])
+        trusted_reject(basis[0])
+    if not helpers_valid():
+        raise trusted_runtime_error(basis[0])
+    first_serialized = trusted_quote(executable_text)
+    if not helpers_valid():
+        raise trusted_runtime_error(basis[0])
+    serialized = [first_serialized]
     for argument in arguments:
-        serialized.append(_quote_windows_native_argument(argument))
+        if not helpers_valid():
+            raise trusted_runtime_error(basis[0])
+        rendered_argument = trusted_quote(argument)
+        if not helpers_valid():
+            raise trusted_runtime_error(basis[0])
+        serialized.append(rendered_argument)
     command_line = " ".join(serialized)
     try:
-        utf16_units = len(command_line.encode("utf-16-le", errors="strict")) // 2 + 1
-    except UnicodeEncodeError:
-        _reject(COMMAND_DECODER_IDENTITY_MISMATCH)
+        utf16_units = trusted_len(command_line.encode("utf-16-le", errors="strict")) // 2 + 1
+    except trusted_unicode_encode_error:
+        if not helpers_valid():
+            raise trusted_runtime_error(basis[0])
+        trusted_reject(basis[0])
     if utf16_units > 30000:
-        _reject(COMMAND_DECODER_LIMIT_EXCEEDED)
+        if not helpers_valid():
+            raise trusted_runtime_error(basis[0])
+        trusted_reject(basis[19])
     serialized_bytes = (command_line + "\x00").encode("utf-16-le", errors="strict")
-    return _WindowsNativeVector(
+    if not helpers_valid() or sha256 is not trusted_sha256:
+        raise trusted_runtime_error(basis[0])
+    digest = trusted_sha256(serialized_bytes).hexdigest()
+    if not helpers_valid() or sha256 is not trusted_sha256:
+        raise trusted_runtime_error(basis[0])
+    raw_namespace = trusted_type_getattribute(trusted_type, "__dict__")
+    if (
+        _WindowsNativeVector is not trusted_type
+        or sha256 is not trusted_sha256
+        or RuntimeError is not trusted_runtime_error
+        or _WINDOWS_NATIVE_VECTOR_TYPE_GETATTRIBUTE is not trusted_type_getattribute
+        or _WINDOWS_NATIVE_VECTOR_OBJECT_NEW is not trusted_object_new
+        or trusted_len(raw_namespace) != trusted_len(trusted_namespace)
+        or trusted_any(raw_namespace.get(name) is not value for name, value in trusted_namespace)
+        or raw_namespace.get("__init__") is not trusted_constructor
+        or raw_namespace.get("__new__") is not None
+        or trusted_type_getattribute(trusted_type, "__bases__") is not trusted_bases
+        or trusted_type_getattribute(trusted_type, "__mro__") is not trusted_mro
+        or trusted_constructor.__code__ is not trusted_constructor_code
+        or trusted_constructor.__defaults__ is not None
+        or trusted_constructor.__kwdefaults__ is not None
+        or trusted_constructor.__closure__ is None
+        or trusted_len(trusted_constructor.__closure__) != trusted_len(trusted_constructor_closure)
+        or trusted_any(
+            cell.cell_contents is not value
+            for cell, value in trusted_zip(
+                trusted_constructor.__closure__, trusted_constructor_closure
+            )
+        )
+    ):
+        raise trusted_runtime_error(basis[0])
+    vector = trusted_object_new(trusted_type)
+    if (
+        not helpers_valid()
+        or trusted_constructor.__code__ is not trusted_constructor_code
+        or trusted_constructor.__defaults__ is not None
+        or trusted_constructor.__kwdefaults__ is not None
+        or trusted_constructor.__closure__ is None
+        or trusted_len(trusted_constructor.__closure__) != trusted_len(trusted_constructor_closure)
+        or trusted_any(
+            cell.cell_contents is not value
+            for cell, value in trusted_zip(
+                trusted_constructor.__closure__, trusted_constructor_closure
+            )
+        )
+    ):
+        raise trusted_runtime_error(basis[0])
+    trusted_constructor(
+        vector,
         contract="complete-suite-windows-native-vector-v1",
         utf16_units=utf16_units,
-        utf16le_sha256=sha256(serialized_bytes).hexdigest(),
+        utf16le_sha256=digest,
         command_line=command_line,
     )
+    if not helpers_valid() or trusted_type_fn(vector) is not trusted_type:
+        trusted_reject(basis[0])
+    return vector
 
 
 class _ByHandleFileInformation(ctypes.Structure):

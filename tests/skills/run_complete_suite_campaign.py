@@ -25,6 +25,7 @@ REPOSITORY_ROOT = SKILLS_ROOT.parents[1]
 sys.path.insert(0, str(SKILLS_ROOT))
 
 import complete_suite_preparation as preparation  # noqa: E402
+import complete_suite_command_policy as command_policy  # noqa: E402
 
 
 CAMPAIGN_FILE = SKILLS_ROOT / "complete-suite-campaign.yaml"
@@ -709,6 +710,138 @@ def _immutable_case_state(case_root: Path) -> dict[str, Any]:
     }
 
 
+def _approved_policy_filesystem_roots(case_root: Path) -> tuple[Path, ...]:
+    workspace = case_root / "workspace"
+    return (
+        workspace,
+        workspace / "data" / "compiled",
+        workspace / "data" / "reports",
+        workspace / "outputs",
+    )
+
+
+_PRE_RUN_STATE_V1_KEYS = frozenset(
+    {
+        "schema_version",
+        "ordinal",
+        "variant",
+        "case_id",
+        "case_root_identity",
+        "workspace_root_identity",
+        "runtime_root_identity",
+        "raw_root_identity",
+        "prompt_sha256",
+        "output_schema_sha256",
+        "workspace_before",
+        "immutable_before",
+        "preexisting_outputs",
+        "policy_filesystem_roots",
+    }
+)
+_POST_RUN_STATE_V1_KEYS = frozenset(
+    {
+        "schema_version",
+        "variant",
+        "case_id",
+        "workspace_after",
+        "immutable_after",
+        "preexisting_outputs_after",
+        "root_identities_after",
+        "policy_filesystem_roots",
+        "created_paths",
+        "changed_paths",
+        "removed_paths",
+        "raw_inputs_before",
+        "raw_inputs_after",
+        "raw_inputs_unchanged",
+    }
+)
+
+
+def _validate_closed_v1_state(
+    value: Mapping[str, Any],
+    *,
+    expected_keys: frozenset[str],
+    label: str,
+) -> None:
+    if value.get("schema_version") != "1.0" or set(value) != expected_keys:
+        raise RuntimeError(f"{label} is not a closed v1 record")
+
+
+def _runner_root_identities(case_root: Path) -> dict[str, dict[str, int]]:
+    return {
+        "case_root_identity": _directory_identity(case_root),
+        "workspace_root_identity": _directory_identity(case_root / "workspace"),
+        "runtime_root_identity": _directory_identity(case_root / "runtime"),
+        "raw_root_identity": _directory_identity(case_root / "raw"),
+    }
+
+
+def _capture_policy_filesystem_roots(
+    case_root: Path,
+) -> tuple[command_policy.FilesystemRootSnapshot, ...]:
+    return preparation.capture_policy_filesystem_roots(
+        case_root=case_root,
+        approved_roots=_approved_policy_filesystem_roots(case_root),
+    )
+
+
+def _capture_bracketed_policy_filesystem_roots(
+    case_root: Path,
+) -> tuple[
+    tuple[command_policy.FilesystemRootSnapshot, ...],
+    dict[str, dict[str, int]],
+]:
+    identities_before = _runner_root_identities(case_root)
+    snapshots = _capture_policy_filesystem_roots(case_root)
+    identities_after = _runner_root_identities(case_root)
+    if identities_after != identities_before:
+        raise RuntimeError("runner root identity changed during capture")
+    return snapshots, identities_before
+
+
+def _policy_filesystem_root_records(
+    roots: tuple[command_policy.FilesystemRootSnapshot, ...],
+) -> list[dict[str, object]]:
+    if type(roots) is not tuple or any(
+        type(root) is not command_policy.FilesystemRootSnapshot for root in roots
+    ):
+        raise RuntimeError("policy filesystem roots are invalid")
+    return [command_policy._root_record(root) for root in roots]
+
+
+def _decode_policy_filesystem_root_records(
+    value: object,
+) -> tuple[command_policy.FilesystemRootSnapshot, ...]:
+    try:
+        return command_policy._snapshot_roots(
+            {"policy_filesystem_roots": value}
+        )
+    except RuntimeError as exc:
+        raise RuntimeError("policy filesystem roots are invalid") from exc
+
+
+def _policy_filesystem_delta(
+    before: tuple[command_policy.FilesystemRootSnapshot, ...],
+    after: tuple[command_policy.FilesystemRootSnapshot, ...],
+) -> tuple[tuple[str, ...], tuple[str, ...], tuple[str, ...]]:
+    if len(before) != len(after) or any(
+        not command_policy._windows_path_equal(
+            before_root.relative_root,
+            after_root.relative_root,
+        )
+        for before_root, after_root in zip(before, after, strict=True)
+    ):
+        raise RuntimeError("policy filesystem root topology changed")
+    try:
+        return command_policy._snapshot_delta(
+            command_policy._build_snapshot_index(before),
+            command_policy._build_snapshot_index(after),
+        )
+    except RuntimeError as exc:
+        raise RuntimeError("policy filesystem delta is invalid") from exc
+
+
 def prepare_approved_campaign(
     approved: ApprovedCampaign,
     paths: HarnessPaths,
@@ -779,15 +912,15 @@ def prepare_approved_campaign(
         (raw / "complete-suite-output.schema.json").write_bytes(output_schema)
         prompt = _render_prompt(case).encode("utf-8")
         (raw / "prompt.md").write_bytes(prompt)
+        policy_filesystem_roots, root_identities = (
+            _capture_bracketed_policy_filesystem_roots(case_root)
+        )
         pre_run = {
             "schema_version": "1.0",
             "ordinal": item.ordinal,
             "variant": item.variant,
             "case_id": item.case_id,
-            "case_root_identity": _directory_identity(case_root),
-            "workspace_root_identity": _directory_identity(workspace),
-            "runtime_root_identity": _directory_identity(case_root / "runtime"),
-            "raw_root_identity": _directory_identity(raw),
+            **root_identities,
             "prompt_sha256": sha256(prompt).hexdigest(),
             "output_schema_sha256": sha256(output_schema).hexdigest(),
             "workspace_before": preparation.inventory_tree(workspace),
@@ -796,7 +929,15 @@ def prepare_approved_campaign(
                 workspace / "outputs",
                 allow_missing=True,
             ),
+            "policy_filesystem_roots": _policy_filesystem_root_records(
+                policy_filesystem_roots
+            ),
         }
+        _validate_closed_v1_state(
+            pre_run,
+            expected_keys=_PRE_RUN_STATE_V1_KEYS,
+            label="pre-run state",
+        )
         _write_json(raw / "pre-run-state.json", pre_run)
         prepared_runs.append(
             {
@@ -920,18 +1061,23 @@ def _validate_pre_run_state(
     item: RunSpec,
     pre_run: Mapping[str, Any],
 ) -> None:
+    _validate_closed_v1_state(
+        pre_run,
+        expected_keys=_PRE_RUN_STATE_V1_KEYS,
+        label="pre-run state",
+    )
     raw = case_root / "raw"
     workspace = case_root / "workspace"
     schema = raw / "complete-suite-output.schema.json"
     prompt = raw / "prompt.md"
+    policy_filesystem_roots, root_identities = (
+        _capture_bracketed_policy_filesystem_roots(case_root)
+    )
     expected = {
         "ordinal": item.ordinal,
         "variant": item.variant,
         "case_id": item.case_id,
-        "case_root_identity": _directory_identity(case_root),
-        "workspace_root_identity": _directory_identity(workspace),
-        "runtime_root_identity": _directory_identity(case_root / "runtime"),
-        "raw_root_identity": _directory_identity(raw),
+        **root_identities,
         "prompt_sha256": _sha256_file(
             prompt,
             max_bytes=preparation.MAX_FILE_BYTES,
@@ -943,11 +1089,20 @@ def _validate_pre_run_state(
             workspace / "outputs",
             allow_missing=True,
         ),
+        "policy_filesystem_roots": _policy_filesystem_root_records(
+            policy_filesystem_roots
+        ),
     }
-    if pre_run.get("schema_version") != "1.0" or any(
-        pre_run.get(key) != value for key, value in expected.items()
-    ):
+    if any(pre_run.get(key) != value for key, value in expected.items()):
         raise RuntimeError("prepared run state changed before launch")
+
+
+def _validate_post_run_state(post_run: Mapping[str, Any]) -> None:
+    _validate_closed_v1_state(
+        post_run,
+        expected_keys=_POST_RUN_STATE_V1_KEYS,
+        label="post-run state",
+    )
 
 
 def run_one(
@@ -1109,22 +1264,40 @@ def run_one(
         output_after,
     ):
         _append_failure(failures, "PREEXISTING_OUTPUT_CHANGED")
-    observed_identities = {
-        "case_root_identity": _directory_identity(case_root),
-        "workspace_root_identity": _directory_identity(workspace),
-        "runtime_root_identity": _directory_identity(case_root / "runtime"),
-        "raw_root_identity": _directory_identity(raw),
-    }
-    if any(pre_run.get(key) != value for key, value in observed_identities.items()):
-        _append_failure(failures, "ROOT_IDENTITY_CHANGED")
-    before_files = _inventory_files(pre_run.get("workspace_before", {}))
-    after_files = _inventory_files(workspace_after or {})
-    created_paths = sorted(set(after_files) - set(before_files))
-    changed_paths = sorted(
-        path
-        for path in set(after_files) & set(before_files)
-        if after_files[path] != before_files[path]
-    )
+    observed_identities: dict[str, dict[str, int]] | None = None
+    policy_filesystem_roots_after: tuple[
+        command_policy.FilesystemRootSnapshot, ...
+    ] | None
+    policy_filesystem_root_records_after: list[dict[str, object]] | None
+    try:
+        policy_filesystem_roots_before = _decode_policy_filesystem_root_records(
+            pre_run.get("policy_filesystem_roots")
+        )
+        policy_filesystem_roots_after, observed_identities = (
+            _capture_bracketed_policy_filesystem_roots(case_root)
+        )
+        if any(
+            pre_run.get(key) != value
+            for key, value in observed_identities.items()
+        ):
+            _append_failure(failures, "ROOT_IDENTITY_CHANGED")
+        created_tuple, changed_tuple, removed_tuple = _policy_filesystem_delta(
+            policy_filesystem_roots_before,
+            policy_filesystem_roots_after,
+        )
+        policy_filesystem_root_records_after = _policy_filesystem_root_records(
+            policy_filesystem_roots_after
+        )
+        created_paths = list(created_tuple)
+        changed_paths = list(changed_tuple)
+        removed_paths = list(removed_tuple)
+    except (OSError, ValueError, RuntimeError):
+        policy_filesystem_roots_after = None
+        policy_filesystem_root_records_after = None
+        created_paths = []
+        changed_paths = []
+        removed_paths = []
+        _append_failure(failures, "POST_INVENTORY_INVALID")
     post_run = {
         "schema_version": "1.0",
         "variant": item.variant,
@@ -1133,12 +1306,15 @@ def run_one(
         "immutable_after": immutable_after,
         "preexisting_outputs_after": output_after,
         "root_identities_after": observed_identities,
+        "policy_filesystem_roots": policy_filesystem_root_records_after,
         "created_paths": created_paths,
         "changed_paths": changed_paths,
+        "removed_paths": removed_paths,
         "raw_inputs_before": raw_inputs_before,
         "raw_inputs_after": raw_inputs_after,
         "raw_inputs_unchanged": raw_inputs_unchanged,
     }
+    _validate_post_run_state(post_run)
     _write_json(raw / "post-run-state.json", post_run)
     status = {
         "schema_version": "1.0",

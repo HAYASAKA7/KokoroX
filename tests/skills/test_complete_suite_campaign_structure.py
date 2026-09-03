@@ -142,6 +142,7 @@ PLANNED_CAMPAIGN6_LF_PATHS = (
     "tests/skills/fixtures/complete-suite-file-change/workspace-override.jsonl",
     "tests/skills/complete_suite_cli_binding.py",
     "tests/skills/test_complete_suite_cli_binding.py",
+    "tests/skills/complete_suite_approved_operation_policy.py",
     "tests/skills/complete_suite_shell_preflight.py",
     "tests/skills/complete_suite_client_preflight_server.py",
     "tests/skills/complete_suite_control_plane.ps1",
@@ -387,8 +388,8 @@ def test_approval_bound_checkout_policy_is_explicit_and_current_bytes_are_lf(
     approval_bound_paths = runner.approval_bound_paths()
     assert len(approval_bound_paths) == 141
     assert approval_bound_paths == tuple(sorted(set(approval_bound_paths)))
-    assert len(PLANNED_CAMPAIGN6_LF_PATHS) == 32
-    assert len(set(PLANNED_CAMPAIGN6_LF_PATHS)) == 32
+    assert len(PLANNED_CAMPAIGN6_LF_PATHS) == 33
+    assert len(set(PLANNED_CAMPAIGN6_LF_PATHS)) == 33
 
     calls: list[tuple[list[str], dict[str, object]]] = []
     real_run = subprocess.run

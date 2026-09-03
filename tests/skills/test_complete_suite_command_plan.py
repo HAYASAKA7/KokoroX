@@ -3924,6 +3924,297 @@ def test_decoder_native_vector_matches_independent_exact_command_line_oracle() -
     assert observed.utf16le_sha256 == expected_hash
 
 
+def test_decoder_native_vector_construction_line_descriptor_is_non_dispatching() -> None:
+    command_plan = _command_plan_module()
+    target = command_plan._WindowsNativeVector
+    original = type.__getattribute__(target, "__dict__")["__init__"]
+    builder = command_plan._windows_native_vector
+    lines, first_line = inspect.getsourcelines(builder)
+    target_line = first_line + next(index for index, line in enumerate(lines) if "vector = trusted_object_new(" in line)
+    dispatches: list[str] = []
+    injections: list[str] = []
+
+    class RestoringDescriptor:
+        def __get__(self, instance: object, owner: type | None = None) -> object:
+            dispatches.append("__init__")
+            type.__setattr__(target, "__init__", original)
+            return original
+
+    def trace(frame: object, event: str, arg: object) -> object:
+        if event == "line" and frame.f_code is builder.__code__ and frame.f_lineno == target_line and not injections:
+            injections.append("builder")
+            type.__setattr__(target, "__init__", RestoringDescriptor())
+        return trace
+
+    prior = sys.gettrace()
+    sys.settrace(trace)
+    try:
+        vector = builder(r"C:\x.exe", ("-NoLogo",))
+    finally:
+        sys.settrace(prior)
+        type.__setattr__(target, "__init__", original)
+    assert injections == ["builder"]
+    assert dispatches == []
+    assert vector.contract == "complete-suite-windows-native-vector-v1"
+
+
+@pytest.mark.parametrize(
+    "authority_name",
+    (
+        "_WINDOWS_NATIVE_VECTOR_TYPE",
+        "_WINDOWS_NATIVE_VECTOR_TYPE_GETATTRIBUTE",
+        "_WINDOWS_NATIVE_VECTOR_OBJECT_NEW",
+        "_WINDOWS_NATIVE_VECTOR_NAMESPACE",
+        "_WINDOWS_NATIVE_VECTOR_BASES",
+        "_WINDOWS_NATIVE_VECTOR_MRO",
+        "_WINDOWS_NATIVE_VECTOR_CONSTRUCTOR",
+        "_WINDOWS_NATIVE_VECTOR_CONSTRUCTOR_CODE",
+        "_WINDOWS_NATIVE_VECTOR_CONSTRUCTOR_CLOSURE",
+    ),
+)
+def test_decoder_native_vector_rejects_mutable_authority_before_dispatch(
+    authority_name: str,
+) -> None:
+    command_plan = _command_plan_module()
+    original = getattr(command_plan, authority_name)
+    dispatches: list[str] = []
+
+    def replacement(*args: object, **kwargs: object) -> object:
+        dispatches.append(authority_name)
+        setattr(command_plan, authority_name, original)
+        return original(*args, **kwargs)
+
+    setattr(command_plan, authority_name, replacement)
+    try:
+        with pytest.raises(RuntimeError, match=r"^COMMAND_DECODER_IDENTITY_MISMATCH$"):
+            command_plan._windows_native_vector(r"C:\x.exe", ("-NoLogo",))
+    finally:
+        setattr(command_plan, authority_name, original)
+    assert dispatches == []
+
+
+def test_decoder_native_vector_rejects_late_sha256_replacement_before_dispatch() -> None:
+    command_plan = _command_plan_module()
+    builder = command_plan._windows_native_vector
+    original = command_plan.sha256
+    dispatches: list[str] = []
+    injections: list[str] = []
+    lines, first_line = inspect.getsourcelines(builder)
+    target_line = first_line + [
+        index
+        for index, line in enumerate(lines)
+        if 'raw_namespace = trusted_type_getattribute(trusted_type, "__dict__")' in line
+    ][-1]
+
+    def replacement(*args: object, **kwargs: object) -> object:
+        dispatches.append("sha256")
+        command_plan.sha256 = original
+        return original(*args, **kwargs)
+
+    def trace(frame: object, event: str, arg: object) -> object:
+        if (
+            event == "line"
+            and frame.f_code is builder.__code__
+            and frame.f_lineno == target_line
+            and not injections
+        ):
+            injections.append("sha256")
+            command_plan.sha256 = replacement
+        return trace
+
+    prior = sys.gettrace()
+    sys.settrace(trace)
+    try:
+        with pytest.raises(RuntimeError, match=r"^COMMAND_DECODER_IDENTITY_MISMATCH$"):
+            builder(r"C:\x.exe", ("-NoLogo",))
+    finally:
+        sys.settrace(prior)
+        command_plan.sha256 = original
+    assert injections == ["sha256"]
+    assert dispatches == []
+
+
+@pytest.mark.parametrize(
+    "prior_name,target_name,ordinal,executable,arguments",
+    (
+        ("_validate_native_string", "_quote_windows_native_argument", 1, r"C:\x.exe", ("a",)),
+        ("_quote_windows_native_argument", "_quote_windows_native_argument", 1, r"C:\x.exe", ("a", "b")),
+        ("_quote_windows_native_argument", "_quote_windows_native_argument", 3, r"C:\x.exe", ("a", "b")),
+        ("_validate_native_string", "_reject", 1, "relative.exe", ("a",)),
+    ),
+)
+def test_decoder_native_vector_reauthenticates_helper_code_after_callbacks(
+    prior_name: str,
+    target_name: str,
+    ordinal: int,
+    executable: str,
+    arguments: tuple[str, ...],
+) -> None:
+    command_plan = _command_plan_module()
+    builder = command_plan._windows_native_vector
+    prior_helper = getattr(command_plan, prior_name)
+    target = getattr(command_plan, target_name)
+    original_code = target.__code__
+    dispatches: list[str] = []
+    returns: list[str] = []
+
+    def replacement(*args: object, **kwargs: object) -> object:
+        _r22d_dispatches.append(_r22d_target_name)
+        _r22d_target.__code__ = _r22d_original_code
+        return _r22d_target(*args, **kwargs)
+
+    target.__globals__["_r22d_dispatches"] = dispatches
+    target.__globals__["_r22d_target_name"] = target_name
+    target.__globals__["_r22d_target"] = target
+    target.__globals__["_r22d_original_code"] = original_code
+
+    def trace(frame: object, event: str, arg: object) -> object:
+        if event == "return" and frame.f_code is prior_helper.__code__:
+            returns.append(prior_name)
+            if len(returns) == ordinal:
+                target.__code__ = replacement.__code__.replace(
+                    co_freevars=original_code.co_freevars
+                )
+        return trace
+
+    prior_trace = sys.gettrace()
+    sys.settrace(trace)
+    try:
+        with pytest.raises(RuntimeError, match=r"^COMMAND_DECODER_IDENTITY_MISMATCH$"):
+            builder(executable, arguments)
+    finally:
+        sys.settrace(prior_trace)
+        target.__code__ = original_code
+        for name in (
+            "_r22d_dispatches",
+            "_r22d_target_name",
+            "_r22d_target",
+            "_r22d_original_code",
+        ):
+            target.__globals__.pop(name, None)
+    assert len(returns) >= ordinal
+    assert dispatches == []
+
+
+def test_decoder_native_vector_reauthenticates_path_method_after_validate() -> None:
+    command_plan = _command_plan_module()
+    builder = command_plan._windows_native_vector
+    prior_helper = command_plan._validate_native_string
+    target = command_plan.PureWindowsPath.is_absolute
+    original_code = target.__code__
+    dispatches: list[str] = []
+    injections: list[str] = []
+
+    def replacement(*args: object, **kwargs: object) -> object:
+        _r22d_path_dispatches.append("path")
+        _r22d_path_target.__code__ = _r22d_path_original_code
+        return _r22d_path_target(*args, **kwargs)
+
+    target.__globals__["_r22d_path_dispatches"] = dispatches
+    target.__globals__["_r22d_path_target"] = target
+    target.__globals__["_r22d_path_original_code"] = original_code
+
+    def trace(frame: object, event: str, arg: object) -> object:
+        if event == "return" and frame.f_code is prior_helper.__code__ and not injections:
+            injections.append("path")
+            target.__code__ = replacement.__code__.replace(
+                co_freevars=original_code.co_freevars
+            )
+        return trace
+
+    prior_trace = sys.gettrace()
+    sys.settrace(trace)
+    try:
+        with pytest.raises(RuntimeError, match=r"^COMMAND_DECODER_IDENTITY_MISMATCH$"):
+            builder(r"C:\x.exe", ("a",))
+    finally:
+        sys.settrace(prior_trace)
+        target.__code__ = original_code
+        for name in (
+            "_r22d_path_dispatches",
+            "_r22d_path_target",
+            "_r22d_path_original_code",
+        ):
+            target.__globals__.pop(name, None)
+    assert injections == ["path"]
+    assert dispatches == []
+
+
+def test_decoder_native_vector_reauthenticates_constructor_after_allocation() -> None:
+    command_plan = _command_plan_module()
+    builder = command_plan._windows_native_vector
+    target = command_plan._WINDOWS_NATIVE_VECTOR_CONSTRUCTOR
+    original_code = target.__code__
+    dispatches: list[str] = []
+    injections: list[str] = []
+    lines, first_line = inspect.getsourcelines(builder)
+    target_line = first_line + next(
+        index for index, line in enumerate(lines) if "vector = trusted_object_new(" in line
+    )
+
+    def replacement(*args: object, **kwargs: object) -> object:
+        _r22d_constructor_dispatches.append("constructor")
+        _r22d_constructor_target.__code__ = _r22d_constructor_original_code
+        return _r22d_constructor_target(*args, **kwargs)
+
+    target.__globals__["_r22d_constructor_dispatches"] = dispatches
+    target.__globals__["_r22d_constructor_target"] = target
+    target.__globals__["_r22d_constructor_original_code"] = original_code
+
+    def trace(frame: object, event: str, arg: object) -> object:
+        if (
+            event == "line"
+            and frame.f_code is builder.__code__
+            and frame.f_lineno == target_line
+            and not injections
+        ):
+            injections.append("constructor")
+            target.__code__ = replacement.__code__.replace(
+                co_freevars=original_code.co_freevars
+            )
+        return trace
+
+    prior_trace = sys.gettrace()
+    sys.settrace(trace)
+    try:
+        with pytest.raises(RuntimeError, match=r"^COMMAND_DECODER_IDENTITY_MISMATCH$"):
+            builder(r"C:\x.exe", ("a",))
+    finally:
+        sys.settrace(prior_trace)
+        target.__code__ = original_code
+        for name in (
+            "_r22d_constructor_dispatches",
+            "_r22d_constructor_target",
+            "_r22d_constructor_original_code",
+        ):
+            target.__globals__.pop(name, None)
+    assert injections == ["constructor"]
+    assert dispatches == []
+
+
+def test_decoder_native_vector_callback_edges_have_complete_state_barriers() -> None:
+    source = inspect.getsource(_command_plan_module()._windows_native_vector)
+    assert "def helpers_valid()" in source
+    assert source.count("not helpers_valid()") >= 12
+    calls = (
+        "trusted_validate(executable)",
+        "trusted_path_type(executable_text)",
+        "trusted_path_is_absolute(trusted_path)",
+        "trusted_quote(executable_text)",
+        "trusted_quote(argument)",
+        "trusted_sha256(serialized_bytes)",
+        "trusted_object_new(trusted_type)",
+        "trusted_constructor(\n",
+    )
+    for call in calls:
+        call_offset = source.index(call)
+        preceding_barrier = source.rfind("helpers_valid()", 0, call_offset)
+        assert preceding_barrier >= 0
+    allocation = source.index("vector = trusted_object_new(trusted_type)")
+    constructor = source.index("trusted_constructor(\n", allocation)
+    assert source.index("trusted_constructor.__code__ is not trusted_constructor_code", allocation) < constructor
+
+
 def test_decoder_run_binds_the_exact_native_vector_observation(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

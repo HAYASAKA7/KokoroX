@@ -301,6 +301,197 @@ def test_inventory_counts_nested_directories_toward_the_entry_limit(
         preparation.inventory_tree(root)
 
 
+def test_policy_filesystem_roots_directory_snapshot_distinguishes_absent_and_empty(
+    tmp_path: Path,
+) -> None:
+    case_root = tmp_path / "case"
+    case_root.mkdir()
+    outputs = case_root / "outputs"
+
+    absent = preparation.capture_policy_filesystem_roots(
+        case_root=case_root,
+        approved_roots=(outputs,),
+    )
+    outputs.mkdir()
+    empty = preparation.capture_policy_filesystem_roots(
+        case_root=case_root,
+        approved_roots=(outputs,),
+    )
+
+    assert len(absent) == len(empty) == 1
+    assert absent[0].root_index == empty[0].root_index == 0
+    assert absent[0].relative_root == empty[0].relative_root == "outputs"
+    assert absent[0].present is False
+    assert absent[0].root_identity is None
+    assert absent[0].entries == ()
+    assert empty[0].present is True
+    assert empty[0].root_identity is not None
+    assert empty[0].entries == ()
+    assert absent[0].ancestor_identities == empty[0].ancestor_identities
+    assert absent[0].manifest_sha256 != empty[0].manifest_sha256
+
+
+def test_policy_filesystem_roots_directory_snapshot_is_recursive_and_hash_bound(
+    tmp_path: Path,
+) -> None:
+    case_root = tmp_path / "case"
+    workspace = case_root / "workspace"
+    nested = workspace / "nested"
+    nested.mkdir(parents=True)
+    (workspace / "root.txt").write_bytes(b"root\n")
+    (nested / "payload.txt").write_bytes(b"payload\n")
+
+    (snapshot,) = preparation.capture_policy_filesystem_roots(
+        case_root=case_root,
+        approved_roots=(workspace,),
+    )
+
+    assert snapshot.present is True
+    assert snapshot.relative_root == "workspace"
+    assert snapshot.root_identity is not None
+    assert snapshot.ancestor_identities
+    assert tuple(entry.relative_path for entry in snapshot.entries) == (
+        "nested",
+        r"nested\payload.txt",
+        "root.txt",
+    )
+    assert tuple(entry.kind for entry in snapshot.entries) == (
+        "directory",
+        "file",
+        "file",
+    )
+    directory, nested_file, root_file = snapshot.entries
+    assert directory.size == 0
+    assert directory.sha256 is None
+    assert nested_file.size == len(b"payload\n")
+    assert nested_file.sha256 == sha256(b"payload\n").hexdigest()
+    assert root_file.size == len(b"root\n")
+    assert root_file.sha256 == sha256(b"root\n").hexdigest()
+    assert all(entry.link_count == entry.identity.link_count == 1 for entry in snapshot.entries)
+
+
+def test_policy_filesystem_roots_use_coherent_identities_for_overlapping_roots(
+    tmp_path: Path,
+) -> None:
+    case_root = tmp_path / "case"
+    workspace = case_root / "workspace"
+    nested = workspace / "nested"
+    nested.mkdir(parents=True)
+
+    workspace_snapshot, nested_snapshot = (
+        preparation.capture_policy_filesystem_roots(
+            case_root=case_root,
+            approved_roots=(workspace, nested),
+        )
+    )
+
+    nested_entry = next(
+        entry
+        for entry in workspace_snapshot.entries
+        if entry.relative_path == "nested"
+    )
+    assert nested_entry.kind == "directory"
+    assert nested_entry.identity == nested_snapshot.root_identity
+
+
+@pytest.mark.parametrize("mutation", ("unsorted", "duplicate", "outside", "relative"))
+def test_policy_filesystem_roots_rejects_unapproved_root_sequences(
+    tmp_path: Path,
+    mutation: str,
+) -> None:
+    case_root = tmp_path / "case"
+    case_root.mkdir()
+    first = case_root / "a"
+    second = case_root / "z"
+    if mutation == "unsorted":
+        approved_roots = (second, first)
+    elif mutation == "duplicate":
+        approved_roots = (first, first)
+    elif mutation == "outside":
+        approved_roots = (tmp_path / "outside",)
+    else:
+        approved_roots = (Path("relative"),)
+
+    with pytest.raises(ValueError):
+        preparation.capture_policy_filesystem_roots(
+            case_root=case_root,
+            approved_roots=approved_roots,
+        )
+
+
+def test_policy_filesystem_roots_enforces_entry_and_aggregate_bounds(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    case_root = tmp_path / "case"
+    root = case_root / "workspace"
+    root.mkdir(parents=True)
+    (root / "one.bin").write_bytes(b"1234")
+    (root / "two.bin").write_bytes(b"5678")
+
+    monkeypatch.setattr(preparation, "POLICY_FILESYSTEM_MAX_ENTRIES_PER_ROOT", 1)
+    with pytest.raises(ValueError, match="entry limit"):
+        preparation.capture_policy_filesystem_roots(
+            case_root=case_root,
+            approved_roots=(root,),
+        )
+
+    monkeypatch.setattr(preparation, "POLICY_FILESYSTEM_MAX_ENTRIES_PER_ROOT", 4_096)
+    monkeypatch.setattr(preparation, "POLICY_FILESYSTEM_MAX_TOTAL_BYTES", 7)
+    with pytest.raises(ValueError, match="aggregate size limit"):
+        preparation.capture_policy_filesystem_roots(
+            case_root=case_root,
+            approved_roots=(root,),
+        )
+
+
+def test_policy_filesystem_roots_rechecks_membership_after_content_capture(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    case_root = tmp_path / "case"
+    root = case_root / "workspace"
+    root.mkdir(parents=True)
+    target = root / "one.txt"
+    target.write_bytes(b"one\n")
+    original = preparation._read_plain_bytes
+    mutated = False
+
+    def mutate_membership(path: Path, *, max_bytes: int) -> bytes:
+        nonlocal mutated
+        payload = original(path, max_bytes=max_bytes)
+        if not mutated:
+            mutated = True
+            (root / "late.txt").write_bytes(b"late\n")
+        return payload
+
+    monkeypatch.setattr(preparation, "_read_plain_bytes", mutate_membership)
+    with pytest.raises(ValueError, match="changed|membership|identity"):
+        preparation.capture_policy_filesystem_roots(
+            case_root=case_root,
+            approved_roots=(root,),
+        )
+
+
+def test_policy_filesystem_roots_rejects_hardlinked_member(tmp_path: Path) -> None:
+    case_root = tmp_path / "case"
+    root = case_root / "workspace"
+    root.mkdir(parents=True)
+    first = root / "first.txt"
+    second = root / "second.txt"
+    first.write_bytes(b"same\n")
+    try:
+        os.link(first, second)
+    except OSError:
+        pytest.skip("hardlinks are unavailable on this filesystem")
+
+    with pytest.raises(ValueError, match="hardlink|link count|identity"):
+        preparation.capture_policy_filesystem_roots(
+            case_root=case_root,
+            approved_roots=(root,),
+        )
+
+
 def test_file_hashing_is_capped_before_digesting(tmp_path: Path) -> None:
     target = tmp_path / "oversized.bin"
     target.write_bytes(b"four")

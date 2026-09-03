@@ -3,16 +3,23 @@ from __future__ import annotations
 from hashlib import sha256
 import json
 import os
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 import re
 import shutil
 import stat
 import subprocess
 import sys
-from typing import Any, Mapping
+from typing import TYPE_CHECKING, Any, Mapping, Sequence
 from unittest.mock import patch
 
 import yaml
+
+if TYPE_CHECKING:
+    from complete_suite_command_plan import FilesystemObjectIdentity
+    from complete_suite_command_policy import (
+        FilesystemRootSnapshot,
+        FilesystemSnapshotEntry,
+    )
 
 
 FIXED_EPOCH = 1_787_151_982
@@ -26,6 +33,8 @@ SKILL_NAMES = (
 MAX_FILES = 4_096
 MAX_FILE_BYTES = 16 * 1024 * 1024
 MAX_TOTAL_BYTES = 128 * 1024 * 1024
+POLICY_FILESYSTEM_MAX_ENTRIES_PER_ROOT = 4_096
+POLICY_FILESYSTEM_MAX_TOTAL_BYTES = 64 * 1024 * 1024
 _CORE_ENVIRONMENT_KEYS = (
     "PATH",
     "PATHEXT",
@@ -195,6 +204,368 @@ def inventory_tree(root: Path, *, allow_missing: bool = False) -> dict[str, Any]
         "tree_sha256": sha256(canonical_bytes(entries)).hexdigest(),
         "files": entries,
     }
+
+
+def _policy_identity(
+    metadata: os.stat_result,
+    *,
+    namespace_device: int | None = None,
+) -> FilesystemObjectIdentity:
+    from complete_suite_command_plan import FilesystemObjectIdentity
+
+    reparse_tag = int(getattr(metadata, "st_reparse_tag", 0))
+    identity = FilesystemObjectIdentity(
+        device=(
+            int(metadata.st_dev)
+            if namespace_device is None
+            else namespace_device
+        ),
+        inode=int(metadata.st_ino),
+        file_type=1,
+        reparse_tag=reparse_tag,
+        link_count=int(metadata.st_nlink),
+    )
+    if identity.reparse_tag != 0:
+        raise ValueError("policy filesystem identity is a reparse point")
+    if identity.link_count != 1:
+        raise ValueError(
+            "policy filesystem member link count must be one; hardlinks are forbidden"
+        )
+    return identity
+
+
+def _policy_identity_record(identity: FilesystemObjectIdentity) -> dict[str, int]:
+    return {
+        "device": identity.device,
+        "file_type": identity.file_type,
+        "inode": identity.inode,
+        "link_count": identity.link_count,
+        "reparse_tag": identity.reparse_tag,
+    }
+
+
+def _policy_entry_record(entry: FilesystemSnapshotEntry) -> dict[str, object]:
+    return {
+        "identity": _policy_identity_record(entry.identity),
+        "kind": entry.kind,
+        "link_count": entry.link_count,
+        "relative_path": entry.relative_path,
+        "sha256": entry.sha256,
+        "size": entry.size,
+    }
+
+
+def _policy_root_payload(
+    *,
+    root_index: int,
+    relative_root: str,
+    present: bool,
+    root_identity: FilesystemObjectIdentity | None,
+    ancestor_identities: tuple[FilesystemObjectIdentity, ...],
+    entries: tuple[FilesystemSnapshotEntry, ...],
+) -> dict[str, object]:
+    return {
+        "ancestor_identities": [
+            _policy_identity_record(identity) for identity in ancestor_identities
+        ],
+        "entries": [_policy_entry_record(entry) for entry in entries],
+        "present": present,
+        "relative_root": relative_root,
+        "root_identity": (
+            None if root_identity is None else _policy_identity_record(root_identity)
+        ),
+        "root_index": root_index,
+    }
+
+
+def _observe_plain_directory(
+    path: Path,
+) -> tuple[FilesystemObjectIdentity, tuple[FilesystemObjectIdentity, ...]]:
+    import complete_suite_command_plan as command_plan
+
+    try:
+        _observed, identity, ancestors, _case_sensitive = (
+            command_plan._observe_namespace_root(str(path))
+        )
+    except RuntimeError as exc:
+        raise ValueError("policy filesystem directory identity is invalid") from exc
+    if (
+        identity.file_type != 1
+        or identity.reparse_tag != 0
+        or identity.link_count != 1
+        or not ancestors
+        or any(
+            ancestor.file_type != 1
+            or ancestor.reparse_tag != 0
+            or ancestor.link_count != 1
+            for ancestor in ancestors
+        )
+    ):
+        raise ValueError("policy filesystem directory identity is unsafe")
+    return identity, ancestors
+
+
+def _policy_relative_root(case_root: Path, approved_root: Path) -> str:
+    case_parts = PureWindowsPath(str(case_root)).parts
+    root_parts = PureWindowsPath(str(approved_root)).parts
+    suffix = root_parts[len(case_parts) :]
+    if not suffix:
+        return "."
+    return str(PureWindowsPath(*suffix))
+
+
+def _absent_root_ancestors(
+    root: Path,
+) -> tuple[FilesystemObjectIdentity, ...]:
+    if root.exists() or root.is_symlink():
+        raise ValueError("policy filesystem root was expected to be absent")
+    existing = root.parent
+    while not existing.exists():
+        if existing.is_symlink():
+            raise ValueError("policy filesystem ancestor may not be a link")
+        parent = existing.parent
+        if parent == existing:
+            raise ValueError("policy filesystem root has no existing ancestor")
+        existing = parent
+    _require_plain_directory(existing, label="policy filesystem ancestor")
+    identity, ancestors = _observe_plain_directory(existing)
+    return (*ancestors, identity)
+
+
+def _policy_membership(
+    root: Path,
+) -> dict[str, tuple[Path, str, tuple[int, int, int, int, int, int]]]:
+    import complete_suite_command_policy as command_policy
+
+    _require_plain_directory(root, label="policy filesystem root")
+    pending = [root]
+    members: dict[
+        str,
+        tuple[Path, str, tuple[int, int, int, int, int, int]],
+    ] = {}
+    while pending:
+        directory = pending.pop()
+        _require_plain_directory(directory, label="policy filesystem directory")
+        try:
+            with os.scandir(directory) as iterator:
+                discovered = list(iterator)
+        except OSError as exc:
+            raise ValueError("policy filesystem membership is unavailable") from exc
+        for entry in discovered:
+            path = Path(entry.path)
+            if entry.is_symlink() or _is_link_or_reparse(path):
+                raise ValueError(
+                    "policy filesystem contains a link or reparse point"
+                )
+            try:
+                metadata = path.lstat()
+            except OSError as exc:
+                raise ValueError("policy filesystem member identity changed") from exc
+            if entry.is_dir(follow_symlinks=False):
+                kind = "directory"
+                pending.append(path)
+            elif entry.is_file(follow_symlinks=False):
+                kind = "file"
+            else:
+                raise ValueError("policy filesystem contains an unsupported entry")
+            _policy_identity(metadata)
+            relative = str(PureWindowsPath(*path.relative_to(root).parts))
+            if relative in members:
+                raise ValueError("policy filesystem membership is duplicated")
+            members[relative] = (path, kind, _file_identity(metadata))
+            if len(members) > POLICY_FILESYSTEM_MAX_ENTRIES_PER_ROOT:
+                raise ValueError("policy filesystem exceeds the entry limit")
+    relative_paths = tuple(members)
+    if not command_policy._windows_unique(relative_paths):
+        raise ValueError("policy filesystem membership has a case alias")
+    return members
+
+
+def _capture_present_policy_root(
+    *,
+    root_index: int,
+    relative_root: str,
+    root: Path,
+    aggregate_bytes: list[int],
+) -> FilesystemRootSnapshot:
+    import complete_suite_command_policy as command_policy
+    from complete_suite_command_policy import (
+        FilesystemRootSnapshot,
+        FilesystemSnapshotEntry,
+    )
+
+    root_identity_before, ancestors_before = _observe_plain_directory(root)
+    first_membership = _policy_membership(root)
+    entries_by_path: dict[str, FilesystemSnapshotEntry] = {}
+    for relative in command_policy._windows_sorted(tuple(first_membership)):
+        path, kind, first_metadata = first_membership[relative]
+        try:
+            metadata = path.lstat()
+        except OSError as exc:
+            raise ValueError("policy filesystem member identity changed") from exc
+        if _file_identity(metadata) != first_metadata:
+            raise ValueError("policy filesystem member identity changed")
+        identity = _policy_identity(
+            metadata,
+            namespace_device=root_identity_before.device,
+        )
+        if kind == "directory":
+            entry = FilesystemSnapshotEntry(
+                relative_path=relative,
+                kind="directory",
+                size=0,
+                sha256=None,
+                link_count=identity.link_count,
+                identity=identity,
+            )
+        else:
+            declared_size = int(metadata.st_size)
+            if aggregate_bytes[0] + declared_size > POLICY_FILESYSTEM_MAX_TOTAL_BYTES:
+                raise ValueError(
+                    "policy filesystem exceeds the aggregate size limit"
+                )
+            payload = _read_plain_bytes(path, max_bytes=MAX_FILE_BYTES)
+            aggregate_bytes[0] += len(payload)
+            if aggregate_bytes[0] > POLICY_FILESYSTEM_MAX_TOTAL_BYTES:
+                raise ValueError(
+                    "policy filesystem exceeds the aggregate size limit"
+                )
+            entry = FilesystemSnapshotEntry(
+                relative_path=relative,
+                kind="file",
+                size=len(payload),
+                sha256=sha256(payload).hexdigest(),
+                link_count=identity.link_count,
+                identity=identity,
+            )
+        entries_by_path[relative] = entry
+    second_membership = _policy_membership(root)
+    root_identity_after, ancestors_after = _observe_plain_directory(root)
+    if (
+        second_membership != first_membership
+        or root_identity_after != root_identity_before
+        or ancestors_after != ancestors_before
+    ):
+        raise ValueError("policy filesystem membership or identity changed")
+    entries = tuple(
+        entries_by_path[relative]
+        for relative in command_policy._windows_sorted(tuple(entries_by_path))
+    )
+    payload = _policy_root_payload(
+        root_index=root_index,
+        relative_root=relative_root,
+        present=True,
+        root_identity=root_identity_before,
+        ancestor_identities=ancestors_before,
+        entries=entries,
+    )
+    return FilesystemRootSnapshot(
+        root_index=root_index,
+        relative_root=relative_root,
+        present=True,
+        root_identity=root_identity_before,
+        ancestor_identities=ancestors_before,
+        entries=entries,
+        manifest_sha256=sha256(canonical_bytes(payload)).hexdigest(),
+    )
+
+
+def _capture_absent_policy_root(
+    *,
+    root_index: int,
+    relative_root: str,
+    root: Path,
+) -> FilesystemRootSnapshot:
+    from complete_suite_command_policy import FilesystemRootSnapshot
+
+    ancestors_before = _absent_root_ancestors(root)
+    ancestors_after = _absent_root_ancestors(root)
+    if ancestors_after != ancestors_before:
+        raise ValueError("policy filesystem ancestor identity changed")
+    payload = _policy_root_payload(
+        root_index=root_index,
+        relative_root=relative_root,
+        present=False,
+        root_identity=None,
+        ancestor_identities=ancestors_before,
+        entries=(),
+    )
+    return FilesystemRootSnapshot(
+        root_index=root_index,
+        relative_root=relative_root,
+        present=False,
+        root_identity=None,
+        ancestor_identities=ancestors_before,
+        entries=(),
+        manifest_sha256=sha256(canonical_bytes(payload)).hexdigest(),
+    )
+
+
+def capture_policy_filesystem_roots(
+    *,
+    case_root: Path,
+    approved_roots: Sequence[Path],
+) -> tuple[FilesystemRootSnapshot, ...]:
+    import complete_suite_command_policy as command_policy
+
+    if (
+        not isinstance(case_root, Path)
+        or not case_root.is_absolute()
+        or isinstance(approved_roots, (str, bytes))
+        or not isinstance(approved_roots, Sequence)
+        or len(approved_roots) > POLICY_FILESYSTEM_MAX_ENTRIES_PER_ROOT
+    ):
+        raise ValueError("policy filesystem roots are invalid")
+    normalized_case_root = Path(os.path.abspath(case_root))
+    if not command_policy._windows_path_equal(case_root, normalized_case_root):
+        raise ValueError("policy filesystem case root is not normalized")
+    _require_plain_directory(case_root, label="policy filesystem case root")
+    case_identity_before, case_ancestors_before = _observe_plain_directory(case_root)
+    roots = tuple(approved_roots)
+    if any(not isinstance(root, Path) or not root.is_absolute() for root in roots):
+        raise ValueError("policy filesystem roots must be absolute paths")
+    relative_roots: list[str] = []
+    for root in roots:
+        normalized_root = Path(os.path.abspath(root))
+        if (
+            not command_policy._windows_path_equal(root, normalized_root)
+            or not command_policy._is_below(root, case_root)
+        ):
+            raise ValueError("policy filesystem root escapes the case root")
+        relative_roots.append(_policy_relative_root(case_root, root))
+    relative_tuple = tuple(relative_roots)
+    if (
+        relative_tuple != command_policy._windows_sorted(relative_tuple)
+        or not command_policy._windows_unique(relative_tuple)
+    ):
+        raise ValueError("policy filesystem roots must be sorted and unique")
+
+    aggregate_bytes = [0]
+    snapshots: list[FilesystemRootSnapshot] = []
+    for root_index, (root, relative_root) in enumerate(
+        zip(roots, relative_tuple, strict=True)
+    ):
+        if root.exists():
+            snapshot = _capture_present_policy_root(
+                root_index=root_index,
+                relative_root=relative_root,
+                root=root,
+                aggregate_bytes=aggregate_bytes,
+            )
+        else:
+            snapshot = _capture_absent_policy_root(
+                root_index=root_index,
+                relative_root=relative_root,
+                root=root,
+            )
+        snapshots.append(snapshot)
+    case_identity_after, case_ancestors_after = _observe_plain_directory(case_root)
+    if (
+        case_identity_after != case_identity_before
+        or case_ancestors_after != case_ancestors_before
+    ):
+        raise ValueError("policy filesystem case-root identity changed")
+    return tuple(snapshots)
 
 
 def _wheel_distribution(filename: str) -> str:

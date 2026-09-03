@@ -52,3 +52,6 @@ tests/security/test_authoring_security.py text eol=lf
 tests/security/test_persistence_security.py text eol=lf
 tests/security/test_research_security.py text eol=lf
 docs/superpowers/plans/2026-08-14-kokoroarc-completion.md text eol=lf
+
+# Task 9 threat-model/residual note is checkout-stable LF like the other plans.
+docs/superpowers/task9-constructor-plan-threat-model-residual.md text eol=lf
