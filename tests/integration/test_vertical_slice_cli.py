@@ -33,6 +33,7 @@ def run_cli(
         check=False,
         capture_output=True,
         text=True,
+        encoding="utf-8",
         env=env,
         cwd=REPOSITORY_ROOT,
         timeout=30,

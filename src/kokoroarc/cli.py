@@ -10,6 +10,7 @@ import os
 from pathlib import Path
 import re
 import stat
+import sys
 import tempfile
 from typing import Any, Callable, cast
 
@@ -2166,7 +2167,27 @@ _CONFIG_HANDLERS: dict[
 }
 
 
+def _force_utf8_output() -> None:
+    """Emit UTF-8 regardless of the host console encoding.
+
+    Every command prints JSON with ``ensure_ascii=False``, and Character Packs
+    are multilingual by design. On a console using a legacy codepage (cp1252 on
+    Windows, for example) encoding that JSON raises UnicodeEncodeError and the
+    command dies after doing its work.
+    """
+
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure is None:
+            continue
+        try:
+            reconfigure(encoding="utf-8")
+        except (AttributeError, OSError, ValueError):
+            pass
+
+
 def main(argv: list[str] | None = None) -> int:
+    _force_utf8_output()
     try:
         with redirect_stderr(StringIO()):
             args = build_parser().parse_args(argv)

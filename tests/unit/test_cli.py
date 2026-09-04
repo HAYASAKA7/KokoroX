@@ -128,6 +128,7 @@ def test_invalid_config_default_scope_arguments_are_sanitized(
         check=False,
         capture_output=True,
         text=True,
+        encoding="utf-8",
         env=environment,
     )
 
@@ -194,6 +195,7 @@ def test_module_version_command() -> None:
         check=False,
         capture_output=True,
         text=True,
+        encoding="utf-8",
     )
     assert completed.returncode == 0
     assert completed.stdout.strip() == f"kokorox {__version__}"
@@ -207,6 +209,7 @@ def test_json_error_when_data_directory_is_missing() -> None:
         check=False,
         capture_output=True,
         text=True,
+        encoding="utf-8",
         env=env,
     )
     body = json.loads(completed.stdout)
@@ -231,6 +234,7 @@ def test_json_session_show_succeeds_with_configured_data_directory(tmp_path) -> 
         check=False,
         capture_output=True,
         text=True,
+        encoding="utf-8",
         env=env,
     )
 
@@ -248,6 +252,7 @@ def test_incomplete_commands_return_sanitized_json_errors(
         check=False,
         capture_output=True,
         text=True,
+        encoding="utf-8",
     )
 
     assert completed.returncode == 2
@@ -323,6 +328,7 @@ def test_invalid_character_arguments_never_echo_private_values(
         check=False,
         capture_output=True,
         text=True,
+        encoding="utf-8",
     )
 
     assert completed.returncode == 2
@@ -356,6 +362,7 @@ def test_nested_character_help_remains_a_successful_stdout_exit() -> None:
         check=False,
         capture_output=True,
         text=True,
+        encoding="utf-8",
     )
 
     assert completed.returncode == 0

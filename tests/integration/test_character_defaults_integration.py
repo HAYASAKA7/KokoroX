@@ -48,6 +48,7 @@ def _run_cli(data_root: Path, *arguments: str) -> dict[str, Any]:
         env=environment,
         capture_output=True,
         text=True,
+        encoding="utf-8",
         check=False,
         timeout=30,
     )
@@ -66,6 +67,7 @@ def _run_cli_error(data_root: Path, *arguments: str) -> dict[str, Any]:
         env=environment,
         capture_output=True,
         text=True,
+        encoding="utf-8",
         check=False,
         timeout=30,
     )
