@@ -60,9 +60,19 @@ jobs:
       # KokoroX rename, so it is deliberately out of the CI gate rather than
       # silently marked passing. See docs/ for the campaign scope note.
       - name: Test
-        run: >
-          python -m pytest tests/unit tests/integration tests/security
-          -n auto --dist load -q --durations=15
+        shell: bash
+        run: |
+          set +e
+          out=$(python -m pytest tests/unit tests/integration tests/security -n auto --dist load -q --tb=line -rf --durations=15 2>&1)
+          rc=$?
+          echo "$out"
+          if [ "$rc" -ne 0 ]; then
+            # Job logs need admin rights; annotations are public, so surface
+            # the failing test names there.
+            summary=$(echo "$out" | grep -E '^(FAILED|ERROR)' | head -20 | paste -sd';' -)
+            echo "::error title=pytest ${{ matrix.os }} py${{ matrix.python }}::${summary:-see log}"
+          fi
+          exit "$rc"
 
   coverage:
     needs: matrix
@@ -119,9 +129,19 @@ jobs:
       - name: Install the Skill suite and verify placement
         shell: bash
         run: |
-          set -euo pipefail
+          set +e
           kokorox --version
-          kokorox suite install --skills-root "$PWD/ci-skills" --json
-          test "$(find ci-skills -name SKILL.md | wc -l)" -eq 4
-          test "$(find ci-skills -path '*/agents/*.yaml' | wc -l)" -eq 40
+          out=$(kokorox suite install --skills-root "$PWD/ci-skills" --json 2>&1)
+          rc=$?
+          echo "$out"
+          if [ "$rc" -ne 0 ]; then
+            echo "::error title=suite install ${{ matrix.os }}::rc=$rc $(echo "$out" | tr -s '[:space:]' ' ' | cut -c1-400)"
+            exit "$rc"
+          fi
+          skills=$(find ci-skills -name SKILL.md | wc -l | tr -d ' ')
+          agents=$(find ci-skills -path '*/agents/*.yaml' | wc -l | tr -d ' ')
+          if [ "$skills" -ne 4 ] || [ "$agents" -ne 40 ]; then
+            echo "::error title=install layout ${{ matrix.os }}::SKILL.md=$skills want 4, agents=$agents want 40"
+            exit 1
+          fi
           echo "4 skills and 40 agent profiles installed"
