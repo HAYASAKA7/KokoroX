@@ -7,6 +7,7 @@ from pathlib import Path
 import shutil
 import subprocess
 import sys
+import time
 from typing import Any
 
 import pytest
@@ -186,6 +187,29 @@ def test_external_json_hardlink_is_rejected_without_reading_alias(
     assert original.read_bytes() == canonical_bytes({"value": "private"}) + b"\n"
 
 
+def _wait_for_timestamp_tick(path: Path) -> None:
+    """Block until a fresh write would carry a timestamp different from `path`.
+
+    `_read_json` detects an in-place mutation through the file identity, and
+    `st_mtime_ns` is the only component a same-size overwrite can move. Clocks
+    advance in discrete ticks -- coarsely so on Windows -- so two writes can
+    land inside one tick and report the same timestamp. Waiting out the tick
+    keeps the test measuring the rejection, not the clock.
+    """
+
+    baseline = path.stat().st_mtime_ns
+    probe = path.with_name(path.name + ".tick")
+    deadline = time.monotonic() + 5.0
+    while time.monotonic() < deadline:
+        probe.write_bytes(b"0")
+        current = probe.stat().st_mtime_ns
+        probe.unlink()
+        if current != baseline:
+            return
+        time.sleep(0.001)
+    raise AssertionError("filesystem timestamps did not advance within 5 seconds")
+
+
 def test_external_json_mutation_during_stable_read_is_rejected(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -193,6 +217,34 @@ def test_external_json_mutation_during_stable_read_is_rejected(
     path = _write_json(tmp_path / "input.json", {"value": "first"})
     replacement = canonical_bytes({"value": "other"}) + b"\n"
     assert len(replacement) == path.stat().st_size
+    _wait_for_timestamp_tick(path)
+    real_fstat = os.fstat
+    calls = 0
+
+    def mutate_after_open(descriptor: int) -> os.stat_result:
+        nonlocal calls
+        result = real_fstat(descriptor)
+        calls += 1
+        if calls == 1:
+            path.write_bytes(replacement)
+        return result
+
+    monkeypatch.setattr(os, "fstat", mutate_after_open)
+    with pytest.raises(KokoroError) as caught:
+        cli_module._read_json(path)
+
+    assert caught.value.code == "INPUT_PATH_UNSAFE"
+
+
+def test_external_json_resize_during_stable_read_is_rejected(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A mutation that changes the size is rejected without consulting a clock."""
+
+    path = _write_json(tmp_path / "input.json", {"value": "first"})
+    replacement = canonical_bytes({"value": "a much longer value"}) + b"\n"
+    assert len(replacement) != path.stat().st_size
     real_fstat = os.fstat
     calls = 0
 
