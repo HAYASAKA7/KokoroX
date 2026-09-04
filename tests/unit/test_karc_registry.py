@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from copy import deepcopy
 
@@ -158,13 +159,34 @@ def test_registry_rejects_noncanonical_and_over_capacity(tmp_path: Path) -> None
     )
 
 
+def _depth_the_decoder_refuses() -> int:
+    """Return a JSON nesting depth this interpreter will not decode.
+
+    The decoder's depth limit is not `sys.getrecursionlimit()`. CPython 3.12
+    moved the C scanner onto its own stack guard, which raised the threshold
+    from roughly a thousand to tens of thousands and made it depend on the
+    platform's stack size. Probing keeps this test about the registry's error
+    contract instead of one interpreter's numbers.
+    """
+
+    depth = 1_000
+    while depth <= 1_000_000:
+        try:
+            json.loads("[" * depth + "0" + "]" * depth)
+        except RecursionError:
+            return depth
+        depth *= 2
+    pytest.skip("this interpreter decodes arbitrarily nested JSON")
+
+
 def test_registry_rejects_excessive_json_nesting_with_stable_error(
     tmp_path: Path,
 ) -> None:
+    depth = _depth_the_decoder_refuses()
     data_root = tmp_path / "data"
     path = data_root / "registry" / "global.json"
     path.parent.mkdir(parents=True)
-    path.write_bytes(b'[' * 2_000 + b'0' + b']' * 2_000)
+    path.write_bytes(b"[" * depth + b"0" + b"]" * depth)
 
     _assert_code("KARC_REGISTRY_INVALID", load_installed_registry, data_root, SCHEMAS)
 

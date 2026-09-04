@@ -979,7 +979,12 @@ def _parse_registry(payload: bytes) -> dict[str, Any]:
             object_pairs_hook=_unique_object,
             parse_constant=_reject_constant,
         )
-    except (UnicodeDecodeError, json.JSONDecodeError, ValueError) as error:
+    except (
+        UnicodeDecodeError,
+        json.JSONDecodeError,
+        RecursionError,
+        ValueError,
+    ) as error:
         raise _error(
             "KARC_REGISTRY_INVALID",
             "Installed registry is not strict JSON.",
