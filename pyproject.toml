@@ -66,7 +66,10 @@ testpaths = ["tests"]
 addopts = "-ra"
 
 [tool.coverage.run]
-source = ["kokoroarc"]
+# Measure the repository tree only. A bare package name also matches the
+# copies integration tests install into temp roots, which would silently
+# inflate the denominator and understate coverage.
+source = ["src/kokoroarc"]
 # Statement coverage only: tests spawn subprocesses whose coverage data is
 # written without this config, and branch data cannot combine with statement
 # data ("Can't combine statement coverage data with branch data").
