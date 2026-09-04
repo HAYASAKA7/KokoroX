@@ -9,10 +9,9 @@ from typing import Any
 
 from kokoroarc import __version__
 from kokoroarc.errors import KokoroError
+from kokoroarc.language_tags import is_channel_language, is_language_tag
 
 
-_LANGUAGES = frozenset({"zh-CN", "en-US", "ja-JP"})
-_CHANNEL_LANGUAGES = _LANGUAGES | {"preserve"}
 _ARTIFACT_ID = re.compile(r"^[a-z0-9][a-z0-9._/-]{0,127}\Z", re.ASCII)
 _SEMANTIC_ID = re.compile(r"^[a-z][a-z0-9]*(?:_[a-z0-9]+)*\Z", re.ASCII)
 _SEGMENT_SOURCES = (
@@ -121,7 +120,7 @@ def build_render_plan(
     mixing = policy.get("mixing")
     if (
         not isinstance(primary_language, str)
-        or primary_language not in _LANGUAGES
+        or not is_language_tag(primary_language)
         or not isinstance(channels, Mapping)
         or not isinstance(mixing, Mapping)
     ):
@@ -142,7 +141,7 @@ def build_render_plan(
     for _, channel in _SEGMENT_SOURCES:
         if channel in channels:
             route = channels[channel]
-            if not isinstance(route, str) or route not in _CHANNEL_LANGUAGES:
+            if not is_channel_language(route):
                 raise _invalid_input()
 
     segments: list[dict[str, Any]] = []
@@ -152,7 +151,7 @@ def build_render_plan(
         target_language = channels.get(channel)
         if (
             not isinstance(target_language, str)
-            or target_language not in _CHANNEL_LANGUAGES
+            or not is_channel_language(target_language)
         ):
             raise _invalid_input()
         segment: dict[str, Any] = {

@@ -287,7 +287,8 @@ def test_uses_a_closed_versioned_release_threshold_profile() -> None:
     assert captured.value.code == "SOFT_THRESHOLD_PROFILE_UNSUPPORTED"
 
 
-def test_insufficient_samples_and_locale_coverage_fail_the_dimension() -> None:
+def test_insufficient_samples_fail_the_dimension() -> None:
+    """Dropping a sample no longer implies a missing required locale."""
     value = _evaluation_input()
     value["samples"]["locale_naturalness"].pop("locale-naturalness-3")
 
@@ -299,7 +300,6 @@ def test_insufficient_samples_and_locale_coverage_fail_the_dimension() -> None:
     assert result["finding_codes"] == [
         "EVALUATOR_ADVISORY",
         "SOFT_INSUFFICIENT_SAMPLES",
-        "SOFT_REQUIRED_LOCALE_MISSING",
     ]
     assert report["passed"] is False
 

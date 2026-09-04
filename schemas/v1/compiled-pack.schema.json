@@ -208,10 +208,9 @@
       "type": "object",
       "additionalProperties": false,
       "minProperties": 1,
-      "properties": {
-        "zh-CN": {"$ref": "#/$defs/expression_lines"},
-        "en-US": {"$ref": "#/$defs/expression_lines"},
-        "ja-JP": {"$ref": "#/$defs/expression_lines"}
+      "maxProperties": 64,
+      "patternProperties": {
+        "^[a-z]{2,3}(-[A-Z][a-z]{3})?(-([A-Z]{2}|[0-9]{3}))?$": {"$ref": "#/$defs/expression_lines"}
       }
     },
     "expressions": {
@@ -250,11 +249,10 @@
     "locales": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["zh-CN", "en-US", "ja-JP"],
-      "properties": {
-        "zh-CN": {"$ref": "#/$defs/locale_config"},
-        "en-US": {"$ref": "#/$defs/locale_config"},
-        "ja-JP": {"$ref": "#/$defs/locale_config"}
+      "minProperties": 1,
+      "maxProperties": 64,
+      "patternProperties": {
+        "^[a-z]{2,3}(-[A-Z][a-z]{3})?(-([A-Z]{2}|[0-9]{3}))?$": {"$ref": "#/$defs/locale_config"}
       }
     },
     "scenario": {

@@ -12,6 +12,7 @@ from typing import Any, Callable, Iterator, Literal, Mapping, Sequence, cast
 
 from kokoroarc import __version__
 from kokoroarc.errors import KokoroError
+from kokoroarc.language_tags import is_language_tag
 from kokoroarc.packs.compiler import canonical_bytes
 from kokoroarc.persistence._storage import (
     ArtifactSnapshot,
@@ -49,7 +50,6 @@ from kokoroarc.persistence.consent import (
 
 _STABLE_ID = re.compile(r"[a-z0-9]+(?:[._-][a-z0-9]+)*\Z")
 _MEMORY_ID = re.compile(r"memory-[a-f0-9]{32}\Z")
-_LOCALES = frozenset({"zh-CN", "en-US", "ja-JP"})
 _CREDENTIAL_ASSIGNMENT = re.compile(
     r"(?i)\b(?:api[_-]?key|access[_-]?token|token|password|passwd|"
     r"secret|client[_-]?secret)\s*[:=]\s*[^\s,;]+"
@@ -440,7 +440,7 @@ def _validate_approved_content(
         raise _memory_invalid("summary")
     if (
         not localized
-        or set(localized) - _LOCALES
+        or any(not is_language_tag(key) for key in localized)
         or any(not _valid_summary(value) for value in localized.values())
     ):
         raise _memory_invalid("localized_summaries")

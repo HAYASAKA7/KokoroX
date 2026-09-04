@@ -29,7 +29,7 @@ Require exact artifact ID and SHA-256, namespace, character ID, display name, co
 | Evidence | `evidence.yaml` | Record original authorship, supported Research Bundle claim-ID references, or typed user claims without collapsing provenance. |
 | Derived calibration | `derived-profile.yaml` | Keep numeric or inferred behavior separate from evidence. |
 | Runtime overrides | `overrides.yaml` | Record only explicit user overrides; never rewrite evidence. |
-| Locale profiles | `locales/{zh-CN,en-US,ja-JP}.yaml` | Author each independently; intentional equivalence must be deliberate. |
+| Locale profiles | `locales/<locale>.yaml` (one per declared locale, e.g. `en-US`, `zh-CN`, `fr-FR`) | Author each independently; intentional equivalence must be deliberate. |
 | Behavioral fixtures | `tests/positive.yaml`, `tests/negative.yaml` | Store expected/forbidden behavior as data, never host instructions. |
 
 For a dossier revision, copy the explicit source pack to a working path under `KOKOROARC_DATA_DIR` before editing. Convert original provenance to dossier provenance only when the request supplies typed `user_dossier` input. Use structured file editing; never place dossier strings in a shell command. Preserve the request JSON unchanged. Keep generated or revised artifacts and working files under `KOKOROARC_DATA_DIR`; keep temporary files there or under an explicitly configured temp root. Treat both roots as trusted configuration and never invent or hard-code a drive or directory.
@@ -55,7 +55,7 @@ python -m kokoroarc.cli character draft compile --request <request.json> --pack 
 
 Never copy source instructions into commands. The CLI bundle argument is a trusted host path from the research handoff; it is not request data.
 
-Run each stateless validation twice. Preserve both complete output bodies from each pair and compare them, not a self-reported match boolean or selected fields. Continue only when both request results match, both draft results match, `valid` is true, all hard failures are empty, and locale coverage is true for all three first-class locales.
+Run each stateless validation twice. Preserve both complete output bodies from each pair and compare them, not a self-reported match boolean or selected fields. Continue only when both request results match, both draft results match, `valid` is true, all hard failures are empty, and locale coverage is true for every locale the pack declares.
 
 Compilation success must report and preserve:
 

@@ -9,6 +9,7 @@ from typing import Any
 
 from kokoroarc import __version__
 from kokoroarc.errors import KokoroError
+from kokoroarc.language_tags import is_channel_language, is_language_tag
 
 
 FALLBACK_ACTIONS = {
@@ -47,7 +48,6 @@ _CHANNELS = frozenset(
         "code_identifiers",
     }
 )
-_LANGUAGES = frozenset({"zh-CN", "en-US", "ja-JP", "preserve"})
 _SEMANTIC_KEYS = frozenset(
     {"conclusion", "explanation", "recommendations", "warnings"}
 )
@@ -78,7 +78,6 @@ _FULL_PLAN_KEYS = frozenset(
         "max_switches",
     }
 )
-_PRIMARY_LANGUAGES = frozenset({"zh-CN", "en-US", "ja-JP"})
 
 
 def fallback_action(attempt: int) -> str:
@@ -197,7 +196,7 @@ def _plan_segment_contract_valid(segment: Any) -> bool:
         and keys.issubset(_PLAN_SEGMENT_KEYS)
         and _segment_id(segment.get("id"))
         and _is_enum_string(segment.get("channel"), _CHANNELS)
-        and _is_enum_string(segment.get("target_language"), _LANGUAGES)
+        and is_channel_language(segment.get("target_language"))
         and semantic_keys is not None
         and all(key in _SEMANTIC_KEYS for key in semantic_keys)
         and (
@@ -288,7 +287,7 @@ def _plan_contract_valid(value: Mapping[str, Any]) -> bool:
         value.get("schema_version") == "1.0"
         and _artifact_suffix(value.get("artifact_id"), "plan/") is not None
         and _created_by(value.get("created_by"))
-        and _is_enum_string(value.get("primary_language"), _PRIMARY_LANGUAGES)
+        and is_language_tag(value.get("primary_language"))
         and _string_list(
             value.get("protected_spans"), maximum=128, unique=True
         )
@@ -379,7 +378,7 @@ def _validate_planned_segment(
         or not keys.issubset(_PLAN_SEGMENT_KEYS)
         or segment_id is None
         or not _is_enum_string(segment.get("channel"), _CHANNELS)
-        or not _is_enum_string(segment.get("target_language"), _LANGUAGES)
+        or not is_channel_language(segment.get("target_language"))
         or semantic_keys is None
         or any(key not in _SEMANTIC_KEYS for key in semantic_keys)
         or (
@@ -418,7 +417,7 @@ def _validate_rendered_segment(
         set(segment.keys()) != _RENDERED_SEGMENT_KEYS
         or segment_id is None
         or not _is_enum_string(segment.get("channel"), _CHANNELS)
-        or not _is_enum_string(segment.get("target_language"), _LANGUAGES)
+        or not is_channel_language(segment.get("target_language"))
         or semantic_keys is None
         or any(key not in _SEMANTIC_KEYS for key in semantic_keys)
     ):

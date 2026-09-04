@@ -351,7 +351,7 @@ def test_warning_match_requires_warning_channel_and_semantic_key() -> None:
 def test_rendered_segment_contract_rejects_unknown_channel_and_language() -> None:
     actual = rendered()
     actual["segments"][0]["channel"] = "unknown"
-    actual["segments"][0]["target_language"] = "fr-FR"
+    actual["segments"][0]["target_language"] = "fr_FR"
 
     result = validate_rendered_output(actual, semantic(), plan())
 
@@ -805,3 +805,27 @@ def test_full_semantic_with_reduced_plan_still_checks_known_route_coverage() -> 
     ]
     assert missing == ["conclusion", "recommendations"]
     assert_schema_valid(result)
+
+
+@pytest.mark.parametrize(
+    "language", ["fr-FR", "ko-KR", "pt-BR", "zh-Hans-CN", "es-419", "de"]
+)
+def test_accepts_any_well_formed_primary_language(language: str) -> None:
+    """The user's language is not restricted to the reference locales."""
+    result = validate_rendered_output(rendered(), semantic(), plan(
+        primary_language=language
+    ))
+
+    assert result["valid"] is True
+    assert result["violations"] == []
+
+
+@pytest.mark.parametrize("language", ["fr_FR", "english", "EN-us", "", 1])
+def test_rejects_malformed_primary_language(language: object) -> None:
+    """A malformed tag fails the plan closed rather than rendering."""
+    result = validate_rendered_output(rendered(), semantic(), plan(
+        primary_language=language
+    ))
+
+    assert result["valid"] is False
+    assert [item["code"] for item in result["violations"]] == ["INVALID_PLAN"]

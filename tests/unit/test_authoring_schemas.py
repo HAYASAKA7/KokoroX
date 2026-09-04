@@ -339,11 +339,11 @@ def test_build_request_requires_mode_specific_input(
     SCHEMAS.validate("character-build-request", invalid)
 
 
-def test_build_request_requires_exact_first_class_locales(valid_request: dict) -> None:
+def test_build_request_rejects_malformed_or_duplicate_locales(valid_request: dict) -> None:
     for locales in (
-        ["zh-CN", "en-US"],
-        ["zh-CN", "en-US", "ja-JP", "fr-FR"],
+        [],
         ["zh-CN", "en-US", "en-US"],
+        ["zh-CN", "fr_FR"],
     ):
         invalid = deepcopy(valid_request)
         invalid["requested_locales"] = locales

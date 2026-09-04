@@ -10,11 +10,11 @@ from typing import Any
 
 from kokoroarc import __version__
 from kokoroarc.errors import KokoroError
+from kokoroarc.language_tags import is_language_tag
 from kokoroarc.packs.compiler import canonical_bytes
 from kokoroarc.schemas import SchemaRegistry
 
 
-_FIRST_CLASS_LOCALES = ("zh-CN", "en-US", "ja-JP")
 _ORIGINAL_CLAIM_SOURCES = frozenset({"creative_brief", "user_override"})
 _DOSSIER_CLAIM_SOURCES = frozenset(
     {"user_dossier", "creative_brief", "user_override"}
@@ -104,15 +104,25 @@ def validate_authoring_pack(
     expressions = (
         expressions_value if isinstance(expressions_value, Mapping) else {}
     )
+    declared_locales = tuple(
+        locale for locale in locales if is_language_tag(locale)
+    )
     locale_coverage = {
-        locale: locale in locales
-        and bool(expressions)
+        locale: bool(expressions)
         and all(
             isinstance(locale_set, Mapping) and locale in locale_set
             for locale_set in expressions.values()
         )
-        for locale in _FIRST_CLASS_LOCALES
+        for locale in declared_locales
     }
+    if not declared_locales:
+        hard_failures.append(
+            _finding(
+                "AUTHORING_LOCALE_MISSING",
+                ["locales"],
+                "Source pack does not declare any valid locale.",
+            )
+        )
     for locale, covered in locale_coverage.items():
         if not covered:
             path = (

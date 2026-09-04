@@ -251,12 +251,12 @@ def test_normalize_rejects_invalid_identity(
 @pytest.mark.parametrize(
     "locales",
     [
-        ["zh-CN", "en-US"],
-        ["zh-CN", "en-US", "fr-FR"],
+        [],
         ["zh-CN", "en-US", "en-US"],
+        ["zh-CN", "fr_FR"],
     ],
 )
-def test_normalize_requires_exact_first_class_locales(
+def test_normalize_rejects_malformed_or_duplicate_locales(
     locales: list[str],
     registry: SchemaRegistry,
     original_request: dict[str, Any],
@@ -735,7 +735,9 @@ def test_validate_authoring_pack_reports_missing_locale_coverage(
     original_request: dict[str, Any],
     source: dict[str, Any],
 ) -> None:
-    source["locales"].pop(locale)
+    """A locale the pack declares must actually be authored."""
+    for locale_set in source["expressions"].values():
+        locale_set.pop(locale, None)
 
     report = validate_authoring_pack(original_request, source, registry)
 
@@ -743,7 +745,27 @@ def test_validate_authoring_pack_reports_missing_locale_coverage(
     assert [item["code"] for item in report["hard_failures"]] == [
         "AUTHORING_LOCALE_MISSING"
     ]
-    assert report["hard_failures"][0]["path"] == ["locales", locale]
+    assert report["hard_failures"][0]["path"] == ["expressions", locale]
+
+
+def test_validate_authoring_pack_allows_a_locale_subset(
+    registry: SchemaRegistry,
+    original_request: dict[str, Any],
+    source: dict[str, Any],
+) -> None:
+    """Packs declare the locales they author; three are not required."""
+    source["locales"].pop("ja-JP")
+    for locale_set in source["expressions"].values():
+        locale_set.pop("ja-JP", None)
+
+    report = validate_authoring_pack(original_request, source, registry)
+
+    assert set(report["locale_coverage"]) == {"zh-CN", "en-US"}
+    assert all(report["locale_coverage"].values())
+    assert [
+        item for item in report["hard_failures"]
+        if item["code"] == "AUTHORING_LOCALE_MISSING"
+    ] == []
 
 
 @pytest.mark.parametrize("locale", ["zh-CN", "en-US", "ja-JP"])

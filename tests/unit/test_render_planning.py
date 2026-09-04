@@ -217,7 +217,7 @@ def test_rejects_invalid_immutable_spans(spans: Any) -> None:
     assert_invalid(semantic(immutable_spans=spans), policy())
 
 
-@pytest.mark.parametrize("primary", [None, "preserve", "fr-FR", 1, []])
+@pytest.mark.parametrize("primary", [None, "preserve", "fr_FR", 1, []])
 def test_rejects_invalid_primary_language(primary: Any) -> None:
     assert_invalid(semantic(), policy(primary_language=primary))
 
@@ -227,7 +227,7 @@ def test_rejects_invalid_channel_mappings(channels: Any) -> None:
     assert_invalid(semantic(), policy(channels=channels))
 
 
-@pytest.mark.parametrize("route", [None, "fr-FR", 1, []])
+@pytest.mark.parametrize("route", [None, "fr_FR", 1, []])
 def test_rejects_invalid_emitted_channel_routes(route: Any) -> None:
     routes = policy()["channels"]
     routes["character_dialogue"] = route

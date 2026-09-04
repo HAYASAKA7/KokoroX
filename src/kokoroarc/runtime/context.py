@@ -7,11 +7,11 @@ import re
 from typing import Any
 
 from kokoroarc.errors import KokoroError
+from kokoroarc.language_tags import is_language_tag
 from kokoroarc.json_compat import find_json_incompatibility
 
 
-_SUPPORTED_LOCALES = frozenset({"zh-CN", "en-US", "ja-JP"})
-_LOCALE_ID = re.compile(r"^[a-z]{2}-[A-Z]{2}\Z", re.ASCII)
+_MAX_LOCALES = 64
 _SEMANTIC_ID = re.compile(r"^[a-z][a-z0-9]*(?:_[a-z0-9]+)*\Z", re.ASCII)
 _SLUG_ID = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*\Z", re.ASCII)
 _SEMVER = re.compile(
@@ -204,8 +204,8 @@ def _expression_selection(expressions: Any, locale: str) -> dict[str, Any]:
             raise _InvalidContext
         if (
             type(locale_set) is not dict
-            or not 1 <= len(locale_set) <= len(_SUPPORTED_LOCALES)
-            or not _keys_are_allowed(locale_set, _SUPPORTED_LOCALES)
+            or not 1 <= len(locale_set) <= _MAX_LOCALES
+            or any(not is_language_tag(key) for key in locale_set)
         ):
             raise _InvalidContext
         if locale in locale_set:
@@ -252,9 +252,7 @@ def _state_summary(state: Any) -> dict[str, Any]:
 
 def _validate_selection(locale: Any, scenario: Any) -> tuple[str, str]:
     if (
-        type(locale) is not str
-        or _LOCALE_ID.fullmatch(locale) is None
-        or not _bounded_string(locale, 5)
+        not is_language_tag(locale)
     ):
         raise _InvalidContext
     if not _semantic_id(scenario):
@@ -323,15 +321,20 @@ def _build_runtime_context(
     scenarios = compiled.get("scenarios")
     if (
         type(locales) is not dict
-        or len(locales) > len(_SUPPORTED_LOCALES)
-        or not _keys_are_allowed(locales, _SUPPORTED_LOCALES)
+        or not 1 <= len(locales) <= _MAX_LOCALES
+        or any(not is_language_tag(key) for key in locales)
         or type(scenarios) is not dict
         or not 1 <= len(scenarios) <= 128
         or any(not _semantic_id(key) for key in scenarios)
     ):
         raise _InvalidContext
-    if selected_locale not in _SUPPORTED_LOCALES or selected_locale not in locales:
-        raise _UnsupportedLocale
+    # KokoroArc renders task content in the user's language. When the pack does
+    # not author that locale, persona expression falls back to the pack's
+    # primary authored locale (lowest tag, chosen deterministically) rather
+    # than failing the activation.
+    persona_locale = (
+        selected_locale if selected_locale in locales else min(locales)
+    )
     if selected_scenario not in scenarios:
         raise _UnknownScenario
 
@@ -349,7 +352,7 @@ def _build_runtime_context(
 
     identity = compiled.get("identity")
     effective_profile = compiled.get("effective_profile")
-    locale_config = locales[selected_locale]
+    locale_config = locales[persona_locale]
     scenario_config = scenarios[selected_scenario]
     if (
         not _identity_valid(identity)
@@ -359,7 +362,9 @@ def _build_runtime_context(
     ):
         raise _InvalidContext
 
-    expressions = _expression_selection(compiled.get("expressions"), selected_locale)
+    expressions = _expression_selection(
+        compiled.get("expressions"), persona_locale
+    )
     growth_dimensions = _growth_dimensions(compiled.get("growth"))
     state_summary = _state_summary(state)
     selected_data = {
@@ -367,7 +372,7 @@ def _build_runtime_context(
         "character_version": character_version,
         "identity": identity,
         "effective_profile": effective_profile,
-        "locales": {selected_locale: locale_config},
+        "locales": {persona_locale: locale_config},
         "scenarios": {selected_scenario: scenario_config},
         "expressions": expressions,
         "growth": {"dimensions": growth_dimensions},

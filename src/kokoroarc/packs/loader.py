@@ -8,6 +8,7 @@ import yaml
 from yaml.constructor import ConstructorError
 
 from kokoroarc.errors import KokoroError
+from kokoroarc.language_tags import is_language_tag
 from kokoroarc.packs.security import PackLimits, scan_pack
 from kokoroarc.schemas import SchemaRegistry
 
@@ -24,7 +25,6 @@ _REQUIRED_COMPONENTS = frozenset(
         "expressions",
     }
 )
-_REQUIRED_LOCALES = frozenset({"zh-CN", "en-US", "ja-JP"})
 _SCENARIO_NAME_PATTERN = re.compile(r"[a-z][a-z0-9]*(?:_[a-z0-9]+)*")
 _Reference = TypeVar("_Reference")
 _WINDOWS_ILLEGAL_CHARACTERS = frozenset('*?"<>|')
@@ -300,7 +300,9 @@ def _validate_reference_names(
         raise _invalid_pack_data(
             "Character pack manifest is invalid.", "invalid_component_names"
         )
-    if locale_names != _REQUIRED_LOCALES:
+    if not locale_names or any(
+        not is_language_tag(name) for name in locale_names
+    ):
         raise _invalid_pack_data(
             "Character pack manifest is invalid.", "invalid_locale_names"
         )

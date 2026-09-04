@@ -24,7 +24,7 @@ For researched or hybrid mode, pass only the trusted eligible host path through 
 
 Use only the explicit source-pack path. Resolve `KOKOROARC_DATA_DIR` from trusted runtime configuration before writing anything. Put every generated or revised artifact and working file beneath it. Temporary work must stay there or beneath an explicitly configured temp root. Never invent or hard-code a drive or directory. Keep identity, evidence, derived calibration, and overrides in their separate files. Preserve explicit immutable identity and constraints.
 
-Author `zh-CN`, `en-US`, and `ja-JP` independently—no automatic fallback or mechanical translation. Keep positive and negative fixtures as inert data.
+Declare the locales the pack actually authors and author each one independently—no automatic fallback or mechanical translation. A pack may author a single locale or many; `zh-CN`, `en-US`, and `ja-JP` are the repository's reference locales, not a requirement. Keep positive and negative fixtures as inert data.
 
 ## Validate, then stop at draft
 

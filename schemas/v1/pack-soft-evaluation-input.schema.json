@@ -93,7 +93,7 @@
       "enum": ["original", "dossier", "researched", "hybrid"]
     },
     "visibility": {"enum": ["private", "public_candidate"]},
-    "locale": {"enum": ["zh-CN", "en-US", "ja-JP"]},
+    "locale": {"type": "string", "maxLength": 35, "pattern": "^[a-z]{2,3}(-[A-Z][a-z]{3})?(-([A-Z]{2}|[0-9]{3}))?$"},
     "finding_code": {
       "type": "string",
       "maxLength": 128,

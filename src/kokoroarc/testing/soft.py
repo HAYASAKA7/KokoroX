@@ -9,6 +9,7 @@ from typing import Any, cast
 
 from kokoroarc import __version__
 from kokoroarc.errors import KokoroError
+from kokoroarc.language_tags import is_language_tag
 from kokoroarc.packs.compiler import canonical_bytes
 from kokoroarc.schemas import SchemaRegistry
 
@@ -21,7 +22,6 @@ _DIMENSIONS = (
     "repetition_catchphrase_quality",
     "safety_policy_retention",
 )
-_REQUIRED_LOCALES = frozenset({"zh-CN", "en-US", "ja-JP"})
 _PROFILE_ID = "default-release"
 _PROFILE_VERSION = "1.0.0"
 _QUANTUM = Decimal("0.000001")
@@ -328,7 +328,7 @@ def _aggregate_dimension(
     if normalized_lower_bound < Decimal(str(policy["threshold"])):
         failure_codes.add("SOFT_LOWER_BOUND_BELOW_THRESHOLD")
     locales = {cast(str, sample["locale"]) for sample in ordered_samples}
-    if not _REQUIRED_LOCALES.issubset(locales):
+    if not locales or any(not is_language_tag(item) for item in locales):
         failure_codes.add("SOFT_REQUIRED_LOCALE_MISSING")
 
     finding_codes.update(failure_codes)

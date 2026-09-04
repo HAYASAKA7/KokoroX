@@ -23,7 +23,7 @@ kokoro session end --session <id> --json
 
 kokoro policy compile --input <policy-input.json> --json
 
-kokoro runtime context --session <id> --locale <zh-CN|en-US|ja-JP> --scenario <scenario> --json
+kokoro runtime context --session <id> --locale <locale> --scenario <scenario> --json
 kokoro runtime plan --semantic <semantic.json> --policy <policy.json> [--expression-intent <id>] --json
 kokoro runtime validate --semantic <semantic.json> --plan <plan.json> --rendered <rendered.json> --json
 
@@ -57,7 +57,7 @@ For a single-language response, the minimal explicit input is:
 {"mode": "single", "primary_language": "en-US"}
 ```
 
-Supported languages are `zh-CN`, `en-US`, and `ja-JP`. The `commands`, `file_paths`, `exact_errors`, and `code_identifiers` channels are always `preserve`. Never override them, even when asked to translate everything.
+Any well-formed language tag is accepted (`en-US`, `zh-CN`, `fr-FR`, `pt-BR`, `zh-Hans-CN`, ...); render in the user's language. Task content follows the user's language, while character dialogue falls back to a locale the pack actually authors when the user's language is unauthored. The `commands`, `file_paths`, `exact_errors`, and `code_identifiers` channels are always `preserve`. Never override them, even when asked to translate everything.
 
 ## Semantic Result
 

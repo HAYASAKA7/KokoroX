@@ -37,8 +37,8 @@
         "version": {"type": "string", "minLength": 1, "maxLength": 64}
       }
     },
-    "language": {"enum": ["zh-CN", "en-US", "ja-JP"]},
-    "channel_language": {"enum": ["zh-CN", "en-US", "ja-JP", "preserve"]},
+    "language": {"type": "string", "maxLength": 35, "pattern": "^[a-z]{2,3}(-[A-Z][a-z]{3})?(-([A-Z]{2}|[0-9]{3}))?$"},
+    "channel_language": {"type": "string", "maxLength": 35, "pattern": "^(preserve|[a-z]{2,3}(-[A-Z][a-z]{3})?(-([A-Z]{2}|[0-9]{3}))?)$"},
     "channels": {
       "type": "object",
       "additionalProperties": false,

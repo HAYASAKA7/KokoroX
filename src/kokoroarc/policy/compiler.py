@@ -8,9 +8,10 @@ from math import isfinite
 from typing import Any
 
 from kokoroarc.errors import KokoroError
+from kokoroarc.language_tags import DEFAULT_LOCALES, is_channel_language, is_language_tag
 
 
-LANGUAGES = frozenset({"zh-CN", "en-US", "ja-JP"})
+LANGUAGES = frozenset(DEFAULT_LOCALES)  # reference defaults; not a closed set
 CHANNELS = frozenset(
     {
         "character_dialogue",
@@ -71,7 +72,7 @@ def _protected_override(channel: str) -> KokoroError:
 
 
 def _is_language(value: Any) -> bool:
-    return isinstance(value, str) and value in LANGUAGES
+    return is_language_tag(value)
 
 
 def _validate_layer(
@@ -107,7 +108,7 @@ def _validate_layer(
         if channel in protected_channels and value != "preserve":
             raise _protected_override(channel)
         if not isinstance(value, str) or (
-            value not in LANGUAGES and value != "preserve"
+            not is_channel_language(value)
         ):
             raise _invalid_policy()
 

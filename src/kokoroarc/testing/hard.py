@@ -15,6 +15,7 @@ from typing import Any, Mapping, cast
 from kokoroarc import __version__
 from kokoroarc.authoring.validation import validate_authoring_pack
 from kokoroarc.errors import KokoroError
+from kokoroarc.language_tags import is_language_tag
 from kokoroarc.packs.compiler import canonical_bytes, compile_pack
 from kokoroarc.packs.loader import (
     assemble_source_pack_from_contents,
@@ -31,7 +32,6 @@ from kokoroarc.testing.corpus import (
 )
 
 
-_FIRST_CLASS_LOCALES = frozenset({"zh-CN", "en-US", "ja-JP"})
 _SEMANTIC_KEYS = frozenset(
     {"conclusion", "explanation", "recommendations", "warnings"}
 )
@@ -796,12 +796,17 @@ def _check_locale_coverage(
 ) -> None:
     multilingual = corpus.document("tests/multilingual.yaml")
     locales = multilingual["expected_locales"]
-    if set(locales) != _FIRST_CLASS_LOCALES or len(locales) != 3:
+    pack_locales = set(compiled.get("locales") or ())
+    if (
+        not locales
+        or any(not is_language_tag(item) for item in locales)
+        or (pack_locales and set(locales) != pack_locales)
+    ):
         findings.append(
             _finding(
                 "PACK_TEST_LOCALE_COVERAGE_MISSING",
                 ["tests", "multilingual.yaml", "expected_locales"],
-                "The multilingual fixture must cover zh-CN, en-US, and ja-JP.",
+                "The multilingual fixture must cover the pack's authored locales.",
             )
         )
     if multilingual["semantic_key"] not in _SEMANTIC_KEYS:
@@ -823,12 +828,16 @@ def _check_locale_coverage(
     positive = corpus.document("tests/positive.yaml")
     for index, case in enumerate(positive["cases"]):
         case_locales = case["expected_locales"]
-        if set(case_locales) != _FIRST_CLASS_LOCALES or len(case_locales) != 3:
+        if (
+            not case_locales
+            or any(not is_language_tag(item) for item in case_locales)
+            or (pack_locales and set(case_locales) != pack_locales)
+        ):
             findings.append(
                 _finding(
                     "PACK_TEST_CASE_LOCALE_COVERAGE_MISSING",
                     ["tests", "positive.yaml", "cases", index, "expected_locales"],
-                    "Each positive fixture must cover all first-class locales.",
+                    "Each positive fixture must cover the pack's authored locales.",
                 )
             )
 

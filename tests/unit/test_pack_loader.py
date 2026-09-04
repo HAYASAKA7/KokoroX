@@ -352,12 +352,12 @@ def test_load_source_pack_propagates_schema_error_after_exactly_one_validation(
         ),
         (
             "locale_files",
-            REQUIRED_LOCALES - {"ja-JP"},
+            set(),
             "invalid_locale_names",
         ),
         (
             "locale_files",
-            REQUIRED_LOCALES | {"fr-FR"},
+            REQUIRED_LOCALES | {"fr_FR"},
             "invalid_locale_names",
         ),
         ("scenario_files", set(), "invalid_scenario_names"),

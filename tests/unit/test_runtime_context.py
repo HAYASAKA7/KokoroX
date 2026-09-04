@@ -238,7 +238,11 @@ def test_build_runtime_context_accepts_the_minimal_consumed_shape() -> None:
 
 @pytest.mark.parametrize(
     ("locale", "code"),
-    [("fr-FR", "UNSUPPORTED_LOCALE"), ("zh-cn", "INVALID_RUNTIME_CONTEXT"), (1, "INVALID_RUNTIME_CONTEXT")],
+    [
+        ("zh-cn", "INVALID_RUNTIME_CONTEXT"),
+        ("english", "INVALID_RUNTIME_CONTEXT"),
+        (1, "INVALID_RUNTIME_CONTEXT"),
+    ],
 )
 def test_build_runtime_context_classifies_locale_selection_errors(
     locale: Any, code: str
@@ -258,12 +262,19 @@ def test_build_runtime_context_classifies_scenario_selection_errors(
 
 def test_build_runtime_context_reports_missing_valid_selections_exactly() -> None:
     compiled = _compiled()
-    del compiled["locales"]["zh-CN"]
-    _assert_error("UNSUPPORTED_LOCALE", compiled, _state())
-
-    compiled = _compiled()
     del compiled["scenarios"]["debugging"]
     _assert_error("UNKNOWN_SCENARIO", compiled, _state())
+
+
+def test_unauthored_locale_falls_back_to_primary_authored_locale() -> None:
+    """Task content follows the user; persona degrades, it does not fail."""
+    compiled = _compiled()
+    del compiled["locales"]["zh-CN"]
+
+    result = build_runtime_context(compiled, _state(), "zh-CN", "debugging")
+
+    assert "zh-CN" not in result["locales"]
+    assert set(result["locales"]) == {min(compiled["locales"])}
 
 
 @pytest.mark.parametrize(

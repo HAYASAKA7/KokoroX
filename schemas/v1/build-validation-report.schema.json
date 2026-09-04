@@ -43,10 +43,9 @@
     "properties": {
       "hard_failures": {"maxItems": 0},
       "locale_coverage": {
-        "properties": {
-          "zh-CN": {"const": true},
-          "en-US": {"const": true},
-          "ja-JP": {"const": true}
+        "maxProperties": 64,
+        "patternProperties": {
+          "^[a-z]{2,3}(-[A-Z][a-z]{3})?(-([A-Z]{2}|[0-9]{3}))?$": {"const": true}
         }
       }
     }
@@ -92,11 +91,10 @@
     "locale_coverage": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["zh-CN", "en-US", "ja-JP"],
-      "properties": {
-        "zh-CN": {"type": "boolean"},
-        "en-US": {"type": "boolean"},
-        "ja-JP": {"type": "boolean"}
+      "minProperties": 1,
+      "maxProperties": 64,
+      "patternProperties": {
+        "^[a-z]{2,3}(-[A-Z][a-z]{3})?(-([A-Z]{2}|[0-9]{3}))?$": {"type": "boolean"}
       }
     },
     "provenance_counts": {

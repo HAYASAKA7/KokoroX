@@ -525,10 +525,9 @@
       "type": "object",
       "additionalProperties": false,
       "minProperties": 1,
-      "properties": {
-        "zh-CN": {"$ref": "#/$defs/summary"},
-        "en-US": {"$ref": "#/$defs/summary"},
-        "ja-JP": {"$ref": "#/$defs/summary"}
+      "maxProperties": 64,
+      "patternProperties": {
+        "^[a-z]{2,3}(-[A-Z][a-z]{3})?(-([A-Z]{2}|[0-9]{3}))?$": {"$ref": "#/$defs/summary"}
       }
     },
     "memory_reference": {

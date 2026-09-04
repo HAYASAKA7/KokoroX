@@ -179,15 +179,10 @@
     },
     "requested_locales": {
       "type": "array",
-      "minItems": 3,
-      "maxItems": 3,
+      "minItems": 1,
+      "maxItems": 64,
       "uniqueItems": true,
-      "items": {"enum": ["zh-CN", "en-US", "ja-JP"]},
-      "allOf": [
-        {"contains": {"const": "zh-CN"}},
-        {"contains": {"const": "en-US"}},
-        {"contains": {"const": "ja-JP"}}
-      ]
+      "items": {"type": "string", "maxLength": 35, "pattern": "^[a-z]{2,3}(-[A-Z][a-z]{3})?(-([A-Z]{2}|[0-9]{3}))?$"}
     },
     "input_record": {
       "oneOf": [
