@@ -6,6 +6,7 @@ tests/skills/transcripts/** -text
 
 # Distribution inputs and release hashes require checkout-stable LF.
 README.md text eol=lf
+LICENSE text eol=lf
 MANIFEST.in text eol=lf
 pyproject.toml text eol=lf
 src/** text eol=lf
