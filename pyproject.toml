@@ -10,6 +10,18 @@ readme = "README.md"
 license = "MIT"
 license-files = ["LICENSE"]
 authors = [{ name = "HAYASAKA7" }]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Intended Audience :: Developers",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
+  "Topic :: Software Development :: Libraries :: Python Modules",
+  "Typing :: Typed",
+]
 requires-python = ">=3.11"
 dependencies = [
   "PyYAML>=6,<7",
@@ -34,6 +46,9 @@ kokorox = "kokoroarc.cli:main"
 
 [tool.setuptools.dynamic]
 version = {attr = "kokoroarc.__version__"}
+
+[tool.setuptools.package-data]
+kokoroarc = ["py.typed"]
 
 [tool.setuptools.packages.find]
 where = ["src"]

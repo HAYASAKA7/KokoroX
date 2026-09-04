@@ -59,3 +59,8 @@ docs/superpowers/task9-constructor-plan-threat-model-residual.md text eol=lf
 
 # The authoritative design specification is checkout-stable LF.
 docs/KokoroX_Design_Specification_v0.3.0.md text eol=lf whitespace=-blank-at-eol,-blank-at-eof
+
+# Release and CI inputs are checkout-stable LF.
+CHANGELOG.md text eol=lf
+.github/**/*.yml text eol=lf
+src/kokoroarc/py.typed text eol=lf
