@@ -41,6 +41,7 @@ from kokoroarc.persistence.state import (
 )
 import kokoroarc.persistence.state as persistent_state_module
 from kokoroarc.schemas import SchemaRegistry
+from kokoroarc import __version__
 
 from persistence_support import (
     ConsentedRin,
@@ -95,7 +96,7 @@ def _consent() -> dict[str, Any]:
     return {
         "schema_version": "1.0",
         "artifact_id": "consents/global/rin-aster/consent-01",
-        "created_by": {"component": "kokoroarc", "version": "0.0.0.dev0"},
+        "created_by": {"component": "kokoroarc", "version": __version__},
         "consent_id": "rin-aster-consent-01",
         "scope": "global",
         "workspace_id": None,

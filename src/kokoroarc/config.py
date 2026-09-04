@@ -70,11 +70,11 @@ class Settings:
 
     @classmethod
     def from_env(cls, env: Mapping[str, str]) -> "Settings":
-        raw_data_dir = env.get("KOKOROARC_DATA_DIR")
+        raw_data_dir = env.get("KOKOROX_DATA_DIR")
         if not raw_data_dir:
             raise KokoroError(
                 "DATA_DIR_REQUIRED",
-                "Set KOKOROARC_DATA_DIR before running a stateful command.",
+                "Set KOKOROX_DATA_DIR before running a stateful command.",
             )
         return cls(
             data_dir=Path(raw_data_dir).expanduser().resolve(),

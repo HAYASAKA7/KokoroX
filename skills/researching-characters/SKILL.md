@@ -1,6 +1,6 @@
 ---
 name: researching-characters
-description: Use when building or revising a KokoroArc character from a named fictional subject and continuity, timeline, spoiler, provenance, or external evidence matters. Do not use for wholly original characters, casual discussion, ordinary roleplay, or private-dossier-only work.
+description: Use when building or revising a KokoroX character from a named fictional subject and continuity, timeline, spoiler, provenance, or external evidence matters. Do not use for wholly original characters, casual discussion, ordinary roleplay, or private-dossier-only work.
 ---
 
 # Researching Characters

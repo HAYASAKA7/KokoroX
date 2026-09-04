@@ -28,9 +28,9 @@ def _cli(
     env = os.environ.copy()
     env["PYTHONPATH"] = str(REPOSITORY_ROOT / "src")
     if data_dir is None:
-        env.pop("KOKOROARC_DATA_DIR", None)
+        env.pop("KOKOROX_DATA_DIR", None)
     else:
-        env["KOKOROARC_DATA_DIR"] = str(data_dir)
+        env["KOKOROX_DATA_DIR"] = str(data_dir)
     return subprocess.run(
         [sys.executable, "-m", "kokoroarc.cli", *arguments],
         check=False,
@@ -642,7 +642,7 @@ def test_researched_draft_compile_rejects_source_change_during_publication(
         return source
 
     monkeypatch.setattr(authoring_storage, "load_source_pack", mutate_after_load)
-    monkeypatch.setenv("KOKOROARC_DATA_DIR", str(data_dir))
+    monkeypatch.setenv("KOKOROX_DATA_DIR", str(data_dir))
 
     returncode = cli_module.main(
         [

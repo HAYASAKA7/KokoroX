@@ -9,6 +9,7 @@ from pathlib import Path
 
 import pytest
 
+from kokoroarc import __version__
 from kokoroarc.errors import KokoroError
 from kokoroarc.state import store as store_module
 from kokoroarc.state import transitions as transitions_module
@@ -328,7 +329,7 @@ def test_apply_does_not_mutate_minimal_or_full_event(tmp_path: Path) -> None:
     full = {
         "schema_version": "1.0",
         "artifact_id": "event/e2",
-        "created_by": {"component": "kokoroarc", "version": "0.0.0.dev0"},
+        "created_by": {"component": "kokoroarc", "version": __version__},
         "event_id": "e2",
         "turn_id": "turn-2",
         "origin": "verified_task_outcome",

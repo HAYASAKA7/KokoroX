@@ -20,6 +20,7 @@ from kokoroarc.authoring.validation import validate_authoring_pack
 from kokoroarc.errors import KokoroError
 from kokoroarc.packs.loader import load_source_pack
 from kokoroarc.schemas import SchemaRegistry
+from kokoroarc import __version__
 
 
 @pytest.fixture
@@ -27,7 +28,7 @@ def artifacts() -> tuple[dict[str, Any], dict[str, Any], dict[str, Any], dict[st
     request = {
         "schema_version": "1.0",
         "artifact_id": "original/rin-aster/build-request",
-        "created_by": {"component": "kokoroarc", "version": "0.0.0.dev0"},
+        "created_by": {"component": "kokoroarc", "version": __version__},
         "mode": "original",
         "namespace": "original",
         "character_id": "rin-aster",

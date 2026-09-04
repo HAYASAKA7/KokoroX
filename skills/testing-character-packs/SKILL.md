@@ -1,6 +1,6 @@
 ---
 name: testing-character-packs
-description: Use to validate, evaluate, review, or promote a KokoroArc Character Pack, or check its installation readiness, packaging readiness, private-export readiness, or publication readiness. Do not use for ordinary character use, casual design discussion, authoring, or character research.
+description: Use to validate, evaluate, review, or promote a KokoroX Character Pack, or check its installation readiness, packaging readiness, private-export readiness, or publication readiness. Do not use for ordinary character use, casual design discussion, authoring, or character research.
 ---
 
 # Testing Character Packs
@@ -11,7 +11,7 @@ changing release artifacts.
 ## Route before acting
 
 - Continue for validation, soft aggregation, review, promotion, or readiness.
-- Route ordinary use to `using-kokoroarc`, creation to
+- Route ordinary use to `using-kokorox`, creation to
   `authoring-character-packs`, and evidence acquisition to
   `researching-characters`.
 - Stop on ambiguous source, data root, input, ownership, visibility, or
@@ -31,7 +31,7 @@ Run one Kokoro CLI invocation per shell command; never chain gate invocations
 or append comparison logic to them. Every `--out` is reports-root-relative;
 never prefix it with `data/reports`.
 
-Keep all generated reports beneath `KOKOROARC_DATA_DIR/reports`.
+Keep all generated reports beneath `KOKOROX_DATA_DIR/reports`.
 Run `pack test` twice to distinct explicit outputs and compare the complete
 report files byte-for-byte. Require matching `source_hash`, `compiled_hash`, and
 `report_hash`; any missing, changed, stale, or failing evidence stops promotion.

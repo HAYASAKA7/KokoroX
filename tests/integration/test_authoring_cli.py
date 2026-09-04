@@ -72,9 +72,9 @@ def _cli(
     env = os.environ.copy()
     env["PYTHONPATH"] = str(Path.cwd() / "src")
     if data_dir is None:
-        env.pop("KOKOROARC_DATA_DIR", None)
+        env.pop("KOKOROX_DATA_DIR", None)
     else:
-        env["KOKOROARC_DATA_DIR"] = str(data_dir)
+        env["KOKOROX_DATA_DIR"] = str(data_dir)
     return subprocess.run(
         [sys.executable, "-m", "kokoroarc.cli", *arguments],
         check=False,
@@ -427,7 +427,7 @@ def test_character_draft_compile_alone_requires_data_dir(
     _assert_error(
         completed,
         "DATA_DIR_REQUIRED",
-        "Set KOKOROARC_DATA_DIR before running a stateful command.",
+        "Set KOKOROX_DATA_DIR before running a stateful command.",
     )
 
 
@@ -551,7 +551,7 @@ def test_character_draft_compile_sanitizes_stale_busy_and_storage_failures(
     expected_retryable: bool,
 ) -> None:
     request_path = _write_request(tmp_path / "request.json", original_request)
-    monkeypatch.setenv("KOKOROARC_DATA_DIR", str(tmp_path / "data"))
+    monkeypatch.setenv("KOKOROX_DATA_DIR", str(tmp_path / "data"))
 
     def fail_publish(*_args: object) -> Path:
         raise error

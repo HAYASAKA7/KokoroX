@@ -1,4 +1,4 @@
-"""Explicit lifecycle storage for KokoroArc sessions."""
+"""Explicit lifecycle storage for KokoroX sessions."""
 
 from __future__ import annotations
 

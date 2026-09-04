@@ -8,6 +8,7 @@ from jsonschema import Draft202012Validator
 
 from kokoroarc.errors import KokoroError
 from kokoroarc.schemas import SchemaRegistry
+from kokoroarc import __version__
 
 
 def load_fixture(name: str) -> dict:
@@ -19,7 +20,7 @@ def valid_compiled_pack() -> dict:
     return {
         "schema_version": "1.0",
         "artifact_id": "original/rin-aster/compiled",
-        "created_by": {"component": "kokoroarc", "version": "0.0.0.dev0"},
+        "created_by": {"component": "kokoroarc", "version": __version__},
         "character_id": "rin-aster",
         "character_version": "1.0.0",
         "source_hash": "a" * 64,

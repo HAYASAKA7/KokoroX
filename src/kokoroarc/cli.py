@@ -87,7 +87,7 @@ _PUBLIC_MESSAGES = {
     ),
     "AUTHORING_SOURCE_CHANGED": "Character source pack changed during compilation.",
     "AUTHORING_VALIDATION_FAILED": "Character authoring validation failed.",
-    "DATA_DIR_REQUIRED": "Set KOKOROARC_DATA_DIR before running a stateful command.",
+    "DATA_DIR_REQUIRED": "Set KOKOROX_DATA_DIR before running a stateful command.",
     "DRAFT_PUBLISH_BUSY": "Character draft publication is already in progress.",
     "DRAFT_PUBLISH_FAILED": "Character draft publication failed.",
     "INPUT_NOT_FOUND": "Input file was not found.",
@@ -203,8 +203,8 @@ def _leaf_json(parser: argparse.ArgumentParser) -> None:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="kokoro")
-    parser.add_argument("--version", action="version", version=f"kokoro {__version__}")
+    parser = argparse.ArgumentParser(prog="kokorox")
+    parser.add_argument("--version", action="version", version=f"kokorox {__version__}")
     commands = parser.add_subparsers(dest="command", required=True)
 
     pack = commands.add_parser("pack")

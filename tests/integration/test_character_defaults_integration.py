@@ -40,7 +40,7 @@ RIN_PACK = REPOSITORY_ROOT / "characters" / "original" / "rin-aster"
 
 def _run_cli(data_root: Path, *arguments: str) -> dict[str, Any]:
     environment = os.environ.copy()
-    environment["KOKOROARC_DATA_DIR"] = str(data_root)
+    environment["KOKOROX_DATA_DIR"] = str(data_root)
     environment["PYTHONDONTWRITEBYTECODE"] = "1"
     completed = subprocess.run(
         [sys.executable, "-m", "kokoroarc.cli", *arguments, "--json"],
@@ -58,7 +58,7 @@ def _run_cli(data_root: Path, *arguments: str) -> dict[str, Any]:
 
 def _run_cli_error(data_root: Path, *arguments: str) -> dict[str, Any]:
     environment = os.environ.copy()
-    environment["KOKOROARC_DATA_DIR"] = str(data_root)
+    environment["KOKOROX_DATA_DIR"] = str(data_root)
     environment["PYTHONDONTWRITEBYTECODE"] = "1"
     completed = subprocess.run(
         [sys.executable, "-m", "kokoroarc.cli", *arguments, "--json"],

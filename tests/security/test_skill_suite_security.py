@@ -41,7 +41,7 @@ def _transaction_debris(root: Path) -> list[Path]:
 
 def test_source_symlink_file_is_rejected_when_supported(tmp_path: Path) -> None:
     source = _copy_source(tmp_path)
-    target = source / "using-kokoroarc" / "references" / "runtime-contract.md"
+    target = source / "using-kokorox" / "references" / "runtime-contract.md"
     outside = tmp_path / "outside.md"
     outside.write_text("outside\n", encoding="utf-8")
     target.unlink()
@@ -62,8 +62,8 @@ def test_source_symlink_file_is_rejected_when_supported(tmp_path: Path) -> None:
 
 def test_source_hardlink_alias_is_rejected_when_supported(tmp_path: Path) -> None:
     source = _copy_source(tmp_path)
-    original = source / "using-kokoroarc" / "SKILL.md"
-    alias = source / "using-kokoroarc" / "references" / "runtime-contract.md"
+    original = source / "using-kokorox" / "SKILL.md"
+    alias = source / "using-kokorox" / "references" / "runtime-contract.md"
     alias.unlink()
     try:
         os.link(original, alias)
@@ -84,7 +84,7 @@ def test_source_mutation_during_file_read_is_rejected(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     source = _copy_source(tmp_path)
-    target = source / "using-kokoroarc" / "SKILL.md"
+    target = source / "using-kokorox" / "SKILL.md"
     real_open = suite.os.open
     real_fstat = suite.os.fstat
     target_descriptor: int | None = None
@@ -151,8 +151,8 @@ def test_byte_identical_source_subdirectory_replacement_is_rejected(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     source = _copy_source(tmp_path)
-    target = source / "using-kokoroarc"
-    displaced = source / "using-kokoroarc-displaced"
+    target = source / "using-kokorox"
+    displaced = source / "using-kokorox-displaced"
     real_capture = suite._capture_closed_tree
     replaced = False
 
@@ -202,7 +202,7 @@ def test_source_special_file_is_rejected_when_supported(tmp_path: Path) -> None:
     if not hasattr(os, "mkfifo"):
         pytest.skip("The current platform cannot create FIFO nodes")
     source = _copy_source(tmp_path)
-    target = source / "using-kokoroarc" / "references" / "runtime-contract.md"
+    target = source / "using-kokorox" / "references" / "runtime-contract.md"
     target.unlink()
     os.mkfifo(target)
 
@@ -267,7 +267,7 @@ def test_hardlinked_installed_skill_file_is_rejected_when_supported(
     source = _copy_source(tmp_path)
     destination = tmp_path / "installed"
     shutil.copytree(source, destination)
-    target = destination / "using-kokoroarc" / "SKILL.md"
+    target = destination / "using-kokorox" / "SKILL.md"
     outside = tmp_path / "outside.md"
     outside.write_bytes(target.read_bytes())
     target.unlink()
@@ -289,7 +289,7 @@ def test_invalid_agent_metadata_is_rejected_before_destination_creation(
     tmp_path: Path,
 ) -> None:
     source = _copy_source(tmp_path)
-    metadata = source / "using-kokoroarc" / "agents" / "openai.yaml"
+    metadata = source / "using-kokorox" / "agents" / "openai.yaml"
     metadata.write_text(
         metadata.read_text(encoding="utf-8") + "unknown: true\n",
         encoding="utf-8",
@@ -319,7 +319,7 @@ def test_source_change_after_staging_rolls_back_every_skill(
         nonlocal changed
         result = real_stage(*args, **kwargs)
         if not changed:
-            skill_file = source / "using-kokoroarc" / "SKILL.md"
+            skill_file = source / "using-kokorox" / "SKILL.md"
             skill_file.write_bytes(skill_file.read_bytes() + b"\n")
             changed = True
         return result
@@ -350,7 +350,7 @@ def test_source_invalidation_after_staging_reports_source_changed(
         nonlocal changed
         result = real_stage(*args, **kwargs)
         if not changed:
-            (source / "using-kokoroarc" / "SKILL.md").unlink()
+            (source / "using-kokorox" / "SKILL.md").unlink()
             changed = True
         return result
 
@@ -441,7 +441,7 @@ def test_identical_destination_change_after_planning_fails_closed(
         calls += 1
         result = real_plan(*args, **kwargs)
         if calls == 1:
-            target = destination / "using-kokoroarc" / "SKILL.md"
+            target = destination / "using-kokorox" / "SKILL.md"
             target.write_bytes(target.read_bytes() + b"\n")
         return result
 
@@ -464,8 +464,8 @@ def test_byte_identical_skill_replacement_after_planning_fails_closed(
     source = _copy_source(tmp_path)
     destination = tmp_path / "installed"
     shutil.copytree(source, destination)
-    target = destination / "using-kokoroarc"
-    displaced = destination / "using-kokoroarc-displaced"
+    target = destination / "using-kokorox"
+    displaced = destination / "using-kokorox-displaced"
     real_plan = suite._plan_actions
     calls = 0
 
@@ -498,8 +498,8 @@ def test_final_fsync_rechecks_preexisting_unchanged_skill(
     source = _copy_source(tmp_path)
     destination = tmp_path / "installed"
     destination.mkdir()
-    unchanged = destination / "using-kokoroarc"
-    shutil.copytree(source / "using-kokoroarc", unchanged)
+    unchanged = destination / "using-kokorox"
+    shutil.copytree(source / "using-kokorox", unchanged)
     target = unchanged / "SKILL.md"
     real_fsync = suite._fsync_directory
     destination_fsyncs = 0
@@ -523,7 +523,7 @@ def test_final_fsync_rechecks_preexisting_unchanged_skill(
     )
     assert target.read_bytes().endswith(b"\n\n")
     assert sorted(path.name for path in destination.iterdir()) == [
-        "using-kokoroarc"
+        "using-kokorox"
     ]
 
 
@@ -725,7 +725,7 @@ def test_destination_mutation_during_verification_is_not_deleted(
 
     def require(source_snapshot, skill_name, root: Path, limits) -> None:
         nonlocal mutated
-        if root.name == "using-kokoroarc" and root.parent == destination:
+        if root.name == "using-kokorox" and root.parent == destination:
             mutated = root / "foreign.txt"
             mutated.write_text("foreign\n", encoding="utf-8")
         real_require(source_snapshot, skill_name, root, limits)
@@ -848,7 +848,7 @@ def test_staging_identity_capture_failure_is_explicit_and_deletes_nothing(
     real_capture = suite._capture_directory_identity
 
     def capture(path: Path):
-        if path.name.startswith(".kokoroarc-skill-suite-using-kokoroarc-"):
+        if path.name.startswith(".kokoroarc-skill-suite-using-kokorox-"):
             raise KokoroError(
                 "SKILL_SUITE_PATH_INVALID",
                 "injected identity capture failure",

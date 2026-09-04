@@ -1,6 +1,6 @@
 schema_version: "1.0"
 artifact_id: original/rin-aster/source
-created_by: {component: kokoroarc, version: 0.0.0.dev0}
+created_by: {component: kokoroarc, version: 0.1.0}
 character_id: rin-aster
 character_version: 1.0.0
 namespace: original

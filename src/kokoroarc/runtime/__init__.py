@@ -1,4 +1,4 @@
-"""Runtime planning primitives for KokoroArc."""
+"""Runtime planning primitives for KokoroX."""
 
 from kokoroarc.runtime.planning import build_render_plan
 

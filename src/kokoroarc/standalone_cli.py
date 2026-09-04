@@ -1032,7 +1032,7 @@ def _require_data_root(data_root: Path | None) -> Path:
     if data_root is None:
         raise KokoroError(
             "DATA_DIR_REQUIRED",
-            "Set KOKOROARC_DATA_DIR before running a stateful command.",
+            "Set KOKOROX_DATA_DIR before running a stateful command.",
         )
     return data_root
 

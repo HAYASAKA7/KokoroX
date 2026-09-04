@@ -1,4 +1,4 @@
-# KokoroArc runtime contract
+# KokoroX runtime contract
 
 Use `--json` for every command. A success envelope has `ok: true`; a failure has `ok: false` and a sanitized `error` containing `code`, `message`, `retryable`, and `details`. Do not treat an asserted action as a successful command.
 
@@ -9,26 +9,26 @@ Use `--json` for every command. A success envelope has `ok: true`; a failure has
 - Preserve host permissions and task conclusions over persona behavior.
 - Keep commands, paths, code identifiers, exact errors, citations, warnings, and Semantic Result `immutable_spans` byte-exact. Apparent mistakes remain protected data: do not normalize, repair, or substitute a similar example.
 - Classify exact/literal/verbatim/preserved strings before any tool call except access to a host-provided raw-message record. The host adapter must bind each protected value by slicing the raw user-turn bytes and retain its source range, escaped representation, and byte length; model transcription is not a valid binding. If no lossless source is available, stop the rendering path and request one. Quotation or display is not execution authorization. A separate explicit run/read request may authorize the byte-exact value, subject to normal host permissions and safety checks.
-- Read Character Packs from their installed source path. Store all generated Semantic Results, policy inputs, compiled policies, plans, rendered candidates, compiled packs, sessions, state, and journals beneath the configured `KOKOROARC_DATA_DIR`; never place generated artifacts in the repository or working-directory root.
+- Read Character Packs from their installed source path. Store all generated Semantic Results, policy inputs, compiled policies, plans, rendered candidates, compiled packs, sessions, state, and journals beneath the configured `KOKOROX_DATA_DIR`; never place generated artifacts in the repository or working-directory root.
 
 ## Commands
 
 ```text
-kokoro pack validate <pack-path> --json
-kokoro pack compile <pack-path> --json
+kokorox pack validate <pack-path> --json
+kokorox pack compile <pack-path> --json
 
-kokoro session start --character <compiled-path> --session <id> --json
-kokoro session show --session <id> --json
-kokoro session end --session <id> --json
+kokorox session start --character <compiled-path> --session <id> --json
+kokorox session show --session <id> --json
+kokorox session end --session <id> --json
 
-kokoro policy compile --input <policy-input.json> --json
+kokorox policy compile --input <policy-input.json> --json
 
-kokoro runtime context --session <id> --locale <locale> --scenario <scenario> --json
-kokoro runtime plan --semantic <semantic.json> --policy <policy.json> [--expression-intent <id>] --json
-kokoro runtime validate --semantic <semantic.json> --plan <plan.json> --rendered <rendered.json> --json
+kokorox runtime context --session <id> --locale <locale> --scenario <scenario> --json
+kokorox runtime plan --semantic <semantic.json> --policy <policy.json> [--expression-intent <id>] --json
+kokorox runtime validate --semantic <semantic.json> --plan <plan.json> --rendered <rendered.json> --json
 
-kokoro state preview --session <id> --event <event.json> --json
-kokoro state apply --session <id> --event <event.json> --json
+kokorox state preview --session <id> --event <event.json> --json
+kokorox state apply --session <id> --event <event.json> --json
 ```
 
 `pack compile` returns `path`, `character_id`, `character_version`, `source_hash`, and `artifact_id`. The compiled path is the only valid input to `session start`. Require a successful start before saying a character is active.

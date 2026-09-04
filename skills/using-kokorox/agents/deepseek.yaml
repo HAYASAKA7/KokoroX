@@ -1,0 +1,4 @@
+interface:
+  display_name: "Using KokoroX"
+  short_description: "Run an explicitly activated KokoroX character safely"
+  default_prompt: "Use the using-kokorox skill with the active KokoroX Character Pack for this response while preserving task correctness and protected content."

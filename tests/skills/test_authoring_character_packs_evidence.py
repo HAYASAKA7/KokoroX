@@ -300,7 +300,7 @@ def test_repository_evidence_is_sanitized() -> None:
 def test_product_skill_uses_configured_roots_without_drive_hardcoding() -> None:
     for path in (SKILL_DIR / "SKILL.md", SKILL_DIR / "references" / "authoring-contract.md"):
         text = path.read_text(encoding="utf-8")
-        assert "KOKOROARC_DATA_DIR" in text
+        assert "KOKOROX_DATA_DIR" in text
         assert "configured temp root" in text.lower()
         assert not re.search(r"(?i)(?:\b[A-Z]:|\b[A-Z]:-based)", text), path
 

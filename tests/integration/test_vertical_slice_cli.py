@@ -27,7 +27,7 @@ def run_cli(
     expected_returncode: int = 0,
 ) -> dict[str, Any]:
     env = os.environ.copy()
-    env["KOKOROARC_DATA_DIR"] = str(data_dir)
+    env["KOKOROX_DATA_DIR"] = str(data_dir)
     completed = subprocess.run(
         [sys.executable, "-m", "kokoroarc.cli", *args, "--json"],
         check=False,
@@ -664,7 +664,7 @@ def test_state_apply_detects_restart_between_growth_lookup_and_commit(
 ) -> None:
     _compiled, _session = compiled_session(tmp_path)
     event_path = write_json(tmp_path / "event.json", interaction_event("e1", 0))
-    settings = Settings.from_env({"KOKOROARC_DATA_DIR": str(tmp_path)})
+    settings = Settings.from_env({"KOKOROX_DATA_DIR": str(tmp_path)})
     schemas = SchemaRegistry(settings.schema_dir)
     real_lookup = cli_module._active_compiled_and_state
 

@@ -11,6 +11,7 @@ from typing import Any
 from kokoroarc.packs.compiler import canonical_bytes
 
 from karc_test_support import archive_documents, build_private_archive
+from kokoroarc import __version__
 
 
 REPOSITORY_ROOT = Path.cwd().resolve()
@@ -88,9 +89,9 @@ def _installed_cli(
 ) -> dict[str, Any]:
     environment = _isolated_environment(temporary_root, installed)
     if data_root is None:
-        environment.pop("KOKOROARC_DATA_DIR", None)
+        environment.pop("KOKOROX_DATA_DIR", None)
     else:
-        environment["KOKOROARC_DATA_DIR"] = str(data_root)
+        environment["KOKOROX_DATA_DIR"] = str(data_root)
     completed = subprocess.run(
         [sys.executable, "-m", "kokoroarc.cli", *arguments],
         check=False,

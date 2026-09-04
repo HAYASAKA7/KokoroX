@@ -128,7 +128,7 @@ def test_export_rejects_duplicate_json_without_writing(
         rin_verified_release,
     )
     paths["hard"].write_bytes(b'{"duplicate":1,"duplicate":2}')
-    monkeypatch.delenv("KOKOROARC_DATA_DIR", raising=False)
+    monkeypatch.delenv("KOKOROX_DATA_DIR", raising=False)
 
     assert cli.main(arguments) == 2
 
@@ -152,7 +152,7 @@ def test_export_rejects_hardlinked_input_without_writing(
     except OSError:
         pytest.skip("hard links are unavailable")
     arguments[arguments.index(str(paths["compiled"]))] = str(alias)
-    monkeypatch.delenv("KOKOROARC_DATA_DIR", raising=False)
+    monkeypatch.delenv("KOKOROX_DATA_DIR", raising=False)
 
     assert cli.main(arguments) == 2
 
@@ -172,7 +172,7 @@ def test_export_never_overwrites_existing_output(
     )
     sentinel = b"caller-owned-output"
     paths["output"].write_bytes(sentinel)
-    monkeypatch.delenv("KOKOROARC_DATA_DIR", raising=False)
+    monkeypatch.delenv("KOKOROX_DATA_DIR", raising=False)
 
     assert cli.main(arguments) == 2
 
@@ -376,7 +376,7 @@ def test_migration_never_overwrites_existing_output(
     output = tmp_path / "current.karc"
     sentinel = b"caller-owned-output"
     output.write_bytes(sentinel)
-    monkeypatch.delenv("KOKOROARC_DATA_DIR", raising=False)
+    monkeypatch.delenv("KOKOROX_DATA_DIR", raising=False)
 
     assert (
         cli.main(
@@ -486,7 +486,7 @@ def test_state_export_never_overwrites_existing_output(
     output = tmp_path / "state.json"
     sentinel = b"caller-owned-state"
     output.write_bytes(sentinel)
-    monkeypatch.setenv("KOKOROARC_DATA_DIR", str(data_root))
+    monkeypatch.setenv("KOKOROX_DATA_DIR", str(data_root))
 
     assert (
         cli.main(
@@ -534,7 +534,7 @@ def test_memory_add_rejects_duplicate_or_secret_summary_without_echo(
     summary = tmp_path / "summary.json"
     summary.write_bytes(payload)
     before = _filesystem_snapshot(data_root)
-    monkeypatch.setenv("KOKOROARC_DATA_DIR", str(data_root))
+    monkeypatch.setenv("KOKOROX_DATA_DIR", str(data_root))
 
     assert (
         cli.main(
@@ -628,7 +628,7 @@ def test_skill_suite_cli_dry_run_does_not_touch_home_or_codex_config(
     config.write_bytes(b"caller_owned = true\n")
     before = _filesystem_snapshot(fake_home)
     monkeypatch.setattr(Path, "home", lambda: fake_home)
-    monkeypatch.delenv("KOKOROARC_DATA_DIR", raising=False)
+    monkeypatch.delenv("KOKOROX_DATA_DIR", raising=False)
 
     assert cli.main(["suite", "install", "--dry-run", "--json"]) == 0
 
@@ -650,12 +650,12 @@ def test_skill_suite_cli_conflict_preserves_existing_skill_and_config(
     config.write_bytes(b"caller_owned = true\n")
     skills_root = fake_home / ".agents" / "skills"
     skills_root.mkdir(parents=True)
-    conflicting = skills_root / "using-kokoroarc"
-    shutil.copytree(Path("skills") / "using-kokoroarc", conflicting)
+    conflicting = skills_root / "using-kokorox"
+    shutil.copytree(Path("skills") / "using-kokorox", conflicting)
     (conflicting / "SKILL.md").write_bytes(b"caller-owned-conflict\n")
     before = _filesystem_snapshot(fake_home)
     monkeypatch.setattr(Path, "home", lambda: fake_home)
-    monkeypatch.delenv("KOKOROARC_DATA_DIR", raising=False)
+    monkeypatch.delenv("KOKOROX_DATA_DIR", raising=False)
 
     assert cli.main(["suite", "install", "--json"]) == 2
 
@@ -671,7 +671,7 @@ def test_skill_suite_cli_invalid_scope_does_not_echo_supplied_path(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     supplied = str(tmp_path / "API_KEY=sk-proj-secret-path")
-    monkeypatch.delenv("KOKOROARC_DATA_DIR", raising=False)
+    monkeypatch.delenv("KOKOROX_DATA_DIR", raising=False)
 
     assert (
         cli.main(

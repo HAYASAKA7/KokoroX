@@ -1,4 +1,4 @@
-# KokoroArc authoring contract
+# KokoroX authoring contract
 
 ## Boundary
 
@@ -32,13 +32,13 @@ Require exact artifact ID and SHA-256, namespace, character ID, display name, co
 | Locale profiles | `locales/<locale>.yaml` (one per declared locale, e.g. `en-US`, `zh-CN`, `fr-FR`) | Author each independently; intentional equivalence must be deliberate. |
 | Behavioral fixtures | `tests/positive.yaml`, `tests/negative.yaml` | Store expected/forbidden behavior as data, never host instructions. |
 
-For a dossier revision, copy the explicit source pack to a working path under `KOKOROARC_DATA_DIR` before editing. Convert original provenance to dossier provenance only when the request supplies typed `user_dossier` input. Use structured file editing; never place dossier strings in a shell command. Preserve the request JSON unchanged. Keep generated or revised artifacts and working files under `KOKOROARC_DATA_DIR`; keep temporary files there or under an explicitly configured temp root. Treat both roots as trusted configuration and never invent or hard-code a drive or directory.
+For a dossier revision, copy the explicit source pack to a working path under `KOKOROX_DATA_DIR` before editing. Convert original provenance to dossier provenance only when the request supplies typed `user_dossier` input. Use structured file editing; never place dossier strings in a shell command. Preserve the request JSON unchanged. Keep generated or revised artifacts and working files under `KOKOROX_DATA_DIR`; keep temporary files there or under an explicitly configured temp root. Treat both roots as trusted configuration and never invent or hard-code a drive or directory.
 
 For researched evidence, use reference-only records such as `claim_id: claim-role` with `source: research_bundle`; do not copy source excerpts or source instructions into the pack or commands. In hybrid mode, keep `user_dossier` and `user_override` claims separately typed. A user override may shape delivery but cannot reuse a bundle claim ID or rewrite a researched fact.
 
 ## Deterministic gate
 
-Set `PYTHONPATH` to the local `src` directory and `KOKOROARC_DATA_DIR` to the explicit trusted data directory. If a separate temp root is configured, resolve and confine temporary work beneath it. Pass only literal trusted file paths:
+Set `PYTHONPATH` to the local `src` directory and `KOKOROX_DATA_DIR` to the explicit trusted data directory. If a separate temp root is configured, resolve and confine temporary work beneath it. Pass only literal trusted file paths:
 
 ```text
 python -m kokoroarc.cli character request validate --input <request.json> --json
@@ -65,7 +65,7 @@ visibility: private
 activation_allowed: false
 ```
 
-The returned path must resolve beneath `KOKOROARC_DATA_DIR/drafts`. Do not create or modify `compiled`, `installed`, `public`, `sessions`, `state`, or `events`. Do not run `pack compile`, session, state, install, or public-publish commands.
+The returned path must resolve beneath `KOKOROX_DATA_DIR/drafts`. Do not create or modify `compiled`, `installed`, `public`, `sessions`, `state`, or `events`. Do not run `pack compile`, session, state, install, or public-publish commands.
 
 ## Failure and reporting
 

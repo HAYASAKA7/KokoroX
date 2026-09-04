@@ -1,4 +1,4 @@
 interface:
   display_name: "Author Character Packs"
-  short_description: "Create safe private KokoroArc character drafts"
+  short_description: "Create safe private KokoroX character drafts"
   default_prompt: "Use the authoring-character-packs skill to create and validate a private character draft."

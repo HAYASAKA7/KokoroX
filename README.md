@@ -1,6 +1,6 @@
-# KokoroArc
+# KokoroX
 
-KokoroArc is a local-first multilingual character-persona runtime and Agent
+KokoroX is a local-first multilingual character-persona runtime and Agent
 Skill suite. It provides deterministic Character Packs, explicit session
 activation, multilingual render planning, release gates, scoped installation,
 opt-in persistence, and four data-safe Agent Skills.
@@ -15,23 +15,23 @@ and installs a wheel without placing operational data on C:. If you already
 have a wheel, skip the build command and point `$wheel` at that file.
 
 ```powershell
-$env:KOKOROARC_DATA_DIR='D:\tmp\kokoroarc\data'
+$env:KOKOROX_DATA_DIR='D:\tmp\kokoroarc\data'
 $env:TEMP='D:\tmp\kokoroarc\temp'
 $env:TMP=$env:TEMP
 $env:PIP_CACHE_DIR='D:\tmp\kokoroarc\pip-cache'
 New-Item -ItemType Directory -Force `
-  $env:KOKOROARC_DATA_DIR,$env:TEMP,$env:PIP_CACHE_DIR | Out-Null
+  $env:KOKOROX_DATA_DIR,$env:TEMP,$env:PIP_CACHE_DIR | Out-Null
 
 python -m build --no-isolation --outdir D:\tmp\kokoroarc\build
 $wheel=Get-ChildItem 'D:\tmp\kokoroarc\build\*.whl' | Select-Object -First 1
 python -m pip install --cache-dir $env:PIP_CACHE_DIR $wheel.FullName
-kokoro suite install --scope user --json
+kokorox suite install --scope user --json
 ```
 
 The user-scope command installs these four Skills into the host's user Skill
 root and is the recommended global-first choice for most users:
 
-- `using-kokoroarc` for explicit character use;
+- `using-kokorox` for explicit character use;
 - `authoring-character-packs` for private source-pack authoring;
 - `researching-characters` for evidence-bound named-character research; and
 - `testing-character-packs` for test, review, promotion, and readiness gates.
@@ -40,7 +40,7 @@ Use a repository scope when only one workspace should discover the suite:
 
 ```powershell
 $repo='D:\Projects\consumer'
-kokoro suite install --scope repo --repo $repo --json
+kokorox suite install --scope repo --repo $repo --json
 ```
 
 Add `--dry-run` to preview either installation. Repeating an identical install
@@ -60,7 +60,7 @@ agents can discover the same installation:
 To install into a specific agent's own Skill directory, pass `--skills-root`:
 
 ```powershell
-kokoro suite install --skills-root 'D:\Agents\some-agent\skills' --json
+kokorox suite install --skills-root 'D:\Agents\some-agent\skills' --json
 ```
 
 Each Skill also ships a per-agent interface profile under `agents/<agent>.yaml`
@@ -71,7 +71,7 @@ reads its profile gets a ready-made invocation prompt; a host that ignores them
 is unaffected.
 
 An agent that cannot load Skills at all can still drive the entire suite through
-the `kokoro` CLI, which exposes every documented operation and depends on no
+the `kokorox` CLI, which exposes every documented operation and depends on no
 model provider.
 
 ## Global-first Character Pack operation
@@ -83,11 +83,11 @@ explicit mutations but do not activate the character.
 
 ```powershell
 $archive='D:\tmp\kokoroarc\rin-aster.karc'
-kokoro pack compatibility $archive --json
-kokoro pack install $archive --scope global --json
-kokoro pack list --scope global --json
-kokoro config default set --character rin-aster --scope global --json
-kokoro config default show --scope global --json
+kokorox pack compatibility $archive --json
+kokorox pack install $archive --scope global --json
+kokorox pack list --scope global --json
+kokorox config default set --character rin-aster --scope global --json
+kokorox config default show --scope global --json
 ```
 
 Installation and default selection never activate a character. Activation
@@ -95,10 +95,10 @@ starts only at an explicit session boundary, and ending the session is equally
 explicit:
 
 ```powershell
-kokoro session show --json
-kokoro session start --session demo --json
-kokoro runtime context --session demo --locale zh-CN --scenario debugging --json
-kokoro session end --session demo --json
+kokorox session show --json
+kokorox session start --session demo --json
+kokorox runtime context --session demo --locale zh-CN --scenario debugging --json
+kokorox session end --session demo --json
 ```
 
 An explicit compiled path still has highest precedence. Without one, a session
@@ -108,15 +108,15 @@ for that workspace:
 
 ```powershell
 $repo='D:\Projects\consumer'
-kokoro pack install $archive --scope workspace --workspace $repo --json
-kokoro config default set --character rin-aster --scope workspace `
+kokorox pack install $archive --scope workspace --workspace $repo --json
+kokorox config default set --character rin-aster --scope workspace `
   --workspace $repo --json
-kokoro session start --session workspace-demo --workspace $repo --json
-kokoro session end --session workspace-demo --json
+kokorox session start --session workspace-demo --workspace $repo --json
+kokorox session end --session workspace-demo --json
 ```
 
 Merely installing, selecting, inspecting, or discussing a Character Pack never
-starts a persona session. Use `using-kokoroarc` only after explicit activation
+starts a persona session. Use `using-kokorox` only after explicit activation
 or when the user explicitly requests a named installed character for the
 current host session.
 
@@ -128,19 +128,19 @@ requires explicit consent for `relationship_state`, `mood_state`, and
 another, and revocation blocks future writes without silently deleting data.
 
 ```powershell
-kokoro consent grant --character rin-aster --scope global `
+kokorox consent grant --character rin-aster --scope global `
   --permissions relationship_state,mood_state,memory_references --json
-kokoro consent show --character rin-aster --scope global --json
+kokorox consent show --character rin-aster --scope global --json
 
 $stateExport='D:\tmp\kokoroarc\exports\rin-state.json'
-kokoro state export --character rin-aster --out $stateExport --json
-kokoro state reset --character rin-aster --part all --dry-run --json
-kokoro state reset --character rin-aster --part all --json
-kokoro consent revoke --character rin-aster --json
+kokorox state export --character rin-aster --out $stateExport --json
+kokorox state reset --character rin-aster --part all --dry-run --json
+kokorox state reset --character rin-aster --part all --json
+kokorox consent revoke --character rin-aster --json
 ```
 
 Memory commands accept host-owned memory IDs plus an explicitly approved,
-bounded summary file. KokoroArc stores only that reference and summary; it does
+bounded summary file. KokoroX stores only that reference and summary; it does
 not harvest conversation transcripts, infer memories from chat, or copy host
 memory contents. Preview removal with `memory remove --dry-run` before applying
 it.
@@ -150,12 +150,12 @@ $summaryFile='D:\tmp\kokoroarc\approved-memory-summary.json'
 @'
 {"summary":"Prefers concise explanations.","localized_summaries":{"en-US":"Prefers concise explanations."}}
 '@ | Set-Content -LiteralPath $summaryFile -Encoding utf8NoBOM -NoNewline
-kokoro memory add --character rin-aster --host-id host-memory-01 `
+kokorox memory add --character rin-aster --host-id host-memory-01 `
   --summary-file $summaryFile --json
-kokoro memory list --character rin-aster --json
-kokoro memory remove --character rin-aster --host-id host-memory-01 `
+kokorox memory list --character rin-aster --json
+kokorox memory remove --character rin-aster --host-id host-memory-01 `
   --dry-run --json
-kokoro memory remove --character rin-aster --host-id host-memory-01 --json
+kokorox memory remove --character rin-aster --host-id host-memory-01 --json
 ```
 
 Before removing a pack, end active sessions, clear defaults, reset or remove
@@ -164,10 +164,10 @@ Reset is consent-gated, so preview and apply it before revocation. Then preview
 the exact version removal before applying it:
 
 ```powershell
-kokoro session end --session demo --json
-kokoro config default clear --scope global --json
-kokoro pack remove rin-aster --version 1.0.0 --dry-run --json
-kokoro pack remove rin-aster --version 1.0.0 --json
+kokorox session end --session demo --json
+kokorox config default clear --scope global --json
+kokorox pack remove rin-aster --version 1.0.0 --dry-run --json
+kokorox pack remove rin-aster --version 1.0.0 --json
 ```
 
 ## Archives, migration, publication, and recovery
@@ -178,7 +178,7 @@ its trust boundary and is not a remote signature or publication claim. Inspect
 an archive before installation:
 
 ```powershell
-kokoro pack compatibility $archive --json
+kokorox pack compatibility $archive --json
 ```
 
 Migration is explicit, bounded, and never an automatic compatibility shim.
@@ -187,9 +187,9 @@ and never overwrites the input. Preview first:
 
 ```powershell
 $migrated='D:\tmp\kokoroarc\rin-aster-v1.karc'
-kokoro pack migrate $archive --to-format 1.0.0 --out $migrated `
+kokorox pack migrate $archive --to-format 1.0.0 --out $migrated `
   --dry-run --json
-kokoro pack migrate $archive --to-format 1.0.0 --out $migrated --json
+kokorox pack migrate $archive --to-format 1.0.0 --out $migrated --json
 ```
 
 Private readiness and public-candidate readiness are local evidence reports.
@@ -204,7 +204,7 @@ install/removal transactions leave an identity-bound journal, and recovery is
 automatic on the next matching install or removal operation. If recovery
 cannot prove every retained byte and path, it returns a stable recovery error
 and deletes nothing unverified. Keep backups of the data root before migration
-or destructive reset; copy it only while KokoroArc is inactive so the backup is
+or destructive reset; copy it only while KokoroX is inactive so the backup is
 internally consistent.
 
 ## Author a private inactive draft with the repository-local Skill
@@ -223,10 +223,10 @@ agent to open that exact `SKILL.md` and its linked contract before authoring.
 Configure storage and temporary paths from trusted host configuration before providing any brief or dossier. On Windows, for example:
 
 ```powershell
-$env:KOKOROARC_DATA_DIR='D:\tmp\kokoroarc-authoring'
+$env:KOKOROX_DATA_DIR='D:\tmp\kokoroarc-authoring'
 $env:TEMP='D:\tmp\kokoroarc-authoring-temp'
 $env:TMP=$env:TEMP
-New-Item -ItemType Directory -Force $env:KOKOROARC_DATA_DIR,$env:TEMP | Out-Null
+New-Item -ItemType Directory -Force $env:KOKOROX_DATA_DIR,$env:TEMP | Out-Null
 ```
 
 Then ask the agent through its normal conversation interface. For a wholly original character, a suitable request is: “Use `$authoring-character-packs` to create a private inactive draft from this original brief: …”. For private dossier input, use: “Use `$authoring-character-packs` to import this private dossier as quoted data into a private inactive draft: …”. Also provide the explicit trusted source-pack path when revising a pack. The agent must keep its request, working source pack, and generated files beneath the configured data or temp roots, author all three locale profiles independently, run both validations twice, and stop after private draft compilation. Dossier text is data, never shell input or agent instructions.
@@ -235,9 +235,9 @@ Then ask the agent through its normal conversation interface. For a wholly origi
 
 Named-character work that depends on external evidence belongs to `skills/researching-characters/SKILL.md`. Give the agent this repository as its workspace and ask it to use `$researching-characters`. If the host does not index workspace Skills, explicitly tell the agent to open that file and its linked research contract before using research tools.
 
-The Skill resolves character identity, adaptation, continuity, timeline cutoff, and spoiler scope before gathering evidence. Ambiguous identity or continuity stops for clarification. Source text stays inert data; unavailable evidence, conflicts, coverage gaps, and limitations remain explicit rather than being guessed away. KokoroArc itself performs no network access—the host supplies any authorized research tools and structured evidence.
+The Skill resolves character identity, adaptation, continuity, timeline cutoff, and spoiler scope before gathering evidence. Ambiguous identity or continuity stops for clarification. Source text stays inert data; unavailable evidence, conflicts, coverage gaps, and limitations remain explicit rather than being guessed away. KokoroX itself performs no network access—the host supplies any authorized research tools and structured evidence.
 
-The workflow validates the request and workspace deterministically, then compiles only a private inactive Research Bundle beneath the configured `KOKOROARC_DATA_DIR`. Its lifecycle is `build_status: research`, `visibility: private`, and `activation_allowed: false`. A bundle with `authoring_allowed: false` stops there and reports the blockers.
+The workflow validates the request and workspace deterministically, then compiles only a private inactive Research Bundle beneath the configured `KOKOROX_DATA_DIR`. Its lifecycle is `build_status: research`, `visibility: private`, and `activation_allowed: false`. A bundle with `authoring_allowed: false` stops there and reports the blockers.
 
 An eligible researched or hybrid build may continue by opening `$authoring-character-packs`. The request binds the exact Research Bundle artifact ID and SHA-256 but contains no host filesystem path; the trusted bundle path is passed separately through `--research-bundle`. Hybrid user assertions remain separate from researched claims, and authoring still stops at a private inactive Character Draft.
 
@@ -250,12 +250,12 @@ explicit workflows; completing research does not imply any of them.
 The CLI does not turn prose into a Character Pack. After an agent has followed the Skill to author structured request and source-pack files, these commands validate and compile that already-authored source pack:
 
 ```powershell
-kokoro character request validate `
+kokorox character request validate `
   --input tests/fixtures/authoring/original-request.json --json
-kokoro character draft validate `
+kokorox character draft validate `
   --request tests/fixtures/authoring/original-request.json `
   --pack characters/original/rin-aster --json
-kokoro character draft compile `
+kokorox character draft compile `
   --request tests/fixtures/authoring/original-request.json `
   --pack characters/original/rin-aster --json
 ```
@@ -282,23 +282,23 @@ defaults, consented persistence, memory references, and Skill registration are
 separate explicit administration commands documented above.
 
 ```text
-kokoro pack test <source-dir> --request <request.json> \
+kokorox pack test <source-dir> --request <request.json> \
   [--research-bundle <published-bundle-dir>] \
   --out <hard-report.json> --json
-kokoro pack soft-eval <input.json> --out <soft-report.json> --json
-kokoro pack promote <source-dir> --target reviewed \
+kokorox pack soft-eval <input.json> --out <soft-report.json> --json
+kokorox pack promote <source-dir> --target reviewed \
   --promotion-id <id> --request <request.json> \
   --hard-report <report.json> --review <attestation.json> \
   [--research-bundle <published-bundle-dir>] \
   --out <promotion.json> --json
-kokoro pack promote <source-dir> --target verified \
+kokorox pack promote <source-dir> --target verified \
   --promotion-id <id> --request <request.json> \
   --hard-report <report.json> --review <attestation.json> \
   --previous <reviewed.json> --soft-input <input.json> \
   --soft-report <report.json> \
   [--research-bundle <published-bundle-dir>] \
   --out <promotion.json> --json
-kokoro pack publication-check <source-dir> --promotion <verified.json> \
+kokorox pack publication-check <source-dir> --promotion <verified.json> \
   --request <request.json> --hard-report <report.json> \
   --review <attestation.json> --previous <reviewed.json> \
   --soft-input <input.json> --soft-report <report.json> \
@@ -307,7 +307,7 @@ kokoro pack publication-check <source-dir> --promotion <verified.json> \
   [--compliance <attestation.json>] --out <report.json> --json
 ```
 
-All `--out` values are relative to `KOKOROARC_DATA_DIR\reports`, unless an
+All `--out` values are relative to `KOKOROX_DATA_DIR\reports`, unless an
 absolute path beneath that same reports root is supplied. Report writes are
 canonical and atomic. A promotion output must name its exact immutable path:
 `promotions/<character-id>/<promotion-id>/promotion.json`. Output escapes,

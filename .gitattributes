@@ -57,4 +57,4 @@ docs/superpowers/plans/2026-08-14-kokoroarc-completion.md text eol=lf
 docs/superpowers/task9-constructor-plan-threat-model-residual.md text eol=lf
 
 # The authoritative design specification is checkout-stable LF.
-docs/KokoroArc_Design_Specification_v0.3.0.md text eol=lf
+docs/KokoroX_Design_Specification_v0.3.0.md text eol=lf whitespace=-blank-at-eol,-blank-at-eof

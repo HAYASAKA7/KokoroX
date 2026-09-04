@@ -328,7 +328,7 @@ def _build_runtime_context(
         or any(not _semantic_id(key) for key in scenarios)
     ):
         raise _InvalidContext
-    # KokoroArc renders task content in the user's language. When the pack does
+    # KokoroX renders task content in the user's language. When the pack does
     # not author that locale, persona expression falls back to the pack's
     # primary authored locale (lowest tag, chosen deterministically) rather
     # than failing the activation.

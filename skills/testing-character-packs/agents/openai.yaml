@@ -1,4 +1,4 @@
 interface:
   display_name: "Test Character Packs"
-  short_description: "Validate and promote KokoroArc character releases"
+  short_description: "Validate and promote KokoroX character releases"
   default_prompt: "Use $testing-character-packs to validate a Character Pack and report its release readiness."

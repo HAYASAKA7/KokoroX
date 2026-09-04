@@ -46,7 +46,7 @@ def aggregate_soft_evaluation(
 ) -> dict[str, Any]:
     """Validate and aggregate one closed, data-only evaluation artifact.
 
-    The evaluator has already run outside KokoroArc. This function performs no
+    The evaluator has already run outside KokoroX. This function performs no
     provider, process, network, runtime, relationship-state, or memory action.
     Every sample inherits the single source/evaluator/rubric/fixture binding at
     the artifact root, so sample-local binding overrides are rejected by the

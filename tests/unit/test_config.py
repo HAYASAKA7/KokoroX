@@ -15,7 +15,7 @@ def test_settings_require_explicit_data_directory() -> None:
 
 
 def test_settings_resolve_data_directory(tmp_path: Path) -> None:
-    settings = Settings.from_env({"KOKOROARC_DATA_DIR": str(tmp_path)})
+    settings = Settings.from_env({"KOKOROX_DATA_DIR": str(tmp_path)})
     assert settings.data_dir == tmp_path.resolve()
 
 
@@ -41,7 +41,7 @@ def test_kokoro_error_string_is_its_message() -> None:
 
 
 def test_settings_is_frozen_and_slotted(tmp_path: Path) -> None:
-    settings = Settings.from_env({"KOKOROARC_DATA_DIR": str(tmp_path)})
+    settings = Settings.from_env({"KOKOROX_DATA_DIR": str(tmp_path)})
 
     assert not hasattr(settings, "__dict__")
     with pytest.raises(FrozenInstanceError):
@@ -50,7 +50,7 @@ def test_settings_is_frozen_and_slotted(tmp_path: Path) -> None:
 
 def test_settings_ensure_directories_creates_expected_layout(tmp_path: Path) -> None:
     root = tmp_path / "data"
-    settings = Settings.from_env({"KOKOROARC_DATA_DIR": str(root)})
+    settings = Settings.from_env({"KOKOROX_DATA_DIR": str(root)})
 
     settings.ensure_directories()
 
@@ -73,7 +73,7 @@ def test_settings_prefers_repository_schemas(monkeypatch: pytest.MonkeyPatch, tm
     monkeypatch.setattr(config, "__file__", str(package_file))
     monkeypatch.setattr(config.sysconfig, "get_path", lambda name, scheme=None: str(tmp_path / "default"))
 
-    settings = Settings.from_env({"KOKOROARC_DATA_DIR": str(tmp_path / "data")})
+    settings = Settings.from_env({"KOKOROX_DATA_DIR": str(tmp_path / "data")})
 
     assert settings.schema_dir == repository_schemas.resolve()
 
@@ -88,7 +88,7 @@ def test_settings_uses_default_installed_schema_fallback(
     monkeypatch.setattr(config, "__file__", str(package_file))
     monkeypatch.setattr(config.sysconfig, "get_path", lambda name, scheme=None: str(default_root))
 
-    settings = Settings.from_env({"KOKOROARC_DATA_DIR": str(tmp_path / "data")})
+    settings = Settings.from_env({"KOKOROX_DATA_DIR": str(tmp_path / "data")})
 
     assert settings.schema_dir == default_schemas.resolve()
 
@@ -110,7 +110,7 @@ def test_settings_uses_user_installed_schema_when_default_is_missing(
         lambda name, scheme=None: str(user_root if scheme == "user" else default_root),
     )
 
-    settings = Settings.from_env({"KOKOROARC_DATA_DIR": str(tmp_path / "data")})
+    settings = Settings.from_env({"KOKOROX_DATA_DIR": str(tmp_path / "data")})
 
     assert settings.schema_dir == user_schemas.resolve()
 
@@ -127,7 +127,7 @@ def test_settings_uses_target_adjacent_schema_when_other_installed_paths_are_mis
     monkeypatch.setattr(config.sysconfig, "get_preferred_scheme", lambda key: "user")
     monkeypatch.setattr(config.sysconfig, "get_path", lambda name, scheme=None: str(default_root))
 
-    settings = Settings.from_env({"KOKOROARC_DATA_DIR": str(tmp_path / "data")})
+    settings = Settings.from_env({"KOKOROX_DATA_DIR": str(tmp_path / "data")})
 
     assert settings.schema_dir == target_schemas.resolve()
 
@@ -157,7 +157,7 @@ def test_settings_prefers_default_schema_for_default_installed_package(
         lambda name, scheme=None: str(paths[scheme or "default"][name]),
     )
 
-    settings = Settings.from_env({"KOKOROARC_DATA_DIR": str(tmp_path / "data")})
+    settings = Settings.from_env({"KOKOROX_DATA_DIR": str(tmp_path / "data")})
 
     assert settings.schema_dir == default_schemas.resolve()
 
@@ -187,7 +187,7 @@ def test_settings_prefers_user_schema_for_user_installed_package(
         lambda name, scheme=None: str(paths[scheme or "default"][name]),
     )
 
-    settings = Settings.from_env({"KOKOROARC_DATA_DIR": str(tmp_path / "data")})
+    settings = Settings.from_env({"KOKOROX_DATA_DIR": str(tmp_path / "data")})
 
     assert settings.schema_dir == user_schemas.resolve()
 
@@ -218,6 +218,6 @@ def test_settings_prefers_target_schema_for_target_installed_package(
         lambda name, scheme=None: str(paths[scheme or "default"][name]),
     )
 
-    settings = Settings.from_env({"KOKOROARC_DATA_DIR": str(tmp_path / "data")})
+    settings = Settings.from_env({"KOKOROX_DATA_DIR": str(tmp_path / "data")})
 
     assert settings.schema_dir == target_schemas.resolve()

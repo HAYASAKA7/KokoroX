@@ -28,19 +28,19 @@ def test_readme_documents_installed_suite_and_d_drive_isolation() -> None:
     readme = Path("README.md").read_text(encoding="utf-8")
 
     for example in (
-        "$env:KOKOROARC_DATA_DIR='D:\\tmp\\kokoroarc\\data'",
+        "$env:KOKOROX_DATA_DIR='D:\\tmp\\kokoroarc\\data'",
         "$env:TEMP='D:\\tmp\\kokoroarc\\temp'",
         "$env:TMP=$env:TEMP",
         "$env:PIP_CACHE_DIR='D:\\tmp\\kokoroarc\\pip-cache'",
         "python -m build --no-isolation --outdir D:\\tmp\\kokoroarc\\build",
         "python -m pip install --cache-dir $env:PIP_CACHE_DIR $wheel.FullName",
-        "kokoro suite install --scope user --json",
-        "kokoro suite install --scope repo --repo $repo --json",
+        "kokorox suite install --scope user --json",
+        "kokorox suite install --scope repo --repo $repo --json",
     ):
         assert example in readme
 
     for skill in (
-        "`using-kokoroarc`",
+        "`using-kokorox`",
         "`authoring-character-packs`",
         "`researching-characters`",
         "`testing-character-packs`",
@@ -54,20 +54,20 @@ def test_readme_documents_global_first_activation_and_persistence() -> None:
     lower = " ".join(readme.lower().split())
 
     for example in (
-        "kokoro pack install $archive --scope global --json",
-        "kokoro config default set --character rin-aster --scope global --json",
-        "kokoro pack install $archive --scope workspace --workspace $repo --json",
-        "kokoro config default set --character rin-aster --scope workspace",
-        "kokoro session start --session demo --json",
-        "kokoro session end --session demo --json",
+        "kokorox pack install $archive --scope global --json",
+        "kokorox config default set --character rin-aster --scope global --json",
+        "kokorox pack install $archive --scope workspace --workspace $repo --json",
+        "kokorox config default set --character rin-aster --scope workspace",
+        "kokorox session start --session demo --json",
+        "kokorox session end --session demo --json",
         "--permissions relationship_state,mood_state,memory_references",
-        "kokoro state export --character rin-aster --out $stateExport --json",
-        "kokoro state reset --character rin-aster --part all --dry-run --json",
-        "kokoro memory add --character rin-aster --host-id host-memory-01",
-        "kokoro memory list --character rin-aster --json",
-        "kokoro memory remove --character rin-aster --host-id host-memory-01",
-        "kokoro consent revoke --character rin-aster --json",
-        "kokoro pack remove rin-aster --version 1.0.0 --dry-run --json",
+        "kokorox state export --character rin-aster --out $stateExport --json",
+        "kokorox state reset --character rin-aster --part all --dry-run --json",
+        "kokorox memory add --character rin-aster --host-id host-memory-01",
+        "kokorox memory list --character rin-aster --json",
+        "kokorox memory remove --character rin-aster --host-id host-memory-01",
+        "kokorox consent revoke --character rin-aster --json",
+        "kokorox pack remove rin-aster --version 1.0.0 --dry-run --json",
     ):
         assert example in readme
 
@@ -87,8 +87,8 @@ def test_readme_documents_archive_release_and_recovery_boundaries() -> None:
     lower = " ".join(readme.lower().split())
 
     for example in (
-        "kokoro pack compatibility $archive --json",
-        "kokoro pack migrate $archive --to-format 1.0.0 --out $migrated",
+        "kokorox pack compatibility $archive --json",
+        "kokorox pack migrate $archive --to-format 1.0.0 --out $migrated",
     ):
         assert example in readme
 
@@ -149,7 +149,7 @@ def _install_and_grant_cli(
     source = tmp_path / "rin.karc"
     source.write_bytes(build_private_archive(release))
     data_root = tmp_path / "data"
-    monkeypatch.setenv("KOKOROARC_DATA_DIR", str(data_root))
+    monkeypatch.setenv("KOKOROX_DATA_DIR", str(data_root))
     code, _installed = _cli_json(
         ["pack", "install", str(source), "--json"],
         capsys,
@@ -483,7 +483,7 @@ def test_main_dispatches_read_only_route_without_data_root(
         )
         return {"ok": True, "compatibility": {"compatible": True}}
 
-    monkeypatch.delenv("KOKOROARC_DATA_DIR", raising=False)
+    monkeypatch.delenv("KOKOROX_DATA_DIR", raising=False)
     monkeypatch.setattr(cli, "handle_standalone", fake_handler)
 
     assert cli.main(["pack", "compatibility", "rin.karc", "--json"]) == 0
@@ -519,7 +519,7 @@ def test_main_dispatches_stateful_route_with_data_root(
         )
         return {"ok": True, "installed": []}
 
-    monkeypatch.setenv("KOKOROARC_DATA_DIR", str(tmp_path))
+    monkeypatch.setenv("KOKOROX_DATA_DIR", str(tmp_path))
     monkeypatch.setattr(cli, "handle_standalone", fake_handler)
 
     assert cli.main(["pack", "list", "--json"]) == 0
@@ -541,7 +541,7 @@ def test_pack_compatibility_inspects_archive_without_persistent_state(
     archive_path = tmp_path / "rin.karc"
     archive_path.write_bytes(archive)
     before = tuple(sorted(path.name for path in tmp_path.iterdir()))
-    monkeypatch.delenv("KOKOROARC_DATA_DIR", raising=False)
+    monkeypatch.delenv("KOKOROX_DATA_DIR", raising=False)
 
     assert (
         cli.main(["pack", "compatibility", str(archive_path), "--json"])
@@ -585,7 +585,7 @@ def test_pack_export_writes_exact_private_archive_once(
     for name, path in inputs.items():
         path.write_bytes(canonical_bytes(documents[by_name[name]]))
     output = tmp_path / "rin.karc"
-    monkeypatch.delenv("KOKOROARC_DATA_DIR", raising=False)
+    monkeypatch.delenv("KOKOROX_DATA_DIR", raising=False)
 
     assert (
         cli.main(
@@ -648,7 +648,7 @@ def test_pack_export_binds_publication_report_for_public_archive(
     for name, path in inputs.items():
         path.write_bytes(canonical_bytes(documents[by_name[name]]))
     output = tmp_path / "rin-public.karc"
-    monkeypatch.delenv("KOKOROARC_DATA_DIR", raising=False)
+    monkeypatch.delenv("KOKOROX_DATA_DIR", raising=False)
 
     assert (
         cli.main(
@@ -695,7 +695,7 @@ def test_pack_migration_previews_then_writes_new_archive(
     source = tmp_path / "rin-legacy.karc"
     source.write_bytes(legacy)
     output = tmp_path / "rin-current.karc"
-    monkeypatch.delenv("KOKOROARC_DATA_DIR", raising=False)
+    monkeypatch.delenv("KOKOROX_DATA_DIR", raising=False)
     arguments = [
         "pack",
         "migrate",
@@ -745,7 +745,7 @@ def test_scoped_pack_cli_global_install_list_and_remove_workflow(
     source = tmp_path / "rin.karc"
     source.write_bytes(build_private_archive(rin_verified_release))
     data_root = tmp_path / "data"
-    monkeypatch.setenv("KOKOROARC_DATA_DIR", str(data_root))
+    monkeypatch.setenv("KOKOROX_DATA_DIR", str(data_root))
     install = ["pack", "install", str(source), "--json"]
 
     code, preview = _cli_json(
@@ -835,7 +835,7 @@ def test_scoped_pack_cli_workspace_dry_run_is_read_only(
     workspace = tmp_path / "workspace"
     workspace.mkdir()
     data_root = tmp_path / "data"
-    monkeypatch.setenv("KOKOROARC_DATA_DIR", str(data_root))
+    monkeypatch.setenv("KOKOROX_DATA_DIR", str(data_root))
     before = _filesystem_snapshot(workspace)
 
     code, body = _cli_json(
@@ -867,7 +867,7 @@ def test_scoped_pack_cli_empty_list_does_not_create_storage(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     data_root = tmp_path / "data"
-    monkeypatch.setenv("KOKOROARC_DATA_DIR", str(data_root))
+    monkeypatch.setenv("KOKOROX_DATA_DIR", str(data_root))
 
     code, body = _cli_json(["pack", "list", "--json"], capsys)
 
@@ -912,7 +912,7 @@ def test_scoped_pack_cli_rejects_mismatched_workspace_arguments(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    monkeypatch.setenv("KOKOROARC_DATA_DIR", str(tmp_path / "data"))
+    monkeypatch.setenv("KOKOROX_DATA_DIR", str(tmp_path / "data"))
 
     code, body = _cli_json(arguments, capsys)
 
@@ -930,7 +930,7 @@ def test_consent_cli_grant_show_replace_and_revoke_lifecycle(
     source = tmp_path / "rin.karc"
     source.write_bytes(build_private_archive(rin_verified_release))
     data_root = tmp_path / "data"
-    monkeypatch.setenv("KOKOROARC_DATA_DIR", str(data_root))
+    monkeypatch.setenv("KOKOROX_DATA_DIR", str(data_root))
     code, _installed = _cli_json(
         ["pack", "install", str(source), "--json"],
         capsys,
@@ -1011,7 +1011,7 @@ def test_consent_cli_rejects_invalid_permission_list_without_mutation(
     source = tmp_path / "rin.karc"
     source.write_bytes(build_private_archive(rin_verified_release))
     data_root = tmp_path / "data"
-    monkeypatch.setenv("KOKOROARC_DATA_DIR", str(data_root))
+    monkeypatch.setenv("KOKOROX_DATA_DIR", str(data_root))
     code, _installed = _cli_json(
         ["pack", "install", str(source), "--json"],
         capsys,
@@ -1050,7 +1050,7 @@ def test_consent_cli_workspace_scope_is_isolated_and_absent_show_is_read_only(
     workspace = tmp_path / "workspace"
     workspace.mkdir()
     data_root = tmp_path / "data"
-    monkeypatch.setenv("KOKOROARC_DATA_DIR", str(data_root))
+    monkeypatch.setenv("KOKOROX_DATA_DIR", str(data_root))
 
     code, absent = _cli_json(
         ["consent", "show", "--character", "rin-aster", "--json"],
@@ -1325,7 +1325,7 @@ def test_skill_suite_cli_default_user_dry_run_uses_fake_home_without_state(
 ) -> None:
     fake_home = tmp_path / "fake-home"
     monkeypatch.setattr(Path, "home", lambda: fake_home)
-    monkeypatch.delenv("KOKOROARC_DATA_DIR", raising=False)
+    monkeypatch.delenv("KOKOROX_DATA_DIR", raising=False)
 
     code, body = _cli_json(
         ["suite", "install", "--dry-run", "--json"],
@@ -1349,7 +1349,7 @@ def test_skill_suite_cli_installs_explicit_user_root_idempotently(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     skills_root = tmp_path / "consumer-home" / ".agents" / "skills"
-    monkeypatch.delenv("KOKOROARC_DATA_DIR", raising=False)
+    monkeypatch.delenv("KOKOROX_DATA_DIR", raising=False)
     command = [
         "suite",
         "install",
@@ -1386,7 +1386,7 @@ def test_skill_suite_cli_repo_dry_run_then_install_is_confined(
 ) -> None:
     repo = tmp_path / "consumer-repo"
     repo.mkdir()
-    monkeypatch.delenv("KOKOROARC_DATA_DIR", raising=False)
+    monkeypatch.delenv("KOKOROX_DATA_DIR", raising=False)
     command = [
         "suite",
         "install",
@@ -1436,7 +1436,7 @@ def test_skill_suite_cli_rejects_mismatched_scope_arguments_without_state(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    monkeypatch.delenv("KOKOROARC_DATA_DIR", raising=False)
+    monkeypatch.delenv("KOKOROX_DATA_DIR", raising=False)
     before = _filesystem_snapshot(tmp_path)
 
     code, body = _cli_json(

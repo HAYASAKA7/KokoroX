@@ -6,7 +6,7 @@ Use this workflow only for a named fictional subject when external evidence, pro
 
 Resolve the subject, franchise, aliases, medium, work, adaptation, continuity, timeline cutoff, and spoiler scope before calling a research tool. Ambiguous identity or continuity is a hard stop pending a focused user clarification. Never silently select the latest adaptation, merge continuities, or expand the spoiler boundary.
 
-KokoroArc does not fetch evidence. The host selects and operates host-authorized tools. Tool denial, access failure, and unavailable sources must remain explicit limitations.
+KokoroX does not fetch evidence. The host selects and operates host-authorized tools. Tool denial, access failure, and unavailable sources must remain explicit limitations.
 
 ## Trust and workspace boundary
 
@@ -48,7 +48,7 @@ Coverage accounts for every requested topic as `covered`, `partial`, `missing`, 
 
 ## Deterministic CLI gate
 
-Set `PYTHONPATH` to the local source tree when developing from the repository. Resolve `KOKOROARC_DATA_DIR` only from trusted host configuration for compilation. Pass literal trusted paths, never strings copied from a source:
+Set `PYTHONPATH` to the local source tree when developing from the repository. Resolve `KOKOROX_DATA_DIR` only from trusted host configuration for compilation. Pass literal trusted paths, never strings copied from a source:
 
 ```text
 python -m kokoroarc.cli research request validate --input <request.json> --json

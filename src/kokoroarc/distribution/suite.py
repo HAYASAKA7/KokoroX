@@ -19,7 +19,7 @@ from kokoroarc.packs.loader import parse_yaml_bytes
 
 
 SKILL_SUITE_NAMES = (
-    "using-kokoroarc",
+    "using-kokorox",
     "authoring-character-packs",
     "researching-characters",
     "testing-character-packs",
@@ -39,7 +39,7 @@ AGENT_PROFILE_NAMES = (
 )
 
 _SKILL_REFERENCE_FILES = {
-    "using-kokoroarc": "references/runtime-contract.md",
+    "using-kokorox": "references/runtime-contract.md",
     "authoring-character-packs": "references/authoring-contract.md",
     "researching-characters": "references/research-contract.md",
     "testing-character-packs": "references/testing-contract.md",
@@ -362,7 +362,7 @@ def install_skill_suite(
             raise
         raise _error(
             "SKILL_SUITE_INSTALL_FAILED",
-            "The KokoroArc Skill suite could not be installed.",
+            "The KokoroX Skill suite could not be installed.",
             reason=type(error).__name__,
         ) from error
     return _result_document(
@@ -397,13 +397,13 @@ def _resolve_source_snapshot(
         return next(iter(snapshots.values()))
     if len(snapshots) > 1:
         raise _source_error(
-            "Multiple complete KokoroArc Skill suite sources were discovered."
+            "Multiple complete KokoroX Skill suite sources were discovered."
         )
     if last_error is not None:
         raise last_error
     raise _error(
         "SKILL_SUITE_SOURCE_INVALID",
-        "The KokoroArc Skill suite source is unavailable or incomplete.",
+        "The KokoroX Skill suite source is unavailable or incomplete.",
     )
 
 
@@ -784,7 +784,7 @@ def _plan_actions(
                 raise
             raise _error(
                 "SKILL_SUITE_CONFLICT",
-                "An installed Skill differs from the KokoroArc suite.",
+                "An installed Skill differs from the KokoroX suite.",
             ) from error
         prefix = f"{skill_name}/"
         expected = {
@@ -798,7 +798,7 @@ def _plan_actions(
         if actual != expected:
             raise _error(
                 "SKILL_SUITE_CONFLICT",
-                "An installed Skill differs from the KokoroArc suite.",
+                "An installed Skill differs from the KokoroX suite.",
             )
         actions.append((skill_name, "unchanged"))
     return tuple(actions)
@@ -1754,14 +1754,14 @@ def _path_error(message: str) -> KokoroError:
 def _conflict_error() -> KokoroError:
     return _error(
         "SKILL_SUITE_CONFLICT",
-        "An installed Skill differs from the KokoroArc suite.",
+        "An installed Skill differs from the KokoroX suite.",
     )
 
 
 def _limit_error(limit: str) -> KokoroError:
     return _error(
         "SKILL_SUITE_LIMIT_EXCEEDED",
-        "The KokoroArc Skill suite exceeds its configured limits.",
+        "The KokoroX Skill suite exceeds its configured limits.",
         limit=limit,
     )
 

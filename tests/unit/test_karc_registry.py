@@ -16,6 +16,7 @@ from kokoroarc.distribution.registry import (
 from kokoroarc.errors import KokoroError
 from kokoroarc.packs.compiler import canonical_bytes
 from kokoroarc.schemas import SchemaRegistry
+from kokoroarc import __version__
 
 
 SCHEMAS = SchemaRegistry(Path("schemas/v1"))
@@ -54,7 +55,7 @@ def test_global_scope_builds_the_canonical_revision_zero_registry() -> None:
     assert registry == {
         "schema_version": "1.0",
         "artifact_id": "registry/global/installed-packs",
-        "created_by": {"component": "kokoroarc", "version": "0.0.0.dev0"},
+        "created_by": {"component": "kokoroarc", "version": __version__},
         "scope": "global",
         "workspace_id": None,
         "revision": 0,

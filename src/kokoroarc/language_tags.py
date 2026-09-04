@@ -1,6 +1,6 @@
-"""Language-tag validation shared by every KokoroArc layer.
+"""Language-tag validation shared by every KokoroX layer.
 
-KokoroArc renders in the user's language. Locales are therefore an open set
+KokoroX renders in the user's language. Locales are therefore an open set
 validated by shape rather than a closed enumeration: a Character Pack declares
 the locales it actually authors, and the runtime selects among them.
 

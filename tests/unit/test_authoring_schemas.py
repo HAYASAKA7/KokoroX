@@ -6,6 +6,7 @@ import pytest
 
 from kokoroarc.errors import KokoroError
 from kokoroarc.schemas import SchemaRegistry
+from kokoroarc import __version__
 
 
 SCHEMAS = SchemaRegistry(Path("schemas/v1"))
@@ -23,7 +24,7 @@ def _metadata(artifact_id: str) -> dict:
     return {
         "schema_version": "1.0",
         "artifact_id": artifact_id,
-        "created_by": {"component": "kokoroarc", "version": "0.0.0.dev0"},
+        "created_by": {"component": "kokoroarc", "version": __version__},
     }
 
 

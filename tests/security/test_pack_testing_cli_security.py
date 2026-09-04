@@ -35,7 +35,7 @@ def _run_cli(
     *arguments: str,
 ) -> tuple[dict[str, Any], subprocess.CompletedProcess[str]]:
     env = os.environ.copy()
-    env["KOKOROARC_DATA_DIR"] = str(data_dir)
+    env["KOKOROX_DATA_DIR"] = str(data_dir)
     env["PYTHONPATH"] = str(REPOSITORY_ROOT / "src")
     completed = subprocess.run(
         [sys.executable, "-m", "kokoroarc.cli", *arguments, "--json"],

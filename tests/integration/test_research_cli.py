@@ -122,7 +122,7 @@ _AGENT_PROFILE_FILES = {
 REQUIRED_SKILL_FILES = {
     f"{skill}/{relative}"
     for skill, contract in (
-        ("using-kokoroarc", "runtime-contract.md"),
+        ("using-kokorox", "runtime-contract.md"),
         ("authoring-character-packs", "authoring-contract.md"),
         ("researching-characters", "research-contract.md"),
         ("testing-character-packs", "testing-contract.md"),
@@ -164,9 +164,9 @@ def _cli(
     env = os.environ.copy()
     env["PYTHONPATH"] = str(python_path or REPOSITORY_ROOT / "src")
     if data_dir is None:
-        env.pop("KOKOROARC_DATA_DIR", None)
+        env.pop("KOKOROX_DATA_DIR", None)
     else:
-        env["KOKOROARC_DATA_DIR"] = str(data_dir)
+        env["KOKOROX_DATA_DIR"] = str(data_dir)
     return subprocess.run(
         [sys.executable, "-m", "kokoroarc.cli", *arguments],
         check=False,
@@ -404,7 +404,7 @@ def test_research_bundle_compile_alone_requires_data_dir() -> None:
     _assert_error(
         completed,
         "DATA_DIR_REQUIRED",
-        "Set KOKOROARC_DATA_DIR before running a stateful command.",
+        "Set KOKOROX_DATA_DIR before running a stateful command.",
     )
 
 
@@ -612,7 +612,7 @@ def test_built_archives_and_installed_research_cli_are_complete(
 
     probe_env = os.environ.copy()
     probe_env["PYTHONPATH"] = str(installed)
-    probe_env.pop("KOKOROARC_DATA_DIR", None)
+    probe_env.pop("KOKOROX_DATA_DIR", None)
     schema_names = sorted(
         name.removesuffix(".schema.json")
         for name in REQUIRED_STANDALONE_SCHEMAS

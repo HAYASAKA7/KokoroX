@@ -447,7 +447,8 @@ def test_load_accepts_manifest_created_by_an_older_runtime(tmp_path: Path) -> No
             b'"state_revision":0', b'"state_revision":Infinity'
         ),
         canonical_file(expected_manifest()).replace(
-            b'"version":"0.0.0.dev0"', b'"version":"\\ud800"'
+            b'"version":"' + __version__.encode() + b'"',
+            b'"version":"\\ud800"',
         ),
     ],
     ids=["duplicate-key", "nan", "infinity", "unpaired-surrogate"],

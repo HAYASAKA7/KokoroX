@@ -6,6 +6,7 @@ import os
 import pytest
 
 from kokoroarc.cli import build_parser
+from kokoroarc import __version__
 
 
 @pytest.mark.parametrize(
@@ -121,7 +122,7 @@ def test_invalid_config_default_scope_arguments_are_sanitized(
 ) -> None:
     data_root = tmp_path / "must-not-be-created"
     environment = os.environ.copy()
-    environment["KOKOROARC_DATA_DIR"] = str(data_root)
+    environment["KOKOROX_DATA_DIR"] = str(data_root)
     completed = subprocess.run(
         [sys.executable, "-m", "kokoroarc.cli", *arguments],
         check=False,
@@ -195,12 +196,12 @@ def test_module_version_command() -> None:
         text=True,
     )
     assert completed.returncode == 0
-    assert completed.stdout.strip() == "kokoro 0.0.0.dev0"
+    assert completed.stdout.strip() == f"kokorox {__version__}"
 
 
 def test_json_error_when_data_directory_is_missing() -> None:
     env = os.environ.copy()
-    env.pop("KOKOROARC_DATA_DIR", None)
+    env.pop("KOKOROX_DATA_DIR", None)
     completed = subprocess.run(
         [sys.executable, "-m", "kokoroarc.cli", "session", "show", "--json"],
         check=False,
@@ -214,7 +215,7 @@ def test_json_error_when_data_directory_is_missing() -> None:
         "ok": False,
         "error": {
             "code": "DATA_DIR_REQUIRED",
-            "message": "Set KOKOROARC_DATA_DIR before running a stateful command.",
+            "message": "Set KOKOROX_DATA_DIR before running a stateful command.",
             "retryable": False,
             "details": {},
         },
@@ -224,7 +225,7 @@ def test_json_error_when_data_directory_is_missing() -> None:
 
 def test_json_session_show_succeeds_with_configured_data_directory(tmp_path) -> None:
     env = os.environ.copy()
-    env["KOKOROARC_DATA_DIR"] = str(tmp_path)
+    env["KOKOROX_DATA_DIR"] = str(tmp_path)
     completed = subprocess.run(
         [sys.executable, "-m", "kokoroarc.cli", "session", "show", "--json"],
         check=False,
@@ -358,7 +359,7 @@ def test_nested_character_help_remains_a_successful_stdout_exit() -> None:
     )
 
     assert completed.returncode == 0
-    assert completed.stdout.startswith("usage: kokoro character draft compile")
+    assert completed.stdout.startswith("usage: kokorox character draft compile")
     assert completed.stderr == ""
 
 

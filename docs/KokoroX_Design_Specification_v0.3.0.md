@@ -1,4 +1,4 @@
-# KokoroArc: Multilingual Character Persona Runtime
+# KokoroX: Multilingual Character Persona Runtime
 
 **Version:** 0.3.0  
 **Status:** Architecture and implementation specification  
@@ -10,15 +10,15 @@
 
 ## 1. Executive Summary
 
-KokoroArc is a multilingual persona runtime for AI agents. It allows an agent to express a stable original or user-installed character through speech habits, behavioral preferences, emotional continuity, relationship growth, scenario-specific reactions, and language-specific rendering without sacrificing task correctness, tool safety, or factual integrity.
+KokoroX is a multilingual persona runtime for AI agents. It allows an agent to express a stable original or user-installed character through speech habits, behavioral preferences, emotional continuity, relationship growth, scenario-specific reactions, and language-specific rendering without sacrificing task correctness, tool safety, or factual integrity.
 
 The system is intentionally split into three planes:
 
 1. **Semantic plane:** The agent understands the request, reasons, uses tools, and produces a persona-neutral task result.
-2. **Character plane:** KokoroArc selects behavior, applies character state, renders the task result in the active language, and validates that character expression did not distort the result.
-3. **Character construction plane:** KokoroArc can compile a Character Pack from a researched work-and-character target, a user-provided dossier, an original-character brief, or a hybrid of researched evidence and explicit user overrides. Every important profile claim is tagged as canonical evidence, model interpretation, or user override.
+2. **Character plane:** KokoroX selects behavior, applies character state, renders the task result in the active language, and validates that character expression did not distort the result.
+3. **Character construction plane:** KokoroX can compile a Character Pack from a researched work-and-character target, a user-provided dossier, an original-character brief, or a hybrid of researched evidence and explicit user overrides. Every important profile claim is tagged as canonical evidence, model interpretation, or user override.
 
-KokoroArc can be distributed as a standalone Agent Skill Suite. The same package can be embedded in Lumora as a provider-independent persona layer with UI controls, persistent state, Character Pack installation, and per-session configuration.
+KokoroX can be distributed as a standalone Agent Skill Suite. The same package can be embedded in Lumora as a provider-independent persona layer with UI controls, persistent state, Character Pack installation, and per-session configuration.
 
 The relationship system is inspired by visual novels and character-driven games, but it is designed as an auditable state machine rather than an opaque engagement mechanic. Growth changes how a character speaks and behaves. It never unlocks unsafe capabilities, overrides user intent, or pressures the user to continue interacting.
 
@@ -118,7 +118,7 @@ Persona-neutral reasoning and tool execution
 Semantic Result + Required Warnings + Immutable Spans
     |
     v
-KokoroArc Context Builder
+KokoroX Context Builder
     |-- Character Pack
     |-- Relationship State
     |-- Mood State
@@ -162,7 +162,7 @@ Owned by Lumora or the standalone agent host:
 - sensitive data handling;
 - model invocation.
 
-KokoroArc cannot weaken this layer.
+KokoroX cannot weaken this layer.
 
 #### Layer B: Semantic task engine
 
@@ -257,7 +257,7 @@ Pack Validator and Review Report
 Install privately or export as a Character Pack
 ```
 
-The construction pipeline may use web search, user-provided files, pasted notes, or a combination of these sources. Tool access is supplied by the host. KokoroArc itself records the result as structured provenance rather than assuming any particular search provider.
+The construction pipeline may use web search, user-provided files, pasted notes, or a combination of these sources. Tool access is supplied by the host. KokoroX itself records the result as structured provenance rather than assuming any particular search provider.
 
 ---
 
@@ -279,7 +279,7 @@ This mode is suitable for Codex-style clients, Claude Code-style clients, and lo
 
 ### 6.2 Lumora built-in capability
 
-> **Scope note (v0.3):** KokoroArc is delivered as a standalone Agent Skill
+> **Scope note (v0.3):** KokoroX is delivered as a standalone Agent Skill
 > Suite. Lumora integration is not pursued. This section is retained as
 > reference design only; nothing here is implemented or planned.
 
@@ -295,7 +295,7 @@ Lumora provides:
 - state inspection and reset;
 - extension lifecycle and migrations;
 - provider-neutral context injection;
-- optional native KokoroArc service.
+- optional native KokoroX service.
 
 Configuration precedence:
 
@@ -305,7 +305,7 @@ Session > Workspace > Provider > Global > Runtime default
 
 ### 6.3 Hybrid mode
 
-> **Scope note (v0.3):** KokoroArc is delivered as a standalone Agent Skill
+> **Scope note (v0.3):** KokoroX is delivered as a standalone Agent Skill
 > Suite. Lumora integration is not pursued. This section is retained as
 > reference design only; nothing here is implemented or planned.
 
@@ -390,13 +390,13 @@ Adaptive traits must never mutate identity or safety boundaries.
 
 ### 7.4 Character construction modes
 
-KokoroArc supports four first-class construction modes that compile to the same Character Pack format.
+KokoroX supports four first-class construction modes that compile to the same Character Pack format.
 
 | Mode | User input | External research | Typical use |
 |---|---|---:|---|
 | `research` | Work title and character name, plus optional continuity constraints | Required | Private adaptation of an existing fictional character |
 | `dossier` | User-provided structured or unstructured character information | Optional | Original characters, private interpretations, or offline construction |
-| `original` | Creative brief and design constraints | Not required | New characters designed specifically for KokoroArc |
+| `original` | Creative brief and design constraints | Not required | New characters designed specifically for KokoroX |
 | `hybrid` | Researched target plus explicit user corrections and preferences | Required or previously cached | Canon-aware but customized character behavior |
 
 All four modes produce the same runtime artifacts. The runtime does not need to know whether a trait came from research or user authorship, but the authoring UI and provenance inspector must preserve that distinction.
@@ -797,14 +797,14 @@ Character Packs map these canonical states to character-specific expression.
 
 ## 10. Memory Model
 
-KokoroArc distinguishes four kinds of memory:
+KokoroX distinguishes four kinds of memory:
 
 1. **Runtime state:** scores, stage, mood, cooldowns, and route flags.
 2. **Interaction events:** concise evidence records used for audit and transition replay.
 3. **Character canon:** immutable facts supplied by the pack.
 4. **User memory:** optional user-specific facts owned by the host memory system.
 
-KokoroArc does not silently convert conversation content into durable user memory. It stores references to host-approved memory IDs where possible.
+KokoroX does not silently convert conversation content into durable user memory. It stores references to host-approved memory IDs where possible.
 
 Cross-language memories use canonical semantics:
 
@@ -845,7 +845,7 @@ Each locale has a separately authored render profile. A locale profile is not a 
 
 ### 11.2 Language policy compilation
 
-Language selection is no longer represented by one global `locale` field. KokoroArc compiles natural-language instructions and stored settings into a structured Language Routing Policy.
+Language selection is no longer represented by one global `locale` field. KokoroX compiles natural-language instructions and stored settings into a structured Language Routing Policy.
 
 Precedence, from highest to lowest:
 
@@ -928,7 +928,7 @@ The renderer must never infer that a protected technical token should be transla
 
 ### 11.4 Mixing styles
 
-KokoroArc supports three controlled mixing styles.
+KokoroX supports three controlled mixing styles.
 
 #### Segment mode
 
@@ -1291,7 +1291,7 @@ Validation failure policy:
 
 ### 15.1 Runtime Skills
 
-#### `using-kokoroarc`
+#### `using-kokorox`
 
 Routes runtime and authoring requests. It distinguishes ordinary persona rendering from character research, dossier compilation, and hybrid construction.
 
@@ -1469,7 +1469,7 @@ A pack update that changes stage thresholds or removes event types must provide 
 
 ## 17. Lumora Integration
 
-> **Scope note (v0.3):** KokoroArc is delivered as a standalone Agent Skill
+> **Scope note (v0.3):** KokoroX is delivered as a standalone Agent Skill
 > Suite. Lumora integration is not pursued. This section is retained as
 > reference design only; nothing here is implemented or planned.
 
@@ -1481,7 +1481,7 @@ Lumora
 ├── Workspace and Session Manager
 ├── Tool and Approval Layer
 ├── Memory Layer
-├── KokoroArc Persona Runtime
+├── KokoroX Persona Runtime
 │   ├── Pack Registry
 │   ├── Context Builder
 │   ├── State Engine
@@ -1639,38 +1639,38 @@ session.end
 ### 18.1 CLI
 
 ```bash
-kokoro character request compile \
+kokorox character request compile \
   --prompt-file character-request.txt \
   --out build-request.json
-kokoro character research \
+kokorox character research \
   --request build-request.json \
   --out ./research/example-character
-kokoro character compile \
+kokorox character compile \
   --request build-request.json \
   --research ./research/example-character \
   --out ./characters/private/example-character
-kokoro character compile \
+kokorox character compile \
   --dossier character-notes.md \
   --out ./characters/private/custom-character
-kokoro character provenance ./characters/private/example-character
+kokorox character provenance ./characters/private/example-character
 
-kokoro pack validate ./characters/private/example-character
-kokoro pack compile ./characters/private/example-character --out ./dist/example-character.karc
-kokoro pack install ./dist/example-character.karc
-kokoro pack list
+kokorox pack validate ./characters/private/example-character
+kokorox pack compile ./characters/private/example-character --out ./dist/example-character.karc
+kokorox pack install ./dist/example-character.karc
+kokorox pack list
 
-kokoro policy compile \
+kokorox policy compile \
   --prompt "Use Chinese for explanations and Japanese for dialogue" \
   --out policy.json
-kokoro policy inspect --session session-123
-kokoro policy set --session session-123 --file policy.json
+kokorox policy inspect --session session-123
+kokorox policy set --session session-123 --file policy.json
 
-kokoro state show --character rin-aster
-kokoro state reset --character rin-aster --scope mood
-kokoro state export --character rin-aster --out state.json
+kokorox state show --character rin-aster
+kokorox state reset --character rin-aster --scope mood
+kokorox state export --character rin-aster --out state.json
 
-kokoro render test --character rin-aster --policy policy.json --scenario debugging
-kokoro eval run ./characters/rin-aster/tests
+kokorox render test --character rin-aster --policy policy.json --scenario debugging
+kokorox eval run ./characters/rin-aster/tests
 ```
 
 ### 18.2 Native service interface
@@ -2077,7 +2077,7 @@ The runtime repository and public Character Pack registry may later be separated
 
 ## 26. Acceptance Criteria for Version 0.3
 
-KokoroArc 0.3 is complete when:
+KokoroX 0.3 is complete when:
 
 - all included Skill metadata validates;
 - the Suite includes separate `research-character` and `compile-character-pack` Skills;
@@ -2104,7 +2104,7 @@ KokoroArc 0.3 is complete when:
 
 ## 27. Final Design Decision
 
-KokoroArc should be implemented as a **persona runtime with evidence-backed Character Pack construction and an explicit Language Routing layer**, not as a collection of isolated character prompts.
+KokoroX should be implemented as a **persona runtime with evidence-backed Character Pack construction and an explicit Language Routing layer**, not as a collection of isolated character prompts.
 
 Its defining loop is:
 

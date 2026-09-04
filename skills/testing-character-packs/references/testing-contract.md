@@ -1,4 +1,4 @@
-# KokoroArc Character Pack testing contract
+# KokoroX Character Pack testing contract
 
 ## Boundary
 
@@ -22,7 +22,7 @@ score, or environment lookup. Never browse or call a provider to fill missing
 release evidence.
 
 Resolve the trusted configured data root before acting. Every `--out` is
-relative to `KOKOROARC_DATA_DIR/reports`, or is an absolute path contained by
+relative to `KOKOROX_DATA_DIR/reports`, or is an absolute path contained by
 that directory. Never write a report into an input, source pack, Research
 Bundle, repository root, or redirected path. Temporary work may use only the
 configured data root or a separately trusted configured temp root.
@@ -40,10 +40,10 @@ failure. Pass only reports-root-relative names to `--out`, without a
 Run the same command twice with distinct explicit output names:
 
 ```text
-kokoro pack test <source-dir> --request <request.json> \
+kokorox pack test <source-dir> --request <request.json> \
   [--research-bundle <published-bundle-dir>] \
   --out <hard-report-a.json> --json
-kokoro pack test <source-dir> --request <request.json> \
+kokorox pack test <source-dir> --request <request.json> \
   [--research-bundle <published-bundle-dir>] \
   --out <hard-report-b.json> --json
 ```
@@ -65,8 +65,8 @@ dimensions, locales, samples, scores, confidences, and source bindings. Do not
 generate or edit those values.
 
 ```text
-kokoro pack soft-eval <input.json> --out <soft-report-a.json> --json
-kokoro pack soft-eval <input.json> --out <soft-report-b.json> --json
+kokorox pack soft-eval <input.json> --out <soft-report-a.json> --json
+kokorox pack soft-eval <input.json> --out <soft-report-b.json> --json
 ```
 
 Retain and compare both complete outputs exactly. Require equal `artifact_id`,
@@ -83,7 +83,7 @@ promotion ID for each real transition.
 Create the reviewed record first:
 
 ```text
-kokoro pack promote <source-dir> --target reviewed \
+kokorox pack promote <source-dir> --target reviewed \
   --promotion-id <reviewed-promotion-id> \
   --request <request.json> --hard-report <hard-report-a.json> \
   --review <attestation.json> \
@@ -98,7 +98,7 @@ Require `to_status: reviewed`, the expected `promotion_id`, and the returned
 Only then create the matching verified record:
 
 ```text
-kokoro pack promote <source-dir> --target verified \
+kokorox pack promote <source-dir> --target verified \
   --promotion-id <verified-promotion-id> \
   --request <request.json> --hard-report <hard-report-a.json> \
   --review <attestation.json> \
@@ -122,7 +122,7 @@ explicitly asks for it. Supply the complete evidence that produced the verified
 promotion:
 
 ```text
-kokoro pack publication-check <source-dir> \
+kokorox pack publication-check <source-dir> \
   --promotion <verified-promotion.json> \
   --request <request.json> --hard-report <hard-report-a.json> \
   --review <attestation.json> --previous <reviewed-promotion.json> \

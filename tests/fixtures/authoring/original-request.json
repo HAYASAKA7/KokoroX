@@ -3,7 +3,7 @@
   "artifact_id": "original/rin-aster/build-request",
   "created_by": {
     "component": "kokoroarc",
-    "version": "0.0.0.dev0"
+    "version": "0.1.0"
   },
   "mode": "original",
   "namespace": "original",

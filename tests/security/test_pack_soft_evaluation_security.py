@@ -12,6 +12,7 @@ import pytest
 from kokoroarc.errors import KokoroError
 from kokoroarc.schemas import SchemaRegistry
 from kokoroarc.testing.soft import aggregate_soft_evaluation
+from kokoroarc import __version__
 
 
 SCHEMAS = SchemaRegistry(Path("schemas/v1"))
@@ -30,7 +31,7 @@ def _evaluation_input() -> dict[str, Any]:
     return {
         "schema_version": "1.0",
         "artifact_id": "original/rin-aster/release/soft-input",
-        "created_by": {"component": "kokoroarc", "version": "0.0.0.dev0"},
+        "created_by": {"component": "kokoroarc", "version": __version__},
         "namespace": "original",
         "character_id": "rin-aster",
         "character_version": "1.0.0",

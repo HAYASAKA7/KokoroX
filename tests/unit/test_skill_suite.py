@@ -29,7 +29,7 @@ _AGENT_PROFILE_FILES = {
     f"agents/{profile_name}.yaml" for profile_name in EXPECTED_AGENT_PROFILES
 }
 EXPECTED_SKILL_FILES = {
-    "using-kokoroarc": {"SKILL.md", "references/runtime-contract.md"}
+    "using-kokorox": {"SKILL.md", "references/runtime-contract.md"}
     | _AGENT_PROFILE_FILES,
     "authoring-character-packs": {"SKILL.md", "references/authoring-contract.md"}
     | _AGENT_PROFILE_FILES,
@@ -80,7 +80,7 @@ def test_plugin_manifest_declares_only_the_four_skill_suite() -> None:
     assert payload["version"] == "0.1.0"
     assert isinstance(payload["description"], str)
     assert payload["description"].strip()
-    assert payload["author"] == {"name": "KokoroArc"}
+    assert payload["author"] == {"name": "KokoroX"}
     assert payload["skills"] == "./skills/"
     assert set(payload["interface"]) == {
         "displayName",
@@ -91,7 +91,7 @@ def test_plugin_manifest_declares_only_the_four_skill_suite() -> None:
         "capabilities",
         "defaultPrompt",
     }
-    assert payload["interface"]["developerName"] == "KokoroArc"
+    assert payload["interface"]["developerName"] == "KokoroX"
     assert payload["interface"]["capabilities"] == ["Skills"]
     assert isinstance(payload["interface"]["defaultPrompt"], str)
     for field in (
@@ -480,7 +480,7 @@ def test_preview_rejects_a_nonidentical_existing_skill(tmp_path: Path) -> None:
     source = _copy_source(tmp_path)
     skills_root = tmp_path / "installed"
     shutil.copytree(source, skills_root)
-    (skills_root / "using-kokoroarc" / "SKILL.md").write_text(
+    (skills_root / "using-kokorox" / "SKILL.md").write_text(
         "different\n",
         encoding="utf-8",
     )
@@ -503,7 +503,7 @@ def test_preview_classifies_inventory_differences_as_conflicts(
     source = _copy_source(tmp_path)
     skills_root = tmp_path / "installed"
     shutil.copytree(source, skills_root)
-    target = skills_root / "using-kokoroarc"
+    target = skills_root / "using-kokorox"
     if mutation == "extra":
         (target / "extra.txt").write_text("extra\n", encoding="utf-8")
     else:
@@ -553,11 +553,11 @@ def test_preview_rejects_invalid_source_skills(
 ) -> None:
     suite = _suite_module()
     source = _copy_source(tmp_path)
-    skill_file = source / "using-kokoroarc" / "SKILL.md"
+    skill_file = source / "using-kokorox" / "SKILL.md"
     if mutation == "unknown_file":
-        (source / "using-kokoroarc" / "unknown.txt").write_text("x")
+        (source / "using-kokorox" / "unknown.txt").write_text("x")
     elif mutation == "missing_file":
-        (source / "using-kokoroarc" / "agents" / "openai.yaml").unlink()
+        (source / "using-kokorox" / "agents" / "openai.yaml").unlink()
     elif mutation == "duplicate_frontmatter":
         text = skill_file.read_text(encoding="utf-8")
         skill_file.write_text(
@@ -568,8 +568,8 @@ def test_preview_rejects_invalid_source_skills(
         text = skill_file.read_text(encoding="utf-8")
         skill_file.write_text(
             text.replace(
-                "name: using-kokoroarc",
-                "name: &skill_name using-kokoroarc\nmetadata: *skill_name",
+                "name: using-kokorox",
+                "name: &skill_name using-kokorox\nmetadata: *skill_name",
                 1,
             ),
             encoding="utf-8",
@@ -577,13 +577,13 @@ def test_preview_rejects_invalid_source_skills(
     elif mutation == "wrong_name":
         text = skill_file.read_text(encoding="utf-8")
         skill_file.write_text(
-            text.replace("name: using-kokoroarc", "name: another-skill", 1),
+            text.replace("name: using-kokorox", "name: another-skill", 1),
             encoding="utf-8",
         )
     elif mutation == "invalid_utf8":
         skill_file.write_bytes(b"---\nname: \xff\n---\n")
     elif mutation == "missing_default_prompt":
-        metadata = source / "using-kokoroarc" / "agents" / "openai.yaml"
+        metadata = source / "using-kokorox" / "agents" / "openai.yaml"
         text = metadata.read_text(encoding="utf-8")
         metadata.write_text(
             "\n".join(
@@ -593,7 +593,7 @@ def test_preview_rejects_invalid_source_skills(
             encoding="utf-8",
         )
     elif mutation == "unknown_agent_interface":
-        metadata = source / "using-kokoroarc" / "agents" / "openai.yaml"
+        metadata = source / "using-kokorox" / "agents" / "openai.yaml"
         metadata.write_text(
             metadata.read_text(encoding="utf-8") + "  unknown: value\n",
             encoding="utf-8",
@@ -641,7 +641,7 @@ def test_source_candidates_include_the_environment_prefix() -> None:
     """A wheel installs the Skill data files under the environment prefix.
 
     They do not land beside the package in site-packages, so an installed
-    `kokoro suite install` can only find them if the prefix is searched.
+    `kokorox suite install` can only find them if the prefix is searched.
     """
     suite = _suite_module()
 

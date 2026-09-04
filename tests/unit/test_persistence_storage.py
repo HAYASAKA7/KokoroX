@@ -14,6 +14,7 @@ from kokoroarc.persistence._storage import (
     scan_canonical_directory,
 )
 from kokoroarc.schemas import SchemaRegistry
+from kokoroarc import __version__
 
 
 SCHEMAS = SchemaRegistry(Path("schemas/v1"))
@@ -23,7 +24,7 @@ def _consent() -> dict[str, Any]:
     return {
         "schema_version": "1.0",
         "artifact_id": "consents/global/rin-aster/consent-01",
-        "created_by": {"component": "kokoroarc", "version": "0.0.0.dev0"},
+        "created_by": {"component": "kokoroarc", "version": __version__},
         "consent_id": "rin-aster-consent-01",
         "scope": "global",
         "workspace_id": None,
