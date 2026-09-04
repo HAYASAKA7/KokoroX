@@ -9,6 +9,7 @@ description = "A multilingual character-persona runtime for AI agents"
 readme = "README.md"
 license = "MIT"
 license-files = ["LICENSE"]
+authors = [{ name = "HAYASAKA7" }]
 requires-python = ">=3.11"
 dependencies = [
   "PyYAML>=6,<7",
@@ -22,6 +23,11 @@ dev = [
   "pytest-cov>=5,<7",
   "pytest-xdist>=3,<4",
 ]
+
+[project.urls]
+Homepage = "https://github.com/HAYASAKA7/KokoroX"
+Repository = "https://github.com/HAYASAKA7/KokoroX"
+Issues = "https://github.com/HAYASAKA7/KokoroX/issues"
 
 [project.scripts]
 kokorox = "kokoroarc.cli:main"
