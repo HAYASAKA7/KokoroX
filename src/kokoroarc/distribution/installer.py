@@ -3584,6 +3584,14 @@ def _publish_archive(staging: Path, final: Path, payload: bytes) -> None:
     _fsync_directory(final.parent)
 
 
+# renameat2(2) on Linux and renameatx_np(2) on macOS both take
+# (fromfd, from, tofd, to, flags). AT_FDCWD differs between the two.
+_LINUX_AT_FDCWD = -100
+_LINUX_RENAME_NOREPLACE = 1
+_DARWIN_AT_FDCWD = -2
+_DARWIN_RENAME_EXCL = 0x00000004
+
+
 def _rename_directory_no_replace(staging: Path, final: Path) -> None:
     try:
         if os.name == "nt":
@@ -3629,11 +3637,11 @@ def _linux_rename_no_replace(staging: Path, final: Path) -> None:
     ]
     rename.restype = ctypes.c_int
     result = rename(
-        -100,
+        _LINUX_AT_FDCWD,
         os.fsencode(staging),
-        -100,
+        _LINUX_AT_FDCWD,
         os.fsencode(final),
-        1,
+        _LINUX_RENAME_NOREPLACE,
     )
     if result == 0:
         return
@@ -3656,9 +3664,21 @@ def _darwin_rename_no_replace(staging: Path, final: Path) -> None:
             "KARC_INSTALL_ATOMIC_UNAVAILABLE",
             "macOS exclusive rename is unavailable.",
         )
-    rename.argtypes = [ctypes.c_char_p, ctypes.c_char_p, ctypes.c_uint]
+    rename.argtypes = [
+        ctypes.c_int,
+        ctypes.c_char_p,
+        ctypes.c_int,
+        ctypes.c_char_p,
+        ctypes.c_uint,
+    ]
     rename.restype = ctypes.c_int
-    result = rename(os.fsencode(staging), os.fsencode(final), 0x00000004)
+    result = rename(
+        _DARWIN_AT_FDCWD,
+        os.fsencode(staging),
+        _DARWIN_AT_FDCWD,
+        os.fsencode(final),
+        _DARWIN_RENAME_EXCL,
+    )
     if result == 0:
         return
     code = ctypes.get_errno()
