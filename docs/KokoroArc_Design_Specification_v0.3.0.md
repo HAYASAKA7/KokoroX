@@ -37,7 +37,7 @@ The relationship system is inspired by visual novels and character-driven games,
 - Allow a user to provide only a work title and character name, provide a complete dossier, or combine researched material with user corrections.
 - Preserve source provenance, confidence, continuity selection, spoiler policy, and Canon/Interpretation/Override separation throughout character construction.
 - Operate as both a prompt-only Skill Suite and a future native runtime service.
-- Integrate with Lumora without coupling to a specific model provider.
+- Stay independent of any specific model provider, so any Agent Skills-compatible host can run the suite.
 - Provide automated consistency, semantic-preservation, and localization evaluation.
 
 ### 2.2 Non-goals for version 0.3
@@ -265,6 +265,8 @@ The construction pipeline may use web search, user-provided files, pasted notes,
 
 ### 6.1 Standalone Skill Suite
 
+> **Scope note (v0.3):** this is the delivered deployment mode.
+
 The package can be installed into an Agent Skills-compatible directory. In this mode:
 
 - `SKILL.md` files define orchestration and rendering rules;
@@ -276,6 +278,10 @@ The package can be installed into an Agent Skills-compatible directory. In this 
 This mode is suitable for Codex-style clients, Claude Code-style clients, and local agent runners.
 
 ### 6.2 Lumora built-in capability
+
+> **Scope note (v0.3):** KokoroArc is delivered as a standalone Agent Skill
+> Suite. Lumora integration is not pursued. This section is retained as
+> reference design only; nothing here is implemented or planned.
 
 Lumora provides:
 
@@ -298,6 +304,10 @@ Session > Workspace > Provider > Global > Runtime default
 ```
 
 ### 6.3 Hybrid mode
+
+> **Scope note (v0.3):** KokoroArc is delivered as a standalone Agent Skill
+> Suite. Lumora integration is not pursued. This section is retained as
+> reference design only; nothing here is implemented or planned.
 
 Lumora may expose the native runtime while also exporting a portable Skill directory for external clients. The same Character Pack is compiled into:
 
@@ -1458,6 +1468,10 @@ A pack update that changes stage thresholds or removes event types must provide 
 ---
 
 ## 17. Lumora Integration
+
+> **Scope note (v0.3):** KokoroArc is delivered as a standalone Agent Skill
+> Suite. Lumora integration is not pursued. This section is retained as
+> reference design only; nothing here is implemented or planned.
 
 ### 17.1 Capability placement
 
