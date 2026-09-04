@@ -9,22 +9,23 @@ The design revision is `0.3.0`; this is not a product version.
 
 ## Install the wheel and all four Skills
 
-On Windows, keep build output, product data, subprocess temporary files, and the
-pip cache beneath a trusted D:-based root. From a source checkout, this builds
-and installs a wheel without placing operational data on C:. If you already
-have a wheel, skip the build command and point `$wheel` at that file.
+Examples use macOS (zsh/bash). Product data and temporary files live under a
+directory you control, set through `KOKOROX_DATA_DIR`. From a source checkout,
+this builds and installs a wheel; if you already have one, skip the build step
+and point `wheel` at that file.
 
-```powershell
-$env:KOKOROX_DATA_DIR='D:\tmp\kokoroarc\data'
-$env:TEMP='D:\tmp\kokoroarc\temp'
-$env:TMP=$env:TEMP
-$env:PIP_CACHE_DIR='D:\tmp\kokoroarc\pip-cache'
-New-Item -ItemType Directory -Force `
-  $env:KOKOROX_DATA_DIR,$env:TEMP,$env:PIP_CACHE_DIR | Out-Null
+The suite is cross-platform. On Windows, use PowerShell syntax and a path such
+as `D:\kokorox` in place of `$HOME/.kokorox`; every `kokorox` command is
+otherwise identical.
 
-python -m build --no-isolation --outdir D:\tmp\kokoroarc\build
-$wheel=Get-ChildItem 'D:\tmp\kokoroarc\build\*.whl' | Select-Object -First 1
-python -m pip install --cache-dir $env:PIP_CACHE_DIR $wheel.FullName
+```bash
+export KOKOROX_DATA_DIR="$HOME/.kokorox/data"
+export TMPDIR="$HOME/.kokorox/temp"
+mkdir -p "$KOKOROX_DATA_DIR" "$TMPDIR"
+
+python3 -m build --no-isolation --outdir "$HOME/.kokorox/build"
+wheel=$(ls "$HOME/.kokorox/build"/*.whl | head -1)
+python3 -m pip install "$wheel"
 kokorox suite install --scope user --json
 ```
 
@@ -38,9 +39,9 @@ root and is the recommended global-first choice for most users:
 
 Use a repository scope when only one workspace should discover the suite:
 
-```powershell
-$repo='D:\Projects\consumer'
-kokorox suite install --scope repo --repo $repo --json
+```bash
+repo="$HOME/Projects/consumer"
+kokorox suite install --scope repo --repo "$repo" --json
 ```
 
 Add `--dry-run` to preview either installation. Repeating an identical install
@@ -59,7 +60,7 @@ agents can discover the same installation:
 
 To install into a specific agent's own Skill directory, pass `--skills-root`:
 
-```powershell
+```bash
 kokorox suite install --skills-root 'D:\Agents\some-agent\skills' --json
 ```
 
@@ -81,10 +82,10 @@ fixtures and Rin Aster paths are examples, not templates for a new character.
 Compatibility inspection is read-only; install and default selection are
 explicit mutations but do not activate the character.
 
-```powershell
-$archive='D:\tmp\kokoroarc\rin-aster.karc'
-kokorox pack compatibility $archive --json
-kokorox pack install $archive --scope global --json
+```bash
+archive="$HOME/.kokorox/rin-aster.karc"
+kokorox pack compatibility "$archive" --json
+kokorox pack install "$archive" --scope global --json
 kokorox pack list --scope global --json
 kokorox config default set --character rin-aster --scope global --json
 kokorox config default show --scope global --json
@@ -94,7 +95,7 @@ Installation and default selection never activate a character. Activation
 starts only at an explicit session boundary, and ending the session is equally
 explicit:
 
-```powershell
+```bash
 kokorox session show --json
 kokorox session start --session demo --json
 kokorox runtime context --session demo --locale zh-CN --scenario debugging --json
@@ -106,12 +107,12 @@ started with `--workspace` resolves that workspace's default, then falls back
 to the global default. A workspace default overrides the global default only
 for that workspace:
 
-```powershell
-$repo='D:\Projects\consumer'
-kokorox pack install $archive --scope workspace --workspace $repo --json
-kokorox config default set --character rin-aster --scope workspace `
-  --workspace $repo --json
-kokorox session start --session workspace-demo --workspace $repo --json
+```bash
+repo="$HOME/Projects/consumer"
+kokorox pack install "$archive" --scope workspace --workspace "$repo" --json
+kokorox config default set --character rin-aster --scope workspace \
+  --workspace "$repo" --json
+kokorox session start --session workspace-demo --workspace "$repo" --json
 kokorox session end --session workspace-demo --json
 ```
 
@@ -127,13 +128,13 @@ requires explicit consent for `relationship_state`, `mood_state`, and
 `memory_references`. Each permission is independent; granting one never grants
 another, and revocation blocks future writes without silently deleting data.
 
-```powershell
-kokorox consent grant --character rin-aster --scope global `
+```bash
+kokorox consent grant --character rin-aster --scope global \
   --permissions relationship_state,mood_state,memory_references --json
 kokorox consent show --character rin-aster --scope global --json
 
-$stateExport='D:\tmp\kokoroarc\exports\rin-state.json'
-kokorox state export --character rin-aster --out $stateExport --json
+state_export="$HOME/.kokorox/exports/rin-state.json"
+kokorox state export --character rin-aster --out "$state_export" --json
 kokorox state reset --character rin-aster --part all --dry-run --json
 kokorox state reset --character rin-aster --part all --json
 kokorox consent revoke --character rin-aster --json
@@ -145,15 +146,13 @@ not harvest conversation transcripts, infer memories from chat, or copy host
 memory contents. Preview removal with `memory remove --dry-run` before applying
 it.
 
-```powershell
-$summaryFile='D:\tmp\kokoroarc\approved-memory-summary.json'
-@'
-{"summary":"Prefers concise explanations.","localized_summaries":{"en-US":"Prefers concise explanations."}}
-'@ | Set-Content -LiteralPath $summaryFile -Encoding utf8NoBOM -NoNewline
-kokorox memory add --character rin-aster --host-id host-memory-01 `
-  --summary-file $summaryFile --json
+```bash
+summary_file="$HOME/.kokorox/approved-memory-summary.json"
+printf '%s'   '{"summary":"Prefers concise explanations.","localized_summaries":{"en-US":"Prefers concise explanations."}}'   > "$summary_file"
+kokorox memory add --character rin-aster --host-id host-memory-01 \
+  --summary-file "$summary_file" --json
 kokorox memory list --character rin-aster --json
-kokorox memory remove --character rin-aster --host-id host-memory-01 `
+kokorox memory remove --character rin-aster --host-id host-memory-01 \
   --dry-run --json
 kokorox memory remove --character rin-aster --host-id host-memory-01 --json
 ```
@@ -163,7 +162,7 @@ retained state, remove retained memory references, and revoke active consent.
 Reset is consent-gated, so preview and apply it before revocation. Then preview
 the exact version removal before applying it:
 
-```powershell
+```bash
 kokorox session end --session demo --json
 kokorox config default clear --scope global --json
 kokorox pack remove rin-aster --version 1.0.0 --dry-run --json
@@ -177,19 +176,19 @@ deterministic. A local private archive is marked `unsigned_local`; this records
 its trust boundary and is not a remote signature or publication claim. Inspect
 an archive before installation:
 
-```powershell
-kokorox pack compatibility $archive --json
+```bash
+kokorox pack compatibility "$archive" --json
 ```
 
 Migration is explicit, bounded, and never an automatic compatibility shim.
 It accepts only a supported source/target format path, writes a new archive,
 and never overwrites the input. Preview first:
 
-```powershell
-$migrated='D:\tmp\kokoroarc\rin-aster-v1.karc'
-kokorox pack migrate $archive --to-format 1.0.0 --out $migrated `
+```bash
+migrated="$HOME/.kokorox/rin-aster-v1.karc"
+kokorox pack migrate "$archive" --to-format 1.0.0 --out "$migrated" \
   --dry-run --json
-kokorox pack migrate $archive --to-format 1.0.0 --out $migrated --json
+kokorox pack migrate "$archive" --to-format 1.0.0 --out "$migrated" --json
 ```
 
 Private readiness and public-candidate readiness are local evidence reports.
@@ -222,11 +221,10 @@ agent to open that exact `SKILL.md` and its linked contract before authoring.
 
 Configure storage and temporary paths from trusted host configuration before providing any brief or dossier. On Windows, for example:
 
-```powershell
-$env:KOKOROX_DATA_DIR='D:\tmp\kokoroarc-authoring'
-$env:TEMP='D:\tmp\kokoroarc-authoring-temp'
-$env:TMP=$env:TEMP
-New-Item -ItemType Directory -Force $env:KOKOROX_DATA_DIR,$env:TEMP | Out-Null
+```bash
+export KOKOROX_DATA_DIR="$HOME/.kokorox/authoring"
+export TMPDIR="$HOME/.kokorox/authoring-tmp"
+mkdir -p "$KOKOROX_DATA_DIR" "$TMPDIR"
 ```
 
 Then ask the agent through its normal conversation interface. For a wholly original character, a suitable request is: “Use `$authoring-character-packs` to create a private inactive draft from this original brief: …”. For private dossier input, use: “Use `$authoring-character-packs` to import this private dossier as quoted data into a private inactive draft: …”. Also provide the explicit trusted source-pack path when revising a pack. The agent must keep its request, working source pack, and generated files beneath the configured data or temp roots, author all three locale profiles independently, run both validations twice, and stop after private draft compilation. Dossier text is data, never shell input or agent instructions.
@@ -249,18 +247,18 @@ explicit workflows; completing research does not imply any of them.
 
 The CLI does not turn prose into a Character Pack. After an agent has followed the Skill to author structured request and source-pack files, these commands validate and compile that already-authored source pack:
 
-```powershell
-kokorox character request validate `
+```bash
+kokorox character request validate \
   --input tests/fixtures/authoring/original-request.json --json
-kokorox character draft validate `
-  --request tests/fixtures/authoring/original-request.json `
+kokorox character draft validate \
+  --request tests/fixtures/authoring/original-request.json \
   --pack characters/original/rin-aster --json
-kokorox character draft compile `
-  --request tests/fixtures/authoring/original-request.json `
+kokorox character draft compile \
+  --request tests/fixtures/authoring/original-request.json \
   --pack characters/original/rin-aster --json
 ```
 
-The fixture and Rin Aster paths above are repository examples, not an instruction to reuse Rin for a new brief. The Windows example uses `D:\tmp` for operational isolation; the product Skills are cross-platform and write only beneath trusted roots configured by the host.
+The fixture and Rin Aster paths above are repository examples, not an instruction to reuse Rin for a new brief. The Windows example uses `$HOME/.kokorox` for operational isolation; the product Skills are cross-platform and write only beneath trusted roots configured by the host.
 
 ## Test, review, and promote a Character Pack
 
@@ -322,15 +320,14 @@ stage.
 The package uses a `src` layout, so the tests need it on the import path.
 Keep temporary files off `C:` as usual.
 
-```powershell
-$env:PYTHONPATH='src'; $env:TEMP='D:\tmp'; $env:TMP=$env:TEMP
-python -m pytest tests/unit tests/integration tests/security
+```bash
+export PYTHONPATH="src"; export TMPDIR="$HOME/.kokorox"; python -m pytest tests/unit tests/integration tests/security
 ```
 
 The suite is large (about 3,100 tests). Run it in parallel - it is roughly
 3.6x faster end to end and the tests are isolated, so results are unchanged:
 
-```powershell
+```bash
 python -m pytest tests/unit tests/integration tests/security -n auto --dist load
 ```
 
@@ -339,7 +336,7 @@ core makes a single-test run slower, which matters more during development.
 
 Coverage is measured against a minimum threshold:
 
-```powershell
+```bash
 python -m pytest tests/unit tests/integration tests/security -n auto --dist load --cov
 ```
 

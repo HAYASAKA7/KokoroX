@@ -24,18 +24,18 @@ from karc_test_support import (
 )
 
 
-def test_readme_documents_installed_suite_and_d_drive_isolation() -> None:
+def test_readme_documents_installed_suite_and_data_isolation() -> None:
     readme = Path("README.md").read_text(encoding="utf-8")
 
     for example in (
-        "$env:KOKOROX_DATA_DIR='D:\\tmp\\kokoroarc\\data'",
-        "$env:TEMP='D:\\tmp\\kokoroarc\\temp'",
-        "$env:TMP=$env:TEMP",
-        "$env:PIP_CACHE_DIR='D:\\tmp\\kokoroarc\\pip-cache'",
-        "python -m build --no-isolation --outdir D:\\tmp\\kokoroarc\\build",
-        "python -m pip install --cache-dir $env:PIP_CACHE_DIR $wheel.FullName",
+        'export KOKOROX_DATA_DIR="$HOME/.kokorox/data"',
+        'export TMPDIR="$HOME/.kokorox/temp"',
+        'mkdir -p "$KOKOROX_DATA_DIR" "$TMPDIR"',
+        'python3 -m build --no-isolation --outdir "$HOME/.kokorox/build"',
+        'wheel=$(ls "$HOME/.kokorox/build"/*.whl | head -1)',
+        'python3 -m pip install "$wheel"',
         "kokorox suite install --scope user --json",
-        "kokorox suite install --scope repo --repo $repo --json",
+        'kokorox suite install --scope repo --repo "$repo" --json',
     ):
         assert example in readme
 
@@ -54,14 +54,14 @@ def test_readme_documents_global_first_activation_and_persistence() -> None:
     lower = " ".join(readme.lower().split())
 
     for example in (
-        "kokorox pack install $archive --scope global --json",
+        'kokorox pack install "$archive" --scope global --json',
         "kokorox config default set --character rin-aster --scope global --json",
-        "kokorox pack install $archive --scope workspace --workspace $repo --json",
+        'kokorox pack install "$archive" --scope workspace --workspace "$repo" --json',
         "kokorox config default set --character rin-aster --scope workspace",
         "kokorox session start --session demo --json",
         "kokorox session end --session demo --json",
         "--permissions relationship_state,mood_state,memory_references",
-        "kokorox state export --character rin-aster --out $stateExport --json",
+        'kokorox state export --character rin-aster --out "$state_export" --json',
         "kokorox state reset --character rin-aster --part all --dry-run --json",
         "kokorox memory add --character rin-aster --host-id host-memory-01",
         "kokorox memory list --character rin-aster --json",
@@ -87,8 +87,8 @@ def test_readme_documents_archive_release_and_recovery_boundaries() -> None:
     lower = " ".join(readme.lower().split())
 
     for example in (
-        "kokorox pack compatibility $archive --json",
-        "kokorox pack migrate $archive --to-format 1.0.0 --out $migrated",
+        'kokorox pack compatibility "$archive" --json',
+        'kokorox pack migrate "$archive" --to-format 1.0.0 --out "$migrated"',
     ):
         assert example in readme
 
