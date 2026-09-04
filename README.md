@@ -316,3 +316,32 @@ prints one JSON envelope to stdout and keeps stderr empty.
 `ok: true` means the deterministic command completed; callers must still check
 `passed`, `ready_for_private_export`, or `ready_for_publication` before the next
 stage.
+
+## Running the test suite
+
+The package uses a `src` layout, so the tests need it on the import path.
+Keep temporary files off `C:` as usual.
+
+```powershell
+$env:PYTHONPATH='src'; $env:TEMP='D:\tmp'; $env:TMP=$env:TEMP
+python -m pytest tests/unit tests/integration tests/security
+```
+
+The suite is large (about 3,100 tests). Run it in parallel - it is roughly
+3.6x faster end to end and the tests are isolated, so results are unchanged:
+
+```powershell
+python -m pytest tests/unit tests/integration tests/security -n auto --dist load
+```
+
+Parallelism is deliberately not enabled by default: spawning a worker per
+core makes a single-test run slower, which matters more during development.
+
+Coverage is measured against a minimum threshold:
+
+```powershell
+python -m pytest tests/unit tests/integration tests/security -n auto --dist load --cov
+```
+
+Run the suites separately if the machine is short on memory; combine their
+coverage with `--cov-append` and a shared `COVERAGE_FILE`.

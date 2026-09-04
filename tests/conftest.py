@@ -190,6 +190,44 @@ def rin_public_verified_release(
     return json.loads(_rin_release_payloads["public_candidate"])
 
 
+_RELEASE_CACHE: dict[tuple[Any, ...], bytes] = {}
+
+
+def _cached_verified_release(
+    source_root: Path,
+    request_value: dict[str, Any],
+    *,
+    visibility: str,
+    research_bundle: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Build a verified release once per distinct input, then replay it.
+
+    The build runs hard validation, soft evaluation and promotion, which is by
+    far the most expensive fixture work in the suite. It is deterministic, so
+    identical inputs can reuse canonical bytes. Each caller still receives an
+    independent object it may mutate freely, exactly like the session-scoped
+    `_rin_release_payloads` fixture above.
+    """
+    key = (
+        str(source_root),
+        canonical_bytes(request_value),
+        visibility,
+        canonical_bytes(research_bundle) if research_bundle is not None else None,
+    )
+    cached = _RELEASE_CACHE.get(key)
+    if cached is None:
+        cached = canonical_bytes(
+            _build_verified_release(
+                source_root,
+                request_value,
+                visibility=visibility,
+                research_bundle=research_bundle,
+            )
+        )
+        _RELEASE_CACHE[key] = cached
+    return json.loads(cached)
+
+
 @pytest.fixture
 def verified_release_factory() -> Callable[..., dict[str, Any]]:
-    return _build_verified_release
+    return _cached_verified_release
