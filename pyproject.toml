@@ -14,7 +14,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8,<9", "build>=1,<2"]
+dev = ["pytest>=8,<9", "build>=1,<2", "pytest-cov>=5,<7"]
 
 [project.scripts]
 kokoro = "kokoroarc.cli:main"
@@ -64,3 +64,21 @@ where = ["src"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-ra"
+
+[tool.coverage.run]
+source = ["kokoroarc"]
+# Statement coverage only: tests spawn subprocesses whose coverage data is
+# written without this config, and branch data cannot combine with statement
+# data ("Can't combine statement coverage data with branch data").
+branch = false
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true
+precision = 1
+fail_under = 80
+exclude_also = [
+  "if TYPE_CHECKING:",
+  "raise NotImplementedError",
+  '\.\.\.',
+]
