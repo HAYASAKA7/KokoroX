@@ -111,6 +111,11 @@ source = ["src/kokoroarc"]
 branch = false
 
 [tool.coverage.report]
+# Integration tests pip-install the package into temp roots and run it there.
+# Those child processes write coverage data that ignores `source` above, so the
+# combined file carries hundreds of near-empty temp copies. Report on the
+# repository tree only, or the denominator swamps the real number.
+include = ["src/kokoroarc/*"]
 show_missing = true
 skip_covered = true
 precision = 1
