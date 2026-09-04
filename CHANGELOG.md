@@ -42,8 +42,11 @@ First versioned release of the standalone Agent Skill Suite.
 
 - An installed `kokorox` could not find its Skill sources: the resolver only
   searched beside the package in `site-packages`, while a wheel places the
-  Skill data files under the environment prefix. `pip install` followed by
-  `kokorox suite install` previously failed with `SKILL_SUITE_SOURCE_INVALID`.
+  Skill data files in the install scheme's data directory. `pip install`
+  followed by `kokorox suite install` previously failed with
+  `SKILL_SUITE_SOURCE_INVALID`. Resolution now asks `sysconfig` for every
+  scheme's data path and also covers per-user installs, so environment,
+  `--user`, and framework layouts all work.
 
 [Unreleased]: https://github.com/HAYASAKA7/KokoroX/compare/v0.1.0...HEAD
 [0.1.0]: https://github.com/HAYASAKA7/KokoroX/releases/tag/v0.1.0

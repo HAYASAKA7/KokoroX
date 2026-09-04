@@ -7,7 +7,9 @@ import os
 from pathlib import Path
 import sys
 import re
+import site
 import stat
+import sysconfig
 import tempfile
 import time
 from typing import Any, Literal
@@ -407,20 +409,51 @@ def _resolve_source_snapshot(
     )
 
 
+def _data_roots() -> tuple[Path, ...]:
+    """Return every base a wheel may place its data files under.
+
+    A wheel installs Skill data files into the install scheme's ``data``
+    directory, not beside the package in site-packages. Which directory that
+    is depends on the scheme: a normal environment install uses the prefix, a
+    ``pip install --user`` uses the per-user base, and macOS framework builds
+    use a different layout again. ``sysconfig`` is the authority for the active
+    scheme, so ask it first and keep the prefixes as fallbacks.
+    """
+
+    roots: list[Path] = []
+
+    def add(value: object) -> None:
+        if isinstance(value, str) and value:
+            root = Path(value)
+            if root not in roots:
+                roots.append(root)
+
+    add(sysconfig.get_path("data"))
+    for scheme in sysconfig.get_scheme_names():
+        try:
+            add(sysconfig.get_path("data", scheme))
+        except (KeyError, ValueError):
+            continue
+    add(sys.prefix)
+    add(sys.base_prefix)
+    add(getattr(site, "USER_BASE", None))
+    return tuple(roots)
+
+
 def _source_candidates(source_root: Path | None) -> tuple[Path, ...]:
     if source_root is not None:
         return (Path(source_root),)
     module = Path(__file__).absolute()
     relative = Path("share") / "kokoroarc" / "skills"
     candidates = [module.parents[2] / relative]
-    # A wheel installs the Skill data files under the environment prefix rather
-    # than beside the package in site-packages, so an installed `kokoro` has to
-    # look there as well. Duplicate roots collapse in the caller.
-    for base in (sys.prefix, sys.base_prefix):
-        candidates.append(Path(base) / relative)
+    candidates.extend(root / relative for root in _data_roots())
     if module.parents[2].name.casefold() == "src":
         candidates.insert(0, module.parents[3] / "skills")
-    return tuple(candidates)
+    seen: list[Path] = []
+    for candidate in candidates:
+        if candidate not in seen:
+            seen.append(candidate)
+    return tuple(seen)
 
 
 def _capture_suite_source(
