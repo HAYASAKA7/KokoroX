@@ -61,7 +61,7 @@ agents can discover the same installation:
 To install into a specific agent's own Skill directory, pass `--skills-root`:
 
 ```bash
-kokorox suite install --skills-root 'D:\Agents\some-agent\skills' --json
+kokorox suite install --skills-root "$HOME/Library/Application Support/some-agent/skills" --json
 ```
 
 Each Skill also ships a per-agent interface profile under `agents/<agent>.yaml`
@@ -305,12 +305,13 @@ kokorox pack publication-check <source-dir> --promotion <verified.json> \
   [--compliance <attestation.json>] --out <report.json> --json
 ```
 
-All `--out` values are relative to `KOKOROX_DATA_DIR\reports`, unless an
+All `--out` values are relative to `KOKOROX_DATA_DIR/reports`, unless an
 absolute path beneath that same reports root is supplied. Report writes are
 canonical and atomic. A promotion output must name its exact immutable path:
 `promotions/<character-id>/<promotion-id>/promotion.json`. Output escapes,
 redirects, input aliases, and source-pack aliases are rejected. Every command
-prints one JSON envelope to stdout and keeps stderr empty.
+prints one JSON envelope to stdout and keeps stderr empty. Output is UTF-8
+on every platform, whatever the console's codepage is; decode it as UTF-8.
 `ok: true` means the deterministic command completed; callers must still check
 `passed`, `ready_for_private_export`, or `ready_for_publication` before the next
 stage.
