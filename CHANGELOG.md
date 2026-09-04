@@ -45,6 +45,19 @@ First versioned release of the standalone Agent Skill Suite.
   arguments, so every publish failed with
   `Installation directory could not be published atomically`. It now passes
   `AT_FDCWD` for both descriptors, matching the working Linux `renameat2` path.
+- Every command writes UTF-8 whatever the console's codepage is. `--json`
+  output uses `ensure_ascii=False`, so on a console using a legacy codepage
+  (cp1252, for example) any command whose result contained non-ASCII text died
+  with `UnicodeEncodeError` after doing its work -- which, for a multilingual
+  runtime, was most of them.
+- Reading a registry file nested too deeply for the JSON decoder raised a bare
+  `RecursionError` instead of `KARC_REGISTRY_INVALID`. The depth at which this
+  happened varied by interpreter and platform.
+- Building the package needs setuptools 77 or newer. The declared minimum was
+  75, which predates PEP 639 support and rejected `license = "MIT"` with
+  ``configuration error: `project.license` must be valid exactly by one
+  definition``.
+
 - An installed `kokorox` could not find its Skill sources: the resolver only
   searched beside the package in `site-packages`, while a wheel places the
   Skill data files in the install scheme's data directory. `pip install`
