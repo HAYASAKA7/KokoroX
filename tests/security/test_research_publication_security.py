@@ -145,6 +145,10 @@ def test_source_workspace_mutation_during_staging_fails_before_cutover(
 
 
 @pytest.mark.parametrize("failing_stage", ["backup", "cutover"])
+@pytest.mark.skipif(
+    os.name != "nt",
+    reason="injects a Windows winerror; transient-replace retry is Windows-only",
+)
 def test_transient_rename_failures_are_bounded_and_retried(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -362,6 +366,10 @@ def test_hardlinked_publication_lock_is_rejected(
     assert not final.exists()
 
 
+@pytest.mark.skipif(
+    os.name != "nt",
+    reason="injects a Windows winerror; transient-replace retry is Windows-only",
+)
 def test_unrecoverable_rollback_retains_previous_bundle_at_reported_path(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

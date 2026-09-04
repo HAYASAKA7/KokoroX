@@ -858,6 +858,10 @@ def test_replace_failure_preserves_previous_draft_and_removes_residue(
     assert list(published.parent.glob(f".{published.name}.*-*")) == []
 
 
+@pytest.mark.skipif(
+    os.name != "nt",
+    reason="injects a Windows winerror; transient-replace retry is Windows-only",
+)
 def test_transient_rollback_failures_restore_previous_complete_draft(
     tmp_path: Path,
     source_root: Path,
@@ -895,6 +899,10 @@ def test_transient_rollback_failures_restore_previous_complete_draft(
 
 
 @pytest.mark.parametrize("failing_stage", ["backup", "cutover"])
+@pytest.mark.skipif(
+    os.name != "nt",
+    reason="injects a Windows winerror; transient-replace retry is Windows-only",
+)
 def test_transient_rename_failures_are_retried_to_successful_publication(
     tmp_path: Path,
     source_root: Path,
@@ -937,6 +945,10 @@ def test_transient_rename_failures_are_retried_to_successful_publication(
     assert list(published.parent.glob(f".{published.name}.*-*")) == []
 
 
+@pytest.mark.skipif(
+    os.name != "nt",
+    reason="injects a Windows winerror; transient-replace retry is Windows-only",
+)
 def test_unrecoverable_rollback_preserves_only_good_copy_at_known_backup(
     tmp_path: Path,
     source_root: Path,
