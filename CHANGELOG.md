@@ -40,6 +40,11 @@ First versioned release of the standalone Agent Skill Suite.
 
 ### Fixed
 
+- Atomic installation never worked on macOS. `renameatx_np(2)` takes
+  `(fromfd, from, tofd, to, flags)`, but it was declared and called with three
+  arguments, so every publish failed with
+  `Installation directory could not be published atomically`. It now passes
+  `AT_FDCWD` for both descriptors, matching the working Linux `renameat2` path.
 - An installed `kokorox` could not find its Skill sources: the resolver only
   searched beside the package in `site-packages`, while a wheel places the
   Skill data files in the install scheme's data directory. `pip install`
