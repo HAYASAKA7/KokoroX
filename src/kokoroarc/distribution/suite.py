@@ -5,6 +5,7 @@ import errno
 from hashlib import sha256
 import os
 from pathlib import Path
+import sys
 import re
 import stat
 import tempfile
@@ -410,7 +411,13 @@ def _source_candidates(source_root: Path | None) -> tuple[Path, ...]:
     if source_root is not None:
         return (Path(source_root),)
     module = Path(__file__).absolute()
-    candidates = [module.parents[2] / "share" / "kokoroarc" / "skills"]
+    relative = Path("share") / "kokoroarc" / "skills"
+    candidates = [module.parents[2] / relative]
+    # A wheel installs the Skill data files under the environment prefix rather
+    # than beside the package in site-packages, so an installed `kokoro` has to
+    # look there as well. Duplicate roots collapse in the caller.
+    for base in (sys.prefix, sys.base_prefix):
+        candidates.append(Path(base) / relative)
     if module.parents[2].name.casefold() == "src":
         candidates.insert(0, module.parents[3] / "skills")
     return tuple(candidates)

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib
+import sys
 import json
 from pathlib import Path
 import re
@@ -634,3 +635,17 @@ def test_preview_enforces_source_limits(
             limits=suite.SkillSuiteLimits(**limits),
         ),
     )
+
+
+def test_source_candidates_include_the_environment_prefix() -> None:
+    """A wheel installs the Skill data files under the environment prefix.
+
+    They do not land beside the package in site-packages, so an installed
+    `kokoro suite install` can only find them if the prefix is searched.
+    """
+    suite = _suite_module()
+
+    candidates = suite._source_candidates(None)
+
+    relative = Path("share") / "kokoroarc" / "skills"
+    assert Path(sys.prefix) / relative in candidates
