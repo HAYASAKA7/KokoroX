@@ -1,5 +1,6 @@
 [build-system]
-requires = ["setuptools>=75"]
+# 77 is where setuptools learned PEP 639, which `license = "MIT"` below needs.
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -34,6 +35,9 @@ dev = [
   "build>=1,<2",
   "pytest-cov>=5,<7",
   "pytest-xdist>=3,<4",
+  # Tests build the package with `--no-isolation`, so the backend has to be
+  # importable here, and at the version the metadata above requires.
+  "setuptools>=77",
 ]
 
 [project.urls]
