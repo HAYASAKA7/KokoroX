@@ -11,10 +11,10 @@ from typing import Any
 import pytest
 import yaml
 
-from kokoroarc import cli as cli_module
-from kokoroarc.authoring import storage as authoring_storage
-from kokoroarc.packs.compiler import canonical_bytes
-from kokoroarc.research.bundles import canonical_hash
+from kokorox import cli as cli_module
+from kokorox.authoring import storage as authoring_storage
+from kokorox.packs.compiler import canonical_bytes
+from kokorox.research.bundles import canonical_hash
 
 
 REPOSITORY_ROOT = Path.cwd().resolve()
@@ -32,7 +32,7 @@ def _cli(
     else:
         env["KOKOROX_DATA_DIR"] = str(data_dir)
     return subprocess.run(
-        [sys.executable, "-m", "kokoroarc.cli", *arguments],
+        [sys.executable, "-m", "kokorox.cli", *arguments],
         check=False,
         capture_output=True,
         text=True,

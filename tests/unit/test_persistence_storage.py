@@ -4,17 +4,17 @@ from typing import Any
 
 import pytest
 
-from kokoroarc.errors import KokoroError
-from kokoroarc.packs.compiler import canonical_bytes
-from kokoroarc.persistence._storage import (
+from kokorox.errors import KokoroError
+from kokorox.packs.compiler import canonical_bytes
+from kokorox.persistence._storage import (
     PersistenceKey,
     PersistenceLimits,
     open_persistence_scope,
     read_canonical_object,
     scan_canonical_directory,
 )
-from kokoroarc.schemas import SchemaRegistry
-from kokoroarc import __version__
+from kokorox.schemas import SchemaRegistry
+from kokorox import __version__
 
 
 SCHEMAS = SchemaRegistry(Path("schemas/v1"))
@@ -24,7 +24,7 @@ def _consent() -> dict[str, Any]:
     return {
         "schema_version": "1.0",
         "artifact_id": "consents/global/rin-aster/consent-01",
-        "created_by": {"component": "kokoroarc", "version": __version__},
+        "created_by": {"component": "kokorox", "version": __version__},
         "consent_id": "rin-aster-consent-01",
         "scope": "global",
         "workspace_id": None,

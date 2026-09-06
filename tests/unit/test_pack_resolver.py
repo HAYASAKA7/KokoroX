@@ -5,8 +5,8 @@ from typing import Any
 
 import pytest
 
-from kokoroarc.errors import KokoroError
-from kokoroarc.packs.resolver import INTENSITY_ORDER, resolve_profile
+from kokorox.errors import KokoroError
+from kokorox.packs.resolver import INTENSITY_ORDER, resolve_profile
 
 
 def test_approved_profile_resolution_example() -> None:

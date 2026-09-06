@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from kokoroarc.schemas import SchemaRegistry
+from kokorox.schemas import SchemaRegistry
 
 
 SCHEMAS = SchemaRegistry(Path("schemas/v1"))

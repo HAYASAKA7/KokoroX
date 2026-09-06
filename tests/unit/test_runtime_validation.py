@@ -7,17 +7,17 @@ from typing import Any
 
 import pytest
 
-from kokoroarc import __version__
-from kokoroarc.errors import KokoroError
-from kokoroarc.runtime.validation import fallback_action, validate_rendered_output
-from kokoroarc.schemas import SchemaRegistry
+from kokorox import __version__
+from kokorox.errors import KokoroError
+from kokorox.runtime.validation import fallback_action, validate_rendered_output
+from kokorox.schemas import SchemaRegistry
 
 
 def plan(**overrides: Any) -> dict[str, Any]:
     value: dict[str, Any] = {
         "schema_version": "1.0",
         "artifact_id": "plan/turn-1",
-        "created_by": {"component": "kokoroarc", "version": __version__},
+        "created_by": {"component": "kokorox", "version": __version__},
         "primary_language": "zh-CN",
         "segments": [
             {
@@ -83,7 +83,7 @@ def full_semantic(**overrides: Any) -> dict[str, Any]:
     value: dict[str, Any] = {
         "schema_version": "1.0",
         "artifact_id": "semantic/turn-1",
-        "created_by": {"component": "kokoroarc", "version": __version__},
+        "created_by": {"component": "kokorox", "version": __version__},
         "scenario": "debugging",
         "conclusion": "The cause is clear.",
         "explanation": ["The read path is not protected."],
@@ -190,7 +190,7 @@ def test_valid_output_has_derived_metadata_and_no_fallback() -> None:
     assert result == {
         "schema_version": "1.0",
         "artifact_id": "validation/turn-1",
-        "created_by": {"component": "kokoroarc", "version": __version__},
+        "created_by": {"component": "kokorox", "version": __version__},
         "valid": True,
         "violations": [],
         "fallback_level": None,

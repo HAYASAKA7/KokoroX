@@ -11,15 +11,15 @@ import zipfile
 
 import pytest
 
-from kokoroarc.distribution.archive import (
+from kokorox.distribution.archive import (
     KarcLimits,
     build_karc_archive,
     load_karc_archive,
 )
-from kokoroarc.errors import KokoroError
-from kokoroarc.packs.compiler import compile_pack
-from kokoroarc.packs.loader import load_source_pack
-from kokoroarc.schemas import SchemaRegistry
+from kokorox.errors import KokoroError
+from kokorox.packs.compiler import compile_pack
+from kokorox.packs.loader import load_source_pack
+from kokorox.schemas import SchemaRegistry
 
 
 SCHEMAS = SchemaRegistry(Path("schemas/v1"))

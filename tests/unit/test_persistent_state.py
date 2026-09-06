@@ -11,15 +11,15 @@ from typing import Any, Callable, Mapping
 
 import pytest
 
-from kokoroarc.errors import KokoroError
-from kokoroarc.packs.compiler import canonical_bytes
-from kokoroarc.persistence._storage import PersistenceLimits
-from kokoroarc.persistence.consent import grant_consent, revoke_consent
-from kokoroarc.persistence.memory import (
+from kokorox.errors import KokoroError
+from kokorox.packs.compiler import canonical_bytes
+from kokorox.persistence._storage import PersistenceLimits
+from kokorox.persistence.consent import grant_consent, revoke_consent
+from kokorox.persistence.memory import (
     add_memory_reference,
     list_memory_references,
 )
-from kokoroarc.persistence.state import (
+from kokorox.persistence.state import (
     PersistentResetPreview,
     advance_persistent_mood_turn,
     apply_persistent_mood_event,
@@ -30,8 +30,8 @@ from kokoroarc.persistence.state import (
     replay_persistent_state,
     reset_persistent_data,
 )
-from kokoroarc.state import transitions
-import kokoroarc.persistence.state as persistent_state_module
+from kokorox.state import transitions
+import kokorox.persistence.state as persistent_state_module
 
 from persistence_support import (
     ConsentedRin,

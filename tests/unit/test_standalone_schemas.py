@@ -5,8 +5,8 @@ from typing import Any
 
 import pytest
 
-from kokoroarc.errors import KokoroError
-from kokoroarc.schemas import SchemaRegistry
+from kokorox.errors import KokoroError
+from kokorox.schemas import SchemaRegistry
 
 
 SCHEMAS = SchemaRegistry(Path("schemas/v1"))

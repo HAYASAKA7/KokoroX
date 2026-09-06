@@ -6,22 +6,22 @@ from typing import Any
 
 import pytest
 
-from kokoroarc.errors import KokoroError
-from kokoroarc.packs.compiler import canonical_bytes
-from kokoroarc.persistence.memory import (
+from kokorox.errors import KokoroError
+from kokorox.packs.compiler import canonical_bytes
+from kokorox.persistence.memory import (
     add_memory_reference,
     list_memory_references,
 )
-from kokoroarc.persistence.migrations import (
+from kokorox.persistence.migrations import (
     apply_state_migration,
     preview_state_migration,
 )
-from kokoroarc.persistence.state import (
+from kokorox.persistence.state import (
     apply_persistent_mood_event,
     apply_persistent_relationship_event,
     replay_persistent_state,
 )
-from kokoroarc.schemas import SchemaRegistry
+from kokorox.schemas import SchemaRegistry
 
 from persistence_support import (
     ConsentedRin,

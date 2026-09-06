@@ -8,19 +8,19 @@ from typing import Any
 
 import pytest
 
-import kokoroarc.cli as cli
-from kokoroarc.cli import build_parser
-from kokoroarc.distribution.installer import install_karc_archive
-from kokoroarc.distribution.registry import (
+import kokorox.cli as cli
+from kokorox.cli import build_parser
+from kokorox.distribution.installer import install_karc_archive
+from kokorox.distribution.registry import (
     empty_installed_registry,
     resolve_install_scope,
 )
-from kokoroarc.errors import KokoroError
-from kokoroarc.packs.compiler import canonical_bytes
-from kokoroarc.persistence.consent import grant_consent
-from kokoroarc.persistence.memory import list_memory_references
-from kokoroarc.schemas import SchemaRegistry
-from kokoroarc.standalone_cli import handle_standalone
+from kokorox.errors import KokoroError
+from kokorox.packs.compiler import canonical_bytes
+from kokorox.persistence.consent import grant_consent
+from kokorox.persistence.memory import list_memory_references
+from kokorox.schemas import SchemaRegistry
+from kokorox.standalone_cli import handle_standalone
 
 from karc_test_support import (
     archive_documents,

@@ -9,20 +9,20 @@ from typing import Any
 
 import pytest
 
-import kokoroarc.cli as cli_module
-import kokoroarc.distribution.defaults as defaults_module
-from kokoroarc.config import Settings
-from kokoroarc.distribution.defaults import (
+import kokorox.cli as cli_module
+import kokorox.distribution.defaults as defaults_module
+from kokorox.config import Settings
+from kokorox.distribution.defaults import (
     clear_character_default,
     empty_character_default,
     load_character_default,
     set_character_default,
 )
-from kokoroarc.distribution.installer import install_karc_archive
-from kokoroarc.distribution.registry import resolve_install_scope
-from kokoroarc.errors import KokoroError
-from kokoroarc.packs.compiler import canonical_bytes
-from kokoroarc.schemas import SchemaRegistry
+from kokorox.distribution.installer import install_karc_archive
+from kokorox.distribution.registry import resolve_install_scope
+from kokorox.errors import KokoroError
+from kokorox.packs.compiler import canonical_bytes
+from kokorox.schemas import SchemaRegistry
 
 from karc_test_support import build_private_archive
 

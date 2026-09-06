@@ -8,14 +8,14 @@ from typing import Any
 
 import pytest
 
-from kokoroarc.authoring import storage
-from kokoroarc.authoring.drafts import build_character_draft
-from kokoroarc.authoring.storage import publish_draft_bundle
-from kokoroarc.authoring.validation import validate_authoring_pack
-from kokoroarc.packs.compiler import canonical_bytes
-from kokoroarc.packs.loader import load_source_pack
-from kokoroarc.schemas import SchemaRegistry
-from kokoroarc import __version__
+from kokorox.authoring import storage
+from kokorox.authoring.drafts import build_character_draft
+from kokorox.authoring.storage import publish_draft_bundle
+from kokorox.authoring.validation import validate_authoring_pack
+from kokorox.packs.compiler import canonical_bytes
+from kokorox.packs.loader import load_source_pack
+from kokorox.schemas import SchemaRegistry
+from kokorox import __version__
 
 
 @pytest.fixture
@@ -23,7 +23,7 @@ def original_request() -> dict[str, Any]:
     return {
         "schema_version": "1.0",
         "artifact_id": "original/rin-aster/build-request",
-        "created_by": {"component": "kokoroarc", "version": __version__},
+        "created_by": {"component": "kokorox", "version": __version__},
         "mode": "original",
         "namespace": "original",
         "character_id": "rin-aster",

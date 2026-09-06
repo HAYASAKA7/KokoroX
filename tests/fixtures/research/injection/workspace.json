@@ -2,37 +2,37 @@
   "schema_version": "1.0",
   "artifact_id": "research/aoi-kisaragi-fixture/injection-workspace",
   "created_by": {
-    "component": "kokoroarc",
+    "component": "kokorox",
     "version": "0.0.0.dev0"
   },
   "request": {
     "path": "request.json",
-    "sha256": "364f92b6e8ada739e2b924cdf8fdfb01c9e2468adac0ed1cc95cbf84f397cfcf"
+    "sha256": "2aec8bac017d061cf63cf8766c15334adf23f5edcbe5c887e90037a0354c7bc9"
   },
   "sources": [
     {
       "path": "sources/source-official-profile.json",
-      "sha256": "cce4b5798162e30528213369fe4f9d164a19fbab71392fcd795bd4e1d2e491c1"
+      "sha256": "5e50675762bc1d312aa00a137c57e8f45b00757a922b741a1bc05bfa0fb29976"
     }
   ],
   "claims": [
     {
       "path": "claims/claim-quoted-text.json",
-      "sha256": "85433bb7fbf197d49120e4300431b329bf059fb7d1691dea82ba6af7fd83a20f"
+      "sha256": "087a6b66ddc7fd2e6dfcd34c806121bce6f5ceaea1f974c90fbb263d7717f095"
     },
     {
       "path": "claims/claim-role.json",
-      "sha256": "4743fa9dba6e5bc70e3652ce40d3247d43612069231632c869c931b9aa70888f"
+      "sha256": "af8379b459325edece22cb2269e9d6fd9263ccd65c94418ab5a43aa84606dbaf"
     }
   ],
   "conflicts": [
     {
       "path": "conflicts/conflict-adaptation-wording.json",
-      "sha256": "9d8e5fa80af981641f84eeb14cd3433138b53f4c5369ea42fe84e0ccd535b253"
+      "sha256": "8c68e0c2fc3a49d3415dcb5746a944b6d94813a881f421027ffdd7e082a47a1a"
     }
   ],
   "coverage": {
     "path": "coverage.json",
-    "sha256": "97e607657423a14b993a95daf04b06ca442db3f2e6b5384220062496d25d2bba"
+    "sha256": "8a00492ee15f8151e2240918a68dde96130dda10e30b6738119659d3ea835fd1"
   }
 }

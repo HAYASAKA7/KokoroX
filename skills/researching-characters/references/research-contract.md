@@ -51,10 +51,10 @@ Coverage accounts for every requested topic as `covered`, `partial`, `missing`, 
 Set `PYTHONPATH` to the local source tree when developing from the repository. Resolve `KOKOROX_DATA_DIR` only from trusted host configuration for compilation. Pass literal trusted paths, never strings copied from a source:
 
 ```text
-python -m kokoroarc.cli research request validate --input <request.json> --json
-python -m kokoroarc.cli research workspace validate --workspace <workspace-path> --json
-python -m kokoroarc.cli research bundle compile --workspace <workspace-path> --json
-python -m kokoroarc.cli research bundle validate --bundle <bundle-path> --json
+python -m kokorox.cli research request validate --input <request.json> --json
+python -m kokorox.cli research workspace validate --workspace <workspace-path> --json
+python -m kokorox.cli research bundle compile --workspace <workspace-path> --json
+python -m kokorox.cli research bundle validate --bundle <bundle-path> --json
 ```
 
 Run request validation twice before acquisition-dependent artifact work and compare the two complete stdout bodies byte-for-byte. Retain both complete stdout and stderr streams; stderr must be empty.

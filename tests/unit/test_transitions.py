@@ -3,11 +3,11 @@ from pathlib import Path
 
 import pytest
 
-from kokoroarc.errors import KokoroError
-from kokoroarc.schemas import SchemaRegistry
-from kokoroarc.state import transitions as transitions_module
-from kokoroarc.state.transitions import apply_event, derive_stage
-from kokoroarc import __version__
+from kokorox.errors import KokoroError
+from kokorox.schemas import SchemaRegistry
+from kokorox.state import transitions as transitions_module
+from kokorox.state.transitions import apply_event, derive_stage
+from kokorox import __version__
 
 
 SCHEMAS = SchemaRegistry(Path(__file__).parents[2] / "schemas" / "v1")
@@ -298,7 +298,7 @@ def schema_state(
         "schema_version": "1.0",
         "artifact_id": "state/session-1",
         "created_by": {
-            "component": "kokoroarc",
+            "component": "kokorox",
             "version": __version__,
         },
         "revision": 0,
@@ -320,7 +320,7 @@ def schema_event(event_id: str, novelty_key: str) -> dict:
         "schema_version": "1.0",
         "artifact_id": f"event/{event_id}",
         "created_by": {
-            "component": "kokoroarc",
+            "component": "kokorox",
             "version": __version__,
         },
         "event_id": event_id,

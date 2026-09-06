@@ -9,11 +9,11 @@ from pathlib import Path
 
 import pytest
 
-from kokoroarc import __version__
-from kokoroarc.errors import KokoroError
-from kokoroarc.state import store as store_module
-from kokoroarc.state import transitions as transitions_module
-from kokoroarc.state.store import SessionStore
+from kokorox import __version__
+from kokorox.errors import KokoroError
+from kokorox.state import store as store_module
+from kokorox.state import transitions as transitions_module
+from kokorox.state.store import SessionStore
 
 
 HASH = "a" * 64
@@ -329,7 +329,7 @@ def test_apply_does_not_mutate_minimal_or_full_event(tmp_path: Path) -> None:
     full = {
         "schema_version": "1.0",
         "artifact_id": "event/e2",
-        "created_by": {"component": "kokoroarc", "version": __version__},
+        "created_by": {"component": "kokorox", "version": __version__},
         "event_id": "e2",
         "turn_id": "turn-2",
         "origin": "verified_task_outcome",
@@ -456,8 +456,8 @@ def test_cross_process_apply_uses_the_persistent_advisory_lock(
     started_store(tmp_path)
     worker = """
 import json, sys
-from kokoroarc.errors import KokoroError
-from kokoroarc.state.store import SessionStore
+from kokorox.errors import KokoroError
+from kokorox.state.store import SessionStore
 event_id = sys.argv[2]
 event = {
     'event_id': event_id,
@@ -560,7 +560,7 @@ def test_maximal_valid_full_event_fits_per_record_byte_limit(
     maximal_event = {
         "schema_version": "1.0",
         "artifact_id": f"event/{event_id}",
-        "created_by": {"component": "kokoroarc", "version": "v" * 64},
+        "created_by": {"component": "kokorox", "version": "v" * 64},
         "event_id": event_id,
         "turn_id": "t" * 128,
         "origin": "verified_task_outcome",

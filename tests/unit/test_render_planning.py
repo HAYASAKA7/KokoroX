@@ -7,10 +7,10 @@ from typing import Any
 
 import pytest
 
-from kokoroarc import __version__
-from kokoroarc.errors import KokoroError
-from kokoroarc.runtime.planning import build_render_plan
-from kokoroarc.schemas import SchemaRegistry
+from kokorox import __version__
+from kokorox.errors import KokoroError
+from kokorox.runtime.planning import build_render_plan
+from kokorox.schemas import SchemaRegistry
 
 
 def semantic(**overrides: Any) -> dict[str, Any]:
@@ -56,7 +56,7 @@ def test_builds_ordered_schema_valid_plan_with_exact_protected_span() -> None:
     assert plan == {
         "schema_version": "1.0",
         "artifact_id": "plan/turn-1",
-        "created_by": {"component": "kokoroarc", "version": __version__},
+        "created_by": {"component": "kokorox", "version": __version__},
         "primary_language": "zh-CN",
         "segments": [
             {
@@ -113,14 +113,14 @@ def test_omits_absent_segments_and_numbers_remaining_segments_without_gaps() -> 
 def test_accepts_complete_schema_artifacts() -> None:
     semantic_value = semantic(
         schema_version="1.0",
-        created_by={"component": "kokoroarc", "version": "2.0.0"},
+        created_by={"component": "kokorox", "version": "2.0.0"},
         scenario="debugging",
         format_constraints=["preserve_code_blocks"],
     )
     policy_value = policy(
         schema_version="1.0",
         artifact_id="policy/session-1",
-        created_by={"component": "kokoroarc", "version": "2.0.0"},
+        created_by={"component": "kokorox", "version": "2.0.0"},
         mode="mixed",
         subtitles={"enabled": False, "language": None},
     )

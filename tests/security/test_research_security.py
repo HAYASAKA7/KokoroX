@@ -13,18 +13,18 @@ from types import SimpleNamespace
 
 import pytest
 
-import kokoroarc.research.workspace as research_workspace
-from kokoroarc.errors import KokoroError
-from kokoroarc.packs.compiler import canonical_bytes
-from kokoroarc.research import (
+import kokorox.research.workspace as research_workspace
+from kokorox.errors import KokoroError
+from kokorox.packs.compiler import canonical_bytes
+from kokorox.research import (
     build_research_bundle,
     load_published_research_bundle,
     publish_research_bundle,
     storage,
 )
-from kokoroarc.research.validation import validate_research_workspace
-from kokoroarc.research.workspace import ResearchLimits, load_research_workspace
-from kokoroarc.schemas import SchemaRegistry
+from kokorox.research.validation import validate_research_workspace
+from kokorox.research.workspace import ResearchLimits, load_research_workspace
+from kokorox.schemas import SchemaRegistry
 
 
 FIXTURE_ROOT = Path("tests/fixtures/research/complete")

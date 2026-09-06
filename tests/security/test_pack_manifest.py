@@ -6,9 +6,9 @@ from types import SimpleNamespace
 
 import pytest
 
-from kokoroarc.errors import KokoroError
-from kokoroarc.packs.loader import load_source_pack, resolve_pack_file
-from kokoroarc.schemas import SchemaRegistry
+from kokorox.errors import KokoroError
+from kokorox.packs.loader import load_source_pack, resolve_pack_file
+from kokorox.schemas import SchemaRegistry
 
 
 def assert_unsafe_reference(root: Path, reference: object) -> None:

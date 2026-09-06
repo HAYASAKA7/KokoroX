@@ -9,13 +9,13 @@ from typing import Any, cast
 
 import pytest
 
-from kokoroarc import __version__
-from kokoroarc.distribution.archive import build_karc_archive
-from kokoroarc.distribution.installer import install_karc_archive
-from kokoroarc.packs.compiler import canonical_bytes, compile_pack
-from kokoroarc.packs.loader import load_source_pack
-from kokoroarc.persistence.consent import grant_consent
-from kokoroarc.schemas import SchemaRegistry
+from kokorox import __version__
+from kokorox.distribution.archive import build_karc_archive
+from kokorox.distribution.installer import install_karc_archive
+from kokorox.packs.compiler import canonical_bytes, compile_pack
+from kokorox.packs.loader import load_source_pack
+from kokorox.persistence.consent import grant_consent
+from kokorox.schemas import SchemaRegistry
 
 from karc_test_support import build_private_archive
 
@@ -32,7 +32,7 @@ def interaction_event(
     return {
         "schema_version": "1.0",
         "artifact_id": f"event/{event_id}",
-        "created_by": {"component": "kokoroarc", "version": __version__},
+        "created_by": {"component": "kokorox", "version": __version__},
         "event_id": event_id,
         "turn_id": f"turn-{relationship_revision + 1}",
         "origin": "verified_task_outcome",

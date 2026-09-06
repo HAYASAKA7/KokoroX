@@ -13,14 +13,14 @@ from typing import Any
 
 import pytest
 
-from kokoroarc.authoring import storage
-from kokoroarc.authoring.drafts import build_character_draft
-from kokoroarc.authoring.storage import publish_draft_bundle
-from kokoroarc.authoring.validation import validate_authoring_pack
-from kokoroarc.errors import KokoroError
-from kokoroarc.packs.loader import load_source_pack
-from kokoroarc.schemas import SchemaRegistry
-from kokoroarc import __version__
+from kokorox.authoring import storage
+from kokorox.authoring.drafts import build_character_draft
+from kokorox.authoring.storage import publish_draft_bundle
+from kokorox.authoring.validation import validate_authoring_pack
+from kokorox.errors import KokoroError
+from kokorox.packs.loader import load_source_pack
+from kokorox.schemas import SchemaRegistry
+from kokorox import __version__
 
 
 @pytest.fixture
@@ -28,7 +28,7 @@ def artifacts() -> tuple[dict[str, Any], dict[str, Any], dict[str, Any], dict[st
     request = {
         "schema_version": "1.0",
         "artifact_id": "original/rin-aster/build-request",
-        "created_by": {"component": "kokoroarc", "version": __version__},
+        "created_by": {"component": "kokorox", "version": __version__},
         "mode": "original",
         "namespace": "original",
         "character_id": "rin-aster",
@@ -1339,7 +1339,7 @@ def test_process_exit_auto_releases_publication_lock(
         "import sys,time;"
         f"sys.path.insert(0,{str(Path('src').resolve())!r});"
         "from pathlib import Path;"
-        "from kokoroarc.authoring.storage import _acquire_publication_lock;"
+        "from kokorox.authoring.storage import _acquire_publication_lock;"
         "lock=_acquire_publication_lock(Path(sys.argv[1]));"
         "print('LOCKED',flush=True);"
         "time.sleep(60)"

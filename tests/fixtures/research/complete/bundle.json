@@ -2,7 +2,7 @@
   "schema_version": "1.0",
   "artifact_id": "research/aoi-kisaragi-fixture/bundle",
   "created_by": {
-    "component": "kokoroarc",
+    "component": "kokorox",
     "version": "0.0.0.dev0"
   },
   "build_status": "research",
@@ -15,15 +15,15 @@
   "continuity": "fixture-primary",
   "timeline_cutoff": "episode-01",
   "spoiler_scope": "episode-01 only",
-  "request_hash": "ce2816fe46ddd45950a939d6286d148ea4cab94218ec65df62daa361d4307fec",
-  "workspace_hash": "36c328d763dd4ca705f1619c8225cbc304ac09ccfe930c54375d2b9cf8c128a1",
-  "validation_report_hash": "78fc8a7e8db234f32aca04d6a1b1b690768f77e579d241bde8ffbb99eff0aa26",
+  "request_hash": "4c7b3359079ea3de34ab48882eec415e8b931cda8bdc32c801afe91e22410029",
+  "workspace_hash": "681a1e9a00122ba7f52238520105a3e070ebcf51695f3263a443e1a7cd817fae",
+  "validation_report_hash": "f32ae78bd43980879eb3574431c1b86f6a4946c200529e0c37069edb08324ff3",
   "sources": [
     {
       "schema_version": "1.0",
       "artifact_id": "research/aoi-kisaragi-fixture/source-episode-01",
       "created_by": {
-        "component": "kokoroarc",
+        "component": "kokorox",
         "version": "0.0.0.dev0"
       },
       "source_id": "source-episode-01",
@@ -48,7 +48,7 @@
       "schema_version": "1.0",
       "artifact_id": "research/aoi-kisaragi-fixture/source-official-profile",
       "created_by": {
-        "component": "kokoroarc",
+        "component": "kokorox",
         "version": "0.0.0.dev0"
       },
       "source_id": "source-official-profile",
@@ -75,7 +75,7 @@
       "schema_version": "1.0",
       "artifact_id": "research/aoi-kisaragi-fixture/claim-behavior",
       "created_by": {
-        "component": "kokoroarc",
+        "component": "kokorox",
         "version": "0.0.0.dev0"
       },
       "claim_id": "claim-behavior",
@@ -96,7 +96,7 @@
       "schema_version": "1.0",
       "artifact_id": "research/aoi-kisaragi-fixture/claim-role",
       "created_by": {
-        "component": "kokoroarc",
+        "component": "kokorox",
         "version": "0.0.0.dev0"
       },
       "claim_id": "claim-role",
@@ -119,7 +119,7 @@
       "schema_version": "1.0",
       "artifact_id": "research/aoi-kisaragi-fixture/conflict-adaptation-wording",
       "created_by": {
-        "component": "kokoroarc",
+        "component": "kokorox",
         "version": "0.0.0.dev0"
       },
       "conflict_id": "conflict-adaptation-wording",
@@ -143,7 +143,7 @@
     "schema_version": "1.0",
     "artifact_id": "research/aoi-kisaragi-fixture/coverage",
     "created_by": {
-      "component": "kokoroarc",
+      "component": "kokorox",
       "version": "0.0.0.dev0"
     },
     "topics": [
@@ -174,5 +174,5 @@
   },
   "limitations": [],
   "blocking_reasons": [],
-  "bundle_hash": "5612d291bed5170721c684d9ba33f86ab41dd7001487efa109d803755a1dc117"
+  "bundle_hash": "8541809b13e728c154ce1718905b3fe7518bdad8d19230eaea264f177d4a377b"
 }

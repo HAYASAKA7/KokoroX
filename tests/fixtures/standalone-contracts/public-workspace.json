@@ -2,7 +2,7 @@
   "karc_manifest": {
     "schema_version": "1.0",
     "artifact_id": "original/rin-aster/distribution/karc-manifest-public",
-    "created_by": {"component": "kokoroarc", "version": "0.0.0.dev0"},
+    "created_by": {"component": "kokorox", "version": "0.0.0.dev0"},
     "archive_id": "original.rin-aster.1.1.0",
     "format_version": "1.0.0",
     "namespace": "original",
@@ -110,7 +110,7 @@
   "compatibility_report": {
     "schema_version": "1.0",
     "artifact_id": "original/rin-aster/distribution/compatibility-report-public",
-    "created_by": {"component": "kokoroarc", "version": "0.0.0.dev0"},
+    "created_by": {"component": "kokorox", "version": "0.0.0.dev0"},
     "archive_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
     "manifest": {
       "artifact_id": "original/rin-aster/distribution/karc-manifest-public",
@@ -154,7 +154,7 @@
   "migration_plan": {
     "schema_version": "1.0",
     "artifact_id": "original/rin-aster/distribution/migration-plan-public",
-    "created_by": {"component": "kokoroarc", "version": "0.0.0.dev0"},
+    "created_by": {"component": "kokorox", "version": "0.0.0.dev0"},
     "migration_id": "karc-format-0.9.0-to-1.0.0-with-state",
     "namespace": "original",
     "character_id": "rin-aster",
@@ -210,7 +210,7 @@
   "installed_registry": {
     "schema_version": "1.0",
     "artifact_id": "registry/workspaces/eeeeeeee/installed-packs",
-    "created_by": {"component": "kokoroarc", "version": "0.0.0.dev0"},
+    "created_by": {"component": "kokorox", "version": "0.0.0.dev0"},
     "scope": "workspace",
     "workspace_id": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
     "revision": 3,
@@ -232,7 +232,7 @@
   "default_config": {
     "schema_version": "1.0",
     "artifact_id": "config/workspaces/eeeeeeee/character-default",
-    "created_by": {"component": "kokoroarc", "version": "0.0.0.dev0"},
+    "created_by": {"component": "kokorox", "version": "0.0.0.dev0"},
     "scope": "workspace",
     "workspace_id": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
     "revision": 2,
@@ -249,7 +249,7 @@
   "persistence_consent": {
     "schema_version": "1.0",
     "artifact_id": "consents/workspaces/eeeeeeee/rin-aster/consent-02",
-    "created_by": {"component": "kokoroarc", "version": "0.0.0.dev0"},
+    "created_by": {"component": "kokorox", "version": "0.0.0.dev0"},
     "consent_id": "rin-aster-consent-02",
     "scope": "workspace",
     "workspace_id": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
@@ -270,7 +270,7 @@
   "memory_reference": {
     "schema_version": "1.0",
     "artifact_id": "memory-references/workspaces/eeeeeeee/rin-aster/project-01",
-    "created_by": {"component": "kokoroarc", "version": "0.0.0.dev0"},
+    "created_by": {"component": "kokorox", "version": "0.0.0.dev0"},
     "memory_reference_id": "rin-aster-project-01",
     "source_kind": "host_approved_reference",
     "host_memory_id": "host-memory-project-01",
@@ -296,7 +296,7 @@
   "persistent_state": {
     "schema_version": "1.0",
     "artifact_id": "persistent-state/workspaces/eeeeeeee/rin-aster/generation-22222222",
-    "created_by": {"component": "kokoroarc", "version": "0.0.0.dev0"},
+    "created_by": {"component": "kokorox", "version": "0.0.0.dev0"},
     "scope": "workspace",
     "workspace_id": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
     "installation": {
@@ -318,7 +318,7 @@
     "relationship": {
       "schema_version": "1.0",
       "artifact_id": "state/rin-aster/relationship-workspace",
-      "created_by": {"component": "kokoroarc", "version": "0.0.0.dev0"},
+      "created_by": {"component": "kokorox", "version": "0.0.0.dev0"},
       "revision": 3,
       "turn_index": 3,
       "dimensions": {
@@ -361,7 +361,7 @@
   "persistent_event": {
     "schema_version": "1.0",
     "artifact_id": "persistent-events/workspaces/eeeeeeee/rin-aster/relationship-operation-3",
-    "created_by": {"component": "kokoroarc", "version": "0.0.0.dev0"},
+    "created_by": {"component": "kokorox", "version": "0.0.0.dev0"},
     "scope": "workspace",
     "workspace_id": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
     "installation": {
@@ -389,7 +389,7 @@
       "interaction_event": {
         "schema_version": "1.0",
         "artifact_id": "event/interaction-event-3",
-        "created_by": {"component": "kokoroarc", "version": "0.0.0.dev0"},
+        "created_by": {"component": "kokorox", "version": "0.0.0.dev0"},
         "event_id": "interaction-event-3",
         "turn_id": "turn-3",
         "origin": "verified_task_outcome",
@@ -407,7 +407,7 @@
   "persistence_export": {
     "schema_version": "1.0",
     "artifact_id": "persistence-exports/workspaces/eeeeeeee/rin-aster/export-02",
-    "created_by": {"component": "kokoroarc", "version": "0.0.0.dev0"},
+    "created_by": {"component": "kokorox", "version": "0.0.0.dev0"},
     "scope": "workspace",
     "workspace_id": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
     "namespace": "original",
@@ -415,7 +415,7 @@
     "consent": {
       "schema_version": "1.0",
       "artifact_id": "consents/workspaces/eeeeeeee/rin-aster/consent-02",
-      "created_by": {"component": "kokoroarc", "version": "0.0.0.dev0"},
+      "created_by": {"component": "kokorox", "version": "0.0.0.dev0"},
       "consent_id": "rin-aster-consent-02",
       "scope": "workspace",
       "workspace_id": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
@@ -436,7 +436,7 @@
     "state": {
       "schema_version": "1.0",
       "artifact_id": "persistent-state/workspaces/eeeeeeee/rin-aster/generation-22222222",
-      "created_by": {"component": "kokoroarc", "version": "0.0.0.dev0"},
+      "created_by": {"component": "kokorox", "version": "0.0.0.dev0"},
       "scope": "workspace",
       "workspace_id": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
       "installation": {
@@ -458,7 +458,7 @@
       "relationship": {
         "schema_version": "1.0",
         "artifact_id": "state/rin-aster/relationship-workspace",
-        "created_by": {"component": "kokoroarc", "version": "0.0.0.dev0"},
+        "created_by": {"component": "kokorox", "version": "0.0.0.dev0"},
         "revision": 3,
         "turn_index": 3,
         "dimensions": {
@@ -503,7 +503,7 @@
       {
         "schema_version": "1.0",
         "artifact_id": "memory-references/workspaces/eeeeeeee/rin-aster/project-01",
-        "created_by": {"component": "kokoroarc", "version": "0.0.0.dev0"},
+        "created_by": {"component": "kokorox", "version": "0.0.0.dev0"},
         "memory_reference_id": "rin-aster-project-01",
         "source_kind": "host_approved_reference",
         "host_memory_id": "host-memory-project-01",
@@ -533,7 +533,7 @@
   "state_migration_plan": {
     "schema_version": "1.0",
     "artifact_id": "state-migrations/workspaces/eeeeeeee/rin-aster/preview-02",
-    "created_by": {"component": "kokoroarc", "version": "0.0.0.dev0"},
+    "created_by": {"component": "kokorox", "version": "0.0.0.dev0"},
     "migration_id": "state-migration-02",
     "scope": "workspace",
     "workspace_id": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",

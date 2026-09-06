@@ -10,12 +10,12 @@ from typing import Any
 import pytest
 import yaml
 
-from kokoroarc.errors import KokoroError
-from kokoroarc.packs.compiler import canonical_bytes
-from kokoroarc.packs.security import PackLimits
-from kokoroarc.schemas import SchemaRegistry
-from kokoroarc.testing import hard as hard_module
-from kokoroarc.testing.hard import hard_report_is_current, run_hard_validation
+from kokorox.errors import KokoroError
+from kokorox.packs.compiler import canonical_bytes
+from kokorox.packs.security import PackLimits
+from kokorox.schemas import SchemaRegistry
+from kokorox.testing import hard as hard_module
+from kokorox.testing.hard import hard_report_is_current, run_hard_validation
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]

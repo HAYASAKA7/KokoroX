@@ -7,12 +7,12 @@ from typing import Any, Callable
 
 import pytest
 
-import kokoroarc.research.validation as research_validation
-from kokoroarc.errors import KokoroError
-from kokoroarc.packs.compiler import canonical_bytes
-from kokoroarc.research.validation import validate_research_workspace
-from kokoroarc.research.workspace import ResearchWorkspace, load_research_workspace
-from kokoroarc.schemas import SchemaRegistry
+import kokorox.research.validation as research_validation
+from kokorox.errors import KokoroError
+from kokorox.packs.compiler import canonical_bytes
+from kokorox.research.validation import validate_research_workspace
+from kokorox.research.workspace import ResearchWorkspace, load_research_workspace
+from kokorox.schemas import SchemaRegistry
 
 
 SCHEMAS = SchemaRegistry(Path("schemas/v1"))

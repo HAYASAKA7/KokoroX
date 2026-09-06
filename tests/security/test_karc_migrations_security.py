@@ -5,10 +5,10 @@ from typing import Any
 
 import pytest
 
-import kokoroarc.distribution.migrations as migrations
-from kokoroarc.distribution.migrations import apply_karc_migration
-from kokoroarc.errors import KokoroError
-from kokoroarc.schemas import SchemaRegistry
+import kokorox.distribution.migrations as migrations
+from kokorox.distribution.migrations import apply_karc_migration
+from kokorox.errors import KokoroError
+from kokorox.schemas import SchemaRegistry
 
 from karc_test_support import build_private_archive, make_legacy_090_archive
 

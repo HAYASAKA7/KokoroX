@@ -10,10 +10,10 @@ from typing import Any
 import pytest
 import yaml
 
-from kokoroarc.errors import KokoroError
-from kokoroarc.packs import security as pack_security
-from kokoroarc.testing import corpus as corpus_module
-from kokoroarc.testing.corpus import CorpusLimits, load_test_corpus
+from kokorox.errors import KokoroError
+from kokorox.packs import security as pack_security
+from kokorox.testing import corpus as corpus_module
+from kokorox.testing.corpus import CorpusLimits, load_test_corpus
 
 
 def complete_documents() -> dict[str, dict[str, Any]]:

@@ -2,7 +2,7 @@
   "language_policy": {
     "schema_version": "1.0",
     "artifact_id": "policy/session-1",
-    "created_by": {"component": "kokoroarc", "version": "0.0.0.dev0"},
+    "created_by": {"component": "kokorox", "version": "0.0.0.dev0"},
     "mode": "mixed",
     "primary_language": "zh-CN",
     "channels": {
@@ -22,7 +22,7 @@
   "semantic_result": {
     "schema_version": "1.0",
     "artifact_id": "semantic/turn-1",
-    "created_by": {"component": "kokoroarc", "version": "0.0.0.dev0"},
+    "created_by": {"component": "kokorox", "version": "0.0.0.dev0"},
     "scenario": "debugging",
     "conclusion": "The read path is unprotected.",
     "explanation": ["Writes are locked while reads are not."],
@@ -34,7 +34,7 @@
   "render_plan": {
     "schema_version": "1.0",
     "artifact_id": "plan/turn-1",
-    "created_by": {"component": "kokoroarc", "version": "0.0.0.dev0"},
+    "created_by": {"component": "kokorox", "version": "0.0.0.dev0"},
     "primary_language": "zh-CN",
     "segments": [
       {"id": "s1", "channel": "character_dialogue", "target_language": "ja-JP", "semantic_keys": ["conclusion"]},
@@ -46,7 +46,7 @@
   "validation_result": {
     "schema_version": "1.0",
     "artifact_id": "validation/turn-1",
-    "created_by": {"component": "kokoroarc", "version": "0.0.0.dev0"},
+    "created_by": {"component": "kokorox", "version": "0.0.0.dev0"},
     "valid": true,
     "violations": [],
     "fallback_level": null
@@ -54,7 +54,7 @@
   "interaction_event": {
     "schema_version": "1.0",
     "artifact_id": "event/event-1",
-    "created_by": {"component": "kokoroarc", "version": "0.0.0.dev0"},
+    "created_by": {"component": "kokorox", "version": "0.0.0.dev0"},
     "event_id": "event-1",
     "turn_id": "turn-1",
     "origin": "verified_task_outcome",
@@ -68,7 +68,7 @@
   "relationship_state": {
     "schema_version": "1.0",
     "artifact_id": "state/session-1",
-    "created_by": {"component": "kokoroarc", "version": "0.0.0.dev0"},
+    "created_by": {"component": "kokorox", "version": "0.0.0.dev0"},
     "revision": 0,
     "turn_index": 0,
     "dimensions": {"familiarity": 0.0, "trust": 0.0, "collaboration": 0.0, "tension": 0.0},
@@ -79,7 +79,7 @@
   "session_manifest": {
     "schema_version": "1.0",
     "artifact_id": "session/session-1",
-    "created_by": {"component": "kokoroarc", "version": "0.0.0.dev0"},
+    "created_by": {"component": "kokorox", "version": "0.0.0.dev0"},
     "session_id": "session-1",
     "character_id": "rin-aster",
     "character_version": "1.0.0",

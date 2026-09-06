@@ -5,11 +5,11 @@ from typing import Any
 
 import pytest
 
-from kokoroarc.errors import KokoroError
-from kokoroarc.packs import loader as pack_loader
-from kokoroarc.packs.loader import load_source_pack, load_yaml, resolve_pack_file
-from kokoroarc.packs.security import PackLimits
-from kokoroarc.schemas import SchemaRegistry
+from kokorox.errors import KokoroError
+from kokorox.packs import loader as pack_loader
+from kokorox.packs.loader import load_source_pack, load_yaml, resolve_pack_file
+from kokorox.packs.security import PackLimits
+from kokorox.schemas import SchemaRegistry
 
 
 REQUIRED_COMPONENTS = {

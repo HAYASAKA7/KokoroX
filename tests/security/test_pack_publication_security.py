@@ -11,13 +11,13 @@ from typing import Any, Callable
 import pytest
 import yaml
 
-from kokoroarc import __version__
-from kokoroarc.errors import KokoroError
-from kokoroarc.packs.compiler import canonical_bytes, compile_pack
-from kokoroarc.packs.loader import load_source_pack
-from kokoroarc.schemas import SchemaRegistry
-from kokoroarc.testing import publication as publication_module
-from kokoroarc.testing.publication import (
+from kokorox import __version__
+from kokorox.errors import KokoroError
+from kokorox.packs.compiler import canonical_bytes, compile_pack
+from kokorox.packs.loader import load_source_pack
+from kokorox.schemas import SchemaRegistry
+from kokorox.testing import publication as publication_module
+from kokorox.testing.publication import (
     assess_publication_readiness,
     publication_report_is_current,
 )
@@ -38,7 +38,7 @@ def _promotion(pack: Path) -> dict[str, Any]:
     return {
         "schema_version": "1.0",
         "artifact_id": f"{prefix}/release/promotion-verified",
-        "created_by": {"component": "kokoroarc", "version": __version__},
+        "created_by": {"component": "kokorox", "version": __version__},
         "promotion_id": "rin-promotion-verified-01",
         "namespace": source["namespace"],
         "character_id": source["character_id"],

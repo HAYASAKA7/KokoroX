@@ -6,11 +6,11 @@ from pathlib import Path
 
 import pytest
 
-from kokoroarc.errors import KokoroError
-from kokoroarc.packs.compiler import canonical_bytes
-from kokoroarc.research import load_research_workspace
-from kokoroarc.research.workspace import ResearchLimits
-from kokoroarc.schemas import SchemaRegistry
+from kokorox.errors import KokoroError
+from kokorox.packs.compiler import canonical_bytes
+from kokorox.research import load_research_workspace
+from kokorox.research.workspace import ResearchLimits
+from kokorox.schemas import SchemaRegistry
 
 
 def test_load_research_workspace_returns_canonical_assembled_artifacts() -> None:
@@ -27,7 +27,7 @@ def test_load_research_workspace_returns_canonical_assembled_artifacts() -> None
     assert len(loaded.workspace_hash) == 64
     assert (
         loaded.workspace_hash
-        == "36c328d763dd4ca705f1619c8225cbc304ac09ccfe930c54375d2b9cf8c128a1"
+        == "681a1e9a00122ba7f52238520105a3e070ebcf51695f3263a443e1a7cd817fae"
     )
     assert loaded.workspace_hash == load_research_workspace(
         Path("tests/fixtures/research/complete"), registry
@@ -110,7 +110,7 @@ def test_loads_partial_and_injection_workspaces_without_executing_source_text() 
     assert partial.coverage["blocks_authoring"] is True
     assert (
         partial.workspace_hash
-        == "2a46dc2af58ccb7ac0541605e88a8f64db20035a4a02fcd8fe94843f4dc4586b"
+        == "0b34cbc99ca009d956fd9d7f3058c5ae1f048b8cf0ffbed9c77ae2149f1cff7b"
     )
     assert injection.request["character_id"] == "aoi-kisaragi-fixture"
     assert all(

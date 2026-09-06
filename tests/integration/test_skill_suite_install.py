@@ -7,7 +7,7 @@ import shutil
 
 import pytest
 
-from kokoroarc.distribution.suite import (
+from kokorox.distribution.suite import (
     SKILL_SUITE_NAMES,
     install_skill_suite,
 )
@@ -47,7 +47,7 @@ def _assert_no_transaction_debris(skills_root: Path) -> None:
     assert not [
         path
         for path in skills_root.rglob("*")
-        if path.name.startswith(".kokoroarc-skill-suite-")
+        if path.name.startswith(".kokorox-skill-suite-")
     ]
 
 
@@ -55,7 +55,7 @@ def _coordination_lock(parent: Path, skills_root: Path) -> Path:
     token = sha256(
         os.path.normcase(str(skills_root)).encode("utf-8")
     ).hexdigest()[:16]
-    return parent / f".kokoroarc-skill-suite-{token}.lock"
+    return parent / f".kokorox-skill-suite-{token}.lock"
 
 
 def test_installs_the_complete_suite_into_an_explicit_user_root(

@@ -7,12 +7,12 @@ from typing import Any
 
 import pytest
 
-from kokoroarc.authoring.requests import normalize_build_request
-from kokoroarc.authoring.validation import validate_authoring_pack
-from kokoroarc.errors import KokoroError
-from kokoroarc.research.bundles import canonical_hash
-from kokoroarc.schemas import SchemaRegistry
-from kokoroarc import __version__
+from kokorox.authoring.requests import normalize_build_request
+from kokorox.authoring.validation import validate_authoring_pack
+from kokorox.errors import KokoroError
+from kokorox.research.bundles import canonical_hash
+from kokorox.schemas import SchemaRegistry
+from kokorox import __version__
 
 
 @pytest.fixture
@@ -25,7 +25,7 @@ def original_request() -> dict[str, Any]:
     return {
         "schema_version": "1.0",
         "artifact_id": "original/rin-aster/build-request",
-        "created_by": {"component": "kokoroarc", "version": __version__},
+        "created_by": {"component": "kokorox", "version": __version__},
         "mode": "original",
         "namespace": "original",
         "character_id": "rin-aster",

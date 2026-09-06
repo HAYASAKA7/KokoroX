@@ -7,16 +7,16 @@ import json
 from pathlib import Path
 from typing import Any
 
-from kokoroarc import __version__
-from kokoroarc.packs.compiler import canonical_bytes
-from kokoroarc.schemas import SchemaRegistry
-from kokoroarc.testing.hard import run_hard_validation
-from kokoroarc.testing.promotion import create_promotion_record
-from kokoroarc.testing.publication import (
+from kokorox import __version__
+from kokorox.packs.compiler import canonical_bytes
+from kokorox.schemas import SchemaRegistry
+from kokorox.testing.hard import run_hard_validation
+from kokorox.testing.promotion import create_promotion_record
+from kokorox.testing.publication import (
     assess_publication_readiness,
     publication_report_is_current,
 )
-from kokoroarc.testing.soft import aggregate_soft_evaluation
+from kokorox.testing.soft import aggregate_soft_evaluation
 
 
 SCHEMAS = SchemaRegistry(Path("schemas/v1"))
@@ -43,7 +43,7 @@ def test_real_rin_pipeline_produces_a_current_private_readiness_report() -> None
     review = {
         "schema_version": "1.0",
         "artifact_id": "original/rin-aster/release/review",
-        "created_by": {"component": "kokoroarc", "version": __version__},
+        "created_by": {"component": "kokorox", "version": __version__},
         "review_id": "rin-review-01",
         "namespace": "original",
         "character_id": "rin-aster",
@@ -70,7 +70,7 @@ def test_real_rin_pipeline_produces_a_current_private_readiness_report() -> None
     soft_input = {
         "schema_version": "1.0",
         "artifact_id": "original/rin-aster/release/soft-input",
-        "created_by": {"component": "kokoroarc", "version": __version__},
+        "created_by": {"component": "kokorox", "version": __version__},
         "namespace": "original",
         "character_id": "rin-aster",
         "character_version": "1.0.0",

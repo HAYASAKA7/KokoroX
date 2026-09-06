@@ -6,18 +6,18 @@ from copy import deepcopy
 
 import pytest
 
-import kokoroarc.distribution.registry as registry_module
-from kokoroarc.distribution.registry import (
+import kokorox.distribution.registry as registry_module
+from kokorox.distribution.registry import (
     empty_installed_registry,
     list_installed_packs,
     load_installed_registry,
     resolve_install_scope,
     write_installed_registry_cas,
 )
-from kokoroarc.errors import KokoroError
-from kokoroarc.packs.compiler import canonical_bytes
-from kokoroarc.schemas import SchemaRegistry
-from kokoroarc import __version__
+from kokorox.errors import KokoroError
+from kokorox.packs.compiler import canonical_bytes
+from kokorox.schemas import SchemaRegistry
+from kokorox import __version__
 
 
 SCHEMAS = SchemaRegistry(Path("schemas/v1"))
@@ -56,7 +56,7 @@ def test_global_scope_builds_the_canonical_revision_zero_registry() -> None:
     assert registry == {
         "schema_version": "1.0",
         "artifact_id": "registry/global/installed-packs",
-        "created_by": {"component": "kokoroarc", "version": __version__},
+        "created_by": {"component": "kokorox", "version": __version__},
         "scope": "global",
         "workspace_id": None,
         "revision": 0,

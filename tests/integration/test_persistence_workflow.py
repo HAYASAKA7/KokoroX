@@ -9,16 +9,16 @@ from typing import Any
 
 import pytest
 
-from kokoroarc.distribution import (
+from kokorox.distribution import (
     install_karc_archive,
     load_installed_registry,
     remove_installed_pack,
 )
-from kokoroarc.errors import KokoroError
-from kokoroarc.packs.compiler import canonical_bytes
-import kokoroarc.persistence as persistence
-from kokoroarc.schemas import SchemaRegistry
-from kokoroarc.state import SessionStore
+from kokorox.errors import KokoroError
+from kokorox.packs.compiler import canonical_bytes
+import kokorox.persistence as persistence
+from kokorox.schemas import SchemaRegistry
+from kokorox.state import SessionStore
 
 from karc_test_support import build_private_archive
 from persistence_support import (
@@ -102,9 +102,9 @@ def _fresh_process_replay(
             (
                 "import json, sys\n"
                 "from pathlib import Path\n"
-                "from kokoroarc.config import resolve_schema_dir\n"
-                "from kokoroarc.persistence import replay_persistent_state\n"
-                "from kokoroarc.schemas import SchemaRegistry\n"
+                "from kokorox.config import resolve_schema_dir\n"
+                "from kokorox.persistence import replay_persistent_state\n"
+                "from kokorox.schemas import SchemaRegistry\n"
                 "workspace = None if sys.argv[2] == '-' else Path(sys.argv[2])\n"
                 "result = replay_persistent_state(\n"
                 "    Path(sys.argv[1]), 'rin-aster',\n"

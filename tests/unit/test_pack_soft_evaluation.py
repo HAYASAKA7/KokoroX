@@ -9,11 +9,11 @@ from typing import Any
 
 import pytest
 
-from kokoroarc import __version__
-from kokoroarc.errors import KokoroError
-from kokoroarc.packs.compiler import canonical_bytes
-from kokoroarc.schemas import SchemaRegistry
-from kokoroarc.testing.soft import (
+from kokorox import __version__
+from kokorox.errors import KokoroError
+from kokorox.packs.compiler import canonical_bytes
+from kokorox.schemas import SchemaRegistry
+from kokorox.testing.soft import (
     aggregate_soft_evaluation,
     soft_report_is_current,
 )
@@ -65,7 +65,7 @@ def _evaluation_input() -> dict[str, Any]:
     return {
         "schema_version": "1.0",
         "artifact_id": "original/rin-aster/release/soft-input",
-        "created_by": {"component": "kokoroarc", "version": __version__},
+        "created_by": {"component": "kokorox", "version": __version__},
         "namespace": "original",
         "character_id": "rin-aster",
         "character_version": "1.0.0",
@@ -94,7 +94,7 @@ def _expected_report(value: dict[str, Any]) -> dict[str, Any]:
     return {
         "schema_version": "1.0",
         "artifact_id": "original/rin-aster/release/soft-evaluation",
-        "created_by": {"component": "kokoroarc", "version": __version__},
+        "created_by": {"component": "kokorox", "version": __version__},
         "namespace": "original",
         "character_id": "rin-aster",
         "character_version": "1.0.0",
@@ -132,10 +132,10 @@ def test_aggregates_all_dimensions_and_locales_into_one_exact_report() -> None:
 
     assert report == _expected_report(value)
     assert sha256(canonical_bytes(value)).hexdigest() == (
-        "376510a2809449bdd0d73e36f9546ce75655bf245423f811634a5dc05cd9f0a6"
+        "8ea7218e66ea1915db0f51d81132878f4c0bfcf9852f36b2c83a27013e5c4dde"
     )
     assert sha256(canonical_bytes(report)).hexdigest() == (
-        "df4cc0e35c4fcc1c35e9dbbe90aefe5a9f3865cda6e8214f7e038eb3487cc6e5"
+        "8530c427f9a3bbb4d140fc76435b36d9f54757dc384b7275dd287847d0718245"
     )
     SCHEMAS.validate("pack-soft-evaluation-report", report)
 
@@ -219,7 +219,7 @@ def test_currentness_uses_disposable_schema_instances_and_audits_callers() -> No
     class DetachedMutatingRegistry:
         def validate(self, name: str, instance: Any) -> None:
             SCHEMAS.validate(name, instance)
-            instance["created_by"] = {"component": "kokoroarc", "version": "9.0.0"}
+            instance["created_by"] = {"component": "kokorox", "version": "9.0.0"}
 
     assert soft_report_is_current(
         report,

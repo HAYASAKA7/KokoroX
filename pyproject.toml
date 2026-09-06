@@ -4,7 +4,7 @@ requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "kokoroarc"
+name = "kokorox"
 dynamic = ["version"]
 description = "A multilingual character-persona runtime for AI agents"
 readme = "README.md"
@@ -46,53 +46,53 @@ Repository = "https://github.com/HAYASAKA7/KokoroX"
 Issues = "https://github.com/HAYASAKA7/KokoroX/issues"
 
 [project.scripts]
-kokorox = "kokoroarc.cli:main"
+kokorox = "kokorox.cli:main"
 
 [tool.setuptools.dynamic]
-version = {attr = "kokoroarc.__version__"}
+version = {attr = "kokorox.__version__"}
 
 [tool.setuptools.package-data]
-kokoroarc = ["py.typed"]
+kokorox = ["py.typed"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
 
 [tool.setuptools.data-files]
-"share/kokoroarc/schemas/v1" = ["schemas/v1/*.schema.json"]
-"share/kokoroarc/skills/using-kokorox" = [
+"share/kokorox/schemas/v1" = ["schemas/v1/*.schema.json"]
+"share/kokorox/skills/using-kokorox" = [
   "skills/using-kokorox/SKILL.md",
 ]
-"share/kokoroarc/skills/using-kokorox/agents" = [
+"share/kokorox/skills/using-kokorox/agents" = [
   "skills/using-kokorox/agents/*.yaml",
 ]
-"share/kokoroarc/skills/using-kokorox/references" = [
+"share/kokorox/skills/using-kokorox/references" = [
   "skills/using-kokorox/references/*.md",
 ]
-"share/kokoroarc/skills/authoring-character-packs" = [
+"share/kokorox/skills/authoring-character-packs" = [
   "skills/authoring-character-packs/SKILL.md",
 ]
-"share/kokoroarc/skills/authoring-character-packs/agents" = [
+"share/kokorox/skills/authoring-character-packs/agents" = [
   "skills/authoring-character-packs/agents/*.yaml",
 ]
-"share/kokoroarc/skills/authoring-character-packs/references" = [
+"share/kokorox/skills/authoring-character-packs/references" = [
   "skills/authoring-character-packs/references/*.md",
 ]
-"share/kokoroarc/skills/researching-characters" = [
+"share/kokorox/skills/researching-characters" = [
   "skills/researching-characters/SKILL.md",
 ]
-"share/kokoroarc/skills/researching-characters/agents" = [
+"share/kokorox/skills/researching-characters/agents" = [
   "skills/researching-characters/agents/*.yaml",
 ]
-"share/kokoroarc/skills/researching-characters/references" = [
+"share/kokorox/skills/researching-characters/references" = [
   "skills/researching-characters/references/*.md",
 ]
-"share/kokoroarc/skills/testing-character-packs" = [
+"share/kokorox/skills/testing-character-packs" = [
   "skills/testing-character-packs/SKILL.md",
 ]
-"share/kokoroarc/skills/testing-character-packs/agents" = [
+"share/kokorox/skills/testing-character-packs/agents" = [
   "skills/testing-character-packs/agents/*.yaml",
 ]
-"share/kokoroarc/skills/testing-character-packs/references" = [
+"share/kokorox/skills/testing-character-packs/references" = [
   "skills/testing-character-packs/references/*.md",
 ]
 
@@ -104,7 +104,7 @@ addopts = "-ra"
 # Measure the repository tree only. A bare package name also matches the
 # copies integration tests install into temp roots, which would silently
 # inflate the denominator and understate coverage.
-source = ["src/kokoroarc"]
+source = ["src/kokorox"]
 # Statement coverage only: tests spawn subprocesses whose coverage data is
 # written without this config, and branch data cannot combine with statement
 # data ("Can't combine statement coverage data with branch data").
@@ -115,7 +115,7 @@ branch = false
 # Those child processes write coverage data that ignores `source` above, so the
 # combined file carries hundreds of near-empty temp copies. Report on the
 # repository tree only, or the denominator swamps the real number.
-include = ["src/kokoroarc/*"]
+include = ["src/kokorox/*"]
 show_missing = true
 skip_covered = true
 precision = 1

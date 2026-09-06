@@ -8,10 +8,10 @@ from typing import Any
 
 import pytest
 
-import kokoroarc.cli as cli
-from kokoroarc.cli import build_parser
-from kokoroarc.packs.compiler import canonical_bytes
-from kokoroarc.standalone_cli import (
+import kokorox.cli as cli
+from kokorox.cli import build_parser
+from kokorox.packs.compiler import canonical_bytes
+from kokorox.standalone_cli import (
     standalone_requires_data_root,
     standalone_route,
 )

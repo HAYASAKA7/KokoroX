@@ -41,7 +41,7 @@ EXPECTED_SKILL_FILES = {
 
 
 def _suite_module():
-    return importlib.import_module("kokoroarc.distribution.suite")
+    return importlib.import_module("kokorox.distribution.suite")
 
 
 def _relative_files(root: Path) -> set[str]:
@@ -75,7 +75,7 @@ def test_plugin_manifest_declares_only_the_four_skill_suite() -> None:
         "skills",
         "interface",
     }
-    assert payload["name"] == "kokoroarc"
+    assert payload["name"] == "kokorox"
     assert re.fullmatch(r"\d+\.\d+\.\d+", payload["version"])
     assert payload["version"] == "0.1.0"
     assert isinstance(payload["description"], str)
@@ -121,7 +121,7 @@ def test_plugin_skill_inventory_is_closed_and_complete() -> None:
 
 def test_distribution_suite_exposes_the_frozen_public_surface() -> None:
     suite = _suite_module()
-    distribution = importlib.import_module("kokoroarc.distribution")
+    distribution = importlib.import_module("kokorox.distribution")
 
     assert suite.SKILL_SUITE_NAMES == tuple(EXPECTED_SKILL_FILES)
     assert suite.SkillSuiteLimits().max_files == sum(
@@ -188,10 +188,10 @@ def test_installed_share_source_is_discovered_without_repository_source(
 ) -> None:
     suite = _suite_module()
     site_packages = tmp_path / "site-packages"
-    installed_module = site_packages / "kokoroarc" / "distribution" / "suite.py"
+    installed_module = site_packages / "kokorox" / "distribution" / "suite.py"
     installed_module.parent.mkdir(parents=True)
     installed_module.write_text("# location marker\n", encoding="utf-8")
-    installed_skills = site_packages / "share" / "kokoroarc" / "skills"
+    installed_skills = site_packages / "share" / "kokorox" / "skills"
     shutil.copytree(SOURCE_SKILLS, installed_skills)
     monkeypatch.setattr(suite, "__file__", str(installed_module))
 
@@ -204,10 +204,10 @@ def test_installed_source_ignores_prefix_sibling_skills(
 ) -> None:
     suite = _suite_module()
     site_packages = tmp_path / "environment" / "site-packages"
-    installed_module = site_packages / "kokoroarc" / "distribution" / "suite.py"
+    installed_module = site_packages / "kokorox" / "distribution" / "suite.py"
     installed_module.parent.mkdir(parents=True)
     installed_module.write_text("# location marker\n", encoding="utf-8")
-    installed_skills = site_packages / "share" / "kokoroarc" / "skills"
+    installed_skills = site_packages / "share" / "kokorox" / "skills"
     prefix_sibling_skills = installed_module.parents[3] / "skills"
     shutil.copytree(SOURCE_SKILLS, installed_skills)
     shutil.copytree(SOURCE_SKILLS, prefix_sibling_skills)
@@ -221,11 +221,11 @@ def test_automatic_source_discovery_rejects_two_complete_candidates(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     suite = _suite_module()
-    module = tmp_path / "repository" / "src" / "kokoroarc" / "distribution" / "suite.py"
+    module = tmp_path / "repository" / "src" / "kokorox" / "distribution" / "suite.py"
     module.parent.mkdir(parents=True)
     module.write_text("# location marker\n", encoding="utf-8")
     checkout_skills = module.parents[3] / "skills"
-    installed_skills = module.parents[2] / "share" / "kokoroarc" / "skills"
+    installed_skills = module.parents[2] / "share" / "kokorox" / "skills"
     shutil.copytree(SOURCE_SKILLS, checkout_skills)
     shutil.copytree(SOURCE_SKILLS, installed_skills)
     monkeypatch.setattr(suite, "__file__", str(module))
@@ -238,7 +238,7 @@ def test_automatic_source_discovery_rejects_no_complete_candidate(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     suite = _suite_module()
-    module = tmp_path / "lib" / "kokoroarc" / "distribution" / "suite.py"
+    module = tmp_path / "lib" / "kokorox" / "distribution" / "suite.py"
     module.parent.mkdir(parents=True)
     module.write_text("# location marker\n", encoding="utf-8")
     monkeypatch.setattr(suite, "__file__", str(module))
@@ -265,7 +265,7 @@ def test_preview_is_deterministic_closed_and_does_not_create_user_root(
 
     assert first == second
     assert first == {
-        "artifact_id": "kokoroarc/skill-suite/install-plan",
+        "artifact_id": "kokorox/skill-suite/install-plan",
         "version": "1.0.0",
         "scope": "user",
         "skills_root": str(skills_root.resolve(strict=False)),
@@ -457,7 +457,7 @@ def test_preview_classifies_identical_and_missing_skills(tmp_path: Path) -> None
         "install",
     ]
     assert result["will_write"] is True
-    assert not any(path.name.startswith(".kokoroarc") for path in skills_root.iterdir())
+    assert not any(path.name.startswith(".kokorox") for path in skills_root.iterdir())
 
 
 def test_preview_of_an_identical_suite_is_a_noop(tmp_path: Path) -> None:
@@ -647,5 +647,5 @@ def test_source_candidates_include_the_environment_prefix() -> None:
 
     candidates = suite._source_candidates(None)
 
-    relative = Path("share") / "kokoroarc" / "skills"
+    relative = Path("share") / "kokorox" / "skills"
     assert Path(sys.prefix) / relative in candidates

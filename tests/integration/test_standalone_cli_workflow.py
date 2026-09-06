@@ -8,10 +8,10 @@ import subprocess
 import sys
 from typing import Any
 
-from kokoroarc.packs.compiler import canonical_bytes
+from kokorox.packs.compiler import canonical_bytes
 
 from karc_test_support import archive_documents, build_private_archive
-from kokoroarc import __version__
+from kokorox import __version__
 
 
 REPOSITORY_ROOT = Path.cwd().resolve()
@@ -93,7 +93,7 @@ def _installed_cli(
     else:
         environment["KOKOROX_DATA_DIR"] = str(data_root)
     completed = subprocess.run(
-        [sys.executable, "-m", "kokoroarc.cli", *arguments],
+        [sys.executable, "-m", "kokorox.cli", *arguments],
         check=False,
         capture_output=True,
         text=True,
@@ -123,16 +123,16 @@ def _installed_probe(
             (
                 "import json, sys\n"
                 "from pathlib import Path\n"
-                "import kokoroarc\n"
-                "from kokoroarc.config import resolve_schema_dir\n"
-                "from kokoroarc.persistence import (\n"
+                "import kokorox\n"
+                "from kokorox.config import resolve_schema_dir\n"
+                "from kokorox.persistence import (\n"
                 "    apply_persistent_relationship_event,\n"
                 "    load_consent,\n"
                 "    replay_persistent_state,\n"
                 ")\n"
-                "from kokoroarc.schemas import SchemaRegistry\n"
+                "from kokorox.schemas import SchemaRegistry\n"
                 "installed = Path(sys.argv[1]).resolve(strict=True)\n"
-                "module = Path(kokoroarc.__file__).resolve(strict=True)\n"
+                "module = Path(kokorox.__file__).resolve(strict=True)\n"
                 "assert module.is_relative_to(installed)\n"
                 "data_root = Path(sys.argv[2])\n"
                 "schemas = SchemaRegistry(resolve_schema_dir())\n"
@@ -142,8 +142,8 @@ def _installed_probe(
                 "    'schema_version': '1.0',\n"
                 "    'artifact_id': 'event/installed-workflow-01',\n"
                 "    'created_by': {\n"
-                "        'component': 'kokoroarc',\n"
-                "        'version': kokoroarc.__version__,\n"
+                "        'component': 'kokorox',\n"
+                "        'version': kokorox.__version__,\n"
                 "    },\n"
                 "    'event_id': 'installed-workflow-01',\n"
                 "    'turn_id': 'turn-1',\n"

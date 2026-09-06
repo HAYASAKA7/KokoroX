@@ -9,11 +9,11 @@ from typing import Any
 
 import pytest
 
-from kokoroarc.errors import KokoroError
-from kokoroarc.packs.compiler import canonical_bytes
-from kokoroarc.schemas import SchemaRegistry
-from kokoroarc.testing import storage
-from kokoroarc.testing.storage import (
+from kokorox.errors import KokoroError
+from kokorox.packs.compiler import canonical_bytes
+from kokorox.schemas import SchemaRegistry
+from kokorox.testing import storage
+from kokorox.testing.storage import (
     load_published_promotion_record,
     publish_promotion_record,
 )

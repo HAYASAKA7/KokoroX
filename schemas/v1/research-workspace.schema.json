@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://kokoroarc.local/schemas/v1/research-workspace.schema.json",
+  "$id": "https://kokorox.local/schemas/v1/research-workspace.schema.json",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -165,7 +165,7 @@
       ],
       "properties": {
         "component": {
-          "const": "kokoroarc"
+          "const": "kokorox"
         },
         "version": {
           "type": "string",

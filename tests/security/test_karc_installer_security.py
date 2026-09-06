@@ -11,41 +11,41 @@ from typing import Any
 
 import pytest
 
-import kokoroarc.distribution.installer as installer_module
-import kokoroarc.distribution.registry as registry_module
-import kokoroarc.persistence._storage as persistence_storage_module
-import kokoroarc.persistence.consent as persistence_consent_module
-import kokoroarc.persistence.memory as persistence_memory_module
-import kokoroarc.persistence.migrations as persistence_migrations_module
-import kokoroarc.persistence.state as persistence_state_module
-from kokoroarc.distribution.installer import (
+import kokorox.distribution.installer as installer_module
+import kokorox.distribution.registry as registry_module
+import kokorox.persistence._storage as persistence_storage_module
+import kokorox.persistence.consent as persistence_consent_module
+import kokorox.persistence.memory as persistence_memory_module
+import kokorox.persistence.migrations as persistence_migrations_module
+import kokorox.persistence.state as persistence_state_module
+from kokorox.distribution.installer import (
     install_karc_archive,
     preview_karc_install,
     recover_karc_installations,
     remove_installed_pack,
 )
-from kokoroarc.distribution.registry import (
+from kokorox.distribution.registry import (
     empty_installed_registry,
     load_installed_registry,
     resolve_install_scope,
 )
-from kokoroarc.errors import KokoroError
-from kokoroarc.packs.compiler import canonical_bytes
-from kokoroarc.persistence.consent import grant_consent, revoke_consent
-from kokoroarc.persistence.memory import (
+from kokorox.errors import KokoroError
+from kokorox.packs.compiler import canonical_bytes
+from kokorox.persistence.consent import grant_consent, revoke_consent
+from kokorox.persistence.memory import (
     add_memory_reference,
     remove_memory_reference,
 )
-from kokoroarc.persistence.migrations import (
+from kokorox.persistence.migrations import (
     apply_state_migration,
     preview_state_migration,
 )
-from kokoroarc.persistence.state import (
+from kokorox.persistence.state import (
     apply_persistent_relationship_event,
     preview_persistent_reset,
     reset_persistent_data,
 )
-from kokoroarc.schemas import SchemaRegistry
+from kokorox.schemas import SchemaRegistry
 
 from karc_test_support import build_private_archive
 from persistence_support import (
@@ -446,7 +446,7 @@ def _default_config(plan: dict[str, Any]) -> dict[str, Any]:
     return {
         "schema_version": "1.0",
         "artifact_id": "config/global/character-default",
-        "created_by": {"component": "kokoroarc", "version": "test"},
+        "created_by": {"component": "kokorox", "version": "test"},
         "scope": "global",
         "workspace_id": None,
         "revision": 1,
@@ -466,7 +466,7 @@ def _session_manifest(plan: dict[str, Any], *, active: bool) -> dict[str, Any]:
     return {
         "schema_version": "1.0",
         "artifact_id": "session/removal-blocker",
-        "created_by": {"component": "kokoroarc", "version": "test"},
+        "created_by": {"component": "kokorox", "version": "test"},
         "session_id": "removal-blocker",
         "character_id": "rin-aster",
         "character_version": "1.0.0",

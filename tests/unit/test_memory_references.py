@@ -7,16 +7,16 @@ from typing import Any, Callable
 
 import pytest
 
-from kokoroarc.errors import KokoroError
-from kokoroarc.packs.compiler import canonical_bytes
-from kokoroarc.persistence._storage import PersistenceLimits
-from kokoroarc.persistence.consent import grant_consent, revoke_consent
-from kokoroarc.persistence.memory import (
+from kokorox.errors import KokoroError
+from kokorox.packs.compiler import canonical_bytes
+from kokorox.persistence._storage import PersistenceLimits
+from kokorox.persistence.consent import grant_consent, revoke_consent
+from kokorox.persistence.memory import (
     add_memory_reference,
     list_memory_references,
     remove_memory_reference,
 )
-from kokoroarc.persistence.state import (
+from kokorox.persistence.state import (
     apply_persistent_relationship_event,
     preview_persistent_reset,
     replay_persistent_state,

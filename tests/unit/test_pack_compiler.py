@@ -8,11 +8,11 @@ from typing import Any
 
 import pytest
 
-from kokoroarc import __version__
-from kokoroarc.errors import KokoroError
-from kokoroarc.packs.compiler import canonical_bytes, compile_pack
-from kokoroarc.packs.loader import load_source_pack
-from kokoroarc.schemas import SchemaRegistry
+from kokorox import __version__
+from kokorox.errors import KokoroError
+from kokorox.packs.compiler import canonical_bytes, compile_pack
+from kokorox.packs.loader import load_source_pack
+from kokorox.schemas import SchemaRegistry
 
 
 SCHEMAS = SchemaRegistry(Path("schemas/v1"))
@@ -91,7 +91,7 @@ def test_compile_pack_builds_runtime_metadata() -> None:
 
     assert compiled["schema_version"] == "1.0"
     assert compiled["artifact_id"] == "original/rin-aster/compiled"
-    assert compiled["created_by"] == {"component": "kokoroarc", "version": __version__}
+    assert compiled["created_by"] == {"component": "kokorox", "version": __version__}
     assert compiled["character_id"] == "rin-aster"
     assert compiled["character_version"] == "1.0.0"
 

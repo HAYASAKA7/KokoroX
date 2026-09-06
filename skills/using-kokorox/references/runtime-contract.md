@@ -67,7 +67,7 @@ Create one closed JSON object before characterization:
 {
   "schema_version": "1.0",
   "artifact_id": "semantic/turn-1",
-  "created_by": {"component": "kokoroarc", "version": "<installed-version>"},
+  "created_by": {"component": "kokorox", "version": "<installed-version>"},
   "scenario": "debugging",
   "conclusion": "The cause is clear.",
   "explanation": ["The read path is not protected."],
@@ -132,7 +132,7 @@ An event is a closed JSON object:
 {
   "schema_version": "1.0",
   "artifact_id": "event/turn-1-result",
-  "created_by": {"component": "kokoroarc", "version": "<installed-version>"},
+  "created_by": {"component": "kokorox", "version": "<installed-version>"},
   "event_id": "turn-1-result",
   "turn_id": "turn-1",
   "origin": "verified_task_outcome",

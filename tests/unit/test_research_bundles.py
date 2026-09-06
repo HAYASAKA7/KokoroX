@@ -7,13 +7,13 @@ from typing import Any
 
 import pytest
 
-from kokoroarc.errors import KokoroError
-from kokoroarc.packs.compiler import canonical_bytes
-from kokoroarc.research import build_research_bundle
-from kokoroarc.research.bundles import canonical_hash
-from kokoroarc.research.validation import validate_research_workspace
-from kokoroarc.research.workspace import ResearchWorkspace, load_research_workspace
-from kokoroarc.schemas import SchemaRegistry
+from kokorox.errors import KokoroError
+from kokorox.packs.compiler import canonical_bytes
+from kokorox.research import build_research_bundle
+from kokorox.research.bundles import canonical_hash
+from kokorox.research.validation import validate_research_workspace
+from kokorox.research.workspace import ResearchWorkspace, load_research_workspace
+from kokorox.schemas import SchemaRegistry
 
 
 SCHEMAS = SchemaRegistry(Path("schemas/v1"))
@@ -53,12 +53,12 @@ def test_build_research_bundle_is_byte_stable_and_non_mutating() -> None:
     assert first["request_hash"] == canonical_hash(workspace.request)
     assert (
         first["request_hash"]
-        == "ce2816fe46ddd45950a939d6286d148ea4cab94218ec65df62daa361d4307fec"
+        == "4c7b3359079ea3de34ab48882eec415e8b931cda8bdc32c801afe91e22410029"
     )
     assert first["validation_report_hash"] == canonical_hash(report)
     assert (
         first["validation_report_hash"]
-        == "e7c93e4131ece711232525fd01f39213bc4499cda00caf35edc1e4a8202bd3f1"
+        == "c8ed36ce5f28b8c48b91fb74215859a53ac56d9d12e066a38ef2549237585531"
     )
     assert report == report_before
     assert workspace_before == canonical_bytes(

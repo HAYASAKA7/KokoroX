@@ -8,9 +8,9 @@ from typing import Any
 
 import pytest
 
-from kokoroarc.errors import KokoroError
-from kokoroarc.packs import compiler
-from kokoroarc.packs.compiler import canonical_bytes, write_compiled_pack
+from kokorox.errors import KokoroError
+from kokorox.packs import compiler
+from kokorox.packs.compiler import canonical_bytes, write_compiled_pack
 
 
 def temp_files(directory: Path) -> list[Path]:

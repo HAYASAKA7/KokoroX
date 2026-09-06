@@ -7,18 +7,18 @@ from typing import Any
 
 import pytest
 
-import kokoroarc.distribution.installer as installer_module
-from kokoroarc.distribution.archive import inspect_karc_container
-from kokoroarc.distribution.installer import (
+import kokorox.distribution.installer as installer_module
+from kokorox.distribution.archive import inspect_karc_container
+from kokorox.distribution.installer import (
     install_karc_archive,
     recover_karc_installations,
     remove_installed_pack,
 )
-from kokoroarc.distribution.registry import load_installed_registry
-from kokoroarc.errors import KokoroError
-from kokoroarc.packs.compiler import canonical_bytes
-from kokoroarc.schemas import SchemaRegistry
-from kokoroarc.state.store import SessionStore
+from kokorox.distribution.registry import load_installed_registry
+from kokorox.errors import KokoroError
+from kokorox.packs.compiler import canonical_bytes
+from kokorox.schemas import SchemaRegistry
+from kokorox.state.store import SessionStore
 
 from karc_test_support import build_private_archive
 

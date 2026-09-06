@@ -8,11 +8,11 @@ from types import SimpleNamespace
 
 import pytest
 
-from kokoroarc import __version__
-from kokoroarc.errors import KokoroError
-from kokoroarc.schemas import SchemaRegistry
-from kokoroarc.state import store as store_module
-from kokoroarc.state.store import SessionStore
+from kokorox import __version__
+from kokorox.errors import KokoroError
+from kokorox.schemas import SchemaRegistry
+from kokorox.state import store as store_module
+from kokorox.state.store import SessionStore
 
 
 HASH = "a" * 64
@@ -31,7 +31,7 @@ def expected_manifest(session_id: str = "session-1") -> dict:
     return {
         "schema_version": "1.0",
         "artifact_id": f"session/{session_id}",
-        "created_by": {"component": "kokoroarc", "version": __version__},
+        "created_by": {"component": "kokorox", "version": __version__},
         "session_id": session_id,
         "character_id": "rin-aster",
         "character_version": "1.2.3",
@@ -47,7 +47,7 @@ def expected_state(session_id: str = "session-1") -> dict:
     return {
         "schema_version": "1.0",
         "artifact_id": f"state/{session_id}",
-        "created_by": {"component": "kokoroarc", "version": __version__},
+        "created_by": {"component": "kokorox", "version": __version__},
         "revision": 0,
         "turn_index": 0,
         "dimensions": {
@@ -126,9 +126,9 @@ def test_snapshot_waits_for_the_session_advisory_lock(tmp_path: Path) -> None:
 
 
 def _process_start_worker(data_root: str, barrier, results) -> None:
-    from kokoroarc.errors import KokoroError
-    from kokoroarc.state import store as process_store_module
-    from kokoroarc.state.store import SessionStore
+    from kokorox.errors import KokoroError
+    from kokorox.state import store as process_store_module
+    from kokorox.state.store import SessionStore
 
     real_write = process_store_module._atomic_write_json
 
@@ -848,7 +848,7 @@ def test_atomic_write_failure_preserves_existing_file_and_cleans_staging(
     def fail_replace(_source: Path, _target: Path) -> None:
         raise expected
 
-    monkeypatch.setattr("kokoroarc.packs.compiler.os.replace", fail_replace)
+    monkeypatch.setattr("kokorox.packs.compiler.os.replace", fail_replace)
 
     with pytest.raises(PermissionError) as raised:
         store_module._atomic_write_json({"new": True}, target)

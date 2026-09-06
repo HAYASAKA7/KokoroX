@@ -11,11 +11,11 @@ from typing import Any
 
 import pytest
 
-from kokoroarc import __version__
-from kokoroarc import cli as cli_module
-from kokoroarc.config import Settings
-from kokoroarc.errors import KokoroError
-from kokoroarc.schemas import SchemaRegistry
+from kokorox import __version__
+from kokorox import cli as cli_module
+from kokorox.config import Settings
+from kokorox.errors import KokoroError
+from kokorox.schemas import SchemaRegistry
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 RIN_PACK = REPOSITORY_ROOT / "characters" / "original" / "rin-aster"
@@ -29,7 +29,7 @@ def run_cli(
     env = os.environ.copy()
     env["KOKOROX_DATA_DIR"] = str(data_dir)
     completed = subprocess.run(
-        [sys.executable, "-m", "kokoroarc.cli", *args, "--json"],
+        [sys.executable, "-m", "kokorox.cli", *args, "--json"],
         check=False,
         capture_output=True,
         text=True,
@@ -84,7 +84,7 @@ def semantic_artifact() -> dict[str, Any]:
     return {
         "schema_version": "1.0",
         "artifact_id": "semantic/turn-1",
-        "created_by": {"component": "kokoroarc", "version": __version__},
+        "created_by": {"component": "kokorox", "version": __version__},
         "scenario": "debugging",
         "conclusion": "The cause is clear.",
         "explanation": ["The read path is not protected."],
@@ -99,7 +99,7 @@ def interaction_event(event_id: str, revision: int) -> dict[str, Any]:
     return {
         "schema_version": "1.0",
         "artifact_id": f"event/{event_id}",
-        "created_by": {"component": "kokoroarc", "version": __version__},
+        "created_by": {"component": "kokorox", "version": __version__},
         "event_id": event_id,
         "turn_id": f"turn-{revision + 1}",
         "origin": "verified_task_outcome",

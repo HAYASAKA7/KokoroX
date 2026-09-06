@@ -5,19 +5,19 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-import kokoroarc.distribution.defaults as defaults_module
+import kokorox.distribution.defaults as defaults_module
 import pytest
 
-from kokoroarc.distribution.defaults import (
+from kokorox.distribution.defaults import (
     CharacterSelection,
     empty_character_default,
     load_character_default,
     resolve_character_selection,
 )
-from kokoroarc.distribution.registry import InstallScope, resolve_install_scope
-from kokoroarc.errors import KokoroError
-from kokoroarc.packs.compiler import canonical_bytes
-from kokoroarc.schemas import SchemaRegistry
+from kokorox.distribution.registry import InstallScope, resolve_install_scope
+from kokorox.errors import KokoroError
+from kokorox.packs.compiler import canonical_bytes
+from kokorox.schemas import SchemaRegistry
 
 
 SCHEMAS = SchemaRegistry(Path("schemas/v1"))

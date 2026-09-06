@@ -6,16 +6,16 @@ from typing import Any
 
 import pytest
 
-from kokoroarc.distribution.archive import load_karc_archive
-from kokoroarc.distribution.migrations import (
+from kokorox.distribution.archive import load_karc_archive
+from kokorox.distribution.migrations import (
     DEFAULT_MIGRATIONS,
     MigrationRegistry,
     MigrationStep,
     preview_karc_migration,
 )
-from kokoroarc.errors import KokoroError
-from kokoroarc.packs.compiler import canonical_bytes
-from kokoroarc.schemas import SchemaRegistry
+from kokorox.errors import KokoroError
+from kokorox.packs.compiler import canonical_bytes
+from kokorox.schemas import SchemaRegistry
 
 from karc_test_support import (
     add_archive_code,

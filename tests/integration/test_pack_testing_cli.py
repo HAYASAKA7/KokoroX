@@ -11,8 +11,8 @@ from typing import Any
 
 import yaml
 
-from kokoroarc.packs.compiler import canonical_bytes
-from kokoroarc.schemas import SchemaRegistry
+from kokorox.packs.compiler import canonical_bytes
+from kokorox.schemas import SchemaRegistry
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
@@ -35,7 +35,7 @@ def _run_cli(
     env["KOKOROX_DATA_DIR"] = str(data_dir)
     env["PYTHONPATH"] = str(REPOSITORY_ROOT / "src")
     completed = subprocess.run(
-        [sys.executable, "-m", "kokoroarc.cli", *arguments, "--json"],
+        [sys.executable, "-m", "kokorox.cli", *arguments, "--json"],
         check=False,
         capture_output=True,
         text=True,

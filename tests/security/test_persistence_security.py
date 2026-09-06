@@ -11,27 +11,27 @@ from typing import Any
 
 import pytest
 
-from kokoroarc.errors import KokoroError
-from kokoroarc.packs.compiler import canonical_bytes
-import kokoroarc.persistence._storage as storage
-import kokoroarc.persistence.consent as persistent_consent_module
-from kokoroarc.persistence.consent import (
+from kokorox.errors import KokoroError
+from kokorox.packs.compiler import canonical_bytes
+import kokorox.persistence._storage as storage
+import kokorox.persistence.consent as persistent_consent_module
+from kokorox.persistence.consent import (
     grant_consent,
     load_consent,
     revoke_consent,
 )
-import kokoroarc.persistence.memory as persistent_memory_module
-from kokoroarc.persistence.memory import (
+import kokorox.persistence.memory as persistent_memory_module
+from kokorox.persistence.memory import (
     add_memory_reference,
     list_memory_references,
     remove_memory_reference,
 )
-import kokoroarc.persistence.migrations as persistent_migrations_module
-from kokoroarc.persistence.migrations import (
+import kokorox.persistence.migrations as persistent_migrations_module
+from kokorox.persistence.migrations import (
     apply_state_migration,
     preview_state_migration,
 )
-from kokoroarc.persistence.state import (
+from kokorox.persistence.state import (
     apply_persistent_mood_event,
     apply_persistent_relationship_event,
     export_persistent_data,
@@ -39,9 +39,9 @@ from kokoroarc.persistence.state import (
     replay_persistent_state,
     reset_persistent_data,
 )
-import kokoroarc.persistence.state as persistent_state_module
-from kokoroarc.schemas import SchemaRegistry
-from kokoroarc import __version__
+import kokorox.persistence.state as persistent_state_module
+from kokorox.schemas import SchemaRegistry
+from kokorox import __version__
 
 from persistence_support import (
     ConsentedRin,
@@ -96,7 +96,7 @@ def _consent() -> dict[str, Any]:
     return {
         "schema_version": "1.0",
         "artifact_id": "consents/global/rin-aster/consent-01",
-        "created_by": {"component": "kokoroarc", "version": __version__},
+        "created_by": {"component": "kokorox", "version": __version__},
         "consent_id": "rin-aster-consent-01",
         "scope": "global",
         "workspace_id": None,

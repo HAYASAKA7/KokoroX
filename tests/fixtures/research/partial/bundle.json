@@ -2,7 +2,7 @@
   "schema_version": "1.0",
   "artifact_id": "research/aoi-kisaragi-fixture/partial-bundle",
   "created_by": {
-    "component": "kokoroarc",
+    "component": "kokorox",
     "version": "0.0.0.dev0"
   },
   "build_status": "research",
@@ -15,15 +15,15 @@
   "continuity": "fixture-primary",
   "timeline_cutoff": "episode-01",
   "spoiler_scope": "episode-01 only",
-  "request_hash": "03bda76a0e838897d3d4e13a7828cbb09203f65d57536be5887f6eb00acf2bb3",
-  "workspace_hash": "2a46dc2af58ccb7ac0541605e88a8f64db20035a4a02fcd8fe94843f4dc4586b",
-  "validation_report_hash": "b6e98d893137839e902e11859dbd907ea35bf0597499605175f5865eabdba24a",
+  "request_hash": "62a11b2243c68c2767a6056a5d6640483e309d679b08300b2f2345726f7df19c",
+  "workspace_hash": "0b34cbc99ca009d956fd9d7f3058c5ae1f048b8cf0ffbed9c77ae2149f1cff7b",
+  "validation_report_hash": "6bdc6df186e7a3b7390827f83406e75e5f6d9dbaa925a763eb41fb368b891e35",
   "sources": [
     {
       "schema_version": "1.0",
       "artifact_id": "research/aoi-kisaragi-fixture/partial-source",
       "created_by": {
-        "component": "kokoroarc",
+        "component": "kokorox",
         "version": "0.0.0.dev0"
       },
       "source_id": "source-official-profile",
@@ -50,7 +50,7 @@
       "schema_version": "1.0",
       "artifact_id": "research/aoi-kisaragi-fixture/partial-claim-history",
       "created_by": {
-        "component": "kokoroarc",
+        "component": "kokorox",
         "version": "0.0.0.dev0"
       },
       "claim_id": "claim-history",
@@ -71,7 +71,7 @@
       "schema_version": "1.0",
       "artifact_id": "research/aoi-kisaragi-fixture/partial-claim-role",
       "created_by": {
-        "component": "kokoroarc",
+        "component": "kokorox",
         "version": "0.0.0.dev0"
       },
       "claim_id": "claim-role",
@@ -94,7 +94,7 @@
       "schema_version": "1.0",
       "artifact_id": "research/aoi-kisaragi-fixture/partial-conflict",
       "created_by": {
-        "component": "kokoroarc",
+        "component": "kokorox",
         "version": "0.0.0.dev0"
       },
       "conflict_id": "conflict-adaptation-wording",
@@ -114,7 +114,7 @@
     "schema_version": "1.0",
     "artifact_id": "research/aoi-kisaragi-fixture/partial-coverage",
     "created_by": {
-      "component": "kokoroarc",
+      "component": "kokorox",
       "version": "0.0.0.dev0"
     },
     "topics": [
@@ -157,5 +157,5 @@
   "blocking_reasons": [
     "Missing evidence for the blocked history topic."
   ],
-  "bundle_hash": "069c1e4ccae3e13edbda69de6671b06ea1f43b1f8348ab0f6370c56b60668dbb"
+  "bundle_hash": "2298ad199925404c9d34093be174b97afada62d4a7946b177e0d523dee9ccc98"
 }

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from kokoroarc.language_tags import (
+from kokorox.language_tags import (
     DEFAULT_LOCALES,
     PRESERVE,
     are_language_tags,

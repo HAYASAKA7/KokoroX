@@ -9,10 +9,10 @@ from typing import Any
 
 import pytest
 
-from kokoroarc.errors import KokoroError
-from kokoroarc.schemas import SchemaRegistry
-from kokoroarc.testing.soft import aggregate_soft_evaluation
-from kokoroarc import __version__
+from kokorox.errors import KokoroError
+from kokorox.schemas import SchemaRegistry
+from kokorox.testing.soft import aggregate_soft_evaluation
+from kokorox import __version__
 
 
 SCHEMAS = SchemaRegistry(Path("schemas/v1"))
@@ -31,7 +31,7 @@ def _evaluation_input() -> dict[str, Any]:
     return {
         "schema_version": "1.0",
         "artifact_id": "original/rin-aster/release/soft-input",
-        "created_by": {"component": "kokoroarc", "version": __version__},
+        "created_by": {"component": "kokorox", "version": __version__},
         "namespace": "original",
         "character_id": "rin-aster",
         "character_version": "1.0.0",

@@ -8,9 +8,9 @@ from types import SimpleNamespace
 
 import pytest
 
-from kokoroarc.errors import KokoroError
-from kokoroarc.packs import security as pack_security
-from kokoroarc.packs.security import PackLimits, scan_pack
+from kokorox.errors import KokoroError
+from kokorox.packs import security as pack_security
+from kokorox.packs.security import PackLimits, scan_pack
 
 
 def assert_error_code(root: Path, limits: PackLimits, code: str) -> None:

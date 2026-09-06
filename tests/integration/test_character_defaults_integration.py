@@ -9,26 +9,26 @@ import subprocess
 import sys
 from typing import Any
 
-import kokoroarc.distribution.defaults as defaults_module
+import kokorox.distribution.defaults as defaults_module
 import pytest
-from kokoroarc.distribution.defaults import (
+from kokorox.distribution.defaults import (
     clear_character_default,
     empty_character_default,
     resolve_character_selection,
     set_character_default,
 )
-from kokoroarc.distribution.installer import (
+from kokorox.distribution.installer import (
     install_karc_archive,
     remove_installed_pack,
 )
-from kokoroarc.distribution.registry import (
+from kokorox.distribution.registry import (
     InstallScope,
     load_installed_registry,
     resolve_install_scope,
 )
-from kokoroarc.errors import KokoroError
-from kokoroarc.packs.compiler import canonical_bytes
-from kokoroarc.schemas import SchemaRegistry
+from kokorox.errors import KokoroError
+from kokorox.packs.compiler import canonical_bytes
+from kokorox.schemas import SchemaRegistry
 
 from karc_test_support import build_private_archive
 
@@ -43,7 +43,7 @@ def _run_cli(data_root: Path, *arguments: str) -> dict[str, Any]:
     environment["KOKOROX_DATA_DIR"] = str(data_root)
     environment["PYTHONDONTWRITEBYTECODE"] = "1"
     completed = subprocess.run(
-        [sys.executable, "-m", "kokoroarc.cli", *arguments, "--json"],
+        [sys.executable, "-m", "kokorox.cli", *arguments, "--json"],
         cwd=REPOSITORY_ROOT,
         env=environment,
         capture_output=True,
@@ -62,7 +62,7 @@ def _run_cli_error(data_root: Path, *arguments: str) -> dict[str, Any]:
     environment["KOKOROX_DATA_DIR"] = str(data_root)
     environment["PYTHONDONTWRITEBYTECODE"] = "1"
     completed = subprocess.run(
-        [sys.executable, "-m", "kokoroarc.cli", *arguments, "--json"],
+        [sys.executable, "-m", "kokorox.cli", *arguments, "--json"],
         cwd=REPOSITORY_ROOT,
         env=environment,
         capture_output=True,

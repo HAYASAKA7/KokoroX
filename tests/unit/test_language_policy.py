@@ -7,9 +7,9 @@ from typing import Any
 
 import pytest
 
-from kokoroarc.errors import KokoroError
-from kokoroarc.policy.compiler import DEFAULT_POLICY, normalize_policy
-from kokoroarc.policy.resolver import resolve_policy
+from kokorox.errors import KokoroError
+from kokorox.policy.compiler import DEFAULT_POLICY, normalize_policy
+from kokorox.policy.resolver import resolve_policy
 
 
 EXPECTED_DEFAULT = {

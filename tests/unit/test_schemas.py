@@ -6,9 +6,9 @@ import pytest
 import yaml
 from jsonschema import Draft202012Validator
 
-from kokoroarc.errors import KokoroError
-from kokoroarc.schemas import SchemaRegistry
-from kokoroarc import __version__
+from kokorox.errors import KokoroError
+from kokorox.schemas import SchemaRegistry
+from kokorox import __version__
 
 
 def load_fixture(name: str) -> dict:
@@ -20,7 +20,7 @@ def valid_compiled_pack() -> dict:
     return {
         "schema_version": "1.0",
         "artifact_id": "original/rin-aster/compiled",
-        "created_by": {"component": "kokoroarc", "version": __version__},
+        "created_by": {"component": "kokorox", "version": __version__},
         "character_id": "rin-aster",
         "character_version": "1.0.0",
         "source_hash": "a" * 64,
@@ -471,7 +471,7 @@ def test_common_artifact_id_rejects_trailing_line_terminators(
     document = {
         "schema_version": "1.0",
         "artifact_id": f"persona/hero.v1{terminator}",
-        "created_by": {"component": "kokoroarc", "version": "1.0.0"},
+        "created_by": {"component": "kokorox", "version": "1.0.0"},
     }
 
     assert not metadata.is_valid(document)
@@ -902,7 +902,7 @@ def test_common_schema_validates_metadata_and_locales() -> None:
     valid_metadata = {
         "schema_version": "1.0",
         "artifact_id": "persona/hero.v1",
-        "created_by": {"component": "kokoroarc", "version": "1.0.0"},
+        "created_by": {"component": "kokorox", "version": "1.0.0"},
     }
 
     assert metadata.is_valid(valid_metadata)

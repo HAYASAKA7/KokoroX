@@ -7,8 +7,8 @@ import shutil
 
 import pytest
 
-from kokoroarc.errors import KokoroError
-import kokoroarc.distribution.suite as suite
+from kokorox.errors import KokoroError
+import kokorox.distribution.suite as suite
 
 
 REPOSITORY_ROOT = Path.cwd().resolve()
@@ -34,7 +34,7 @@ def _transaction_debris(root: Path) -> list[Path]:
     return [
         path
         for path in root.rglob("*")
-        if path.name.startswith(".kokoroarc-skill-suite-")
+        if path.name.startswith(".kokorox-skill-suite-")
         and not path.name.endswith(".lock")
     ]
 
@@ -555,7 +555,7 @@ def test_malformed_persistent_lock_is_rejected_without_installing(
     token = sha256(
         os.path.normcase(str(destination)).encode("utf-8")
     ).hexdigest()[:16]
-    lock_path = lock_parent / f".kokoroarc-skill-suite-{token}.lock"
+    lock_path = lock_parent / f".kokorox-skill-suite-{token}.lock"
     lock_path.write_bytes(b"not-a-suite-lock")
 
     _assert_code(
@@ -696,7 +696,7 @@ def test_staging_directory_fsync_failure_removes_generated_tree(
 
     def fsync(path: Path) -> None:
         if path.name == "references" and path.parent.name.startswith(
-            ".kokoroarc-skill-suite-"
+            ".kokorox-skill-suite-"
         ):
             raise OSError("injected directory fsync failure")
         real_fsync(path)
@@ -848,7 +848,7 @@ def test_staging_identity_capture_failure_is_explicit_and_deletes_nothing(
     real_capture = suite._capture_directory_identity
 
     def capture(path: Path):
-        if path.name.startswith(".kokoroarc-skill-suite-using-kokorox-"):
+        if path.name.startswith(".kokorox-skill-suite-using-kokorox-"):
             raise KokoroError(
                 "SKILL_SUITE_PATH_INVALID",
                 "injected identity capture failure",

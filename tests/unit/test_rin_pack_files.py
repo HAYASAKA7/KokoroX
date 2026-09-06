@@ -4,8 +4,8 @@ from pathlib import Path, PurePosixPath, PureWindowsPath
 import pytest
 import yaml
 
-from kokoroarc.schemas import SchemaRegistry
-from kokoroarc import __version__
+from kokorox.schemas import SchemaRegistry
+from kokorox import __version__
 
 
 PACK = Path("characters/original/rin-aster")
@@ -43,7 +43,7 @@ def test_rin_pack_manifest_reference_path_examples(
 EXPECTED_MANIFEST = {
     "schema_version": "1.0",
     "artifact_id": "original/rin-aster/source",
-    "created_by": {"component": "kokoroarc", "version": __version__},
+    "created_by": {"component": "kokorox", "version": __version__},
     "character_id": "rin-aster",
     "character_version": "1.0.0",
     "namespace": "original",

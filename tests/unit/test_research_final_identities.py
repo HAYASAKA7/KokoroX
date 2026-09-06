@@ -3,8 +3,8 @@ from pathlib import Path
 
 import pytest
 
-from kokoroarc.errors import KokoroError
-from kokoroarc.schemas import SchemaRegistry
+from kokorox.errors import KokoroError
+from kokorox.schemas import SchemaRegistry
 
 
 ROOT = Path("tests/fixtures/research")

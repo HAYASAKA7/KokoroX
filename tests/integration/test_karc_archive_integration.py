@@ -7,11 +7,11 @@ from typing import Any
 
 import pytest
 
-from kokoroarc.distribution.archive import build_karc_archive, load_karc_archive
-from kokoroarc.packs.compiler import compile_pack
-from kokoroarc.packs.loader import load_source_pack
-from kokoroarc.schemas import SchemaRegistry
-from kokoroarc.testing.publication import assess_publication_readiness
+from kokorox.distribution.archive import build_karc_archive, load_karc_archive
+from kokorox.packs.compiler import compile_pack
+from kokorox.packs.loader import load_source_pack
+from kokorox.schemas import SchemaRegistry
+from kokorox.testing.publication import assess_publication_readiness
 
 
 SCHEMAS = SchemaRegistry(Path("schemas/v1"))

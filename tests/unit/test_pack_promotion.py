@@ -10,13 +10,13 @@ from typing import Any
 import pytest
 import yaml
 
-from kokoroarc import __version__
-from kokoroarc.errors import KokoroError
-from kokoroarc.packs.compiler import canonical_bytes
-from kokoroarc.schemas import SchemaRegistry
-from kokoroarc.testing.hard import run_hard_validation
-from kokoroarc.testing.promotion import create_promotion_record
-from kokoroarc.testing.soft import aggregate_soft_evaluation
+from kokorox import __version__
+from kokorox.errors import KokoroError
+from kokorox.packs.compiler import canonical_bytes
+from kokorox.schemas import SchemaRegistry
+from kokorox.testing.hard import run_hard_validation
+from kokorox.testing.promotion import create_promotion_record
+from kokorox.testing.soft import aggregate_soft_evaluation
 
 
 SCHEMAS = SchemaRegistry(Path("schemas/v1"))
@@ -47,7 +47,7 @@ def _release_inputs() -> dict[str, Any]:
     review = {
         "schema_version": "1.0",
         "artifact_id": "original/rin-aster/release/review",
-        "created_by": {"component": "kokoroarc", "version": __version__},
+        "created_by": {"component": "kokorox", "version": __version__},
         "review_id": "rin-review-01",
         "namespace": "original",
         "character_id": "rin-aster",
@@ -71,7 +71,7 @@ def _release_inputs() -> dict[str, Any]:
     soft_input = {
         "schema_version": "1.0",
         "artifact_id": "original/rin-aster/release/soft-input",
-        "created_by": {"component": "kokoroarc", "version": __version__},
+        "created_by": {"component": "kokorox", "version": __version__},
         "namespace": "original",
         "character_id": "rin-aster",
         "character_version": "1.0.0",
@@ -129,7 +129,7 @@ def test_creates_exact_draft_to_reviewed_record_for_rin() -> None:
     assert record == {
         "schema_version": "1.0",
         "artifact_id": "original/rin-aster/release/promotion-reviewed",
-        "created_by": {"component": "kokoroarc", "version": __version__},
+        "created_by": {"component": "kokorox", "version": __version__},
         "promotion_id": "rin-promotion-reviewed-01",
         "namespace": "original",
         "character_id": "rin-aster",
@@ -229,7 +229,7 @@ def test_promotes_current_researched_report_with_exact_research_bundle(
     review = {
         "schema_version": "1.0",
         "artifact_id": "research/aoi-kisaragi-fixture/release/review",
-        "created_by": {"component": "kokoroarc", "version": __version__},
+        "created_by": {"component": "kokorox", "version": __version__},
         "review_id": "aoi-review-01",
         "namespace": "research",
         "character_id": "aoi-kisaragi-fixture",

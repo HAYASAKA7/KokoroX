@@ -2,37 +2,37 @@
   "schema_version": "1.0",
   "artifact_id": "research/aoi-kisaragi-fixture/partial-workspace",
   "created_by": {
-    "component": "kokoroarc",
+    "component": "kokorox",
     "version": "0.0.0.dev0"
   },
   "request": {
     "path": "request.json",
-    "sha256": "2f0013c9cae47bcc7d2887484674ca03487aef9b2ff49df82bff2bc49f09d5b7"
+    "sha256": "f161e4735b8ce721145595cdaed0f29ab3ba2be8b787e1d41e2284fb1ebd6c99"
   },
   "sources": [
     {
       "path": "sources/source-official-profile.json",
-      "sha256": "bb5a5c131d36cfb1e60523164bb4083b8c2269a997191dc850433c64a4014dec"
+      "sha256": "96512947de9c94d864c4164ed8be439446f75ecda999269368c2453c5b6ddb2c"
     }
   ],
   "claims": [
     {
       "path": "claims/claim-history.json",
-      "sha256": "07772093008637cce6d7b9a46f928874f75ce966d8d2b032d4978c2c3667e49d"
+      "sha256": "fb3e54c6bdab5601e10ea2cc4c881fd8d5a9b52afb1a099659d17dfb63fb3d47"
     },
     {
       "path": "claims/claim-role.json",
-      "sha256": "17649a6fdfffaa2de7d8500edd2a8fdb7c49029024a19dd7550a43e8fcf68def"
+      "sha256": "476e7e70724dfe1f903a99b4c4411421802c0f0fe4ed57c49a3878d0972bf1a8"
     }
   ],
   "conflicts": [
     {
       "path": "conflicts/conflict-adaptation-wording.json",
-      "sha256": "6602457629e36f217a7c3242c172b75a11697e41633d1439707da26996963314"
+      "sha256": "04e4bbc80de2436f6902d15c1dc7435f313a77c3183b64f5f9fb9ba7132b17ae"
     }
   ],
   "coverage": {
     "path": "coverage.json",
-    "sha256": "7d2b0b03e177b4ca242841ee5806280547384d121e1ea56e2994566ab53ce8b7"
+    "sha256": "cc625c082f21533db1abf0b4e68e1f1cfb4e15c16f04138b74f7b034526f78bb"
   }
 }

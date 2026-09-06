@@ -5,16 +5,16 @@ from typing import Any
 
 import pytest
 
-from kokoroarc.errors import KokoroError
-from kokoroarc.runtime.context import build_runtime_context
-from kokoroarc import __version__
+from kokorox.errors import KokoroError
+from kokorox.runtime.context import build_runtime_context
+from kokorox import __version__
 
 
 def _compiled() -> dict[str, Any]:
     return {
         "schema_version": "1.0",
         "artifact_id": "original/rin-aster/compiled",
-        "created_by": {"component": "kokoroarc", "version": __version__},
+        "created_by": {"component": "kokorox", "version": __version__},
         "character_id": "rin-aster",
         "character_version": "1.0.0",
         "source_hash": "a" * 64,
@@ -71,7 +71,7 @@ def _state() -> dict[str, Any]:
     return {
         "schema_version": "1.0",
         "artifact_id": "state/session-one",
-        "created_by": {"component": "kokoroarc", "version": __version__},
+        "created_by": {"component": "kokorox", "version": __version__},
         "revision": 7,
         "turn_index": 12,
         "dimensions": {

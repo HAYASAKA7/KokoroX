@@ -2,7 +2,7 @@
   "schema_version": "1.0",
   "artifact_id": "research/aoi-kisaragi-fixture/researched-build-request",
   "created_by": {
-    "component": "kokoroarc",
+    "component": "kokorox",
     "version": "0.1.0"
   },
   "mode": "researched",
@@ -28,8 +28,8 @@
   "inputs": [
     {
       "type": "research_bundle",
-      "artifact_id": "research/aoi-kisaragi-fixture/research/36c328d763dd4ca7",
-      "sha256": "665fcbc6ab596f1761e7abc96e33575126b9863deb6a9526d472dadea0c4daa7"
+      "artifact_id": "research/aoi-kisaragi-fixture/research/681a1e9a00122ba7",
+      "sha256": "695f9a8c789889dbddd193aebe0cbb27cb8b7f07ca1fa9f298f139c3c59feb99"
     }
   ],
   "requested_visibility": "private"

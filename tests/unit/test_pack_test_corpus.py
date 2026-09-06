@@ -10,10 +10,10 @@ from typing import Any
 import pytest
 import yaml
 
-from kokoroarc.errors import KokoroError
-from kokoroarc.packs.compiler import canonical_bytes
-from kokoroarc.testing import corpus as corpus_module
-from kokoroarc.testing.corpus import CorpusLimits, load_test_corpus
+from kokorox.errors import KokoroError
+from kokorox.packs.compiler import canonical_bytes
+from kokorox.testing import corpus as corpus_module
+from kokorox.testing.corpus import CorpusLimits, load_test_corpus
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]

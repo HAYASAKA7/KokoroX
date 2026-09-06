@@ -4,9 +4,9 @@ from pathlib import Path
 
 import pytest
 
-from kokoroarc.errors import KokoroError
-from kokoroarc.schemas import SchemaRegistry
-from kokoroarc import __version__
+from kokorox.errors import KokoroError
+from kokorox.schemas import SchemaRegistry
+from kokorox import __version__
 
 
 SCHEMAS = SchemaRegistry(Path("schemas/v1"))
@@ -161,7 +161,7 @@ def test_request_and_source_bounds_are_enforced() -> None:
 def valid_report() -> dict:
     return {
         "schema_version": "1.0", "artifact_id": "research/aoi-kisaragi-fixture/validation",
-        "created_by": {"component": "kokoroarc", "version": __version__},
+        "created_by": {"component": "kokorox", "version": __version__},
         "hard_failures": [], "advisory_findings": [],
         "coverage_summary": {"covered": 2, "partial": 0, "missing": 0, "blocked": 0},
         "blocking_reasons": [], "valid": True, "authoring_allowed": True,

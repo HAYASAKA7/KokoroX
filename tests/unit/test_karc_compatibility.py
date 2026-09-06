@@ -5,10 +5,10 @@ from typing import Any
 
 import pytest
 
-from kokoroarc.distribution.archive import KarcLimits
-from kokoroarc.distribution.compatibility import inspect_karc_compatibility
-from kokoroarc.errors import KokoroError
-from kokoroarc.schemas import SchemaRegistry
+from kokorox.distribution.archive import KarcLimits
+from kokorox.distribution.compatibility import inspect_karc_compatibility
+from kokorox.errors import KokoroError
+from kokorox.schemas import SchemaRegistry
 
 from karc_test_support import (
     build_private_archive,

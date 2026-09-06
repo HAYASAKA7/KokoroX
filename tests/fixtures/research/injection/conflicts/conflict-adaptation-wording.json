@@ -2,7 +2,7 @@
   "schema_version": "1.0",
   "artifact_id": "research/aoi-kisaragi-fixture/injection-conflict",
   "created_by": {
-    "component": "kokoroarc",
+    "component": "kokorox",
     "version": "0.0.0.dev0"
   },
   "conflict_id": "conflict-adaptation-wording",

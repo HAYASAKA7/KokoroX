@@ -17,19 +17,19 @@ from karc_test_support import build_private_archive
 REPOSITORY_ROOT = Path.cwd().resolve()
 RESEARCH_FIXTURES = REPOSITORY_ROOT / "tests" / "fixtures" / "research"
 REQUIRED_CLI_MODULES = {
-    "kokoroarc/cli.py",
-    "kokoroarc/standalone_cli.py",
+    "kokorox/cli.py",
+    "kokorox/standalone_cli.py",
 }
 REQUIRED_RESEARCH_MODULES = {
-    "kokoroarc/research/__init__.py",
-    "kokoroarc/research/bundles.py",
-    "kokoroarc/research/requests.py",
-    "kokoroarc/research/storage.py",
-    "kokoroarc/research/validation.py",
-    "kokoroarc/research/workspace.py",
+    "kokorox/research/__init__.py",
+    "kokorox/research/bundles.py",
+    "kokorox/research/requests.py",
+    "kokorox/research/storage.py",
+    "kokorox/research/validation.py",
+    "kokorox/research/workspace.py",
 }
 REQUIRED_TESTING_MODULES = {
-    f"kokoroarc/testing/{name}.py"
+    f"kokorox/testing/{name}.py"
     for name in (
         "__init__",
         "corpus",
@@ -41,7 +41,7 @@ REQUIRED_TESTING_MODULES = {
     )
 }
 REQUIRED_DISTRIBUTION_MODULES = {
-    f"kokoroarc/distribution/{name}.py"
+    f"kokorox/distribution/{name}.py"
     for name in (
         "__init__",
         "archive",
@@ -54,7 +54,7 @@ REQUIRED_DISTRIBUTION_MODULES = {
     )
 }
 REQUIRED_PERSISTENCE_MODULES = {
-    f"kokoroarc/persistence/{name}.py"
+    f"kokorox/persistence/{name}.py"
     for name in (
         "__init__",
         "_storage",
@@ -168,7 +168,7 @@ def _cli(
     else:
         env["KOKOROX_DATA_DIR"] = str(data_dir)
     return subprocess.run(
-        [sys.executable, "-m", "kokoroarc.cli", *arguments],
+        [sys.executable, "-m", "kokorox.cli", *arguments],
         check=False,
         capture_output=True,
         text=True,
@@ -247,7 +247,7 @@ def test_research_workspace_validate_is_stateless_and_deterministic() -> None:
     assert body["valid"] is True
     assert body["validation_report"]["authoring_allowed"] is True
     assert body["workspace_hash"] == (
-        "36c328d763dd4ca705f1619c8225cbc304ac09ccfe930c54375d2b9cf8c128a1"
+        "681a1e9a00122ba7f52238520105a3e070ebcf51695f3263a443e1a7cd817fae"
     )
     assert first.stderr == second.stderr == ""
 
@@ -488,10 +488,10 @@ def test_research_request_validate_resolves_wheel_install_schema_layout(
     tmp_path: Path,
 ) -> None:
     installed = tmp_path / "installed"
-    shutil.copytree(REPOSITORY_ROOT / "src" / "kokoroarc", installed / "kokoroarc")
+    shutil.copytree(REPOSITORY_ROOT / "src" / "kokorox", installed / "kokorox")
     shutil.copytree(
         REPOSITORY_ROOT / "schemas" / "v1",
-        installed / "share" / "kokoroarc" / "schemas" / "v1",
+        installed / "share" / "kokorox" / "schemas" / "v1",
     )
     outside_repository = tmp_path / "working"
     outside_repository.mkdir()
@@ -542,7 +542,7 @@ def test_built_archives_and_installed_research_cli_are_complete(
         wheel_payloads = {
             name: archive.read(name)
             for name in wheel_entries
-            if "/share/kokoroarc/skills/" in name
+            if "/share/kokorox/skills/" in name
         }
     with tarfile.open(sdist, "r:gz") as archive:
         sdist_entries = {member.name for member in archive.getmembers()}
@@ -569,11 +569,11 @@ def test_built_archives_and_installed_research_cli_are_complete(
         | REQUIRED_PACK_RELEASE_SCHEMAS
         | REQUIRED_STANDALONE_SCHEMAS
     ):
-        wheel_suffix = f"/share/kokoroarc/schemas/v1/{schema}"
+        wheel_suffix = f"/share/kokorox/schemas/v1/{schema}"
         assert any(entry.endswith(wheel_suffix) for entry in wheel_entries)
         assert any(entry.endswith(f"/schemas/v1/{schema}") for entry in sdist_entries)
     for relative in REQUIRED_SKILL_FILES:
-        wheel_suffix = f"/share/kokoroarc/skills/{relative}"
+        wheel_suffix = f"/share/kokorox/skills/{relative}"
         wheel_name = next(
             entry for entry in wheel_entries if entry.endswith(wheel_suffix)
         )
@@ -624,8 +624,8 @@ def test_built_archives_and_installed_research_cli_are_complete(
             "-c",
             (
                 "import json\n"
-                "from kokoroarc.config import resolve_schema_dir\n"
-                "from kokoroarc.schemas import SchemaRegistry\n"
+                "from kokorox.config import resolve_schema_dir\n"
+                "from kokorox.schemas import SchemaRegistry\n"
                 f"names = {schema_names!r}\n"
                 "registry = SchemaRegistry(resolve_schema_dir())\n"
                 "print(json.dumps([registry.load(name)['$id'] "
@@ -640,7 +640,7 @@ def test_built_archives_and_installed_research_cli_are_complete(
     )
     assert schema_probe.returncode == 0, schema_probe.stdout + schema_probe.stderr
     assert json.loads(schema_probe.stdout) == [
-        f"https://kokoroarc.local/schemas/v1/{name}.schema.json"
+        f"https://kokorox.local/schemas/v1/{name}.schema.json"
         for name in schema_names
     ]
     assert schema_probe.stderr == ""
@@ -651,8 +651,8 @@ def test_built_archives_and_installed_research_cli_are_complete(
             "-c",
             (
                 "import json\n"
-                "from kokoroarc.cli import build_parser\n"
-                "from kokoroarc.standalone_cli import standalone_route\n"
+                "from kokorox.cli import build_parser\n"
+                "from kokorox.standalone_cli import standalone_route\n"
                 "args = build_parser().parse_args([\n"
                 "    'pack', 'compatibility', 'rin.karc', '--json',\n"
                 "])\n"
@@ -674,7 +674,7 @@ def test_built_archives_and_installed_research_cli_are_complete(
             sys.executable,
             "-c",
             (
-                "from kokoroarc.distribution import (\n"
+                "from kokorox.distribution import (\n"
                 "    CharacterSelection,\n"
                 "    InstallScope,\n"
                 "    apply_karc_migration,\n"
@@ -739,7 +739,7 @@ def test_built_archives_and_installed_research_cli_are_complete(
     assert distribution_probe.stderr == ""
 
     installed_skill_root = tmp_path / "installed-skill-suite"
-    installed_source = installed / "share" / "kokoroarc" / "skills"
+    installed_source = installed / "share" / "kokorox" / "skills"
     suite_probe = subprocess.run(
         [
             sys.executable,
@@ -748,7 +748,7 @@ def test_built_archives_and_installed_research_cli_are_complete(
                 "import json\n"
                 "from pathlib import Path\n"
                 "import sys\n"
-                "from kokoroarc.distribution import (\n"
+                "from kokorox.distribution import (\n"
                 "    install_skill_suite,\n"
                 "    preview_skill_suite_install,\n"
                 "    resolve_skill_suite_source,\n"
@@ -794,7 +794,7 @@ def test_built_archives_and_installed_research_cli_are_complete(
             sys.executable,
             "-c",
             (
-                "from kokoroarc.persistence import (\n"
+                "from kokorox.persistence import (\n"
                 "    MemoryReferenceView,\n"
                 "    MemoryRemovalResult,\n"
                 "    PersistentResetPreview,\n"

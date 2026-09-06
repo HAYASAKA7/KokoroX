@@ -5,8 +5,8 @@ import os
 
 import pytest
 
-from kokoroarc.cli import build_parser
-from kokoroarc import __version__
+from kokorox.cli import build_parser
+from kokorox import __version__
 
 
 @pytest.mark.parametrize(
@@ -124,7 +124,7 @@ def test_invalid_config_default_scope_arguments_are_sanitized(
     environment = os.environ.copy()
     environment["KOKOROX_DATA_DIR"] = str(data_root)
     completed = subprocess.run(
-        [sys.executable, "-m", "kokoroarc.cli", *arguments],
+        [sys.executable, "-m", "kokorox.cli", *arguments],
         check=False,
         capture_output=True,
         text=True,
@@ -191,7 +191,7 @@ def test_session_start_parser_supports_default_resolution(
 
 def test_module_version_command() -> None:
     completed = subprocess.run(
-        [sys.executable, "-m", "kokoroarc.cli", "--version"],
+        [sys.executable, "-m", "kokorox.cli", "--version"],
         check=False,
         capture_output=True,
         text=True,
@@ -205,7 +205,7 @@ def test_json_error_when_data_directory_is_missing() -> None:
     env = os.environ.copy()
     env.pop("KOKOROX_DATA_DIR", None)
     completed = subprocess.run(
-        [sys.executable, "-m", "kokoroarc.cli", "session", "show", "--json"],
+        [sys.executable, "-m", "kokorox.cli", "session", "show", "--json"],
         check=False,
         capture_output=True,
         text=True,
@@ -230,7 +230,7 @@ def test_json_session_show_succeeds_with_configured_data_directory(tmp_path) -> 
     env = os.environ.copy()
     env["KOKOROX_DATA_DIR"] = str(tmp_path)
     completed = subprocess.run(
-        [sys.executable, "-m", "kokoroarc.cli", "session", "show", "--json"],
+        [sys.executable, "-m", "kokorox.cli", "session", "show", "--json"],
         check=False,
         capture_output=True,
         text=True,
@@ -248,7 +248,7 @@ def test_incomplete_commands_return_sanitized_json_errors(
     arguments: list[str],
 ) -> None:
     completed = subprocess.run(
-        [sys.executable, "-m", "kokoroarc.cli", *arguments],
+        [sys.executable, "-m", "kokorox.cli", *arguments],
         check=False,
         capture_output=True,
         text=True,
@@ -324,7 +324,7 @@ def test_invalid_character_arguments_never_echo_private_values(
     arguments: list[str],
 ) -> None:
     completed = subprocess.run(
-        [sys.executable, "-m", "kokoroarc.cli", *arguments],
+        [sys.executable, "-m", "kokorox.cli", *arguments],
         check=False,
         capture_output=True,
         text=True,
@@ -353,7 +353,7 @@ def test_nested_character_help_remains_a_successful_stdout_exit() -> None:
         [
             sys.executable,
             "-m",
-            "kokoroarc.cli",
+            "kokorox.cli",
             "character",
             "draft",
             "compile",

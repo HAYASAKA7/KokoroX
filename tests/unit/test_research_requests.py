@@ -9,11 +9,11 @@ import unicodedata
 
 import pytest
 
-import kokoroarc.research.requests as research_requests
-from kokoroarc.errors import KokoroError
-from kokoroarc.packs.compiler import canonical_bytes
-from kokoroarc.research import normalize_research_request
-from kokoroarc.schemas import SchemaRegistry
+import kokorox.research.requests as research_requests
+from kokorox.errors import KokoroError
+from kokorox.packs.compiler import canonical_bytes
+from kokorox.research import normalize_research_request
+from kokorox.schemas import SchemaRegistry
 
 
 SCHEMA_ROOT = Path("schemas/v1")

@@ -6,15 +6,15 @@ from typing import Any
 
 import pytest
 
-from kokoroarc.distribution.archive import inspect_karc_container
-from kokoroarc.distribution.installer import preview_karc_install
-from kokoroarc.distribution.registry import (
+from kokorox.distribution.archive import inspect_karc_container
+from kokorox.distribution.installer import preview_karc_install
+from kokorox.distribution.registry import (
     empty_installed_registry,
     resolve_install_scope,
 )
-from kokoroarc.errors import KokoroError
-from kokoroarc.packs.compiler import canonical_bytes
-from kokoroarc.schemas import SchemaRegistry
+from kokorox.errors import KokoroError
+from kokorox.packs.compiler import canonical_bytes
+from kokorox.schemas import SchemaRegistry
 
 from karc_test_support import build_private_archive, build_public_archive
 

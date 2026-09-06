@@ -7,11 +7,11 @@ from typing import Any, Callable
 
 import pytest
 
-from kokoroarc.distribution.registry import resolve_install_scope
-from kokoroarc.errors import KokoroError
-from kokoroarc.packs.compiler import canonical_bytes
-from kokoroarc.persistence._storage import open_persistence_scope
-from kokoroarc.persistence.consent import (
+from kokorox.distribution.registry import resolve_install_scope
+from kokorox.errors import KokoroError
+from kokorox.packs.compiler import canonical_bytes
+from kokorox.persistence._storage import open_persistence_scope
+from kokorox.persistence.consent import (
     _require_active_consent,
     grant_consent,
     load_consent,

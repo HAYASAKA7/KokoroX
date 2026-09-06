@@ -9,16 +9,16 @@ from typing import Any
 
 import pytest
 
-from kokoroarc.errors import KokoroError
-from kokoroarc.research import (
+from kokorox.errors import KokoroError
+from kokorox.research import (
     build_research_bundle,
     load_published_research_bundle,
     publish_research_bundle,
     storage,
 )
-from kokoroarc.research.validation import validate_research_workspace
-from kokoroarc.research.workspace import ResearchWorkspace, load_research_workspace
-from kokoroarc.schemas import SchemaRegistry
+from kokorox.research.validation import validate_research_workspace
+from kokorox.research.workspace import ResearchWorkspace, load_research_workspace
+from kokorox.schemas import SchemaRegistry
 
 
 SCHEMAS = SchemaRegistry(Path("schemas/v1"))
