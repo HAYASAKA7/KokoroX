@@ -2054,7 +2054,7 @@ Exit criteria:
 ## 25. Repository Layout
 
 ```text
-kokoroarc/
+kokorox/
 ├── README.md
 ├── skills/
 ├── characters/

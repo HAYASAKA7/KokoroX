@@ -33,8 +33,12 @@ First versioned release of the standalone Agent Skill Suite.
 
 ### Changed
 
-- The product is named KokoroX and is delivered as a standalone Agent Skill
-  Suite; Lumora integration is not pursued.
+- The product is named KokoroX everywhere it is visible: the distribution is
+  `kokorox` (`pip install kokorox`), so is the import package (`import
+  kokorox`) and the command; installed data files live under `share/kokorox/`;
+  and every artifact the runtime writes records
+  `created_by.component: "kokorox"`, which the schemas require. It is delivered
+  as a standalone Agent Skill Suite; Lumora integration is not pursued.
 - Locales are no longer restricted to `zh-CN`, `en-US`, and `ja-JP`. Those
   remain the repository's reference profiles, not a required set.
 
