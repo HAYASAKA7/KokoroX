@@ -42,6 +42,17 @@ First versioned release of the standalone Agent Skill Suite.
 - Locales are no longer restricted to `zh-CN`, `en-US`, and `ja-JP`. Those
   remain the repository's reference profiles, not a required set.
 
+### Removed
+
+- The frozen Campaign 6 harness and its approved run evidence (`tests/skills/`,
+  4842 files and 74 MB - 93% of the repository's files). It sat outside the CI
+  gate, so it guarded nothing, and its 250-character evidence paths were the
+  sole reason every Windows checkout needed `core.longpaths`. After the rename
+  it also attested to a product name that no longer exists, and its harness
+  runners are byte-compared against approved copies, so it could not be renamed
+  without falsifying what it certifies. The record is preserved at the
+  `campaign-6-evidence` tag.
+
 ### Fixed
 
 - Atomic installation never worked on macOS. `renameatx_np(2)` takes
