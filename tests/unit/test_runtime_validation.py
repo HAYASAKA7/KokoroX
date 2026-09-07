@@ -35,6 +35,7 @@ def plan(**overrides: Any) -> dict[str, Any]:
         ],
         "protected_spans": ["go test -race ./..."],
         "max_switches": 2,
+        "min_primary_ratio": 0.7,
     }
     value.update(overrides)
     return value
@@ -260,7 +261,9 @@ def test_warning_is_not_required_when_semantic_warning_list_is_empty() -> None:
 
 
 def test_planned_warning_is_required_when_semantic_warning_list_is_empty() -> None:
-    warning_only_plan = plan(segments=[plan()["segments"][1]])
+    warning_only_plan = plan(
+        primary_language="en-US", segments=[plan()["segments"][1]]
+    )
 
     result = validate_rendered_output(
         rendered(segments=[]), semantic(warnings=[]), warning_only_plan
@@ -289,7 +292,9 @@ def test_each_planned_warning_requires_its_own_rendered_segment_id() -> None:
     one_rendered = rendered(segments=[deepcopy(warnings[0])])
 
     result = validate_rendered_output(
-        one_rendered, semantic(warnings=[]), plan(segments=warnings)
+        one_rendered,
+        semantic(warnings=[]),
+        plan(primary_language="en-US", segments=warnings),
     )
 
     assert codes(result) == ["MISSING_WARNING"]
@@ -812,12 +817,49 @@ def test_full_semantic_with_reduced_plan_still_checks_known_route_coverage() -> 
 )
 def test_accepts_any_well_formed_primary_language(language: str) -> None:
     """The user's language is not restricted to the reference locales."""
-    result = validate_rendered_output(rendered(), semantic(), plan(
-        primary_language=language
-    ))
+    planned = plan(primary_language=language)
+    planned["segments"][0]["target_language"] = language
+    delivered = rendered()
+    delivered["segments"][0]["target_language"] = language
+
+    result = validate_rendered_output(delivered, semantic(), planned)
 
     assert result["valid"] is True
     assert result["violations"] == []
+
+
+@pytest.mark.parametrize(
+    "language", ["fr-FR", "ko-KR", "pt-BR", "zh-Hans-CN", "es-419", "de"]
+)
+def test_primary_language_absent_from_every_segment_is_rejected(
+    language: str,
+) -> None:
+    """A plan claiming a primary language it never renders in is inconsistent.
+
+    The floor cannot be measured as a share -- rendered segments carry no
+    per-segment text -- but zero primary-language segments means a zero share
+    whatever the segment lengths are, so any floor above 0 is definitely unmet.
+    """
+
+    result = validate_rendered_output(
+        rendered(), semantic(), plan(primary_language=language)
+    )
+
+    assert result["valid"] is False
+    assert "PRIMARY_LANGUAGE_ABSENT" in codes(result)
+    assert_schema_valid(result)
+
+
+def test_a_zero_primary_language_floor_imposes_no_requirement() -> None:
+    """`min_primary_ratio: 0` is a policy that asks for no primary content."""
+
+    result = validate_rendered_output(
+        rendered(),
+        semantic(),
+        plan(primary_language="fr-FR", min_primary_ratio=0),
+    )
+
+    assert "PRIMARY_LANGUAGE_ABSENT" not in codes(result)
 
 
 @pytest.mark.parametrize("language", ["fr_FR", "english", "EN-us", "", 1])

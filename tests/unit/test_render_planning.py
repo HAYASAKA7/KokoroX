@@ -35,7 +35,7 @@ def policy(**overrides: Any) -> dict[str, Any]:
             "recommendations": "en-US",
             "warnings": "zh-CN",
         },
-        "mixing": {"max_switches": 4},
+        "mixing": {"max_switches": 4, "min_primary_ratio": 0.7},
     }
     value.update(overrides)
     return value
@@ -87,6 +87,7 @@ def test_builds_ordered_schema_valid_plan_with_exact_protected_span() -> None:
         ],
         "protected_spans": ["go test -race ./..."],
         "max_switches": 4,
+        "min_primary_ratio": 0.7,
     }
     SchemaRegistry(Path("schemas/v1")).validate("render-plan", plan)
 

@@ -41,7 +41,8 @@
       {"id": "s2", "channel": "technical_explanation", "target_language": "zh-CN", "semantic_keys": ["explanation"]}
     ],
     "protected_spans": ["go test -race ./..."],
-    "max_switches": 4
+    "max_switches": 4,
+    "min_primary_ratio": 0.7
   },
   "validation_result": {
     "schema_version": "1.0",

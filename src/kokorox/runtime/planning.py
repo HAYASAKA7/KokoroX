@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 import json
+from math import isfinite
 import re
 from typing import Any
 
@@ -138,6 +139,17 @@ def build_render_plan(
     except (OverflowError, TypeError, ValueError):
         raise _invalid_input() from None
 
+    # Carried onto the plan so the validator can enforce it. A policy that
+    # declares a primary-language floor and never checks it promises nothing.
+    min_primary_ratio = mixing.get("min_primary_ratio")
+    if (
+        isinstance(min_primary_ratio, bool)
+        or not isinstance(min_primary_ratio, (int, float))
+        or not isfinite(min_primary_ratio)
+        or not 0 <= min_primary_ratio <= 1
+    ):
+        raise _invalid_input()
+
     for _, channel in _SEGMENT_SOURCES:
         if channel in channels:
             route = channels[channel]
@@ -176,4 +188,5 @@ def build_render_plan(
         "segments": segments,
         "protected_spans": protected_spans,
         "max_switches": max_switches,
+        "min_primary_ratio": min_primary_ratio,
     }

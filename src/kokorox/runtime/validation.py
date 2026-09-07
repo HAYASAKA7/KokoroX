@@ -4,12 +4,13 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 import re
+from math import isfinite
 import sys
 from typing import Any
 
 from kokorox import __version__
 from kokorox.errors import KokoroError
-from kokorox.language_tags import is_channel_language, is_language_tag
+from kokorox.language_tags import PRESERVE, is_channel_language, is_language_tag
 
 
 FALLBACK_ACTIONS = {
@@ -76,8 +77,20 @@ _FULL_PLAN_KEYS = frozenset(
         "segments",
         "protected_spans",
         "max_switches",
+        "min_primary_ratio",
     }
 )
+
+
+def _is_ratio(value: Any) -> bool:
+    """Return whether `value` is a finite number within 0..1 inclusive."""
+
+    return (
+        not isinstance(value, bool)
+        and isinstance(value, (int, float))
+        and isfinite(value)
+        and 0 <= value <= 1
+    )
 
 
 def fallback_action(attempt: int) -> str:
@@ -288,6 +301,7 @@ def _plan_contract_valid(value: Mapping[str, Any]) -> bool:
         and _artifact_suffix(value.get("artifact_id"), "plan/") is not None
         and _created_by(value.get("created_by"))
         and is_language_tag(value.get("primary_language"))
+        and _is_ratio(value.get("min_primary_ratio"))
         and _string_list(
             value.get("protected_spans"), maximum=128, unique=True
         )
@@ -572,6 +586,8 @@ def validate_rendered_output(
     plan_protected_spans: list[str] = []
     plan_spans_usable = False
     max_switches: int | None = None
+    min_primary_ratio: float | None = None
+    plan_primary_language: str | None = None
     if plan_mapping:
         plan_is_full = "protected_spans" in plan
         candidate_segments = plan.get("segments")
@@ -597,6 +613,21 @@ def validate_rendered_output(
             )
         else:
             max_switches = candidate_max_switches
+
+        # Absent on reduced plans, which carry only segments and the switch
+        # limit; the floor is then simply not enforced.
+        if "min_primary_ratio" in plan:
+            candidate_ratio = plan.get("min_primary_ratio")
+            if not _is_ratio(candidate_ratio):
+                violations.add(
+                    "INVALID_MIN_PRIMARY_RATIO",
+                    "Planned primary-language floor is invalid.",
+                )
+            else:
+                min_primary_ratio = float(candidate_ratio)
+        candidate_primary = plan.get("primary_language")
+        if is_language_tag(candidate_primary):
+            plan_primary_language = candidate_primary
 
         if plan_is_full:
             candidate_plan_spans = plan.get("protected_spans")
@@ -647,6 +678,41 @@ def validate_rendered_output(
         validated = _validate_planned_segment(segment, index, violations)
         if validated is not None:
             valid_planned.append(validated)
+
+    if (
+        min_primary_ratio is not None
+        and plan_primary_language is not None
+        and valid_planned
+    ):
+        # Only the zero case is checkable here, and it is exact rather than a
+        # proxy: rendered segments carry no per-segment text, so the share of
+        # primary-language content cannot be measured -- but if no segment is
+        # routed to the primary language at all, that share is 0 whatever the
+        # segment sizes are. Any floor above 0 is then definitely unmet. A
+        # count-based ratio would instead misjudge small plans, where one
+        # non-primary segment out of two reads as 50% regardless of length.
+        #
+        # Protected channels carry preserved source text rather than prose in
+        # any language, so they sit outside this entirely.
+        routed = [
+            segment["target_language"]
+            for segment in valid_planned
+            if segment["target_language"] != PRESERVE
+        ]
+        if (
+            routed
+            and min_primary_ratio > 0
+            and plan_primary_language not in routed
+        ):
+            violations.add(
+                "PRIMARY_LANGUAGE_ABSENT",
+                "No planned segment renders in the primary language.",
+                details={
+                    "expected": plan_primary_language,
+                    "limit": min_primary_ratio,
+                    "observed": 0,
+                },
+            )
 
     if semantic_is_full_artifact:
         planned_semantic_keys = {
