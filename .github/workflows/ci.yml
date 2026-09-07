@@ -39,10 +39,6 @@ jobs:
         os: ${{ fromJSON(needs.matrix.outputs.os) }}
         python: ${{ fromJSON(needs.matrix.outputs.python) }}
     steps:
-      - name: Allow long paths on Windows
-        if: runner.os == 'Windows'
-        run: git config --system core.longpaths true
-
       - uses: actions/checkout@v5
 
       - uses: actions/setup-python@v6
@@ -55,15 +51,11 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -e ".[dev]"
 
-      # tests/skills holds the frozen Campaign 6 machinery and historical
-      # campaign evidence. Some of it binds skill bytes captured before the
-      # KokoroX rename, so it is deliberately out of the CI gate rather than
-      # silently marked passing. See docs/ for the campaign scope note.
       - name: Test
         shell: bash
         run: |
           set +e
-          out=$(python -m pytest tests/unit tests/integration tests/security -n auto --dist load -q --tb=line -rf --durations=15 2>&1)
+          out=$(python -m pytest tests -n auto --dist load -q --tb=line -rf --durations=15 2>&1)
           rc=$?
           echo "$out"
           if [ "$rc" -ne 0 ]; then
@@ -78,10 +70,6 @@ jobs:
     needs: matrix
     runs-on: ubuntu-latest
     steps:
-      - name: Allow long paths on Windows
-        if: runner.os == 'Windows'
-        run: git config --system core.longpaths true
-
       - uses: actions/checkout@v5
       - uses: actions/setup-python@v6
         with:
@@ -94,7 +82,7 @@ jobs:
       # fail_under = 80 is configured in pyproject.toml
       - name: Coverage gate
         run: >
-          python -m pytest tests/unit tests/integration tests/security
+          python -m pytest tests
           -n auto --dist load -q --cov --cov-report=term-missing:skip-covered
 
   # The product's headline feature is installing Skills into a host's Skill
@@ -107,10 +95,6 @@ jobs:
       matrix:
         os: ${{ fromJSON(needs.matrix.outputs.os) }}
     steps:
-      - name: Allow long paths on Windows
-        if: runner.os == 'Windows'
-        run: git config --system core.longpaths true
-
       - uses: actions/checkout@v5
       - uses: actions/setup-python@v6
         with:

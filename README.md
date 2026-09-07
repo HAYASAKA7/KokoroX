@@ -322,14 +322,14 @@ The package uses a `src` layout, so the tests need it on the import path.
 Keep temporary files off `C:` as usual.
 
 ```bash
-export PYTHONPATH="src"; export TMPDIR="$HOME/.kokorox"; python -m pytest tests/unit tests/integration tests/security
+export PYTHONPATH="src"; export TMPDIR="$HOME/.kokorox"; python -m pytest tests
 ```
 
 The suite is large (about 3,100 tests). Run it in parallel - it is roughly
 3.6x faster end to end and the tests are isolated, so results are unchanged:
 
 ```bash
-python -m pytest tests/unit tests/integration tests/security -n auto --dist load
+python -m pytest tests -n auto --dist load
 ```
 
 Parallelism is deliberately not enabled by default: spawning a worker per
@@ -338,7 +338,7 @@ core makes a single-test run slower, which matters more during development.
 Coverage is measured against a minimum threshold:
 
 ```bash
-python -m pytest tests/unit tests/integration tests/security -n auto --dist load --cov
+python -m pytest tests -n auto --dist load --cov
 ```
 
 Run the suites separately if the machine is short on memory; combine their
