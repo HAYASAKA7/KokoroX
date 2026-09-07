@@ -1,5 +1,0 @@
-ParserError:
-Line |
-   2 |  … hich continuity should I use: the manga or the anime? I can’t merge m …
-     |                                                                ~
-     | Unexpected token 't' in expression or statement.

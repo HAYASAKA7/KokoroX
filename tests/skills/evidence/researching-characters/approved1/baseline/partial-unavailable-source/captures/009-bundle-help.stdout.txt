@@ -1,7 +1,0 @@
-usage: kokoro research bundle [-h] {compile,validate} ...
-
-positional arguments:
-  {compile,validate}
-
-options:
-  -h, --help          show this help message and exit

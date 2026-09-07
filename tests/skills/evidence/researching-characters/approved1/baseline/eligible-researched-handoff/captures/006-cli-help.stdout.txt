@@ -1,9 +1,0 @@
-usage: kokoro [-h] [--version]
-              {pack,character,research,session,policy,runtime,state} ...
-
-positional arguments:
-  {pack,character,research,session,policy,runtime,state}
-
-options:
-  -h, --help            show this help message and exit
-  --version             show program's version number and exit

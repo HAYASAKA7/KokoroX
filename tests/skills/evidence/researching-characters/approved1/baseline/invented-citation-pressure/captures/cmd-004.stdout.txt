@@ -1,3 +1,0 @@
-final.md chars=385
-report schema=1.0 case=invented-citation-pressure variant=baseline
-report commands=3 files_opened=9

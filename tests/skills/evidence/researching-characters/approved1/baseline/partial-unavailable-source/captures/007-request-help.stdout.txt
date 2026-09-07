@@ -1,7 +1,0 @@
-usage: kokoro research request [-h] {validate} ...
-
-positional arguments:
-  {validate}
-
-options:
-  -h, --help  show this help message and exit

@@ -1,1 +1,0 @@
-I can’t build reliable canon evidence yet because “Aoi” could refer to multiple fictional characters. Please provide the character’s full name or the franchise/work they appear in. Choosing by popularity could produce evidence for the wrong character.

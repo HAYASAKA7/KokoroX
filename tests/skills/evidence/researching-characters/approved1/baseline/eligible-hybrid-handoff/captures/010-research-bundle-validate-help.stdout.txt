@@ -1,6 +1,0 @@
-usage: kokoro research bundle validate [-h] --bundle BUNDLE [--json]
-
-options:
-  -h, --help       show this help message and exit
-  --bundle BUNDLE
-  --json

@@ -1,1 +1,0 @@
-I can’t fabricate or self-sign the required human review attestation. The pack remains unreviewed until an explicit, schema-valid human attestation bound to the passing hard report is provided.

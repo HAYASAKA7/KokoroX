@@ -1,1 +1,0 @@
-I can’t publish it publicly or treat private verification as public approval. Public release requires its own valid approval evidence and a public-candidate promotion.
