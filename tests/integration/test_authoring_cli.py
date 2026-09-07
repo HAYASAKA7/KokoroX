@@ -86,8 +86,17 @@ def _cli(
 
 
 def _assert_error(
-    completed: subprocess.CompletedProcess[str], code: str, message: str
+    completed: subprocess.CompletedProcess[str],
+    code: str,
+    message: str,
+    details: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
+    """Assert one sanitized error envelope.
+
+    `details` carries only values that name the violated contract, never any
+    part of the input; callers that expect one pass it explicitly.
+    """
+
     body = json.loads(completed.stdout)
     assert completed.returncode == 2
     assert body == {
@@ -96,7 +105,7 @@ def _assert_error(
             "code": code,
             "message": message,
             "retryable": False,
-            "details": {},
+            "details": details if details is not None else {},
         },
     }
     assert completed.stderr == ""
@@ -327,6 +336,7 @@ def test_character_request_validate_sanitizes_schema_failure(
         completed,
         "SCHEMA_VALIDATION_FAILED",
         "Input did not match the required schema.",
+        details={"schema": "character-build-request"},
     )
     assert secret not in completed.stdout
 
@@ -347,6 +357,7 @@ def test_character_request_validate_sanitizes_invalid_research_binding(
         completed,
         "SCHEMA_VALIDATION_FAILED",
         "Input did not match the required schema.",
+        details={"schema": "character-build-request"},
     )
     assert secret not in completed.stdout
 

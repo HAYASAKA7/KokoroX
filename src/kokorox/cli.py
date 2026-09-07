@@ -12,7 +12,7 @@ import re
 import stat
 import sys
 import tempfile
-from typing import Any, Callable, cast
+from typing import Any, Callable, Final, cast
 
 from kokorox import __version__
 from kokorox.authoring.drafts import build_character_draft
@@ -2093,11 +2093,20 @@ def _handle_state_apply(
     return {"ok": True, "state": state}
 
 
+_SCHEMA_NAME: Final = re.compile(r"^[a-z][a-z0-9]*(?:-[a-z0-9]+)*\Z", re.ASCII)
+
+
 def _public_error_envelope(error: KokoroError) -> dict[str, Any]:
     code = error.code
     if not isinstance(code, str) or _PUBLIC_ERROR_CODE.fullmatch(code) is None:
         code = "COMMAND_FAILED"
     details: dict[str, Any] = {}
+    # The schema name says which contract was violated without echoing any of
+    # the input, so it survives sanitization; an empty object left callers
+    # guessing which argument was rejected.
+    schema = error.details.get("schema")
+    if isinstance(schema, str) and _SCHEMA_NAME.fullmatch(schema) is not None:
+        details = {"schema": schema}
     if code == "STATE_REVISION_CONFLICT":
         expected = error.details.get("expected")
         actual = error.details.get("actual")

@@ -409,7 +409,10 @@ def test_public_error_mapper_strips_secret_values_and_paths(
     )
     serialized_schema = json.dumps(invalid_schema, ensure_ascii=False)
     assert invalid_schema["error"]["code"] == "SCHEMA_VALIDATION_FAILED"
-    assert invalid_schema["error"]["details"] == {}
+    # Details name the violated contract and nothing else: the schema names are
+    # fixed internal constants, already public in the shipped schema files, so
+    # they say which argument was rejected without echoing any of it.
+    assert invalid_schema["error"]["details"] == {"schema": "semantic-result"}
     assert secret not in serialized_schema
     assert str(tmp_path) not in serialized_schema
 
