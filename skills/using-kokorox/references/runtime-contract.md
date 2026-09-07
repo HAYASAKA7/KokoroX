@@ -11,6 +11,24 @@ Use `--json` for every command. A success envelope has `ok: true`; a failure has
 - Classify exact/literal/verbatim/preserved strings before any tool call except access to a host-provided raw-message record. The host adapter must bind each protected value by slicing the raw user-turn bytes and retain its source range, escaped representation, and byte length; model transcription is not a valid binding. If no lossless source is available, stop the rendering path and request one. Quotation or display is not execution authorization. A separate explicit run/read request may authorize the byte-exact value, subject to normal host permissions and safety checks.
 - Read Character Packs from their installed source path. Store all generated Semantic Results, policy inputs, compiled policies, plans, rendered candidates, compiled packs, sessions, state, and journals beneath the configured `KOKOROX_DATA_DIR`; never place generated artifacts in the repository or working-directory root.
 
+## Host adapter: binding the raw user turn
+
+The trust boundary above requires each protected value to be sliced out of the raw user turn rather than retyped. That guarantee is the host's, and getting it wrong fails silently -- a wrong slice still hashes, still has a byte length, and still lets the rest of the pipeline run. Verify the record you sliced from is a real user turn before using it.
+
+A host transcript usually stores several different things under one "user" label. In Claude Code's JSONL transcript, entries with `type: "user"` include genuine user turns, tool results, and injected Skill text; in one measured session only 119 of 914 such entries were real turns, so "the last user entry" was a non-turn 87% of the time. Select a turn with all four conditions, not just the type:
+
+```python
+def is_user_turn(entry: dict) -> bool:
+    return (
+        "promptSource" in entry              # a real prompt, not an injection
+        and not entry.get("isMeta")          # not Skill or system text
+        and "toolUseResult" not in entry     # not a tool result
+        and isinstance(entry.get("message", {}).get("content"), str)
+    )
+```
+
+Then check the binding before continuing: the slice must be non-empty, must occur in the selected turn at the recorded offset, and must round-trip to the same byte length. A protected span that slices to an empty string means the wrong record was selected -- stop and ask for a lossless source rather than proceeding. On a host that exposes no such record, stop the rendering path; there is no valid fallback to model transcription.
+
 ## Commands
 
 ```text
@@ -73,12 +91,14 @@ Create one closed JSON object before characterization:
   "explanation": ["The read path is not protected."],
   "recommendations": ["Add a concurrent regression test."],
   "warnings": ["Do not trust repeated runs."],
-  "immutable_spans": ["sha256:0123456789abcdef"],
+  "immutable_spans": ["go test -race ./..."],
   "format_constraints": ["preserve_code_blocks"]
 }
 ```
 
 Required fields are exactly `schema_version`, `artifact_id`, `created_by`, `scenario`, `conclusion`, `explanation`, `recommendations`, `warnings`, `immutable_spans`, and `format_constraints`. `artifact_id` must be `semantic/<nonempty-suffix>`. `explanation` and `recommendations` each require at least one item. Put every exact command, path, identifier, error, or citation that could be altered into `immutable_spans`.
+
+`immutable_spans` holds the **literal strings themselves**, byte-for-byte as they appeared in the user's turn. It is not a place for digests. The validator checks that each span occurs verbatim in the rendered text, so a hash there passes only once the hash itself is printed -- and the command it was meant to protect goes unchecked. Keep the digest, source range, and byte length in the host's binding record; put the raw string here.
 
 ## Render plan and rendered output
 
