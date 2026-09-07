@@ -9,6 +9,8 @@ import shutil
 
 import pytest
 
+from kokorox import __version__
+
 
 REPOSITORY_ROOT = Path.cwd().resolve()
 PLUGIN_MANIFEST = REPOSITORY_ROOT / ".codex-plugin" / "plugin.json"
@@ -77,7 +79,7 @@ def test_plugin_manifest_declares_only_the_four_skill_suite() -> None:
     }
     assert payload["name"] == "kokorox"
     assert re.fullmatch(r"\d+\.\d+\.\d+", payload["version"])
-    assert payload["version"] == "0.1.0"
+    assert payload["version"] == __version__
     assert isinstance(payload["description"], str)
     assert payload["description"].strip()
     assert payload["author"] == {"name": "KokoroX"}

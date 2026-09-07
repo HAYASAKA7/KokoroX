@@ -6,6 +6,58 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-09-07
+
+Findings from the first external QA pass against 0.1.0.
+
+### Fixed
+
+- A policy that named only its primary language still rendered in English. The
+  four prose channels (`character_dialogue`, `technical_explanation`,
+  `recommendations`, `warnings`) were hard-coded to `en-US` in the default
+  template, and merging only replaced keys a caller passed explicitly. The
+  documented minimal input `{"mode": "single", "primary_language": "zh-CN"}`
+  therefore produced a plan whose `primary_language` was `zh-CN` and whose every
+  segment was routed to `en-US` -- and validation called it valid. Those four
+  channels now follow `primary_language` unless a caller names one.
+- The Semantic Result example put a digest in `immutable_spans`
+  (`"sha256:0123456789abcdef"`). The validator checks that each span occurs
+  verbatim in the rendered text, so following the example produced
+  `MISSING_PROTECTED_SPAN`, and the natural repair -- printing the digest --
+  satisfied the check while leaving the command it was meant to protect
+  unconstrained. The example is now a literal string, and the contract states
+  that digests belong to the host's binding record, not to `immutable_spans`.
+- `authoring-contract.md` still required reporting "three-locale coverage"
+  after locales became an open set, contradicting the Skill's own statement
+  that a pack may author a single locale. It now reads "declared-locale
+  coverage".
+- Every error but `STATE_REVISION_CONFLICT` reached callers with `details: {}`,
+  including schema failures, which left no way to tell which argument was
+  rejected. The schema name now survives sanitization; it names the violated
+  contract without echoing any input.
+
+### Added
+
+- A host adapter section in the runtime contract covering raw user-turn
+  binding. Hosts store several kinds of record under one "user" label -- in one
+  measured Claude Code session, only 119 of 914 `type: "user"` entries were real
+  turns -- so a naive "last user message" silently binds injected Skill text or
+  a tool result. The section gives the discriminator and the checks that catch a
+  bad binding.
+- `PRIMARY_LANGUAGE_ABSENT`: a plan that declares a primary-language floor above
+  zero and routes no segment to that language is rejected. `min_primary_ratio`
+  was previously declared, shape-checked, and never used for anything.
+
+### Changed
+
+- Render plans carry `min_primary_ratio`, and it is required. The share of
+  primary-language content cannot be measured -- rendered segments carry no
+  per-segment text -- so only the exact zero case is enforced: no segment in the
+  primary language means a zero share whatever the segment lengths are. A
+  count-based ratio was deliberately rejected; with two segments a 0.7 floor
+  would mean "both", flagging legitimate mixed plans.
+
+
 ## [0.1.0] - 2026-09-04
 
 First versioned release of the standalone Agent Skill Suite.
@@ -81,5 +133,6 @@ First versioned release of the standalone Agent Skill Suite.
   scheme's data path and also covers per-user installs, so environment,
   `--user`, and framework layouts all work.
 
-[Unreleased]: https://github.com/HAYASAKA7/KokoroX/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/HAYASAKA7/KokoroX/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/HAYASAKA7/KokoroX/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/HAYASAKA7/KokoroX/releases/tag/v0.1.0
