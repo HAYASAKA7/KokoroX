@@ -29,6 +29,12 @@ MANDATORY_PROTECTED_CHANNELS = frozenset(
     {"commands", "file_paths", "exact_errors", "code_identifiers"}
 )
 
+#: Channels that carry prose. Unless a caller names one explicitly, each one
+#: follows `primary_language`; hard-coding a language here would silently
+#: render every non-English request in English.
+EXPRESSIVE_CHANNELS = ("character_dialogue", "technical_explanation",
+                       "recommendations", "warnings")
+
 _DEFAULT_POLICY_TEMPLATE: dict[str, Any] = {
     "mode": "single",
     "primary_language": "en-US",
@@ -158,5 +164,9 @@ def normalize_policy(policy: Mapping[str, Any]) -> dict[str, Any]:
     layer = _validate_layer(policy)
     normalized = deepcopy(_DEFAULT_POLICY_TEMPLATE)
     _merge_policy(normalized, layer)
+    supplied_channels = layer.get("channels") or {}
+    for channel in EXPRESSIVE_CHANNELS:
+        if channel not in supplied_channels:
+            normalized["channels"][channel] = normalized["primary_language"]
     _validate_complete(normalized)
     return deepcopy(normalized)

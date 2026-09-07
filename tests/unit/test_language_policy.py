@@ -44,6 +44,34 @@ def test_normalize_empty_policy_returns_complete_defaults() -> None:
     assert normalize_policy({}) == EXPECTED_DEFAULT
 
 
+def test_prose_channels_follow_the_primary_language() -> None:
+    """A policy naming only its primary language must not render in English.
+
+    The four prose channels used to be hard-coded to en-US in the template, so
+    the documented minimal input produced a zh-CN plan whose every segment was
+    routed to English.
+    """
+
+    normalized = normalize_policy({"mode": "single", "primary_language": "zh-CN"})
+
+    assert normalized["primary_language"] == "zh-CN"
+    for channel in (
+        "character_dialogue",
+        "technical_explanation",
+        "recommendations",
+        "warnings",
+    ):
+        assert normalized["channels"][channel] == "zh-CN"
+    for channel in (
+        "technical_terms",
+        "commands",
+        "file_paths",
+        "exact_errors",
+        "code_identifiers",
+    ):
+        assert normalized["channels"][channel] == "preserve"
+
+
 def test_normalize_nested_overrides_preserve_sibling_defaults() -> None:
     normalized = normalize_policy(
         {
@@ -61,7 +89,12 @@ def test_normalize_nested_overrides_preserve_sibling_defaults() -> None:
         "primary_language": "ja-JP",
         "channels": {
             **EXPECTED_DEFAULT["channels"],
+            # Only character_dialogue was named; the other prose channels
+            # follow primary_language rather than staying English.
             "character_dialogue": "zh-CN",
+            "technical_explanation": "ja-JP",
+            "recommendations": "ja-JP",
+            "warnings": "ja-JP",
         },
         "mixing": {"max_switches": 2, "min_primary_ratio": 0.7},
         "subtitles": {"enabled": True, "language": "en-US"},
