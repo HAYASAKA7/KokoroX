@@ -14,6 +14,7 @@ import threading
 import time
 from contextlib import contextmanager
 from pathlib import Path
+from collections.abc import Mapping
 from types import MappingProxyType
 from typing import Any, BinaryIO, Callable, Iterator, NamedTuple
 
@@ -58,7 +59,7 @@ CURRENT_TRANSITION_ALGORITHM = "relationship-v1"
 
 
 class _TransitionContract(NamedTuple):
-    apply: Callable[[dict, dict, float, int], dict]
+    apply: Callable[..., dict]
     max_applied_event_ids: int
     max_recent_novelty_keys: int
 
@@ -730,7 +731,7 @@ class SessionStore:
         filename_event_id: str,
         path: Path,
         max_bytes: int,
-    ) -> tuple[dict[str, Any], str, float, int, int]:
+    ) -> tuple[dict[str, Any], str, float, int, dict[str, Any] | None, int]:
         value, actual_bytes = _read_bounded_json_with_size(
             path, min(EVENT_RECORD_MAX_BYTES, max_bytes), _invalid_journal
         )
@@ -739,7 +740,7 @@ class SessionStore:
             or set(value) != {"schema_version", "event", "transition"}
             or value.get("schema_version") != "1.0"
             or not isinstance(value.get("transition"), dict)
-            or set(value["transition"])
+            or set(value["transition"]) - {"stages"}
             != {"algorithm", "max_delta", "repetition_window"}
         ):
             raise _invalid_journal()
@@ -763,11 +764,15 @@ class SessionStore:
             or committed_event["expected_state_revision"] != revision - 1
         ):
             raise _invalid_journal()
+        stages = value["transition"].get("stages")
+        if stages is not None and not isinstance(stages, dict):
+            raise _invalid_journal()
         return (
             committed_event,
             algorithm,
             max_delta,
             repetition_window,
+            stages,
             actual_bytes,
         )
 
@@ -784,6 +789,7 @@ class SessionStore:
                 algorithm,
                 max_delta,
                 repetition_window,
+                stages,
                 actual_bytes,
             ) = self._read_event_record(
                 revision,
@@ -800,6 +806,7 @@ class SessionStore:
                 committed_event,
                 max_delta=max_delta,
                 repetition_window=repetition_window,
+                stages=stages,
             )
             if state["revision"] != revision:
                 raise _invalid_journal()
@@ -1275,6 +1282,7 @@ class SessionStore:
         max_delta: float = 4.0,
         *,
         repetition_window: int = 3,
+        stages: Mapping[str, Mapping[str, float]] | None = None,
         expected_character_id: str | None = None,
         expected_character_version: str | None = None,
         expected_compiled_pack_hash: str | None = None,
@@ -1366,6 +1374,7 @@ class SessionStore:
                     committed_event,
                     max_delta=max_delta,
                     repetition_window=repetition_window,
+                    stages=stages,
                 )
                 next_revision = next_state["revision"]
                 event_path = self._event_path(
@@ -1380,6 +1389,7 @@ class SessionStore:
                         "algorithm": CURRENT_TRANSITION_ALGORITHM,
                         "max_delta": max_delta,
                         "repetition_window": repetition_window,
+                        **({"stages": stages} if stages is not None else {}),
                     },
                 }
 

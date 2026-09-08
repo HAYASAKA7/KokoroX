@@ -6,6 +6,35 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+
+- A pack's relationship pacing was never read. `growth.stages` -- the
+  familiarity and trust thresholds at which a character moves between
+  `unknown`, `acquainted`, `familiar` and `trusted` -- validated, compiled into
+  the artifact byte for byte, and cleared every gate, while `transitions.py`
+  held the reference character's numbers as literals and never mentioned
+  `stages` at all. Every authored pack silently ran rin-aster's curve: one
+  declaring `acquainted` at 6 reached it only at her 10, and one declaring
+  `familiar` at 22 familiarity and 16 trust sat at `acquainted` with 24 and 24,
+  because her gate wants 30.
+
+  The derivation rule is unchanged -- strongest stage first, hold on a relaxed
+  floor before testing the entry bar -- and is now applied to the pack's own
+  numbers. The former literals became `FROZEN_STAGES_V1`, the fallback for a
+  pack that declares no stages, and a test pins that block to the reference
+  pack's `growth.yaml` so the two cannot drift. Equivalence was checked over
+  69,360 combinations of previous stage, familiarity, trust and tension: the
+  reference curve is bit-identical.
+
+  The schema had no exit form for tension, yet the hold value (40) was five
+  above the declared ceiling (35) while every other exit was declared. That is
+  now the documented default, with an optional `exit_max_tension` for packs
+  that prefer to state it. Session, persistence and migration journals each
+  record the thresholds so replay never needs the pack; the field is optional,
+  and its absence correctly means an event was applied under the frozen curve,
+  so no existing journal is invalidated.
+
+
 ## [0.2.0] - 2026-09-08
 
 Findings from the second external QA pass, on the research chain.

@@ -289,7 +289,8 @@
       "properties": {
         "interaction_event": {"$ref": "#/$defs/interaction_event"},
         "max_delta": {"type": "number", "minimum": 0, "maximum": 100},
-        "repetition_window": {"type": "integer", "minimum": 1, "maximum": 10000}
+        "repetition_window": {"type": "integer", "minimum": 1, "maximum": 10000},
+        "stages": {"type": "object"}
       }
     },
     "mood_update_payload": {

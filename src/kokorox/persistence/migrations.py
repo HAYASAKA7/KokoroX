@@ -662,6 +662,10 @@ def _build_migration(
         if operation_kind == "relationship":
             payload["max_delta"] = target_growth[0]
             payload["repetition_window"] = target_growth[1]
+            # Replay runs under the target pack, thresholds included.
+            payload.pop("stages", None)
+            if target_growth[2] is not None:
+                payload["stages"] = target_growth[2]
         target_state, record_payload = _append_target_event(
             captured,
             generation_id,
@@ -718,6 +722,7 @@ def _append_target_event(
             (
                 cast(float, payload["max_delta"]),
                 cast(int, payload["repetition_window"]),
+                cast("dict[str, Any] | None", payload.get("stages")),
             ),
             operation_id,
             captured.scope.boundary,

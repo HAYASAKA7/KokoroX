@@ -2032,11 +2032,17 @@ def _active_compiled_and_state(
     return store, manifest, compiled, state
 
 
-def _growth_config(compiled: dict[str, Any]) -> tuple[float, int]:
+def _growth_config(
+    compiled: dict[str, Any],
+) -> tuple[float, int, dict[str, Any] | None]:
+    """Return the pack's transition config, stage thresholds included."""
+
     growth = compiled["growth"]
+    stages = growth.get("stages")
     return (
         float(growth.get("max_delta_per_event", 4.0)),
         int(growth.get("repetition_window_turns", 3)),
+        stages if isinstance(stages, dict) else None,
     )
 
 
@@ -2067,12 +2073,13 @@ def _handle_state_preview(
             retryable=True,
             details={"expected": expected, "actual": actual},
         )
-    max_delta, repetition_window = _growth_config(compiled)
+    max_delta, repetition_window, stages = _growth_config(compiled)
     preview = apply_event(
         state,
         event,
         max_delta=max_delta,
         repetition_window=repetition_window,
+        stages=stages,
     )
     return {"ok": True, "state": preview}
 
@@ -2084,12 +2091,13 @@ def _handle_state_apply(
     store, manifest, compiled, _state = _active_compiled_and_state(
         settings, schemas, args.session
     )
-    max_delta, repetition_window = _growth_config(compiled)
+    max_delta, repetition_window, stages = _growth_config(compiled)
     state = store.apply(
         args.session,
         event,
         max_delta=max_delta,
         repetition_window=repetition_window,
+        stages=stages,
         expected_character_id=manifest["character_id"],
         expected_character_version=manifest["character_version"],
         expected_compiled_pack_hash=manifest["compiled_pack_hash"],

@@ -2214,7 +2214,7 @@ def _operation_successor(
     state: dict[str, Any],
     operation_kind: str,
     event: dict[str, Any],
-    growth: tuple[float, int] | None,
+    growth: tuple[float, int, dict[str, Any] | None] | None,
     operation_id: str,
     boundary: PersistenceBoundary,
 ) -> dict[str, Any]:
@@ -2234,7 +2234,7 @@ def _operation_successor(
 def _relationship_successor(
     state: dict[str, Any],
     event: dict[str, Any],
-    growth: tuple[float, int],
+    growth: tuple[float, int, dict[str, Any] | None],
     operation_id: str,
     boundary: PersistenceBoundary,
 ) -> dict[str, Any]:
@@ -2248,6 +2248,7 @@ def _relationship_successor(
             transition_event,
             max_delta=growth[0],
             repetition_window=growth[1],
+            stages=growth[2],
         )
     except KokoroError as error:
         boundary.assert_clean()
@@ -2445,7 +2446,7 @@ def _operation_record(
     successor: dict[str, Any],
     operation_kind: str,
     event: dict[str, Any],
-    growth: tuple[float, int] | None,
+    growth: tuple[float, int, dict[str, Any] | None] | None,
     operation_id: str,
 ) -> dict[str, Any]:
     consent = active.consent
@@ -2456,6 +2457,7 @@ def _operation_record(
             "interaction_event": _detached(event),
             "max_delta": growth[0],
             "repetition_window": growth[1],
+            **({"stages": growth[2]} if growth[2] is not None else {}),
         }
     else:
         payload = _detached(event)
@@ -2681,11 +2683,14 @@ def _require_active_generation(
         raise _migration_required("consent")
 
 
-def _growth_config(compiled: dict[str, Any]) -> tuple[float, int]:
+def _growth_config(
+    compiled: dict[str, Any],
+) -> tuple[float, int, dict[str, Any] | None]:
     try:
         growth = compiled["growth"]
         max_delta = growth["max_delta_per_event"]
         repetition_window = growth["repetition_window_turns"]
+        stages = growth.get("stages")
     except (KeyError, TypeError) as error:
         raise _contract_unsupported("growth") from error
     if (
@@ -2697,10 +2702,16 @@ def _growth_config(compiled: dict[str, Any]) -> tuple[float, int]:
         or not 1 <= repetition_window <= 10_000
     ):
         raise _contract_unsupported("growth")
-    return float(max_delta), repetition_window
+    return (
+        float(max_delta),
+        repetition_window,
+        stages if isinstance(stages, dict) else None,
+    )
 
 
-def _recorded_growth(payload: dict[str, Any]) -> tuple[float, int]:
+def _recorded_growth(
+    payload: dict[str, Any],
+) -> tuple[float, int, dict[str, Any] | None]:
     max_delta = payload.get("max_delta")
     repetition_window = payload.get("repetition_window")
     if (
@@ -2712,7 +2723,12 @@ def _recorded_growth(payload: dict[str, Any]) -> tuple[float, int]:
         or not 1 <= repetition_window <= 10_000
     ):
         raise _contract_unsupported("recorded_growth")
-    return float(max_delta), repetition_window
+    stages = payload.get("stages")
+    if stages is not None and not isinstance(stages, dict):
+        raise _contract_unsupported("recorded_growth")
+    # Absent means this event was applied before packs were read, which is
+    # exactly the frozen curve -- so replaying it that way is faithful.
+    return float(max_delta), repetition_window, stages
 
 
 def _validate_operation_payload(
@@ -2845,7 +2861,7 @@ def _exact_operation_retry(
     record: dict[str, Any],
     operation_kind: str,
     event: dict[str, Any],
-    growth: tuple[float, int] | None,
+    growth: tuple[float, int, dict[str, Any] | None] | None,
     expected_state_revision: int,
 ) -> bool:
     if operation_kind == "relationship":
@@ -2865,7 +2881,7 @@ def _exact_operation_retry(
 def _exact_relationship_retry(
     record: dict[str, Any],
     event: dict[str, Any],
-    growth: tuple[float, int],
+    growth: tuple[float, int, dict[str, Any] | None],
     expected_state_revision: int,
 ) -> bool:
     payload = record.get("payload")
@@ -2876,6 +2892,7 @@ def _exact_relationship_retry(
         and payload.get("interaction_event") == event
         and payload.get("max_delta") == growth[0]
         and payload.get("repetition_window") == growth[1]
+        and payload.get("stages") == growth[2]
     )
 
 

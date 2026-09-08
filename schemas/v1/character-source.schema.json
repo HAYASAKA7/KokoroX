@@ -195,7 +195,8 @@
         "exit_familiarity": {"type": "number", "minimum": 0, "maximum": 100},
         "enter_trust": {"type": "number", "minimum": 0, "maximum": 100},
         "exit_trust": {"type": "number", "minimum": 0, "maximum": 100},
-        "max_tension": {"type": "number", "minimum": 0, "maximum": 100}
+        "max_tension": {"type": "number", "minimum": 0, "maximum": 100},
+        "exit_max_tension": {"type": "number", "minimum": 0, "maximum": 100}
       }
     },
     "growth": {

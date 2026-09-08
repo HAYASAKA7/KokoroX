@@ -2,11 +2,16 @@ from copy import deepcopy
 from pathlib import Path
 
 import pytest
+import yaml
 
 from kokorox.errors import KokoroError
 from kokorox.schemas import SchemaRegistry
 from kokorox.state import transitions as transitions_module
-from kokorox.state.transitions import apply_event, derive_stage
+from kokorox.state.transitions import (
+    FROZEN_STAGES_V1,
+    apply_event,
+    derive_stage,
+)
 from kokorox import __version__
 
 
@@ -501,3 +506,100 @@ def test_existing_novelty_key_can_refresh_at_novelty_capacity() -> None:
     assert result["recent_novelty"]["novelty-9999"] == 4
     assert result["dimensions"]["trust"] == 1.0
     SCHEMAS.validate("relationship-state", result)
+
+
+def _dims(familiarity: float, trust: float, tension: float = 0.0) -> dict[str, float]:
+    return {"familiarity": familiarity, "trust": trust, "tension": tension}
+
+
+#: A pacing deliberately faster than the reference character's.
+RINA_STAGES = {
+    "acquainted": {"enter_familiarity": 6, "exit_familiarity": 4},
+    "familiar": {
+        "enter_familiarity": 22,
+        "enter_trust": 16,
+        "exit_familiarity": 18,
+        "exit_trust": 12,
+    },
+    "trusted": {"enter_trust": 44, "max_tension": 30, "exit_trust": 38},
+}
+
+
+def test_a_pack_runs_its_own_curve_not_the_reference_one() -> None:
+    """The numbers an author writes are the numbers that run.
+
+    They were not: `_derive_stage_v1` held rin-aster's thresholds as literals,
+    so a pack declaring `acquainted` at 6 only reached it at her 10, and one
+    declaring `familiar` at 22/16 sat at `acquainted` with 24 and 24 because
+    her gate wants 30. Both figures below are from a real pack that validated,
+    compiled and cleared every gate while running someone else's pacing.
+    """
+
+    assert derive_stage("unknown", _dims(6.0, 0.0), RINA_STAGES) == "acquainted"
+    assert derive_stage("unknown", _dims(6.0, 0.0)) == "unknown"
+
+    assert derive_stage("acquainted", _dims(24.0, 24.0), RINA_STAGES) == "familiar"
+    assert derive_stage("acquainted", _dims(24.0, 24.0)) == "acquainted"
+
+
+def test_the_reference_curve_is_the_fallback_not_the_rule() -> None:
+    """A pack that declares no stages keeps the behaviour it always had."""
+
+    for previous in ("unknown", "acquainted", "familiar", "trusted"):
+        for familiarity in range(0, 101, 5):
+            for trust in range(0, 101, 5):
+                dimensions = _dims(float(familiarity), float(trust), 0.0)
+                assert derive_stage(previous, dimensions) == derive_stage(
+                    previous, dimensions, FROZEN_STAGES_V1
+                )
+
+
+def test_the_frozen_fallback_matches_the_reference_pack_on_disk() -> None:
+    """The fallback is the reference pack's own block, not a second source."""
+
+    growth = yaml.safe_load(
+        Path("characters/original/rin-aster/growth.yaml").read_text(
+            encoding="utf-8"
+        )
+    )
+    declared = {
+        stage: thresholds
+        for stage, thresholds in growth["stages"].items()
+        if stage != "unknown"
+    }
+    assert declared == FROZEN_STAGES_V1
+
+
+def test_a_stage_holds_on_the_pack_s_own_exit_floor() -> None:
+    """Hysteresis relaxes to the declared exit, not to the reference one."""
+
+    # Below rin-aster's exit of 25, at Rina's declared 18.
+    assert derive_stage("familiar", _dims(18.0, 12.0), RINA_STAGES) == "familiar"
+    assert derive_stage("familiar", _dims(17.9, 12.0), RINA_STAGES) == "acquainted"
+
+
+def test_the_tension_ceiling_relaxes_while_holding_a_stage() -> None:
+    """The schema has no exit form for tension, so holding relaxes it by five.
+
+    That is not invented: the reference curve declares `max_tension` 35 and the
+    hardcoded hold value was 40. A pack may state `exit_max_tension` instead.
+    """
+
+    entered = _dims(0.0, 50.0, 34.0)
+    assert derive_stage("unknown", entered, FROZEN_STAGES_V1) == "trusted"
+    # Past the entry ceiling but inside the relaxed one.
+    assert derive_stage("trusted", _dims(0.0, 45.0, 39.0), FROZEN_STAGES_V1) == "trusted"
+    assert derive_stage("trusted", _dims(0.0, 45.0, 41.0), FROZEN_STAGES_V1) != "trusted"
+
+    explicit = {"trusted": {"enter_trust": 50, "max_tension": 30, "exit_trust": 42,
+                            "exit_max_tension": 31}}
+    assert derive_stage("trusted", _dims(0.0, 45.0, 31.0), explicit) == "trusted"
+    assert derive_stage("trusted", _dims(0.0, 45.0, 32.0), explicit) != "trusted"
+
+
+def test_a_stage_without_an_exit_floor_has_no_hysteresis() -> None:
+    """Nothing to hold on to means the entry bar governs both directions."""
+
+    stages = {"acquainted": {"enter_familiarity": 10}}
+    assert derive_stage("acquainted", _dims(9.0, 0.0), stages) == "unknown"
+    assert derive_stage("acquainted", _dims(10.0, 0.0), stages) == "acquainted"
