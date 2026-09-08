@@ -27,6 +27,17 @@ Findings from the first external QA pass against 0.1.0.
   satisfied the check while leaving the command it was meant to protect
   unconstrained. The example is now a literal string, and the contract states
   that digests belong to the host's binding record, not to `immutable_spans`.
+- Research validation reported mismatches as excesses. A claim outside the
+  `timeline_cutoff` namespace was rejected with "Claim timeline exceeds the
+  requested cutoff", but the check is string containment, not ordering: under a
+  `volume-26` cutoff, `volume-1` is rejected though it precedes the cutoff,
+  while `volume-26-epilogue` is accepted whatever it covers. Both spoiler-scope
+  messages said "exceeds the requested scope" for what is a plain equality
+  test. The messages now describe the comparisons that actually run, and the
+  contract states the namespace rule the code has always implemented. The
+  fixtures had hidden it by using `episode-01` for both the cutoff and every
+  claim, so equality alone satisfied them.
+
 - `authoring-contract.md` still required reporting "three-locale coverage"
   after locales became an open set, contradicting the Skill's own statement
   that a pack may author a single locale. It now reads "declared-locale
@@ -44,6 +55,14 @@ Findings from the first external QA pass against 0.1.0.
   turns -- so a naive "last user message" silently binds injected Skill text or
   a tool result. The section gives the discriminator and the checks that catch a
   bad binding.
+- A host adapter section in the research contract, covering evidence a
+  retrieval tool has reprocessed. `content_sha256` must digest the bytes a
+  Source Record describes, but a fetch tool commonly returns text its own model
+  produced from the page, and a digest over that attests the rendering rather
+  than the source -- silently, since the digest computes and the schema
+  validates. The section says to digest what was retained, record it in
+  `limitations`, and keep citing claims out of `direct_fact`.
+
 - `PRIMARY_LANGUAGE_ABSENT`: a plan that declares a primary-language floor above
   zero and routes no segment to that language is rejected. `min_primary_ratio`
   was previously declared, shape-checked, and never used for anything. The

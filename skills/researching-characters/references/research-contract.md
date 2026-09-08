@@ -31,6 +31,8 @@ The manifest binds every referenced path to the SHA-256 of its exact retained by
 
 The Research Request fixes subject identity, franchise, medium, work, adaptation, continuity, timeline cutoff, spoiler scope, ordered research questions, coverage topics, user assertions, constraints, and private visibility. Missing adaptation or continuity is never inferred.
 
+`timeline_cutoff` opens a namespace; it does not order anything. A claim's `timeline` must be the cutoff exactly, or the cutoff followed by `-` and a more specific label -- `volume-26` admits `volume-26` and `volume-26-epilogue`, and rejects `volume-1`, which is outside the namespace rather than before it. Choose one label for the boundary and tag every claim inside it; do not tag claims with the volume or episode they came from unless that string starts with the cutoff. `spoiler_scope` is compared exactly and is what actually holds the spoiler boundary.
+
 Create a Source Record before any claim cites it. Record the host-observed category, canonical locator, title, publisher/owner, access timestamp, availability, content digest, bounded excerpts, continuity, spoiler scope, trust notes, and limitations. Never invent a locator or inaccessible content.
 
 Each claim is one proposition with one of four provenance classifications:
@@ -45,6 +47,12 @@ Support is categorical: `direct`, `corroborated`, `indirect`, or `unsupported`. 
 Keep incompatible claims in a Conflict Record. Resolve only through explicit evidence and rationale or valid separation by continuity, adaptation, or timeline. Popularity, source count, or agent preference is not resolution.
 
 Coverage accounts for every requested topic as `covered`, `partial`, `missing`, or `blocked`. Preserve supporting claims, missing evidence, unavailable sources, spoiler restrictions, limitations, and whether the topic blocks authoring.
+
+## Host adapter: recording evidence a tool has reprocessed
+
+`content_sha256` must digest the bytes the record describes. Retrieval tools often do not return those bytes -- a fetch tool may hand back Markdown its own model produced from the page, in which case a digest over that text attests the tool's rendering, not the source. Nothing detects this: the digest computes, the schema validates, and the record looks complete.
+
+When the host cannot expose the retrieved bytes, digest exactly what you retained, say so in that record's `limitations`, and keep the claims that cite it out of `direct_fact`. Do not present a digest of reprocessed text as a digest of the source. A source whose bytes were never obtained stays `unavailable`, and no claim may cite it -- a retrieval summary is not page content.
 
 ## Deterministic CLI gate
 

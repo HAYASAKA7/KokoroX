@@ -152,6 +152,43 @@ def test_reports_timeline_violation() -> None:
     )
 
 
+@pytest.mark.parametrize(
+    ("timeline", "contained"),
+    [
+        ("episode-01", True),
+        ("episode-01-behavior", True),
+        ("episode-02", False),
+        # An earlier point is outside the namespace, not before the cutoff.
+        ("episode-00", False),
+        # A later one is inside it, whatever it describes.
+        ("episode-01-after-the-finale", True),
+        # Containment is on segments, so a longer number is not a child.
+        ("episode-010", False),
+    ],
+)
+def test_timeline_containment_is_namespace_not_ordering(
+    timeline: str, contained: bool
+) -> None:
+    """`timeline_cutoff` opens a namespace; nothing compares two points in time.
+
+    The fixtures all use `episode-01` for both the cutoff and every claim, so
+    equality alone satisfied them and this edge stayed invisible. A real cutoff
+    exposes it: under `volume-26`, a claim tagged `volume-1` is rejected even
+    though volume 1 precedes the cutoff, and `volume-26-epilogue` is accepted
+    even if it covers later events. `spoiler_scope` carries the actual boundary.
+    """
+
+    workspace = changed(
+        loaded(),
+        lambda value: value["claims"][0].update({"timeline": timeline}),
+    )
+
+    violated = "RESEARCH_TIMELINE_VIOLATION" in codes(
+        validate_research_workspace(workspace, SCHEMAS)
+    )
+    assert violated is not contained
+
+
 def test_reports_spoiler_scope_violation() -> None:
     workspace = changed(
         loaded(),

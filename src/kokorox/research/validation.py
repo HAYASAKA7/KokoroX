@@ -59,7 +59,7 @@ def validate_research_workspace(
                 _finding(
                     "RESEARCH_SPOILER_SCOPE_VIOLATION",
                     ["sources", index, "spoiler_scope"],
-                    "Source spoiler scope exceeds the requested scope.",
+                    "Source spoiler scope does not match the requested scope.",
                 )
             )
 
@@ -214,7 +214,7 @@ def _validate_claim_scope(
             _finding(
                 "RESEARCH_TIMELINE_VIOLATION",
                 ["claims", index, "timeline"],
-                "Claim timeline exceeds the requested cutoff.",
+                "Claim timeline is outside the requested cutoff namespace.",
             )
         )
     if claim["spoiler_scope"] != spoiler_scope:
@@ -222,7 +222,7 @@ def _validate_claim_scope(
             _finding(
                 "RESEARCH_SPOILER_SCOPE_VIOLATION",
                 ["claims", index, "spoiler_scope"],
-                "Claim spoiler scope exceeds the requested scope.",
+                "Claim spoiler scope does not match the requested scope.",
             )
         )
 
@@ -579,6 +579,20 @@ def _validate_coverage(
 
 
 def _timeline_contained(value: str, cutoff: str) -> bool:
+    """Return whether `value` names the cutoff or a point beneath it.
+
+    This is string containment, not ordering. `timeline_cutoff` opens a
+    namespace and a claim must sit inside it: exactly the cutoff, or the cutoff
+    followed by a `-` and a more specific label. Nothing here compares two
+    points in time, so `volume-1` is not "before" `volume-26` -- it is simply
+    outside that namespace and is rejected, while `volume-26-epilogue` is
+    inside it and is accepted whatever it describes.
+
+    Ordering would need a comparable timeline model, which volumes, episodes,
+    arcs, and cross-medium releases do not share. Until there is one, the
+    spoiler boundary is carried by `spoiler_scope`, which is compared exactly.
+    """
+
     return value == cutoff or value.startswith(f"{cutoff}-")
 
 
