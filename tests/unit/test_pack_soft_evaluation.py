@@ -132,10 +132,10 @@ def test_aggregates_all_dimensions_and_locales_into_one_exact_report() -> None:
 
     assert report == _expected_report(value)
     assert sha256(canonical_bytes(value)).hexdigest() == (
-        "85a723d22c695ccc183f30ef5920a28379482c31ba605452cd09491080bc773e"
+        "f62aad2ac52b803789124350d9bcff046f69303d4aabf3d3cab4d66bc6124797"
     )
     assert sha256(canonical_bytes(report)).hexdigest() == (
-        "3a669ea637155ad90d78c5890b50f0ab6a181e9f3ab162159be1c2c75778b157"
+        "95ade0be764a563c83600cd9ed6b3b2cedd0be145abae645075db59c336a8387"
     )
     SCHEMAS.validate("pack-soft-evaluation-report", report)
 

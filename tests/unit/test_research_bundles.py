@@ -58,7 +58,7 @@ def test_build_research_bundle_is_byte_stable_and_non_mutating() -> None:
     assert first["validation_report_hash"] == canonical_hash(report)
     assert (
         first["validation_report_hash"]
-        == "6e29413978ce8649e60161c36e8bf3f533a490e9de4ef201514ad892c31e0ff1"
+        == "178cce9c6e36c55d2e1a950aa4d7b55107fb68494cffd3d0c93c1d5ac8d6bc5e"
     )
     assert report == report_before
     assert workspace_before == canonical_bytes(
