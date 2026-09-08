@@ -753,6 +753,12 @@ def test_built_archives_and_installed_research_cli_are_complete(
                 "    preview_skill_suite_install,\n"
                 "    resolve_skill_suite_source,\n"
                 ")\n"
+                "from kokorox.distribution import suite as probe_suite\n"
+                # The probe proves the layout beside the installed package
+                # prefix is discovered. A suite installed in the environment
+                # running the tests is a second complete source that would
+                # make discovery ambiguous, so keep it out of the candidates.
+                "probe_suite._data_roots = lambda: ()\n"
                 "expected_source = Path(sys.argv[1]).resolve(strict=True)\n"
                 "target = Path(sys.argv[2])\n"
                 "assert resolve_skill_suite_source() == expected_source\n"

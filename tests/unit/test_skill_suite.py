@@ -639,6 +639,7 @@ def test_preview_enforces_source_limits(
     )
 
 
+@pytest.mark.ambient_data_roots
 def test_source_candidates_include_the_environment_prefix() -> None:
     """A wheel installs the Skill data files under the environment prefix.
 

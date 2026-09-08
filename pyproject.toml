@@ -99,6 +99,9 @@ where = ["src"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-ra"
+markers = [
+  "ambient_data_roots: needs the real sysconfig data roots, not isolated ones",
+]
 
 [tool.coverage.run]
 # Measure the repository tree only. A bare package name also matches the

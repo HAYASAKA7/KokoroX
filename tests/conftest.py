@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from hashlib import sha256
+import importlib
 import json
 from pathlib import Path
 from typing import Any
@@ -231,3 +232,31 @@ def _cached_verified_release(
 @pytest.fixture
 def verified_release_factory() -> Callable[..., dict[str, Any]]:
     return _cached_verified_release
+
+
+@pytest.fixture(autouse=True)
+def _hide_ambient_installed_skill_suite(
+    request: pytest.FixtureRequest,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Keep Skill suite discovery blind to a wheel installed in this environment.
+
+    ``_source_candidates`` offers ``share/kokorox/skills`` under every
+    ``sysconfig`` data root. A checkout whose package is also pip-installed
+    therefore exposes two complete suites -- the repository's ``skills/`` and
+    the installed copy -- and discovery fails closed on an ambiguous source.
+    That is precisely the state README's own build, install, then
+    ``PYTHONPATH=src python -m pytest tests`` sequence leaves behind, so the
+    documented workflow made fifteen tests fail on a correct tree. Each test
+    owns the candidates it builds; ambient ones make results depend on how the
+    machine happens to be set up.
+
+    A test that asserts which roots are searched needs the real ones and
+    says so with `@pytest.mark.ambient_data_roots`.
+    """
+
+    if request.node.get_closest_marker("ambient_data_roots") is not None:
+        return
+
+    suite = importlib.import_module("kokorox.distribution.suite")
+    monkeypatch.setattr(suite, "_data_roots", lambda: ())

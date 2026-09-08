@@ -76,6 +76,16 @@ def _build_and_install(root: Path) -> tuple[Path, Path, Path]:
     assert installed_result.returncode == 0, (
         installed_result.stdout + installed_result.stderr
     )
+    # A Skill suite installed in the environment running these tests is a
+    # second complete source beside the one just placed under --target, and
+    # discovery fails closed on that ambiguity. The subprocesses below cannot
+    # be monkeypatched, so drop the ambient roots at interpreter start-up;
+    # `installed` is first on their PYTHONPATH, so this module is imported.
+    (installed / "sitecustomize.py").write_text(
+        "from kokorox.distribution import suite\n"
+        "suite._data_roots = lambda: ()\n",
+        encoding="utf-8",
+    )
     return wheel, sdist, installed
 
 

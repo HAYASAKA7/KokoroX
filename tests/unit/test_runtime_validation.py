@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from copy import deepcopy
 from fractions import Fraction
+from hashlib import sha256
 from pathlib import Path
 from typing import Any
 
@@ -871,3 +872,54 @@ def test_rejects_malformed_primary_language(language: object) -> None:
 
     assert result["valid"] is False
     assert [item["code"] for item in result["violations"]] == ["INVALID_PLAN"]
+
+
+def test_a_digest_in_immutable_spans_protects_only_the_digest() -> None:
+    """A hash in `immutable_spans` leaves the string it stands for unchecked.
+
+    The validator asks whether each span occurs verbatim in the rendered text,
+    so a digest is satisfied by printing that digest. A delivery that prints the
+    hash and silently repairs the command the hash was taken from is therefore
+    clean: every gate passes while the protected value is gone. This is why
+    `runtime-contract.md` requires literal strings here; the rule is load
+    bearing, not stylistic, and nothing in the validator enforces it.
+    """
+
+    original = "git chekout -b topic --track orgin/main"
+    digest = "sha256:" + sha256(original.encode("utf-8")).hexdigest()
+    repaired = "git checkout -b topic --track origin/main"
+    text = f"原因已经明确。 {repaired} {digest}"
+
+    result = validate_rendered_output(
+        rendered(text=text),
+        semantic(immutable_spans=[digest]),
+        plan(protected_spans=[digest]),
+    )
+
+    assert original not in text
+    assert result["valid"] is True
+    assert result["violations"] == []
+    assert_schema_valid(result)
+
+
+def test_a_below_floor_primary_language_share_is_not_measured() -> None:
+    """Only a zero share is detectable; `min_primary_ratio` is never applied.
+
+    Rendered segments carry no text, so the validator cannot weigh how much of
+    a delivery each one accounts for. It can only see whether a primary-language
+    segment was planned at all. Half the segments in the primary language clears
+    a 0.7 floor untouched, and the floor still travels in the violation details
+    as `limit`, which reads as a threshold that was checked.
+    """
+
+    planned = plan()
+    languages = [segment["target_language"] for segment in planned["segments"]]
+    share = Fraction(languages.count(planned["primary_language"]), len(languages))
+    floor = Fraction(str(planned["min_primary_ratio"]))
+    assert share < floor
+
+    result = validate_rendered_output(rendered(), semantic(), planned)
+
+    assert result["valid"] is True
+    assert "PRIMARY_LANGUAGE_ABSENT" not in codes(result)
+    assert_schema_valid(result)
