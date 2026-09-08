@@ -707,9 +707,12 @@ def validate_rendered_output(
             violations.add(
                 "PRIMARY_LANGUAGE_ABSENT",
                 "No planned segment renders in the primary language.",
+                # The floor is deliberately not reported. It gates whether this
+                # check runs, but nothing compares a share against it, and a
+                # `limit` beside an `observed` reads as a threshold that was
+                # measured. Report only what was counted.
                 details={
                     "expected": plan_primary_language,
-                    "limit": min_primary_ratio,
                     "observed": 0,
                 },
             )

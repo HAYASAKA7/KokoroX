@@ -46,7 +46,10 @@ Findings from the first external QA pass against 0.1.0.
   bad binding.
 - `PRIMARY_LANGUAGE_ABSENT`: a plan that declares a primary-language floor above
   zero and routes no segment to that language is rejected. `min_primary_ratio`
-  was previously declared, shape-checked, and never used for anything.
+  was previously declared, shape-checked, and never used for anything. The
+  violation reports only what was counted -- the language expected and the zero
+  segments carrying it -- and deliberately omits the floor, which gates the
+  check but is never compared against a measured share.
 
 ### Changed
 

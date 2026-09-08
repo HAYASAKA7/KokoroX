@@ -848,6 +848,13 @@ def test_primary_language_absent_from_every_segment_is_rejected(
 
     assert result["valid"] is False
     assert "PRIMARY_LANGUAGE_ABSENT" in codes(result)
+    absent = next(
+        item
+        for item in result["violations"]
+        if item["code"] == "PRIMARY_LANGUAGE_ABSENT"
+    )
+    # Only the counted facts. A floor here would read as a measured threshold.
+    assert absent["details"] == {"expected": language, "observed": 0}
     assert_schema_valid(result)
 
 
@@ -908,8 +915,9 @@ def test_a_below_floor_primary_language_share_is_not_measured() -> None:
     Rendered segments carry no text, so the validator cannot weigh how much of
     a delivery each one accounts for. It can only see whether a primary-language
     segment was planned at all. Half the segments in the primary language clears
-    a 0.7 floor untouched, and the floor still travels in the violation details
-    as `limit`, which reads as a threshold that was checked.
+    a 0.7 floor untouched. The floor is no longer reported in the violation
+    details either, so nothing in the envelope implies a comparison that never
+    happens.
     """
 
     planned = plan()
