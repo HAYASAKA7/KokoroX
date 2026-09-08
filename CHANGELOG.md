@@ -6,6 +6,55 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.2.0] - unreleased
+
+Findings from the second external QA pass, on the research chain.
+
+### Changed
+
+- `timeline_cutoff` and every claim `timeline` are ordered points
+  (`{"unit": "volume", "index": 26}`) instead of strings compared by prefix.
+  The old test was `value == cutoff or value.startswith(cutoff + "-")`, which
+  ordered nothing: under a `volume-26` cutoff a claim at `volume-1` was
+  rejected although it precedes the cutoff, while `volume-26-epilogue` was
+  accepted whatever it described. The field could not bound spoilers or express
+  where a fact came from, and the message -- "Claim timeline exceeds the
+  requested cutoff" -- named a comparison that never ran.
+
+  A claim now passes at or before the cutoff's index, within one unit. Units
+  are never mapped onto one another, so a claim in a different unit is a
+  mismatch rather than a guess. A claim may be unplaced (`"index": null`) when
+  no source places it: inventing a number where the evidence gives none is
+  worse than admitting the gap, so it is not a violation, but a coverage topic
+  supported by an unplaced claim cannot be `covered` -- and `covered` forbids
+  limitations, so the gap has to be recorded.
+
+  An authoring request keeps a prose `timeline`, because original and dossier
+  packs have no canonical axis; a research-backed request names the bundle
+  cutoff in its rendered form, `<unit>:<index>`.
+
+  The repository fixtures had hidden all of this by using `episode-01` for both
+  the cutoff and every claim, so equality alone satisfied them.
+- `PRIMARY_LANGUAGE_ABSENT` reports only what was counted -- the language
+  expected and the zero segments carrying it -- and omits the floor, which
+  gates the check but is never compared against a measured share.
+
+### Fixed
+
+- Both spoiler-scope messages said "exceeds the requested scope" for what is a
+  plain equality test, so a claim whose scope was *narrower* than requested was
+  told it had exceeded it.
+
+### Added
+
+- A host adapter section in the research contract, covering evidence a
+  retrieval tool has reprocessed. `content_sha256` must digest the bytes a
+  Source Record describes, but a fetch tool commonly returns text its own model
+  produced from the page, and a digest over that attests the rendering rather
+  than the source -- silently, since the digest computes and the schema
+  validates. The section says to digest what was retained, record it in
+  `limitations`, and keep citing claims out of `direct_fact`.
+
 ## [0.1.1] - 2026-09-07
 
 Findings from the first external QA pass against 0.1.0.
@@ -27,23 +76,38 @@ Findings from the first external QA pass against 0.1.0.
   satisfied the check while leaving the command it was meant to protect
   unconstrained. The example is now a literal string, and the contract states
   that digests belong to the host's binding record, not to `immutable_spans`.
-- Research validation reported mismatches as excesses. A claim outside the
-  `timeline_cutoff` namespace was rejected with "Claim timeline exceeds the
-  requested cutoff", but the check is string containment, not ordering: under a
-  `volume-26` cutoff, `volume-1` is rejected though it precedes the cutoff,
-  while `volume-26-epilogue` is accepted whatever it covers. Both spoiler-scope
-  messages said "exceeds the requested scope" for what is a plain equality
-  test. The messages now describe the comparisons that actually run, and the
-  contract states the namespace rule the code has always implemented. The
-  fixtures had hidden it by using `episode-01` for both the cutoff and every
-  claim, so equality alone satisfied them.
-
 - `authoring-contract.md` still required reporting "three-locale coverage"
   after locales became an open set, contradicting the Skill's own statement
   that a pack may author a single locale. It now reads "declared-locale
   coverage".
 - Every error but `STATE_REVISION_CONFLICT` reached callers with `details: {}`,
   including schema failures, which left no way to tell which argument was
+  rejected. The schema name now survives sanitization; it names the violated
+  contract without echoing any input.
+
+### Added
+
+- A host adapter section in the runtime contract covering raw user-turn
+  binding. Hosts store several kinds of record under one "user" label -- in one
+  measured Claude Code session, only 119 of 914 `type: "user"` entries were real
+  turns -- so a naive "last user message" silently binds injected Skill text or
+  a tool result. The section gives the discriminator and the checks that catch a
+  bad binding.
+- `PRIMARY_LANGUAGE_ABSENT`: a plan that declares a primary-language floor above
+  zero and routes no segment to that language is rejected. `min_primary_ratio`
+  was previously declared, shape-checked, and never used for anything.
+
+### Changed
+
+- Render plans carry `min_primary_ratio`, and it is required. The share of
+  primary-language content cannot be measured -- rendered segments carry no
+  per-segment text -- so only the exact zero case is enforced: no segment in the
+  primary language means a zero share whatever the segment lengths are. A
+  count-based ratio was deliberately rejected; with two segments a 0.7 floor
+  would mean "both", flagging legitimate mixed plans.
+
+
+ment was
   rejected. The schema name now survives sanitization; it names the violated
   contract without echoing any input.
 
@@ -156,5 +220,6 @@ First versioned release of the standalone Agent Skill Suite.
   `--user`, and framework layouts all work.
 
 [Unreleased]: https://github.com/HAYASAKA7/KokoroX/compare/v0.1.1...HEAD
+[0.2.0]: https://github.com/HAYASAKA7/KokoroX/compare/v0.1.1...HEAD
 [0.1.1]: https://github.com/HAYASAKA7/KokoroX/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/HAYASAKA7/KokoroX/releases/tag/v0.1.0
