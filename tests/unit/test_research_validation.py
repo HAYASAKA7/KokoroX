@@ -144,7 +144,9 @@ def test_reports_continuity_mismatch() -> None:
 def test_reports_timeline_violation() -> None:
     workspace = changed(
         loaded(),
-        lambda value: value["claims"][0].update({"timeline": "episode-02"}),
+        lambda value: value["claims"][0].update(
+            {"timeline": {"unit": "episode", "index": 9}}
+        ),
     )
 
     assert "RESEARCH_TIMELINE_VIOLATION" in codes(
@@ -153,40 +155,75 @@ def test_reports_timeline_violation() -> None:
 
 
 @pytest.mark.parametrize(
-    ("timeline", "contained"),
+    ("index", "violated"),
     [
-        ("episode-01", True),
-        ("episode-01-behavior", True),
-        ("episode-02", False),
-        # An earlier point is outside the namespace, not before the cutoff.
-        ("episode-00", False),
-        # A later one is inside it, whatever it describes.
-        ("episode-01-after-the-finale", True),
-        # Containment is on segments, so a longer number is not a child.
-        ("episode-010", False),
+        (0, False),
+        (1, False),
+        # The fixture cutoff is episode 2.
+        (2, False),
+        (3, True),
+        (99, True),
+        # An unplaced claim carries no position, so it cannot be past anything.
+        (None, False),
     ],
 )
-def test_timeline_containment_is_namespace_not_ordering(
-    timeline: str, contained: bool
+def test_timeline_is_compared_as_an_ordered_index(
+    index: int | None, violated: bool
 ) -> None:
-    """`timeline_cutoff` opens a namespace; nothing compares two points in time.
+    """Earlier points pass, later ones are rejected, unplaced ones are neither.
 
-    The fixtures all use `episode-01` for both the cutoff and every claim, so
-    equality alone satisfied them and this edge stayed invisible. A real cutoff
-    exposes it: under `volume-26`, a claim tagged `volume-1` is rejected even
-    though volume 1 precedes the cutoff, and `volume-26-epilogue` is accepted
-    even if it covers later events. `spoiler_scope` carries the actual boundary.
+    This replaces prefix containment, under which `volume-1` was rejected for
+    "exceeding" a `volume-26` cutoff while `volume-26-epilogue` passed whatever
+    it described.
     """
 
     workspace = changed(
         loaded(),
-        lambda value: value["claims"][0].update({"timeline": timeline}),
+        lambda value: value["claims"][0].update(
+            {"timeline": {"unit": "episode", "index": index}}
+        ),
     )
 
-    violated = "RESEARCH_TIMELINE_VIOLATION" in codes(
+    codes_found = codes(validate_research_workspace(workspace, SCHEMAS))
+    assert ("RESEARCH_TIMELINE_VIOLATION" in codes_found) is violated
+
+
+def test_a_different_timeline_unit_is_a_mismatch_not_a_comparison() -> None:
+    """Units are not mapped onto one another; a mismatch is reported as one.
+
+    Volumes, episodes, and arcs have no shared axis, so an episode index is not
+    silently weighed against a volume cutoff.
+    """
+
+    workspace = changed(
+        loaded(),
+        lambda value: value["claims"][0].update(
+            {"timeline": {"unit": "volume", "index": 1}}
+        ),
+    )
+
+    codes_found = codes(validate_research_workspace(workspace, SCHEMAS))
+    assert "RESEARCH_TIMELINE_UNIT_MISMATCH" in codes_found
+    assert "RESEARCH_TIMELINE_VIOLATION" not in codes_found
+
+
+def test_an_unplaced_claim_cannot_support_a_covered_topic() -> None:
+    """Unplaced evidence is real but unbounded, so it cannot claim full coverage.
+
+    `covered` already forbids limitations, so demoting the topic forces the gap
+    to be written down rather than passing silently.
+    """
+
+    workspace = changed(
+        loaded(),
+        lambda value: value["claims"][0].update(
+            {"timeline": {"unit": "episode", "index": None}}
+        ),
+    )
+
+    assert "RESEARCH_COVERAGE_UNPLACED_CLAIM" in codes(
         validate_research_workspace(workspace, SCHEMAS)
     )
-    assert violated is not contained
 
 
 def test_reports_spoiler_scope_violation() -> None:

@@ -27,7 +27,7 @@ def test_load_research_workspace_returns_canonical_assembled_artifacts() -> None
     assert len(loaded.workspace_hash) == 64
     assert (
         loaded.workspace_hash
-        == "681a1e9a00122ba7f52238520105a3e070ebcf51695f3263a443e1a7cd817fae"
+        == "d15f60759059eaed27322878a6404dc2cd1f4e0d31e526b3db89f7ddaa7e8f2b"
     )
     assert loaded.workspace_hash == load_research_workspace(
         Path("tests/fixtures/research/complete"), registry
@@ -110,7 +110,7 @@ def test_loads_partial_and_injection_workspaces_without_executing_source_text() 
     assert partial.coverage["blocks_authoring"] is True
     assert (
         partial.workspace_hash
-        == "0b34cbc99ca009d956fd9d7f3058c5ae1f048b8cf0ffbed9c77ae2149f1cff7b"
+        == "e8261f3ed4fa29be9d97533cd66271baeed297e15c65b8b789fa435cc40103fa"
     )
     assert injection.request["character_id"] == "aoi-kisaragi-fixture"
     assert all(

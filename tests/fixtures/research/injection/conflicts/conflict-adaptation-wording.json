@@ -12,8 +12,8 @@
   ],
   "kind": "wording",
   "scopes": [
-    "fixture-primary@episode-01",
-    "fixture-primary@episode-01-quoted"
+    "fixture-primary@episode:1",
+    "fixture-primary@episode:unplaced"
   ],
   "status": "scope_separated",
   "selected_claim_ids": [

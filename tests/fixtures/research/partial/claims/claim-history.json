@@ -13,7 +13,10 @@
   "source_ids": [],
   "supporting_claim_ids": [],
   "continuity": "fixture-primary",
-  "timeline": "episode-01",
+  "timeline": {
+    "unit": "episode",
+    "index": 1
+  },
   "spoiler_scope": "episode-01 only",
   "limitations": [
     "Fixture-only assertion."

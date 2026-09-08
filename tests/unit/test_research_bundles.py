@@ -53,7 +53,7 @@ def test_build_research_bundle_is_byte_stable_and_non_mutating() -> None:
     assert first["request_hash"] == canonical_hash(workspace.request)
     assert (
         first["request_hash"]
-        == "4c7b3359079ea3de34ab48882eec415e8b931cda8bdc32c801afe91e22410029"
+        == "8a9bbea170b0e7ea626737527deb350ee70e1471c4602225fac62d73a7c156cc"
     )
     assert first["validation_report_hash"] == canonical_hash(report)
     assert (

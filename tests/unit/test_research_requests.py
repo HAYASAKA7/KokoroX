@@ -19,6 +19,24 @@ from kokorox.schemas import SchemaRegistry
 SCHEMA_ROOT = Path("schemas/v1")
 FIXTURE = Path("tests/fixtures/research/complete/request.json")
 UNRESOLVED_FIELDS = ("medium", "work", "adaptation", "continuity", "timeline_cutoff")
+
+
+def set_scope(request: dict[str, Any], field: str, value: str) -> None:
+    """Put `value` where the unresolved-scope check reads it for `field`.
+
+    Every scope field but the timeline cutoff is a plain string; the cutoff is
+    a structured point whose `unit` carries the label.
+    """
+
+    if field == "timeline_cutoff":
+        request[field] = {"unit": value, "index": 0}
+    else:
+        request[field] = value
+
+
+def read_scope(request: dict[str, Any], field: str) -> str:
+    value = request[field]
+    return value["unit"] if field == "timeline_cutoff" else value
 UNRESOLVED_VALUES = ("  UnKnOwN  ", "\tUNSPECIFIED\n", " Ambiguous ", "  MiXeD\t")
 COUNT_LIMITS = {
     "aliases": 32,
@@ -128,7 +146,7 @@ def test_rejects_every_unresolved_identity_and_continuity_sentinel_without_paylo
     sentinel: str,
 ) -> None:
     sensitive = "SENSITIVE ASSERTION AND SOURCE PAYLOAD"
-    complete_request[field] = sentinel
+    set_scope(complete_request, field, sentinel)
     complete_request["user_assertions"] = [sensitive]
 
     error = invalid_request(registry, complete_request)
@@ -143,7 +161,7 @@ def test_multiple_unresolved_fields_report_first_contract_field_deterministicall
     registry: SchemaRegistry, complete_request: dict[str, Any]
 ) -> None:
     for field in reversed(UNRESOLVED_FIELDS):
-        complete_request[field] = " MIXED "
+        set_scope(complete_request, field, " MIXED ")
 
     first = invalid_request(registry, complete_request)
     second = invalid_request(registry, complete_request)
@@ -156,11 +174,11 @@ def test_multiple_unresolved_fields_report_first_contract_field_deterministicall
 def test_explicit_not_applicable_is_not_treated_as_unresolved(
     registry: SchemaRegistry, complete_request: dict[str, Any], field: str
 ) -> None:
-    complete_request[field] = "not_applicable"
+    set_scope(complete_request, field, "not_applicable")
 
     normalized = normalize_research_request(complete_request, registry)
 
-    assert normalized[field] == "not_applicable"
+    assert read_scope(normalized, field) == "not_applicable"
 
 
 def test_unicode_code_points_and_user_order_are_preserved_exactly(

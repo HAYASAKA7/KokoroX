@@ -31,7 +31,7 @@ The manifest binds every referenced path to the SHA-256 of its exact retained by
 
 The Research Request fixes subject identity, franchise, medium, work, adaptation, continuity, timeline cutoff, spoiler scope, ordered research questions, coverage topics, user assertions, constraints, and private visibility. Missing adaptation or continuity is never inferred.
 
-`timeline_cutoff` opens a namespace; it does not order anything. A claim's `timeline` must be the cutoff exactly, or the cutoff followed by `-` and a more specific label -- `volume-26` admits `volume-26` and `volume-26-epilogue`, and rejects `volume-1`, which is outside the namespace rather than before it. Choose one label for the boundary and tag every claim inside it; do not tag claims with the volume or episode they came from unless that string starts with the cutoff. `spoiler_scope` is compared exactly and is what actually holds the spoiler boundary.
+`timeline_cutoff` and every claim `timeline` are ordered points: `{"unit": "volume", "index": 26}`. A claim passes when its `index` is at or before the cutoff's. Comparison holds only inside one unit -- volumes, episodes, and arcs share no axis, and no mapping between them is guessed, so a claim in a different unit is a hard mismatch, like a missing adaptation or continuity. A cutoff must always be placed; a claim may set `"index": null` when no source places it. Unplaced is not a violation -- inventing a number where the evidence gives none is worse -- but a coverage topic supported by an unplaced claim cannot be `covered`, and `covered` forbids limitations, so the gap has to be written down. `spoiler_scope` is compared exactly and remains the scope label.
 
 Create a Source Record before any claim cites it. Record the host-observed category, canonical locator, title, publisher/owner, access timestamp, availability, content digest, bounded excerpts, continuity, spoiler scope, trust notes, and limitations. Never invent a locator or inaccessible content.
 
@@ -91,7 +91,7 @@ For an eligible researched or hybrid build, open `authoring-character-packs`. Th
 1. request data containing `type: research_bundle`, the exact bundle artifact ID, and exact lowercase SHA-256 bundle hash, with no filesystem path;
 2. the explicit eligible bundle host path passed separately through `--research-bundle`.
 
-The authoring request must exactly match namespace, character, display identity, continuity, timeline, and spoiler scope. Hybrid user dossier/override claims remain separately typed and cannot reuse a supported bundle claim ID or rewrite a researched fact. Authoring still stops at a private inactive Character Draft.
+The authoring request must exactly match namespace, character, display identity, continuity, timeline, and spoiler scope. Its `timeline` is prose, since original and dossier packs have no canonical axis, so a research-backed request names the bundle cutoff in its rendered form -- `<unit>:<index>`, such as `volume:26`. Hybrid user dossier/override claims remain separately typed and cannot reuse a supported bundle claim ID or rewrite a researched fact. Authoring still stops at a private inactive Character Draft.
 
 ## Final report
 

@@ -78,9 +78,7 @@
       "maxLength": 256
     },
     "timeline": {
-      "type": "string",
-      "minLength": 1,
-      "maxLength": 256
+      "$ref": "#/$defs/claim_timeline_point"
     },
     "spoiler_scope": {
       "type": "string",
@@ -257,6 +255,33 @@
           "type": "string",
           "minLength": 1,
           "maxLength": 64
+        }
+      }
+    },
+    "claim_timeline_point": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "unit",
+        "index"
+      ],
+      "properties": {
+        "unit": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "index": {
+          "oneOf": [
+            {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 100000
+            },
+            {
+              "type": "null"
+            }
+          ]
         }
       }
     }

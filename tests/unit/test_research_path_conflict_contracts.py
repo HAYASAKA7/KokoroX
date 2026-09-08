@@ -5,6 +5,7 @@ from pathlib import Path
 import pytest
 
 from kokorox.errors import KokoroError
+from kokorox.research.validation import timeline_label
 from kokorox.schemas import SchemaRegistry
 
 
@@ -52,7 +53,7 @@ def test_complete_scope_separation_binds_incompatible_same_topic_claims() -> Non
     conflict = load("complete", "conflicts/conflict-adaptation-wording.json")
     referenced = [next(claim for claim in claims.values() if claim["claim_id"] == claim_id) for claim_id in conflict["claim_ids"]]
     assert len({claim["subject_id"] for claim in referenced}) == 1
-    assert len({claim["timeline"] for claim in referenced}) >= 2
+    assert len({timeline_label(claim["timeline"]) for claim in referenced}) >= 2
     statements = {claim["statement"] for claim in referenced}
     assert any("observatory apprentice" in statement for statement in statements)
     assert any("not an observatory apprentice" in statement for statement in statements)

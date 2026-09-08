@@ -7,7 +7,7 @@
   },
   "request": {
     "path": "request.json",
-    "sha256": "e3af2f5be0cc87f228ad81a480d4c974704e1dc7a20a8306b192a838e648c7bf"
+    "sha256": "1643a6eb07da346a152f7f0c7b976c30a094d6fcb3677b167ccea95cdb9ff8b9"
   },
   "sources": [
     {
@@ -22,17 +22,17 @@
   "claims": [
     {
       "path": "claims/claim-behavior.json",
-      "sha256": "77daae72376c94347545dc792f9ae87ebaf58d199f41fbc786bfe1623a9c5b8a"
+      "sha256": "78d8a5f84e9d4e866cb864a55f7cd1d48356fb74e068ff0537e7abfc52cf5ed0"
     },
     {
       "path": "claims/claim-role.json",
-      "sha256": "f69808cf7b540ecc32cb4c1caa875c4c60f202ab09c9f26e34428d498eb45fbe"
+      "sha256": "edc87c2485b4f425d2fca43a20234fe91384a47a60e3e9e11a1ffde948efa0c1"
     }
   ],
   "conflicts": [
     {
       "path": "conflicts/conflict-adaptation-wording.json",
-      "sha256": "8de06c6bbfa6f51d6bd3a8a5adffe643117e3b3a2f2bcb9ff9c00ad2fd4eddb2"
+      "sha256": "82d37d5d3cf2624330f4a182ca959b339499f5a24c5ef2c85e7ba1db914517b5"
     }
   ],
   "coverage": {

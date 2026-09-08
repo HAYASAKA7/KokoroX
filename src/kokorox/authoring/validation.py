@@ -12,6 +12,7 @@ from kokorox import __version__
 from kokorox.errors import KokoroError
 from kokorox.language_tags import is_language_tag
 from kokorox.packs.compiler import canonical_bytes
+from kokorox.research.validation import timeline_label
 from kokorox.schemas import SchemaRegistry
 
 
@@ -264,12 +265,6 @@ def _validate_research_provenance(
             "Research Bundle continuity does not match the request.",
         ),
         (
-            "timeline",
-            "timeline_cutoff",
-            "RESEARCH_BUNDLE_TIMELINE_MISMATCH",
-            "Research Bundle timeline does not match the request.",
-        ),
-        (
             "spoiler_scope",
             "spoiler_scope",
             "RESEARCH_BUNDLE_SPOILER_MISMATCH",
@@ -278,6 +273,23 @@ def _validate_research_provenance(
     ):
         if request.get(request_field) != bundle.get(bundle_field):
             findings.append(_finding(code, [request_field], message))
+
+    # The bundle's cutoff is a structured point; an authoring request's timeline
+    # stays prose, because original and dossier packs have no canonical axis to
+    # place themselves on. A research-backed request must name the bundle's
+    # cutoff in its canonical rendering, `<unit>:<index>`.
+    cutoff = bundle.get("timeline_cutoff")
+    expected_timeline = (
+        timeline_label(cutoff) if isinstance(cutoff, Mapping) else None
+    )
+    if request.get("timeline") != expected_timeline:
+        findings.append(
+            _finding(
+                "RESEARCH_BUNDLE_TIMELINE_MISMATCH",
+                ["timeline"],
+                "Research Bundle timeline does not match the request.",
+            )
+        )
 
     coverage = bundle.get("coverage")
     coverage_blocks = (

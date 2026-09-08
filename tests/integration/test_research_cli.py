@@ -247,7 +247,7 @@ def test_research_workspace_validate_is_stateless_and_deterministic() -> None:
     assert body["valid"] is True
     assert body["validation_report"]["authoring_allowed"] is True
     assert body["workspace_hash"] == (
-        "681a1e9a00122ba7f52238520105a3e070ebcf51695f3263a443e1a7cd817fae"
+        "d15f60759059eaed27322878a6404dc2cd1f4e0d31e526b3db89f7ddaa7e8f2b"
     )
     assert first.stderr == second.stderr == ""
 

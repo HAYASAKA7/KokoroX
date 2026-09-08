@@ -7,7 +7,7 @@
   },
   "request": {
     "path": "request.json",
-    "sha256": "2aec8bac017d061cf63cf8766c15334adf23f5edcbe5c887e90037a0354c7bc9"
+    "sha256": "30ea0d1b0e71bd9985a225baa223bc6cbc7d0d528200fc1825a2cd1ba7d97bd3"
   },
   "sources": [
     {
@@ -18,17 +18,17 @@
   "claims": [
     {
       "path": "claims/claim-quoted-text.json",
-      "sha256": "087a6b66ddc7fd2e6dfcd34c806121bce6f5ceaea1f974c90fbb263d7717f095"
+      "sha256": "39e1a38350b035d855a125af534510536044b12478445aa7c1eb1ec34b3d0837"
     },
     {
       "path": "claims/claim-role.json",
-      "sha256": "af8379b459325edece22cb2269e9d6fd9263ccd65c94418ab5a43aa84606dbaf"
+      "sha256": "1d4128388765786363d74af3632efd6bfcf1d48a5e3b9ec9092bbeb11f69bfa3"
     }
   ],
   "conflicts": [
     {
       "path": "conflicts/conflict-adaptation-wording.json",
-      "sha256": "8c68e0c2fc3a49d3415dcb5746a944b6d94813a881f421027ffdd7e082a47a1a"
+      "sha256": "3aa5b5e0358a723107540945e0f534cb6db65dbbb8889c15c17123b0c041e4f1"
     }
   ],
   "coverage": {

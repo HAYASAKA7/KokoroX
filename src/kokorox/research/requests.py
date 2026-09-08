@@ -11,7 +11,9 @@ from kokorox.schemas import SchemaRegistry
 
 
 _UNRESOLVED = frozenset({"unknown", "unspecified", "ambiguous", "mixed"})
-_SCOPE_FIELDS = ("medium", "work", "adaptation", "continuity", "timeline_cutoff")
+_SCOPE_FIELDS = ("medium", "work", "adaptation", "continuity")
+#: The cutoff is structured; its unit is the part that can be left unresolved.
+_SCOPE_POINT_FIELDS = ("timeline_cutoff",)
 
 
 def normalize_research_request(
@@ -50,6 +52,13 @@ def normalize_research_request(
     normalized = cast(dict[str, Any], normalized_value)
     for field in _SCOPE_FIELDS:
         if normalized[field].strip().casefold() in _UNRESOLVED:
+            raise KokoroError(
+                "RESEARCH_CONTINUITY_UNRESOLVED",
+                "Research identity and continuity must be resolved before collection.",
+                details={"field": field},
+            )
+    for field in _SCOPE_POINT_FIELDS:
+        if normalized[field]["unit"].strip().casefold() in _UNRESOLVED:
             raise KokoroError(
                 "RESEARCH_CONTINUITY_UNRESOLVED",
                 "Research identity and continuity must be resolved before collection.",

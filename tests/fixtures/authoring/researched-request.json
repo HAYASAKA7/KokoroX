@@ -23,13 +23,13 @@
     "Keep the resulting draft private and inactive."
   ],
   "continuity": "fixture-primary",
-  "timeline": "episode-01",
+  "timeline": "episode:2",
   "spoiler_scope": "episode-01 only",
   "inputs": [
     {
       "type": "research_bundle",
-      "artifact_id": "research/aoi-kisaragi-fixture/research/681a1e9a00122ba7",
-      "sha256": "f56e425cad6e096e6b6fc08fac8dd93fb73fc2c7fa70c06cf26813645579592c"
+      "artifact_id": "research/aoi-kisaragi-fixture/research/d15f60759059eaed",
+      "sha256": "4ea7734ad862425f524eb7fc9fb42db43aec82b682b227a7b27a023fed9b22ad"
     }
   ],
   "requested_visibility": "private"

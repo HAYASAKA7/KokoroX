@@ -7,7 +7,7 @@
   },
   "request": {
     "path": "request.json",
-    "sha256": "f161e4735b8ce721145595cdaed0f29ab3ba2be8b787e1d41e2284fb1ebd6c99"
+    "sha256": "29e8bcae99fc0044d60eeccc9f016bc53870154a9509d33105d4d33d60e70e8c"
   },
   "sources": [
     {
@@ -18,11 +18,11 @@
   "claims": [
     {
       "path": "claims/claim-history.json",
-      "sha256": "fb3e54c6bdab5601e10ea2cc4c881fd8d5a9b52afb1a099659d17dfb63fb3d47"
+      "sha256": "b431850aea46102e62799bd6c81941441d5f1ea544c3cb02232bf50d219cfb6e"
     },
     {
       "path": "claims/claim-role.json",
-      "sha256": "476e7e70724dfe1f903a99b4c4411421802c0f0fe4ed57c49a3878d0972bf1a8"
+      "sha256": "c41bee442084a6579d7f595b749457abe60210a7dc27e393ab3e933a0d39bca0"
     }
   ],
   "conflicts": [

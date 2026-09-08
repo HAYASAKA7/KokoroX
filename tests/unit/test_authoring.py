@@ -11,6 +11,7 @@ from kokorox.authoring.requests import normalize_build_request
 from kokorox.authoring.validation import validate_authoring_pack
 from kokorox.errors import KokoroError
 from kokorox.research.bundles import canonical_hash
+from kokorox.research.validation import timeline_label
 from kokorox.schemas import SchemaRegistry
 from kokorox import __version__
 
@@ -76,7 +77,8 @@ def _research_authoring_case(
             "character_id": bundle["character_id"],
             "display_name": bundle["display_name"],
             "continuity": bundle["continuity"],
-            "timeline": bundle["timeline_cutoff"],
+            # Prose on the request side; the bundle cutoff in rendered form.
+            "timeline": timeline_label(bundle["timeline_cutoff"]),
             "spoiler_scope": bundle["spoiler_scope"],
             "inputs": [
                 {

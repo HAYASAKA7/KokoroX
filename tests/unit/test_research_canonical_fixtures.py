@@ -7,6 +7,7 @@ import pytest
 
 from kokorox.errors import KokoroError
 from kokorox.packs.compiler import canonical_bytes
+from kokorox.research.validation import timeline_label
 from kokorox.schemas import SchemaRegistry
 
 
@@ -76,6 +77,11 @@ def test_injection_conflict_has_distinct_represented_scopes() -> None:
         load("injection", f"claims/{path.name}")["claim_id"]: load("injection", f"claims/{path.name}")
         for path in (ROOT / "injection" / "claims").glob("*.json")
     }
-    claim_scopes = {(claims[claim_id]["continuity"], claims[claim_id]["timeline"]) for claim_id in conflict["claim_ids"]}
+    claim_scopes = {
+        (claims[claim_id]["continuity"], timeline_label(claims[claim_id]["timeline"]))
+        for claim_id in conflict["claim_ids"]
+    }
     assert len(claim_scopes) >= 2
-    assert set(conflict["scopes"]) == {f"{continuity}@{timeline}" for continuity, timeline in claim_scopes}
+    assert set(conflict["scopes"]) == {
+        f"{continuity}@{timeline}" for continuity, timeline in claim_scopes
+    }

@@ -13,10 +13,13 @@
   "character_id": "aoi-kisaragi-fixture",
   "display_name": "Aoi Kisaragi Fixture",
   "continuity": "fixture-primary",
-  "timeline_cutoff": "episode-01",
+  "timeline_cutoff": {
+    "unit": "episode",
+    "index": 1
+  },
   "spoiler_scope": "episode-01 only",
-  "request_hash": "62a11b2243c68c2767a6056a5d6640483e309d679b08300b2f2345726f7df19c",
-  "workspace_hash": "0b34cbc99ca009d956fd9d7f3058c5ae1f048b8cf0ffbed9c77ae2149f1cff7b",
+  "request_hash": "d5b6510038ec751716ce0908831ac33d95aab376fc532ccfabb5a459e2f65702",
+  "workspace_hash": "e8261f3ed4fa29be9d97533cd66271baeed297e15c65b8b789fa435cc40103fa",
   "validation_report_hash": "6bdc6df186e7a3b7390827f83406e75e5f6d9dbaa925a763eb41fb368b891e35",
   "sources": [
     {
@@ -61,7 +64,10 @@
       "source_ids": [],
       "supporting_claim_ids": [],
       "continuity": "fixture-primary",
-      "timeline": "episode-01",
+      "timeline": {
+        "unit": "episode",
+        "index": 1
+      },
       "spoiler_scope": "episode-01 only",
       "limitations": [
         "Fixture-only assertion."
@@ -82,7 +88,10 @@
       "source_ids": [],
       "supporting_claim_ids": [],
       "continuity": "fixture-primary",
-      "timeline": "episode-01",
+      "timeline": {
+        "unit": "episode",
+        "index": 1
+      },
       "spoiler_scope": "episode-01 only",
       "limitations": [
         "The source record is unavailable."
@@ -157,5 +166,5 @@
   "blocking_reasons": [
     "Missing evidence for the blocked history topic."
   ],
-  "bundle_hash": "2298ad199925404c9d34093be174b97afada62d4a7946b177e0d523dee9ccc98"
+  "bundle_hash": "d3e13544b648b8a9f163009bef86cff66c35729d02553bf517e51ad47f19f692"
 }

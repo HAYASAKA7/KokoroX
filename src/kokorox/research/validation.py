@@ -189,7 +189,7 @@ def _validate_claim_scope(
     index: int,
     character_id: str,
     continuity: str,
-    timeline_cutoff: str,
+    timeline_cutoff: Mapping[str, Any],
     spoiler_scope: str,
     findings: list[dict[str, Any]],
 ) -> None:
@@ -209,12 +209,21 @@ def _validate_claim_scope(
                 "Claim continuity does not match the requested continuity.",
             )
         )
-    if not _timeline_contained(claim["timeline"], timeline_cutoff):
+    placement = _timeline_within(claim["timeline"], timeline_cutoff)
+    if placement == "unit":
+        findings.append(
+            _finding(
+                "RESEARCH_TIMELINE_UNIT_MISMATCH",
+                ["claims", index, "timeline", "unit"],
+                "Claim timeline uses a different unit than the requested cutoff.",
+            )
+        )
+    elif placement == "past":
         findings.append(
             _finding(
                 "RESEARCH_TIMELINE_VIOLATION",
-                ["claims", index, "timeline"],
-                "Claim timeline is outside the requested cutoff namespace.",
+                ["claims", index, "timeline", "index"],
+                "Claim timeline is past the requested cutoff.",
             )
         )
     if claim["spoiler_scope"] != spoiler_scope:
@@ -432,7 +441,8 @@ def _validate_conflicts(
                 if claim_id in claim_by_id
             ]
             expected_scopes = {
-                f"{claim['continuity']}@{claim['timeline']}" for claim in referenced
+                f"{claim['continuity']}@{timeline_label(claim['timeline'])}"
+                for claim in referenced
             }
             if len(expected_scopes) < 2 or set(conflict["scopes"]) != expected_scopes:
                 hard.append(
@@ -504,6 +514,22 @@ def _validate_coverage(
                         "Coverage marks an available source as unavailable.",
                     )
                 )
+
+        # An unplaced claim carries no position relative to the cutoff, so a
+        # topic leaning on one cannot claim the boundary was respected. It is
+        # held to `partial` rather than rejected: the evidence is real, only
+        # its placement is unknown, and `covered` already forbids limitations,
+        # so demoting it forces that gap to be written down.
+        if status == "covered" and any(
+            claim["timeline"]["index"] is None for claim in supported_claims
+        ):
+            hard.append(
+                _finding(
+                    "RESEARCH_COVERAGE_UNPLACED_CLAIM",
+                    ["coverage", "topics", index, "status"],
+                    "A topic supported by an unplaced claim cannot be covered.",
+                )
+            )
 
         limitations = (
             topic["missing_evidence"]
@@ -578,22 +604,34 @@ def _validate_coverage(
     return summary
 
 
-def _timeline_contained(value: str, cutoff: str) -> bool:
-    """Return whether `value` names the cutoff or a point beneath it.
+def timeline_label(point: Mapping[str, Any]) -> str:
+    """Render one timeline point as a stable scope key."""
 
-    This is string containment, not ordering. `timeline_cutoff` opens a
-    namespace and a claim must sit inside it: exactly the cutoff, or the cutoff
-    followed by a `-` and a more specific label. Nothing here compares two
-    points in time, so `volume-1` is not "before" `volume-26` -- it is simply
-    outside that namespace and is rejected, while `volume-26-epilogue` is
-    inside it and is accepted whatever it describes.
+    index = point["index"]
+    return f"{point['unit']}:{'unplaced' if index is None else index}"
 
-    Ordering would need a comparable timeline model, which volumes, episodes,
-    arcs, and cross-medium releases do not share. Until there is one, the
-    spoiler boundary is carried by `spoiler_scope`, which is compared exactly.
+
+def _timeline_within(point: Mapping[str, Any], cutoff: Mapping[str, Any]) -> str:
+    """Compare one claim's timeline point against the requested cutoff.
+
+    Returns `"ok"`, `"unit"` for a unit that is not the requested one, or
+    `"past"` for a placed point beyond the cutoff.
+
+    Ordering only holds inside a single unit. Volumes, episodes, arcs, and
+    cross-medium releases do not share an axis, and no mapping between them is
+    inferred here -- a different unit is a hard mismatch, the same way a missing
+    adaptation or continuity is never guessed. An unplaced point (`index: null`)
+    is not a violation: sources frequently place nothing, and forcing a number
+    there would manufacture precision the evidence does not carry. It is held
+    back at the coverage gate instead, which is where weak evidence belongs.
     """
 
-    return value == cutoff or value.startswith(f"{cutoff}-")
+    if point["unit"] != cutoff["unit"]:
+        return "unit"
+    index = point["index"]
+    if index is not None and index > cutoff["index"]:
+        return "past"
+    return "ok"
 
 
 def _normalize_assertion(value: str) -> str:

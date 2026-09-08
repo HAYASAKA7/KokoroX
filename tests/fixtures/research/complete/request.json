@@ -19,7 +19,10 @@
   "work": "Fixture Arc",
   "adaptation": "fixture-primary",
   "continuity": "fixture-primary",
-  "timeline_cutoff": "episode-01",
+  "timeline_cutoff": {
+    "unit": "episode",
+    "index": 2
+  },
   "spoiler_scope": "episode-01 only",
   "research_questions": [
     "What role does Aoi hold?",

@@ -15,7 +15,10 @@
   ],
   "supporting_claim_ids": [],
   "continuity": "fixture-primary",
-  "timeline": "episode-01-behavior",
+  "timeline": {
+    "unit": "episode",
+    "index": 2
+  },
   "spoiler_scope": "episode-01 only",
   "limitations": []
 }
