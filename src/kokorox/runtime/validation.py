@@ -93,8 +93,14 @@ def _is_ratio(value: Any) -> bool:
     )
 
 
-def fallback_action(attempt: int) -> str:
-    """Return a fallback action after clamping a safe integer attempt."""
+#: `<algorithm>:<hex>` -- what a content digest looks like when it is written
+#: into a span list instead of the string the digest was taken from.
+_DIGEST_SPAN = re.compile(r"^[a-z0-9][a-z0-9-]{1,15}:[0-9a-f]{32,128}\Z", re.ASCII)
+
+
+def _clamped_attempt(attempt: int) -> int:
+    """Return `attempt` clamped onto the ladder, rejecting unbounded input."""
+
     if (
         isinstance(attempt, bool)
         or not isinstance(attempt, int)
@@ -104,7 +110,12 @@ def fallback_action(attempt: int) -> str:
             "INVALID_FALLBACK_ATTEMPT",
             "Fallback attempt must be a bounded integer.",
         )
-    return FALLBACK_ACTIONS[min(max(attempt, 0), 3)]
+    return min(max(attempt, 0), 3)
+
+
+def fallback_action(attempt: int) -> str:
+    """Return a fallback action after clamping a safe integer attempt."""
+    return FALLBACK_ACTIONS[_clamped_attempt(attempt)]
 
 
 def _bounded_string(value: Any, maximum: int) -> bool:
@@ -454,9 +465,21 @@ def validate_rendered_output(
     rendered: Any,
     semantic: Any,
     plan: Any,
+    *,
+    attempt: int = 0,
 ) -> dict[str, Any]:
-    """Return a schema-compatible, deterministic hard-validation result."""
+    """Return a schema-compatible, deterministic hard-validation result.
+
+    `attempt` is how many times this candidate has already failed. Validation
+    is stateless -- it cannot know -- so the caller owns the count, and
+    `fallback_level` reports the rung that count lands on. Returning a constant
+    here would pin every caller to `repair_segments` and put the neutral
+    renderer, the bottom of the ladder, out of reach.
+    """
+
+    level = _clamped_attempt(attempt)
     violations = _Violations()
+    advisories = _Violations()
 
     # Duplicate planned IDs are intentionally the first reported condition.
     for segment_id in _duplicate_planned_ids(plan):
@@ -665,6 +688,22 @@ def validate_rendered_output(
                     details={"protected_span": span},
                 )
 
+    # A digest in the span list protects only the digest. The check is literal
+    # containment, so printing the hash satisfies it while the string the hash
+    # stood for goes unconstrained -- writing it wrong returns green.
+    #
+    # This cannot be a violation: a user asking about a checksum has a genuine
+    # reason to protect one. But they protect other literals too, so a set that
+    # is entirely digests has no honest reading. Advisory, and only then.
+    if enforced_spans and all(
+        _DIGEST_SPAN.fullmatch(span) is not None for span in enforced_spans
+    ):
+        advisories.add(
+            "PROTECTED_SPANS_ALL_DIGESTS",
+            "Every immutable span is a digest, so no literal is protected.",
+            details={"protected_span": enforced_spans[0]},
+        )
+
     if switch_count is not None and max_switches is not None:
         if switch_count > max_switches:
             violations.add(
@@ -839,5 +878,6 @@ def validate_rendered_output(
         "created_by": {"component": "kokorox", "version": __version__},
         "valid": valid,
         "violations": violations.items,
-        "fallback_level": None if valid else 0,
+        "advisories": advisories.items,
+        "fallback_level": None if valid else level,
     }

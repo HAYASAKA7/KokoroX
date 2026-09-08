@@ -195,6 +195,7 @@ def test_valid_output_has_derived_metadata_and_no_fallback() -> None:
         "created_by": {"component": "kokorox", "version": __version__},
         "valid": True,
         "violations": [],
+        "advisories": [],
         "fallback_level": None,
     }
     assert_schema_valid(result)
@@ -889,7 +890,11 @@ def test_a_digest_in_immutable_spans_protects_only_the_digest() -> None:
     hash and silently repairs the command the hash was taken from is therefore
     clean: every gate passes while the protected value is gone. This is why
     `runtime-contract.md` requires literal strings here; the rule is load
-    bearing, not stylistic, and nothing in the validator enforces it.
+    bearing, not stylistic, and no *violation* enforces it.
+
+    A span list that is entirely digests now raises an advisory, which leaves
+    `valid` untouched but makes the set visible. Nothing stronger is possible:
+    a digest can be exactly what a user asked to protect.
     """
 
     original = "git chekout -b topic --track orgin/main"
@@ -931,3 +936,71 @@ def test_a_below_floor_primary_language_share_is_not_measured() -> None:
     assert result["valid"] is True
     assert "PRIMARY_LANGUAGE_ABSENT" not in codes(result)
     assert_schema_valid(result)
+
+
+def test_a_span_list_of_only_digests_is_advised_without_failing() -> None:
+    """The pathological set is visible without blocking a legitimate one."""
+
+    digest = "sha256:" + sha256(b"git chekout -b topic").hexdigest()
+
+    result = validate_rendered_output(
+        rendered(text=f"原因已经明确。 {digest}"),
+        semantic(immutable_spans=[digest]),
+        plan(protected_spans=[digest]),
+    )
+
+    assert result["valid"] is True
+    assert result["violations"] == []
+    assert [item["code"] for item in result["advisories"]] == [
+        "PROTECTED_SPANS_ALL_DIGESTS"
+    ]
+    assert_schema_valid(result)
+
+
+def test_a_digest_beside_a_literal_span_is_not_advised() -> None:
+    """Someone protecting a checksum they were asked about keeps other literals.
+
+    Only a set with no literal at all has no honest reading, so that is the
+    only shape flagged.
+    """
+
+    digest = "sha256:" + sha256(b"anything").hexdigest()
+    command = "go test -race ./..."
+
+    result = validate_rendered_output(
+        rendered(text=f"原因已经明确。 {command} {digest}"),
+        semantic(immutable_spans=[command, digest]),
+        plan(protected_spans=[command, digest]),
+    )
+
+    assert result["advisories"] == []
+    assert_schema_valid(result)
+
+
+@pytest.mark.parametrize(
+    ("attempt", "level"), [(0, 0), (1, 1), (2, 2), (3, 3), (9, 3), (-4, 0)]
+)
+def test_fallback_level_reports_the_rung_the_caller_is_on(
+    attempt: int, level: int
+) -> None:
+    """Validation is stateless, so the caller's count decides the rung.
+
+    Reporting a constant pinned every caller to `repair_segments` and put the
+    neutral renderer -- the bottom of the ladder -- out of reach.
+    """
+
+    result = validate_rendered_output(
+        rendered(text="no protected span here"),
+        semantic(),
+        plan(),
+        attempt=attempt,
+    )
+
+    assert result["valid"] is False
+    assert result["fallback_level"] == level
+
+
+def test_a_valid_delivery_has_no_rung() -> None:
+    assert validate_rendered_output(
+        rendered(), semantic(), plan(), attempt=2
+    )["fallback_level"] is None

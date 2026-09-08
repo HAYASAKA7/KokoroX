@@ -129,7 +129,7 @@ Render an object with exactly:
 
 Rendered segment metadata must match the plan. Do not copy `expression_intent` into rendered segments. Include every planned segment, warning route, and protected span.
 
-`runtime validate` returns `validation.valid`, `validation.violations`, and `validation.fallback_level`. Delivery is valid only when `valid` is `true`. Treat the validated `rendered.text` as an immutable delivery payload: send it verbatim and do not perform a final rewrite, summary, wrapper, or formatting pass.
+`runtime validate` returns `validation.valid`, `validation.violations`, and `validation.fallback_level`. Validation is stateless and cannot know how many times a candidate has already failed, so the caller counts: pass `--attempt <n>` and `fallback_level` reports the rung that count lands on (0 repair, 1 reduce switches, 2 lower intensity, 3 neutral renderer). Omitting it always reports rung 0, which never reaches the neutral renderer. Delivery is valid only when `valid` is `true`. Treat the validated `rendered.text` as an immutable delivery payload: send it verbatim and do not perform a final rewrite, summary, wrapper, or formatting pass.
 
 This validator is a deterministic structural gate: it checks plan/segment correspondence, warning routing, language switching, and byte-exact protected spans relative to the Semantic Result. It cannot prove that an immutable span was transcribed correctly from the user turn. That guarantee belongs to the host's raw-message binding described above. The host also remains responsible for the correctness of the closed Semantic Result and for ensuring the rendered prose does not contradict it.
 

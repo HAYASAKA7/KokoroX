@@ -372,6 +372,9 @@ def build_parser() -> argparse.ArgumentParser:
     runtime_validate.add_argument("--semantic", required=True)
     runtime_validate.add_argument("--plan", required=True)
     runtime_validate.add_argument("--rendered", required=True)
+    # Validation is stateless, so the caller carries the retry count that
+    # decides which rung of the fallback ladder `fallback_level` reports.
+    runtime_validate.add_argument("--attempt", type=int, default=0)
     _leaf_json(runtime_validate)
 
     state = commands.add_parser("state")
@@ -2007,7 +2010,9 @@ def _handle_runtime_validate(
     rendered = _read_json(Path(args.rendered))
     schemas.validate("semantic-result", semantic)
     schemas.validate("render-plan", plan)
-    validation = validate_rendered_output(rendered, semantic, plan)
+    validation = validate_rendered_output(
+        rendered, semantic, plan, attempt=args.attempt
+    )
     schemas.validate("validation-result", validation)
     return {"ok": True, "validation": validation}
 

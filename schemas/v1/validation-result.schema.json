@@ -9,6 +9,7 @@
     "created_by",
     "valid",
     "violations",
+    "advisories",
     "fallback_level"
   ],
   "properties": {
@@ -17,6 +18,11 @@
     "created_by": {"$ref": "#/$defs/created_by"},
     "valid": {"type": "boolean"},
     "violations": {
+      "type": "array",
+      "maxItems": 128,
+      "items": {"$ref": "#/$defs/violation"}
+    },
+    "advisories": {
       "type": "array",
       "maxItems": 128,
       "items": {"$ref": "#/$defs/violation"}
