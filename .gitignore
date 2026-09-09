@@ -10,4 +10,8 @@ build/
 dist/
 *.egg-info/
 .kokoroarc/
+.kokorox/
 reports/generated/
+# The install-smoke job installs the suite into the checkout to verify
+# placement, so reproducing that job locally leaves four Skills here.
+ci-skills/

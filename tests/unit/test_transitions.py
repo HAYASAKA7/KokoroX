@@ -512,8 +512,9 @@ def _dims(familiarity: float, trust: float, tension: float = 0.0) -> dict[str, f
     return {"familiarity": familiarity, "trust": trust, "tension": tension}
 
 
-#: A pacing deliberately faster than the reference character's.
-RINA_STAGES = {
+#: A pacing deliberately faster than the reference character's, so a test
+#: can tell whose numbers actually ran.
+FAST_STAGES = {
     "acquainted": {"enter_familiarity": 6, "exit_familiarity": 4},
     "familiar": {
         "enter_familiarity": 22,
@@ -531,14 +532,14 @@ def test_a_pack_runs_its_own_curve_not_the_reference_one() -> None:
     They were not: `_derive_stage_v1` held rin-aster's thresholds as literals,
     so a pack declaring `acquainted` at 6 only reached it at her 10, and one
     declaring `familiar` at 22/16 sat at `acquainted` with 24 and 24 because
-    her gate wants 30. Both figures below are from a real pack that validated,
+    her gate wants 30. Both figures below come from a pack that validated,
     compiled and cleared every gate while running someone else's pacing.
     """
 
-    assert derive_stage("unknown", _dims(6.0, 0.0), RINA_STAGES) == "acquainted"
+    assert derive_stage("unknown", _dims(6.0, 0.0), FAST_STAGES) == "acquainted"
     assert derive_stage("unknown", _dims(6.0, 0.0)) == "unknown"
 
-    assert derive_stage("acquainted", _dims(24.0, 24.0), RINA_STAGES) == "familiar"
+    assert derive_stage("acquainted", _dims(24.0, 24.0), FAST_STAGES) == "familiar"
     assert derive_stage("acquainted", _dims(24.0, 24.0)) == "acquainted"
 
 
@@ -573,9 +574,9 @@ def test_the_frozen_fallback_matches_the_reference_pack_on_disk() -> None:
 def test_a_stage_holds_on_the_pack_s_own_exit_floor() -> None:
     """Hysteresis relaxes to the declared exit, not to the reference one."""
 
-    # Below rin-aster's exit of 25, at Rina's declared 18.
-    assert derive_stage("familiar", _dims(18.0, 12.0), RINA_STAGES) == "familiar"
-    assert derive_stage("familiar", _dims(17.9, 12.0), RINA_STAGES) == "acquainted"
+    # Below rin-aster's exit of 25, at this pack's declared 18.
+    assert derive_stage("familiar", _dims(18.0, 12.0), FAST_STAGES) == "familiar"
+    assert derive_stage("familiar", _dims(17.9, 12.0), FAST_STAGES) == "acquainted"
 
 
 def test_the_tension_ceiling_relaxes_while_holding_a_stage() -> None:
