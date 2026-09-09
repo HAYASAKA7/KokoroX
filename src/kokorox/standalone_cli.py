@@ -323,6 +323,11 @@ def add_standalone_parsers(
     )
     suite_install.add_argument("--repo")
     suite_install.add_argument("--skills-root")
+    # Discovery searches the checkout and every install scheme's data root, so
+    # a checkout whose package is also installed offers two complete suites.
+    # Naming one is the only way out of that; without it the command can only
+    # refuse.
+    suite_install.add_argument("--source")
     suite_install.add_argument("--dry-run", action="store_true")
     _add_json(suite_install, leaf_json)
 
@@ -1511,6 +1516,7 @@ def _handle_suite_install(
 ) -> dict[str, Any]:
     del data_root, schemas
     plan = install_skill_suite(
+        source_root=_optional_path(args.source),
         scope=args.scope,
         repo_root=_optional_path(args.repo),
         skills_root=_optional_path(args.skills_root),

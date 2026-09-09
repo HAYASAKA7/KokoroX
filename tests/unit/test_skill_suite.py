@@ -10,6 +10,7 @@ import shutil
 import pytest
 
 from kokorox import __version__
+from kokorox.errors import KokoroError
 
 
 REPOSITORY_ROOT = Path.cwd().resolve()
@@ -232,7 +233,7 @@ def test_automatic_source_discovery_rejects_two_complete_candidates(
     shutil.copytree(SOURCE_SKILLS, installed_skills)
     monkeypatch.setattr(suite, "__file__", str(module))
 
-    _assert_error("SKILL_SUITE_SOURCE_INVALID", suite.resolve_skill_suite_source)
+    _assert_error("SKILL_SUITE_SOURCE_AMBIGUOUS", suite.resolve_skill_suite_source)
 
 
 def test_automatic_source_discovery_rejects_no_complete_candidate(
@@ -245,7 +246,7 @@ def test_automatic_source_discovery_rejects_no_complete_candidate(
     module.write_text("# location marker\n", encoding="utf-8")
     monkeypatch.setattr(suite, "__file__", str(module))
 
-    _assert_error("SKILL_SUITE_SOURCE_INVALID", suite.resolve_skill_suite_source)
+    _assert_error("SKILL_SUITE_SOURCE_MISSING", suite.resolve_skill_suite_source)
 
 
 def test_preview_is_deterministic_closed_and_does_not_create_user_root(
@@ -652,3 +653,76 @@ def test_source_candidates_include_the_environment_prefix() -> None:
 
     relative = Path("share") / "kokorox" / "skills"
     assert Path(sys.prefix) / relative in candidates
+
+
+def test_no_source_and_two_sources_are_different_errors(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """One code cannot serve two opposite remedies.
+
+    "Two sources were found" is fixed by naming one; "none was found" is fixed
+    by installing one. Both used to raise `SKILL_SUITE_SOURCE_INVALID` with an
+    empty `details`, leaving the caller to guess which situation they were in.
+    """
+
+    suite = _suite_module()
+
+    monkeypatch.setattr(suite, "_source_candidates", lambda _root: ())
+    with pytest.raises(KokoroError) as missing:
+        suite.resolve_skill_suite_source()
+    assert missing.value.code == "SKILL_SUITE_SOURCE_MISSING"
+
+    duplicate = tmp_path / "second"
+    shutil.copytree(SOURCE_SKILLS, duplicate)
+    monkeypatch.setattr(
+        suite, "_source_candidates", lambda _root: (SOURCE_SKILLS, duplicate)
+    )
+    with pytest.raises(KokoroError) as ambiguous:
+        suite.resolve_skill_suite_source()
+    assert ambiguous.value.code == "SKILL_SUITE_SOURCE_AMBIGUOUS"
+    assert ambiguous.value.details["sources"] == 2
+
+
+def test_naming_a_source_settles_an_ambiguous_discovery(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """`--source` is the way out; without it the command can only refuse."""
+
+    suite = _suite_module()
+    duplicate = tmp_path / "second"
+    shutil.copytree(SOURCE_SKILLS, duplicate)
+    monkeypatch.setattr(
+        suite, "_source_candidates", lambda _root: (SOURCE_SKILLS, duplicate)
+    )
+
+    assert suite.resolve_skill_suite_source(duplicate) == duplicate.resolve()
+
+
+def test_suite_errors_reach_the_caller_with_their_own_message() -> None:
+    """Suite codes had no public message, so every remedy they carry was lost.
+
+    `_public_error_envelope` falls back to a generic sentence for any code it
+    does not know, and no `SKILL_SUITE_*` code was listed -- so a caller was
+    told "Command could not be completed" and nothing else.
+    """
+
+    from kokorox.cli import _public_error_envelope
+
+    for code in (
+        "SKILL_SUITE_SOURCE_MISSING",
+        "SKILL_SUITE_SOURCE_AMBIGUOUS",
+        "SKILL_SUITE_SOURCE_INVALID",
+        "SKILL_SUITE_CONFLICT",
+    ):
+        envelope = _public_error_envelope(
+            KokoroError(code, "internal detail", retryable=False)
+        )["error"]
+        assert envelope["code"] == code
+        assert envelope["message"] != "Command could not be completed."
+
+    counted = _public_error_envelope(
+        KokoroError(
+            "SKILL_SUITE_SOURCE_AMBIGUOUS", "x", details={"sources": 2}
+        )
+    )["error"]
+    assert counted["details"] == {"sources": 2}

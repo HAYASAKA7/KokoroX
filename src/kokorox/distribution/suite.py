@@ -397,15 +397,25 @@ def _resolve_source_snapshot(
             snapshots[snapshot.root] = snapshot
     if len(snapshots) == 1:
         return next(iter(snapshots.values()))
+    # Two sources and no source need opposite remedies -- drop one, or install
+    # one -- so they cannot share a code. `SKILL_SUITE_SOURCE_INVALID` keeps
+    # its literal meaning: a source was found and is not usable.
     if len(snapshots) > 1:
-        raise _source_error(
-            "Multiple complete KokoroX Skill suite sources were discovered."
+        raise _error(
+            "SKILL_SUITE_SOURCE_AMBIGUOUS",
+            "Multiple complete KokoroX Skill suite sources were discovered; "
+            "name one with --source.",
+            sources=len(snapshots),
         )
-    if last_error is not None:
-        raise last_error
+    # Discovery either produced a usable source or it did not. Whether some
+    # candidate path existed and failed to capture is internal detail: the
+    # caller has no usable source either way and the remedy is the same, so
+    # the reason rides along rather than changing the code.
+    # `SKILL_SUITE_SOURCE_INVALID` stays for a source the caller *named*.
     raise _error(
-        "SKILL_SUITE_SOURCE_INVALID",
-        "The KokoroX Skill suite source is unavailable or incomplete.",
+        "SKILL_SUITE_SOURCE_MISSING",
+        "No KokoroX Skill suite source was found; name one with --source.",
+        **({"reason": last_error.code} if last_error is not None else {}),
     )
 
 

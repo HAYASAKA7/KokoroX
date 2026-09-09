@@ -167,6 +167,30 @@ _PUBLIC_MESSAGES = {
     "REPORT_OUTPUT_PATH_UNSAFE": "Report output path is unsafe.",
     "REPORT_OUTPUT_WRITE_FAILED": "Report output could not be written.",
     "SCHEMA_VALIDATION_FAILED": "Input did not match the required schema.",
+    # Suite errors reached callers with the generic fallback message, so every
+    # remedy they carry -- which source to name, what to remove -- was dropped
+    # before anyone could read it.
+    "SKILL_SUITE_CLEANUP_FAILED": "Skill suite staging could not be cleaned up.",
+    "SKILL_SUITE_CONFLICT": (
+        "An installed Skill differs from the KokoroX suite; remove it first."
+    ),
+    "SKILL_SUITE_DESTINATION_CHANGED": (
+        "The Skill destination changed during installation."
+    ),
+    "SKILL_SUITE_INSTALL_FAILED": "The Skill suite could not be installed.",
+    "SKILL_SUITE_LIMIT_EXCEEDED": "The Skill suite source exceeds a bound.",
+    "SKILL_SUITE_PATH_INVALID": "A Skill suite path is unsafe.",
+    "SKILL_SUITE_ROLLBACK_FAILED": "Skill suite installation could not roll back.",
+    "SKILL_SUITE_SOURCE_AMBIGUOUS": (
+        "Several complete Skill suite sources were found; name one with --source."
+    ),
+    "SKILL_SUITE_SOURCE_CHANGED": "The Skill suite source changed during install.",
+    "SKILL_SUITE_SOURCE_INVALID": (
+        "The named Skill suite source is unusable or incomplete."
+    ),
+    "SKILL_SUITE_SOURCE_MISSING": (
+        "No Skill suite source was found; name one with --source."
+    ),
     "SOFT_EVALUATION_INPUT_INVALID": "Soft-evaluation input is invalid.",
     "STATE_REVISION_CONFLICT": "Relationship state revision conflicted.",
     "UNSAFE_PACK_PATH": "Character pack path is unsafe.",
@@ -2120,6 +2144,14 @@ def _public_error_envelope(error: KokoroError) -> dict[str, Any]:
     schema = error.details.get("schema")
     if isinstance(schema, str) and _SCHEMA_NAME.fullmatch(schema) is not None:
         details = {"schema": schema}
+    sources = error.details.get("sources")
+    if (
+        code == "SKILL_SUITE_SOURCE_AMBIGUOUS"
+        and isinstance(sources, int)
+        and not isinstance(sources, bool)
+        and 0 <= sources <= 64
+    ):
+        details = {"sources": sources}
     if code == "STATE_REVISION_CONFLICT":
         expected = error.details.get("expected")
         actual = error.details.get("actual")

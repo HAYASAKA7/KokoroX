@@ -6,7 +6,26 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- `suite install --source <path>` names the Skill suite source explicitly.
+  Discovery searches the checkout and every install scheme's data root, so a
+  checkout whose package is also installed offers two complete suites and the
+  command could only refuse. There was no way to say which one you meant.
+
 ### Fixed
+
+- Skill suite errors reached callers with the generic "Command could not be
+  completed", because no `SKILL_SUITE_*` code had a public message. Every
+  remedy they carried was discarded before anyone could read it. All eleven now
+  say what happened and what to do.
+- `SKILL_SUITE_SOURCE_INVALID` covered both "two sources were found" and "none
+  was found", whose remedies are opposites, with `details: {}` either way.
+  Discovery failures are now `SKILL_SUITE_SOURCE_MISSING`, an ambiguous
+  discovery is `SKILL_SUITE_SOURCE_AMBIGUOUS` and reports how many were found,
+  and `SKILL_SUITE_SOURCE_INVALID` keeps its literal meaning: the source you
+  named is unusable.
+
 
 - The answer arrived in the character's language instead of the reader's. The
   planner routed `conclusion` to `character_dialogue`, and the contract defined
