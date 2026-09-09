@@ -30,7 +30,9 @@ def policy(**overrides: Any) -> dict[str, Any]:
     value: dict[str, Any] = {
         "primary_language": "zh-CN",
         "channels": {
-            "character_dialogue": "ja-JP",
+            # Carries the conclusion, so it follows the primary language.
+            # Other channels stay mixed, which is what this fixture exercises.
+            "character_dialogue": "zh-CN",
             "technical_explanation": "zh-CN",
             "recommendations": "en-US",
             "warnings": "zh-CN",
@@ -62,7 +64,7 @@ def test_builds_ordered_schema_valid_plan_with_exact_protected_span() -> None:
             {
                 "id": "s1",
                 "channel": "character_dialogue",
-                "target_language": "ja-JP",
+                "target_language": "zh-CN",
                 "semantic_keys": ["conclusion"],
                 "expression_intent": "restrained_diagnosis",
             },
@@ -274,3 +276,50 @@ def test_preserve_route_does_not_change_or_remove_protected_spans() -> None:
 
     assert plan["segments"][1]["target_language"] == "preserve"
     assert plan["protected_spans"] == ["go test -race ./..."]
+
+
+def test_the_planner_refuses_a_conclusion_it_knows_will_never_validate() -> None:
+    """Fail where the mistake is fixable, not one step later.
+
+    `runtime validate` rejects a conclusion routed off the primary language,
+    but every fallback rung operates on the rendered candidate and none can
+    change a plan. An agent following the ladder renders once, descends all
+    four rungs, and is still invalid. The only repair is upstream -- recompile
+    the policy -- which the ladder never suggests.
+    """
+
+    with pytest.raises(KokoroError) as raised:
+        build_render_plan(
+            semantic(),
+            policy(channels={
+                "character_dialogue": "ja-JP",
+                "technical_explanation": "zh-CN",
+                "recommendations": "zh-CN",
+                "warnings": "zh-CN",
+            }),
+        )
+
+    assert raised.value.code == "PLAN_CONCLUSION_LANGUAGE_MISMATCH"
+    assert raised.value.details == {"expected": "zh-CN", "actual": "ja-JP"}
+
+
+def test_other_channels_may_still_leave_the_primary_language() -> None:
+    """Only the conclusion is pinned; mixed policies remain legitimate."""
+
+    plan = build_render_plan(
+        semantic(),
+        policy(channels={
+            "character_dialogue": "zh-CN",
+            "technical_explanation": "zh-CN",
+            "recommendations": "en-US",
+            "warnings": "ja-JP",
+        }),
+    )
+
+    languages = {
+        segment["channel"]: segment["target_language"]
+        for segment in plan["segments"]
+    }
+    assert languages["character_dialogue"] == "zh-CN"
+    assert languages["recommendations"] == "en-US"
+    assert languages["warnings"] == "ja-JP"

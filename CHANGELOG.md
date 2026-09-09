@@ -8,12 +8,47 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- `kokorox pack recover` finishes or rolls back an interrupted install or
+  removal. `recover_karc_installations` already existed, was exported, and was
+  covered by three test files -- and had no call site anywhere in `src/`. A
+  scope killed mid-install therefore deadlocked: install refused with
+  `KARC_INSTALL_RECOVERY_REQUIRED` because a journal was present, removal
+  reported `KARC_REMOVE_NOT_FOUND` because the registry never recorded the
+  installation, and the bytes stayed in the target. The only way out was
+  deleting the journal and staging tree by hand, which no document described.
+  The suite stayed green throughout, because the recovery function itself was
+  well tested; nothing tested that anything called it.
+
+### Added
+
 - `suite install --source <path>` names the Skill suite source explicitly.
   Discovery searches the checkout and every install scheme's data root, so a
   checkout whose package is also installed offers two complete suites and the
   command could only refuse. There was no way to say which one you meant.
 
 ### Fixed
+
+- The README promised that recovery from an interrupted transaction "is
+  automatic on the next matching install or removal operation". It never was,
+  and a test asserted the README contained that sentence, so the claim was held
+  in place by the suite. Both now describe the refusal and name
+  `kokorox pack recover`.
+- Fifty-one `KARC_*` error codes reached callers as "Command could not be
+  completed"; only the `KARC_DEFAULT_*` family had public messages. That
+  included both halves of the deadlock above, so the situation was unreadable
+  from the CLI. Every code now carries its own message, and the one that
+  strands a scope names the command that clears it.
+- `runtime plan` accepted a policy routing the conclusion off
+  `primary_language`, leaving `runtime validate` to reject the result. No
+  fallback rung can repair that: every rung operates on the rendered candidate
+  and the plan is fixed input, so an agent renders once, descends all four
+  rungs and is still invalid. Planning now raises
+  `PLAN_CONCLUSION_LANGUAGE_MISMATCH` where the policy can still be corrected.
+  The planning fixture had encoded the defect -- `character_dialogue: ja-JP`
+  under a `zh-CN` primary -- exactly as the contract example once did.
+- The runtime contract described `runtime context` as returning a
+  `persona_locale`. It is a local variable; the authored locale is the single
+  key of the returned `locales` map.
 
 - Skill suite errors reached callers with the generic "Command could not be
   completed", because no `SKILL_SUITE_*` code had a public message. Every

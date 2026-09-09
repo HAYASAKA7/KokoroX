@@ -156,6 +156,28 @@ def build_render_plan(
             if not is_channel_language(route):
                 raise _invalid_input()
 
+    # The conclusion is the answer, so it renders in the reader's language.
+    # `runtime validate` enforces that too, but catching it only there leaves
+    # the caller stranded: every fallback rung operates on the rendered
+    # candidate, and none of them can change a plan. Refusing here fails at the
+    # point where the mistake is both made and fixable -- recompile the policy
+    # -- instead of after a render that could never validate.
+    conclusion_channel = dict(_SEGMENT_SOURCES)["conclusion"]
+    conclusion_route = channels.get(conclusion_channel)
+    if (
+        content["conclusion"]
+        and isinstance(conclusion_route, str)
+        and conclusion_route != primary_language
+    ):
+        raise KokoroError(
+            "PLAN_CONCLUSION_LANGUAGE_MISMATCH",
+            "The conclusion channel must route to the primary language.",
+            details={
+                "expected": primary_language,
+                "actual": conclusion_route,
+            },
+        )
+
     segments: list[dict[str, Any]] = []
     for semantic_key, channel in _SEGMENT_SOURCES:
         if not content[semantic_key]:

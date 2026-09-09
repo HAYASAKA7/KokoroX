@@ -15,6 +15,7 @@ from kokorox.distribution.archive import KarcLimits, build_karc_archive
 from kokorox.distribution.compatibility import inspect_karc_compatibility
 from kokorox.distribution.installer import (
     install_karc_archive,
+    recover_karc_installations,
     remove_installed_pack,
 )
 from kokorox.distribution.migrations import (
@@ -85,6 +86,7 @@ _PACK_ROUTES = frozenset(
         "install",
         "list",
         "migrate",
+        "recover",
         "remove",
     }
 )
@@ -94,6 +96,7 @@ _DATA_ROOT_ROUTES = frozenset(
     {
         ("pack", "install"),
         ("pack", "list"),
+        ("pack", "recover"),
         ("pack", "remove"),
         ("consent", "grant"),
         ("consent", "show"),
@@ -237,6 +240,13 @@ def add_standalone_parsers(
     _add_scope(install)
     install.add_argument("--dry-run", action="store_true")
     _add_json(install, leaf_json)
+
+    # The journal an interrupted transaction leaves needs a way to be acted on.
+    # Install refuses while one exists and remove cannot see an unregistered
+    # installation, so without this the scope has no CLI route back.
+    pack_recover = pack_commands.add_parser("recover")
+    _add_scope(pack_recover)
+    _add_json(pack_recover, leaf_json)
 
     pack_list = pack_commands.add_parser("list")
     _add_scope(pack_list)
@@ -1083,6 +1093,23 @@ def _handle_pack_list(
     }
 
 
+def _handle_pack_recover(
+    args: argparse.Namespace,
+    data_root: Path | None,
+    schemas: SchemaRegistry,
+) -> dict[str, Any]:
+    recovery = recover_karc_installations(
+        _require_data_root(data_root),
+        schemas,
+        workspace_root=_workspace_root(args),
+    )
+    return {
+        "ok": True,
+        "recovery": recovery,
+        "activates_character": False,
+    }
+
+
 def _handle_pack_remove(
     args: argparse.Namespace,
     data_root: Path | None,
@@ -1531,6 +1558,7 @@ _HANDLERS: dict[StandaloneRoute, StandaloneHandler] = {
     ("pack", "install"): _handle_pack_install,
     ("pack", "list"): _handle_pack_list,
     ("pack", "migrate"): _handle_pack_migrate,
+    ("pack", "recover"): _handle_pack_recover,
     ("pack", "remove"): _handle_pack_remove,
     ("consent", "grant"): _handle_consent_grant,
     ("consent", "revoke"): _handle_consent_revoke,

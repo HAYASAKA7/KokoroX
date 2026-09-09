@@ -97,6 +97,136 @@ _PUBLIC_MESSAGES = {
     "INPUT_TOO_LARGE": "Input file exceeds the size limit.",
     "INPUT_INVALID_JSON": "Input file contains invalid JSON.",
     "INVALID_PACK_DATA": "Character pack data is invalid.",
+    # Every KARC_* code outside the DEFAULT family reached callers as
+    # "Command could not be completed", including the two that deadlock a
+    # scope after an interrupted install.
+    "KARC_ARCHIVE_INVALID": "Character archive is invalid.",
+    "KARC_ARCHIVE_LIMIT_EXCEEDED": "Character archive exceeds a bound.",
+    "KARC_BINDING_MISMATCH": (
+        "Archive binding does not match the request."
+    ),
+    "KARC_COMPATIBILITY_BLOCKED": (
+        "Archive is not compatible with this runtime."
+    ),
+    "KARC_COMPATIBILITY_REPORT_INVALID": (
+        "Compatibility report is invalid."
+    ),
+    "KARC_COMPATIBILITY_TARGET_INVALID": (
+        "Compatibility target is invalid."
+    ),
+    "KARC_INPUT_INVALID": "Installation input is invalid.",
+    "KARC_INPUT_MUTATION": (
+        "Installation input changed while it was read."
+    ),
+    "KARC_INSTALL_ARCHIVE_INVALID": (
+        "Archive could not be installed; it is invalid."
+    ),
+    "KARC_INSTALL_ATOMIC_UNAVAILABLE": (
+        "Atomic installation is unavailable on this filesystem."
+    ),
+    "KARC_INSTALL_CLEANUP_FAILED": (
+        "Installation staging could not be cleaned up."
+    ),
+    "KARC_INSTALL_CONFLICT": (
+        "A different installation already occupies the target."
+    ),
+    "KARC_INSTALL_JOURNAL_CHANGED": (
+        "The install journal changed during recovery."
+    ),
+    "KARC_INSTALL_JOURNAL_INVALID": (
+        "The install journal is unreadable; recovery cannot proceed."
+    ),
+    "KARC_INSTALL_JOURNAL_WRITE_FAILED": (
+        "The install journal could not be written."
+    ),
+    "KARC_INSTALL_LOCK_LOST": "The install scope lock was lost.",
+    "KARC_INSTALL_PATH_CHANGED": (
+        "An installation path changed during the transaction."
+    ),
+    "KARC_INSTALL_PATH_INVALID": "An installation path is unsafe.",
+    "KARC_INSTALL_RECOVERY_REQUIRED": (
+        "An unfinished install transaction must be recovered first; run `kokorox pack recover` for this scope."
+    ),
+    "KARC_INSTALL_SOURCE_CHANGED": (
+        "The archive changed during installation."
+    ),
+    "KARC_INSTALL_SOURCE_INVALID": "The archive source is unusable.",
+    "KARC_INSTALL_STAGING_INVALID": "Installation staging is invalid.",
+    "KARC_INSTALL_WRITE_FAILED": (
+        "The installation could not be written."
+    ),
+    "KARC_MANIFEST_SCHEMA_MUTATION": (
+        "Archive manifest changed while it was read."
+    ),
+    "KARC_MANIFEST_SCHEMA_UNSUPPORTED": (
+        "Archive manifest schema is unsupported."
+    ),
+    "KARC_MEMBER_INTEGRITY_INVALID": (
+        "An archive member failed its integrity check."
+    ),
+    "KARC_MEMBER_INVENTORY_INVALID": (
+        "The archive member inventory is invalid."
+    ),
+    "KARC_PROMOTION_NOT_VERIFIED": "The pack has no verified promotion.",
+    "KARC_PUBLICATION_NOT_READY": (
+        "The pack is not ready for publication."
+    ),
+    "KARC_PUBLICATION_REQUIRED": (
+        "A publication readiness report is required."
+    ),
+    "KARC_PUBLICATION_UNEXPECTED": (
+        "A publication report was not expected here."
+    ),
+    "KARC_REGISTRY_CHANGED": (
+        "The installed registry changed during the operation."
+    ),
+    "KARC_REGISTRY_CONFLICT": (
+        "The installed registry revision conflicted."
+    ),
+    "KARC_REGISTRY_INVALID": "The installed registry is invalid.",
+    "KARC_REGISTRY_LIMIT_EXCEEDED": (
+        "The installed registry exceeds a bound."
+    ),
+    "KARC_REGISTRY_LOCKED": (
+        "The installed registry is locked by another operation."
+    ),
+    "KARC_REGISTRY_LOCK_FAILED": (
+        "The installed registry could not be locked."
+    ),
+    "KARC_REGISTRY_PATH_INVALID": (
+        "The installed registry path is unsafe."
+    ),
+    "KARC_REGISTRY_SCOPE_MISMATCH": (
+        "The installed registry belongs to another scope."
+    ),
+    "KARC_RELEASE_INVALID": "Release evidence is invalid.",
+    "KARC_REMOVE_CONFLICT": (
+        "Removal conflicted with a concurrent change."
+    ),
+    "KARC_REMOVE_IDENTITY_INVALID": "The removal identity is invalid.",
+    "KARC_REMOVE_NOT_FOUND": (
+        "No installation is registered for that character in this scope."
+    ),
+    "KARC_REMOVE_PATH_CHANGED": (
+        "An installation path changed during removal."
+    ),
+    "KARC_REMOVE_REFERENCED": (
+        "The installation is still referenced by a session or memory reference."
+    ),
+    "KARC_REMOVE_REFERENCE_SCAN_INVALID": (
+        "Reference scanning failed during removal."
+    ),
+    "KARC_REMOVE_STORAGE_INVALID": "Installation storage is invalid.",
+    "KARC_RUNTIME_VERSION_UNSUPPORTED": (
+        "The archive needs a different runtime version."
+    ),
+    "KARC_SCHEMA_VERSION_UNSUPPORTED": (
+        "The archive schema version is unsupported."
+    ),
+    "KARC_SCOPE_CHANGED": (
+        "The installation scope changed during the operation."
+    ),
+    "KARC_SCOPE_INVALID": "The installation scope is invalid.",
     "KARC_DEFAULT_AMBIGUOUS": "Character default selection is ambiguous.",
     "KARC_DEFAULT_BINDING_INVALID": "Character default selection is invalid.",
     "KARC_DEFAULT_CLEANUP_FAILED": "Character default cleanup failed.",

@@ -98,7 +98,9 @@ def test_readme_documents_archive_release_and_recovery_boundaries() -> None:
         "migration is explicit, bounded, and never an automatic compatibility shim",
         "readiness does not publish anything or grant distribution rights",
         "conflicts fail closed",
-        "recovery is automatic on the next matching install or removal operation",
+        # Recovery is not automatic; the README must say so and name the way out.
+        "recovery is not automatic",
+        "run `kokorox pack recover`",
         "keep backups of the data root before migration or destructive reset",
     ):
         assert statement in lower
@@ -1447,3 +1449,44 @@ def test_skill_suite_cli_rejects_mismatched_scope_arguments_without_state(
     assert code == 2
     assert body["error"]["code"] == "SKILL_SUITE_PATH_INVALID"
     assert _filesystem_snapshot(tmp_path) == before
+
+
+def test_pack_recover_is_reachable_from_the_cli() -> None:
+    """An interrupted transaction needs a command that acts on its journal.
+
+    `recover_karc_installations` existed, was exported, and was covered by
+    three test files -- with no call site anywhere in `src/`. Install refuses
+    while a journal exists and removal cannot see an installation the registry
+    never recorded, so a scope crashed mid-install had no CLI route back and
+    the suite stayed green because the function itself was well tested.
+    """
+
+    from kokorox.cli import build_parser
+    from kokorox.standalone_cli import _HANDLERS, standalone_route
+
+    args = build_parser().parse_args(["pack", "recover", "--json"])
+    route = standalone_route(args)
+
+    assert route == ("pack", "recover")
+    assert route in _HANDLERS
+
+
+def test_every_karc_error_says_something_specific() -> None:
+    """A code with no public message is a remedy the caller never receives.
+
+    Only the `KARC_DEFAULT_*` family had messages, so an interrupted install
+    reported "Command could not be completed" and nothing else.
+    """
+
+    from kokorox.cli import _PUBLIC_MESSAGES, _public_error_envelope
+    from kokorox.errors import KokoroError
+
+    for code in ("KARC_INSTALL_RECOVERY_REQUIRED", "KARC_REMOVE_NOT_FOUND"):
+        message = _public_error_envelope(
+            KokoroError(code, "internal detail", retryable=False)
+        )["error"]["message"]
+        assert message != "Command could not be completed."
+        assert message == _PUBLIC_MESSAGES[code]
+
+    # The one that strands a scope must name the way out.
+    assert "pack recover" in _PUBLIC_MESSAGES["KARC_INSTALL_RECOVERY_REQUIRED"]

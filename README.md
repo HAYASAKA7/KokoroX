@@ -199,10 +199,12 @@ attestation; self-assertion cannot unlock it.
 Install, remove, migration, default, persistence, and suite operations use
 bounded locks, canonical inputs, and atomic publication. Conflicts fail closed;
 the command does not guess which concurrent value should win. Interrupted
-install/removal transactions leave an identity-bound journal, and recovery is
-automatic on the next matching install or removal operation. If recovery
-cannot prove every retained byte and path, it returns a stable recovery error
-and deletes nothing unverified. Keep backups of the data root before migration
+install/removal transactions leave an identity-bound journal. Recovery is not
+automatic: install refuses while a journal exists, and removal cannot see an
+installation the registry never recorded, so run `kokorox pack recover` for
+that scope to finish or roll back the transaction. If recovery cannot prove
+every retained byte and path, it returns a stable recovery error and deletes
+nothing unverified. Keep backups of the data root before migration
 or destructive reset; copy it only while KokoroX is inactive so the backup is
 internally consistent.
 
