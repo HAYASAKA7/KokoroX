@@ -1004,3 +1004,94 @@ def test_a_valid_delivery_has_no_rung() -> None:
     assert validate_rendered_output(
         rendered(), semantic(), plan(), attempt=2
     )["fallback_level"] is None
+
+
+def _four_channel_plan(conclusion_language: str) -> dict[str, Any]:
+    """A full delivery whose conclusion can be routed away from the reader."""
+
+    rows = [
+        ("s1", "character_dialogue", conclusion_language, ["conclusion"]),
+        ("s2", "technical_explanation", "zh-CN", ["explanation"]),
+        ("s3", "recommendations", "zh-CN", ["recommendations"]),
+        ("s4", "warnings", "zh-CN", ["warnings"]),
+    ]
+    return plan(
+        primary_language="zh-CN",
+        protected_spans=[],
+        segments=[
+            {
+                "id": segment_id,
+                "channel": channel,
+                "target_language": language,
+                "semantic_keys": keys,
+            }
+            for segment_id, channel, language, keys in rows
+        ],
+    )
+
+
+def _matching_render(planned: dict[str, Any]) -> dict[str, Any]:
+    return rendered(
+        text="结论。 说明。 建议。 警告。",
+        segments=deepcopy(planned["segments"]),
+        switch_count=1,
+    )
+
+
+def test_the_conclusion_must_render_in_the_reader_s_language() -> None:
+    """The answer cannot arrive in a language the reader may not read.
+
+    A pack authoring only `ja-JP` used to pull the conclusion onto its own
+    locale, because the conclusion was routed to `character_dialogue` -- the
+    channel documented to fall back. The supporting detail was translated
+    correctly around it, so the reader got the one load-bearing sentence in
+    the wrong language. The pack's locales choose expression material, which
+    is what `persona_locale` is for; they do not choose the answer's language.
+    """
+
+    planned = _four_channel_plan("ja-JP")
+
+    result = validate_rendered_output(
+        _matching_render(planned), full_semantic(), planned
+    )
+
+    assert result["valid"] is False
+    mismatch = next(
+        item
+        for item in result["violations"]
+        if item["code"] == "CONCLUSION_LANGUAGE_MISMATCH"
+    )
+    assert mismatch["details"] == {
+        "semantic_key": "conclusion",
+        "expected": "zh-CN",
+        "actual": "ja-JP",
+    }
+    assert_schema_valid(result)
+
+
+def test_the_primary_language_ratio_cannot_see_a_misrouted_conclusion() -> None:
+    """Why the floor check is not enough on its own.
+
+    `PRIMARY_LANGUAGE_ABSENT` fires only when no segment carries the primary
+    language. Three of these four do, so it stays silent while the answer
+    itself is in the wrong one.
+    """
+
+    planned = _four_channel_plan("ja-JP")
+
+    result = validate_rendered_output(
+        _matching_render(planned), full_semantic(), planned
+    )
+
+    assert "PRIMARY_LANGUAGE_ABSENT" not in codes(result)
+    assert "CONCLUSION_LANGUAGE_MISMATCH" in codes(result)
+
+
+def test_a_conclusion_in_the_primary_language_is_accepted() -> None:
+    planned = _four_channel_plan("zh-CN")
+
+    result = validate_rendered_output(
+        _matching_render(planned), full_semantic(), planned
+    )
+
+    assert "CONCLUSION_LANGUAGE_MISMATCH" not in codes(result)

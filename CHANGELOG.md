@@ -8,6 +8,25 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- The answer arrived in the character's language instead of the reader's. The
+  planner routed `conclusion` to `character_dialogue`, and the contract defined
+  exactly that channel as the one that falls back to a locale the pack actually
+  authors. So a pack authoring only `ja-JP`, asked a question in `zh-CN`,
+  returned the explanation, recommendations and warnings in `zh-CN` and the
+  conclusion -- the answer, the one load-bearing sentence -- in `ja-JP`, and
+  every gate passed.
+
+  Nothing caught it because `PRIMARY_LANGUAGE_ABSENT` fires only when *no*
+  segment carries the primary language, and three of four did. `runtime
+  validate` now rejects any plan whose conclusion renders in another language:
+  the conclusion is the answer, so its language is not a routing choice. The
+  fallback itself was never wrong, only misapplied -- a pack's authored locales
+  decide which expression material `runtime context` offers, which is what
+  `persona_locale` already selects, not what language the answer is written in.
+  The contract said the opposite, and its own render-plan example demonstrated
+  the defect.
+
+
 - A pack's relationship pacing was never read. `growth.stages` -- the
   familiarity and trust thresholds at which a character moves between
   `unknown`, `acquainted`, `familiar` and `trusted` -- validated, compiled into

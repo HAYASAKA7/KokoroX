@@ -75,7 +75,7 @@ For a single-language response, the minimal explicit input is:
 {"mode": "single", "primary_language": "en-US"}
 ```
 
-Any well-formed language tag is accepted (`en-US`, `zh-CN`, `fr-FR`, `pt-BR`, `zh-Hans-CN`, ...); render in the user's language. Task content follows the user's language, while character dialogue falls back to a locale the pack actually authors when the user's language is unauthored. The `commands`, `file_paths`, `exact_errors`, and `code_identifiers` channels are always `preserve`. Never override them, even when asked to translate everything.
+Any well-formed language tag is accepted (`en-US`, `zh-CN`, `fr-FR`, `pt-BR`, `zh-Hans-CN`, ...); render in the user's language. Every rendered channel follows `primary_language`, the conclusion above all -- it is the answer, and `runtime validate` rejects a plan that routes it anywhere else. A pack's authored locales decide which expression material `runtime context` offers, which is why it returns one `persona_locale`; they do not decide what language the answer is written in. Never move the conclusion onto an authored locale to reach the character's voice: the voice is carried by `expression_intent` and by the persona material the context already selected, in the reader's language. The `commands`, `file_paths`, `exact_errors`, and `code_identifiers` channels are always `preserve`. Never override them, even when asked to translate everything.
 
 ## Semantic Result
 
@@ -119,7 +119,7 @@ Render an object with exactly:
     {
       "id": "s1",
       "channel": "character_dialogue",
-      "target_language": "ja-JP",
+      "target_language": "zh-CN",
       "semantic_keys": ["conclusion"]
     }
   ],

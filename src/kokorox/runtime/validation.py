@@ -718,6 +718,29 @@ def validate_rendered_output(
         if validated is not None:
             valid_planned.append(validated)
 
+    # The conclusion is the answer. A pack's authored locales decide which
+    # expression material `runtime context` offers -- that fallback lives in
+    # `persona_locale` -- not what language the answer is written in. Routing
+    # the conclusion to an authored locale delivers the one load-bearing
+    # sentence in a language the reader may not read while the supporting
+    # detail around it is correctly translated, and the ratio check cannot see
+    # it: three of four segments still carry the primary language.
+    if plan_primary_language is not None:
+        for segment in valid_planned:
+            if "conclusion" not in segment["semantic_keys"]:
+                continue
+            if segment["target_language"] != plan_primary_language:
+                violations.add(
+                    "CONCLUSION_LANGUAGE_MISMATCH",
+                    "The conclusion must render in the primary language.",
+                    segment_id=segment["id"],
+                    details={
+                        "semantic_key": "conclusion",
+                        "expected": plan_primary_language,
+                        "actual": segment["target_language"],
+                    },
+                )
+
     if (
         min_primary_ratio is not None
         and plan_primary_language is not None
