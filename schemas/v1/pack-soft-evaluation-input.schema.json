@@ -147,7 +147,6 @@
         "semantic_equivalence",
         "character_consistency",
         "locale_naturalness",
-        "cross_language_persona_equivalence",
         "repetition_catchphrase_quality",
         "safety_policy_retention"
       ],

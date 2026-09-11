@@ -345,6 +345,39 @@ def _validate_verified_evidence(
         soft_input, captured["soft_evaluation_input"][1]
     ):
         raise _binding_mismatch()
+    _require_earned_soft_profile(hard, soft_input, soft_report)
+
+
+_SINGLE_LOCALE_PROFILE = "single-locale-release"
+
+
+def _require_earned_soft_profile(
+    hard: dict[str, Any],
+    soft_input: dict[str, Any],
+    soft_report: dict[str, Any],
+) -> None:
+    """Grant the single-locale profile only to a pack with one locale.
+
+    The soft aggregator cannot see the pack, so any input could claim the
+    lighter profile and skip cross-language equivalence. The current hard
+    report records the locales the pack declares; the profile is earned only
+    when that is exactly one, and every sample was taken in it.
+    """
+
+    if soft_report["threshold_profile"]["profile_id"] != _SINGLE_LOCALE_PROFILE:
+        return
+    declared = hard.get("locales")
+    sampled = {
+        sample["locale"]
+        for group in soft_input["samples"].values()
+        for sample in group.values()
+    }
+    if not isinstance(declared, list) or len(declared) != 1 or sampled != set(declared):
+        raise KokoroError(
+            "PACK_PROMOTION_SOFT_PROFILE_INAPPLICABLE",
+            "The single-locale soft profile applies only to a pack that declares "
+            "exactly one locale, sampled in that locale.",
+        )
 
 
 def _artifact_reference(value: dict[str, Any], payload: bytes) -> dict[str, str]:

@@ -24,6 +24,19 @@ _DIMENSIONS = (
 )
 _PROFILE_ID = "default-release"
 _PROFILE_VERSION = "1.0.0"
+_SINGLE_LOCALE_PROFILE_ID = "single-locale-release"
+_CROSS_LANGUAGE = "cross_language_persona_equivalence"
+#: Each profile names the dimensions it measures. A pack authored in one locale
+#: has no second language to be equivalent across, so its profile drops that
+#: dimension rather than demanding three samples of a property it cannot have.
+#: Whether a pack earned the lighter profile is decided where its locales are
+#: known: promotion reads them from the current hard report.
+_PROFILES: dict[tuple[str, str], tuple[str, ...]] = {
+    (_PROFILE_ID, _PROFILE_VERSION): _DIMENSIONS,
+    (_SINGLE_LOCALE_PROFILE_ID, _PROFILE_VERSION): tuple(
+        dimension for dimension in _DIMENSIONS if dimension != _CROSS_LANGUAGE
+    ),
+}
 _QUANTUM = Decimal("0.000001")
 _ARITHMETIC_CONTEXT = Context(prec=50, rounding=ROUND_HALF_EVEN)
 _MAX_RESULT_FINDINGS = 64
@@ -74,13 +87,16 @@ def aggregate_soft_evaluation(
         threshold_profile_version,
     )
 
+    _require_profile_fit(
+        cast(dict[str, dict[str, Any]], snapshot["samples"]), profile
+    )
     results = {
         dimension: _aggregate_dimension(
             dimension,
             cast(dict[str, dict[str, Any]], snapshot["samples"][dimension]),
             cast(dict[str, Any], profile["dimensions"][dimension]),
         )
-        for dimension in _DIMENSIONS
+        for dimension in profile["dimensions"]
     }
     report = {
         "schema_version": "1.0",
@@ -134,14 +150,16 @@ def soft_report_is_current(
     evaluation_input: dict[str, Any],
     schemas: SchemaRegistry,
     *,
-    threshold_profile_id: str = _PROFILE_ID,
-    threshold_profile_version: str = _PROFILE_VERSION,
+    threshold_profile_id: str | None = None,
+    threshold_profile_version: str | None = None,
 ) -> bool:
     """Return whether a report exactly matches fresh deterministic aggregation.
 
     The JSON Schema is the closed structural envelope. This semantic check is
     the acceptance boundary: it re-aggregates the exact bound input so sibling
     arithmetic, six-place normalization, and every binding must also match.
+    Without an explicit profile the report is judged by the one it recorded;
+    a caller pinning a profile still gets False for a report made under another.
     """
     try:
         report_bytes = canonical_bytes(report)
@@ -154,11 +172,22 @@ def soft_report_is_current(
             "pack-soft-evaluation-report",
             json.loads(report_bytes),
         )
+        recorded = cast(dict[str, Any], json.loads(report_bytes))[
+            "threshold_profile"
+        ]
         current = aggregate_soft_evaluation(
             cast(dict[str, Any], json.loads(input_bytes)),
             cast(SchemaRegistry, audited_schemas),
-            threshold_profile_id=threshold_profile_id,
-            threshold_profile_version=threshold_profile_version,
+            threshold_profile_id=(
+                threshold_profile_id
+                if threshold_profile_id is not None
+                else recorded["profile_id"]
+            ),
+            threshold_profile_version=(
+                threshold_profile_version
+                if threshold_profile_version is not None
+                else recorded["version"]
+            ),
         )
         return (
             report_bytes == canonical_bytes(current)
@@ -244,15 +273,55 @@ def _validate_identity_bindings(value: dict[str, Any]) -> None:
         )
 
 
+def _require_profile_fit(
+    samples: dict[str, dict[str, Any]],
+    profile: dict[str, Any],
+) -> None:
+    """Refuse samples that do not match the profile they are judged by.
+
+    A measured dimension without samples is an incomplete input, as it always
+    was. A sample for a dimension the profile does not measure would sit in the
+    input looking like evidence the report never weighed, so it is refused.
+    The single-locale profile also needs every sample in one locale; whether
+    that is the pack's only locale is promotion's check, since only it can see
+    the pack.
+    """
+
+    measured = set(profile["dimensions"])
+    if not measured.issubset(samples):
+        raise KokoroError(
+            "SOFT_EVALUATION_INPUT_INVALID",
+            "The soft-evaluation input does not match its closed schema.",
+        )
+    if set(samples) - measured:
+        raise KokoroError(
+            "SOFT_THRESHOLD_PROFILE_INAPPLICABLE",
+            "The soft-evaluation input samples a dimension the profile does "
+            "not measure.",
+            details={"profile": profile["profile_id"]},
+        )
+    if profile["profile_id"] == _SINGLE_LOCALE_PROFILE_ID:
+        locales = {
+            sample["locale"] for group in samples.values() for sample in group.values()
+        }
+        if len(locales) != 1:
+            raise KokoroError(
+                "SOFT_THRESHOLD_PROFILE_INAPPLICABLE",
+                "A single-locale evaluation must sample exactly one locale.",
+                details={"profile": profile["profile_id"]},
+            )
+
+
 def _threshold_profile(profile_id: str, version: str) -> dict[str, Any]:
-    if profile_id != _PROFILE_ID or version != _PROFILE_VERSION:
+    dimensions = _PROFILES.get((profile_id, version))
+    if dimensions is None:
         raise KokoroError(
             "SOFT_THRESHOLD_PROFILE_UNSUPPORTED",
             "The soft-evaluation threshold profile is unsupported.",
         )
     return {
-        "profile_id": _PROFILE_ID,
-        "version": _PROFILE_VERSION,
+        "profile_id": profile_id,
+        "version": version,
         "aggregation": "lower_confidence_bound",
         "dimensions": {
             dimension: {
@@ -260,7 +329,7 @@ def _threshold_profile(profile_id: str, version: str) -> dict[str, Any]:
                 "min_confidence": 0.8,
                 "threshold": 0.8,
             }
-            for dimension in _DIMENSIONS
+            for dimension in dimensions
         },
     }
 

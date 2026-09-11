@@ -8,6 +8,13 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- A pack authored in one locale can clear the soft gate honestly.
+  `pack soft-eval --profile single-locale-release` judges the five dimensions
+  that apply and drops `cross_language_persona_equivalence`, which a
+  one-language pack cannot have -- the release profile demanded three samples
+  of it anyway. The profile is earned rather than chosen: the hard report now
+  records the pack's declared `locales`, and promotion refuses the profile
+  unless that is exactly one locale and every sample was taken in it.
 - `kokorox suite remove` uninstalls the Skill suite. There was no way to take
   it out again short of deleting directories by hand. Install writes no
   receipt, so removal proves ownership the way install decides a reinstall is

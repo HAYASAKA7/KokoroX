@@ -343,6 +343,16 @@ def run_hard_validation(
                 if first_compiled_bytes is not None
                 else None
             ),
+            # The locales the pack declares, from the compiled pack. Promotion
+            # reads them here -- this report is evidence it re-verifies byte
+            # for byte -- to tell an earned single-locale profile from a chosen
+            # one.
+            "locales": (
+                sorted(compiled_snapshot["locales"])
+                if compiled_snapshot is not None
+                and isinstance(compiled_snapshot.get("locales"), Mapping)
+                else []
+            ),
             "corpus_hash": corpus.corpus_hash if corpus is not None else None,
             "check_input_hashes": {
                 "request_hash": sha256(request_bytes).hexdigest(),

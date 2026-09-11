@@ -591,6 +591,7 @@ def test_character_draft_compile_rejects_user_selected_destination_or_lifecycle_
                 "pack_command": "soft-eval",
                 "input": "soft-input.json",
                 "out": "soft.json",
+                "profile": "default-release",
                 "json": True,
             },
         ),

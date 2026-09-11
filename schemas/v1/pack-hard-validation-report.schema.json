@@ -28,6 +28,12 @@
     "artifact_id": {"$ref": "#/$defs/artifact_id"},
     "created_by": {"$ref": "#/$defs/created_by"},
     "namespace": {"$ref": "#/$defs/slug_id"},
+    "locales": {
+      "type": "array",
+      "maxItems": 64,
+      "uniqueItems": true,
+      "items": {"type": "string", "maxLength": 35, "pattern": "^[a-z]{2,3}(-[A-Z][a-z]{3})?(-([A-Z]{2}|[0-9]{3}))?$"}
+    },
     "character_id": {"$ref": "#/$defs/slug_id"},
     "character_version": {"$ref": "#/$defs/semantic_version"},
     "mode": {"$ref": "#/$defs/construction_mode"},

@@ -84,6 +84,30 @@
           {"properties": {"results": {"properties": {"safety_policy_retention": {"properties": {"passed": {"const": false}}}}}}}
         ]
       }
+    },
+    {
+      "if": {
+        "properties": {"threshold_profile": {"properties": {"profile_id": {"const": "default-release"}}}},
+        "required": ["threshold_profile"]
+      },
+      "then": {
+        "properties": {
+          "threshold_profile": {"properties": {"dimensions": {"required": ["cross_language_persona_equivalence"]}}},
+          "results": {"required": ["cross_language_persona_equivalence"]}
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {"threshold_profile": {"properties": {"profile_id": {"const": "single-locale-release"}}}},
+        "required": ["threshold_profile"]
+      },
+      "then": {
+        "properties": {
+          "threshold_profile": {"properties": {"dimensions": {"not": {"required": ["cross_language_persona_equivalence"]}}}},
+          "results": {"not": {"required": ["cross_language_persona_equivalence"]}}
+        }
+      }
     }
   ],
   "$defs": {
@@ -173,7 +197,6 @@
         "semantic_equivalence",
         "character_consistency",
         "locale_naturalness",
-        "cross_language_persona_equivalence",
         "repetition_catchphrase_quality",
         "safety_policy_retention"
       ],
@@ -191,7 +214,7 @@
       "additionalProperties": false,
       "required": ["profile_id", "version", "aggregation", "dimensions"],
       "properties": {
-        "profile_id": {"const": "default-release"},
+        "profile_id": {"enum": ["default-release", "single-locale-release"]},
         "version": {"const": "1.0.0"},
         "aggregation": {"const": "lower_confidence_bound"},
         "dimensions": {"$ref": "#/$defs/dimension_policies"}
@@ -271,7 +294,6 @@
         "semantic_equivalence",
         "character_consistency",
         "locale_naturalness",
-        "cross_language_persona_equivalence",
         "repetition_catchphrase_quality",
         "safety_policy_retention"
       ],

@@ -511,3 +511,98 @@ def test_propagates_schema_registry_operational_failures() -> None:
         )
 
     assert captured.value.code == "SCHEMA_READ_FAILED"
+
+
+def _single_locale_input(locale: str = "ja-JP") -> dict[str, Any]:
+    value = _evaluation_input()
+    value["samples"] = {
+        dimension: {
+            f"{dimension.replace('_', '-')}-{index + 1}": {
+                "locale": locale,
+                "scenario_id": "debugging",
+                "case_id": f"{dimension.replace('_', '-')}-{index + 1}",
+                "score": 0.95,
+                "confidence": 0.95,
+                "finding_codes": [],
+            }
+            for index in range(3)
+        }
+        for dimension in DIMENSIONS
+        if dimension != "cross_language_persona_equivalence"
+    }
+    return value
+
+
+def test_single_locale_profile_measures_only_the_dimensions_that_apply() -> None:
+    report = aggregate_soft_evaluation(
+        _single_locale_input(),
+        SCHEMAS,
+        threshold_profile_id="single-locale-release",
+    )
+
+    measured = set(DIMENSIONS) - {"cross_language_persona_equivalence"}
+    assert report["threshold_profile"]["profile_id"] == "single-locale-release"
+    assert set(report["threshold_profile"]["dimensions"]) == measured
+    assert set(report["results"]) == measured
+    assert report["passed"] is True
+    # The same bar, not a lower one: only the inapplicable dimension is gone.
+    assert all(
+        policy == {"min_samples": 3, "min_confidence": 0.8, "threshold": 0.8}
+        for policy in report["threshold_profile"]["dimensions"].values()
+    )
+
+
+def test_a_single_locale_report_is_current_under_the_profile_it_recorded() -> None:
+    value = _single_locale_input()
+    report = aggregate_soft_evaluation(
+        value,
+        SCHEMAS,
+        threshold_profile_id="single-locale-release",
+    )
+
+    assert soft_report_is_current(report, value, SCHEMAS) is True
+    assert (
+        soft_report_is_current(
+            report,
+            value,
+            SCHEMAS,
+            threshold_profile_id="default-release",
+            threshold_profile_version="1.0.0",
+        )
+        is False
+    )
+
+
+def test_the_single_locale_profile_refuses_cross_language_samples() -> None:
+    """A sample the report ignores would read as evidence it weighed."""
+
+    value = _single_locale_input()
+    value["samples"]["cross_language_persona_equivalence"] = deepcopy(
+        value["samples"]["semantic_equivalence"]
+    )
+
+    with pytest.raises(KokoroError) as captured:
+        aggregate_soft_evaluation(
+            value, SCHEMAS, threshold_profile_id="single-locale-release"
+        )
+    assert captured.value.code == "SOFT_THRESHOLD_PROFILE_INAPPLICABLE"
+
+
+def test_the_single_locale_profile_refuses_a_second_locale() -> None:
+    value = _single_locale_input()
+    next(iter(value["samples"]["semantic_equivalence"].values()))["locale"] = "en-US"
+
+    with pytest.raises(KokoroError) as captured:
+        aggregate_soft_evaluation(
+            value, SCHEMAS, threshold_profile_id="single-locale-release"
+        )
+    assert captured.value.code == "SOFT_THRESHOLD_PROFILE_INAPPLICABLE"
+
+
+def test_the_default_profile_still_requires_cross_language_samples() -> None:
+    value = _evaluation_input()
+    del value["samples"]["cross_language_persona_equivalence"]
+
+    with pytest.raises(KokoroError) as captured:
+        aggregate_soft_evaluation(value, SCHEMAS)
+    assert captured.value.code == "SOFT_EVALUATION_INPUT_INVALID"

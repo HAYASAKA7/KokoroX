@@ -74,6 +74,13 @@ Retain and compare both complete outputs exactly. Require equal `artifact_id`,
 missing dimension, or a binding mismatch blocks verified promotion. Soft
 evaluation measures quality only; it cannot waive hard or publication gates.
 
+A pack that authors exactly one locale has no second language to be
+equivalent across. Evaluate it with `--profile single-locale-release`: the same
+thresholds over the other five dimensions, every sample in that one locale, and
+no `cross_language_persona_equivalence` samples at all. The profile is earned,
+not chosen: promotion refuses it with `PACK_PROMOTION_SOFT_PROFILE_INAPPLICABLE`
+unless the current hard report shows the pack declares exactly that one locale.
+
 ## Human review and immutable promotion
 
 A human review attestation must be explicit, schema-valid, unchanged, and bound

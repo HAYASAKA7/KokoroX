@@ -446,6 +446,10 @@ _PUBLIC_MESSAGES = {
         "The Character Pack review did not accept promotion."
     ),
     "PACK_PROMOTION_SOFT_GATE_FAILED": "The soft-evaluation report did not pass.",
+    "PACK_PROMOTION_SOFT_PROFILE_INAPPLICABLE": (
+        "The single-locale soft profile applies only to a pack that declares "
+        "exactly one locale; evaluate this pack under default-release."
+    ),
     "PACK_PROMOTION_SOFT_REPORT_STALE": (
         "The soft-evaluation report is not current for its exact input; re-run "
         "the soft evaluation."
@@ -591,6 +595,10 @@ _PUBLIC_MESSAGES = {
     "SOFT_EVALUATION_RESERVED_FINDING": (
         "The evaluator used a finding code reserved for the aggregator."
     ),
+    "SOFT_THRESHOLD_PROFILE_INAPPLICABLE": (
+        "The soft-evaluation samples do not fit the threshold profile: "
+        "single-locale-release takes one locale and no cross-language samples."
+    ),
     "SOFT_THRESHOLD_PROFILE_UNSUPPORTED": (
         "The soft-evaluation threshold profile is unsupported."
     ),
@@ -656,6 +664,13 @@ def build_parser() -> argparse.ArgumentParser:
     pack_soft_eval = pack_commands.add_parser("soft-eval")
     pack_soft_eval.add_argument("input")
     pack_soft_eval.add_argument("--out", required=True)
+    # A pack authored in one locale is judged without the cross-language
+    # dimension; promotion checks that the pack really declares only one.
+    pack_soft_eval.add_argument(
+        "--profile",
+        choices=("default-release", "single-locale-release"),
+        default="default-release",
+    )
     _leaf_json(pack_soft_eval)
     pack_promote = pack_commands.add_parser("promote")
     pack_promote.add_argument("source_dir")
@@ -1507,7 +1522,9 @@ def _handle_pack_soft_eval(
         "SOFT_EVALUATION_INPUT_INVALID",
         "Soft-evaluation input is invalid.",
     )
-    report = aggregate_soft_evaluation(evaluation_input, schemas)
+    report = aggregate_soft_evaluation(
+        evaluation_input, schemas, threshold_profile_id=args.profile
+    )
     report, report_hash = _publish_report_output(
         output,
         report,

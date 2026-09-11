@@ -626,3 +626,185 @@ def test_verified_rechecks_source_after_final_soft_validation_callback(
 
     assert registry.mutated is True
     assert captured.value.code == "PACK_PROMOTION_SOURCE_CHANGED"
+
+
+def _single_locale_soft_input(
+    hard_report: dict[str, Any], locale: str
+) -> dict[str, Any]:
+    prefix = f"{hard_report['namespace']}/{hard_report['character_id']}"
+    return {
+        "schema_version": "1.0",
+        "artifact_id": f"{prefix}/release/soft-input",
+        "created_by": {"component": "kokorox", "version": __version__},
+        "namespace": hard_report["namespace"],
+        "character_id": hard_report["character_id"],
+        "character_version": hard_report["character_version"],
+        "mode": hard_report["mode"],
+        "visibility": "private",
+        "source_artifact_id": hard_report["source_artifact_id"],
+        "source_hash": hard_report["source_hash"],
+        "compiled_artifact_id": hard_report["compiled_artifact_id"],
+        "compiled_hash": hard_report["compiled_hash"],
+        "evaluator": {"id": "local-evaluator", "version": "1.0.0"},
+        "rubric_version": "1.0.0",
+        "fixture_version": "1.0.0",
+        "samples": {
+            dimension: {
+                f"{dimension.replace('_', '-')}-{index + 1}": {
+                    "locale": locale,
+                    "scenario_id": "debugging",
+                    "case_id": f"{dimension.replace('_', '-')}-{index + 1}",
+                    "score": 0.95,
+                    "confidence": 0.95,
+                    "finding_codes": [],
+                }
+                for index in range(3)
+            }
+            for dimension in DIMENSIONS
+            if dimension != "cross_language_persona_equivalence"
+        },
+    }
+
+
+def test_a_multi_locale_pack_cannot_claim_the_single_locale_profile() -> None:
+    """Otherwise any pack could skip the cross-language check by asking."""
+
+    inputs = _release_inputs()
+    reviewed = _reviewed(inputs)
+    soft_input = _single_locale_soft_input(inputs["hard_report"], "ja-JP")
+    soft_report = aggregate_soft_evaluation(
+        soft_input, SCHEMAS, threshold_profile_id="single-locale-release"
+    )
+
+    with pytest.raises(KokoroError) as captured:
+        create_promotion_record(
+            RIN_PACK,
+            inputs["request"],
+            inputs["hard_report"],
+            inputs["review"],
+            SCHEMAS,
+            target="verified",
+            promotion_id="rin-promotion-verified-01",
+            previous_promotion=reviewed,
+            soft_evaluation_input=soft_input,
+            soft_evaluation_report=soft_report,
+        )
+    assert captured.value.code == "PACK_PROMOTION_SOFT_PROFILE_INAPPLICABLE"
+
+
+def test_a_single_locale_pack_is_verified_under_the_single_locale_profile(
+    tmp_path: Path,
+) -> None:
+    """The case the QA pass hit: a ja-JP-only pack, honestly evaluated."""
+
+    import shutil
+
+    import yaml
+
+    pack = tmp_path / "rin-ja"
+    shutil.copytree(RIN_PACK, pack)
+
+    def rewrite(relative: str, change: Any) -> None:
+        path = pack / relative
+        data = yaml.safe_load(path.read_text(encoding="utf-8"))
+        change(data)
+        path.write_text(
+            yaml.safe_dump(data, allow_unicode=True, sort_keys=False),
+            encoding="utf-8",
+        )
+
+    rewrite(
+        "character.yaml",
+        lambda data: data.update(
+            locale_files={"ja-JP": data["locale_files"]["ja-JP"]}
+        ),
+    )
+    for tag in ("zh-CN", "en-US"):
+        (pack / "locales" / f"{tag}.yaml").unlink()
+    rewrite(
+        "expressions.yaml",
+        lambda data: data.update(
+            {intent: {"ja-JP": lines["ja-JP"]} for intent, lines in data.items()}
+        ),
+    )
+    rewrite(
+        "tests/multilingual.yaml",
+        lambda data: data.update(expected_locales=["ja-JP"]),
+    )
+    rewrite(
+        "tests/positive.yaml",
+        lambda data: [
+            case.update(expected_locales={"ja-JP": case["expected_locales"]["ja-JP"]})
+            for case in data["cases"]
+        ],
+    )
+    request = json.loads(REQUEST_PATH.read_text(encoding="utf-8"))
+    request["requested_locales"] = ["ja-JP"]
+
+    hard_report = run_hard_validation(pack, request, SCHEMAS)
+    assert hard_report["passed"] is True, {
+        name: check
+        for name, check in hard_report["checks"].items()
+        if not check["passed"]
+    }
+    assert hard_report["locales"] == ["ja-JP"]
+
+    review = {
+        "schema_version": "1.0",
+        "artifact_id": "original/rin-aster/release/review",
+        "created_by": {"component": "kokorox", "version": __version__},
+        "review_id": "rin-review-01",
+        "namespace": "original",
+        "character_id": "rin-aster",
+        "character_version": "1.0.0",
+        "mode": "original",
+        "source_artifact_id": hard_report["source_artifact_id"],
+        "source_hash": hard_report["source_hash"],
+        "hard_report": {
+            "artifact_id": hard_report["artifact_id"],
+            "sha256": _sha256(hard_report),
+        },
+        "decision": "accept",
+        "reviewer": {"id": "local-user", "type": "user"},
+        "reviewed": {
+            "identity": True,
+            "continuity": True,
+            "provenance": True,
+            "overrides": True,
+            "privacy": True,
+        },
+        "corrections": {},
+        "visibility_acknowledged": "private",
+    }
+    soft_input = _single_locale_soft_input(hard_report, "ja-JP")
+    soft_report = aggregate_soft_evaluation(
+        soft_input, SCHEMAS, threshold_profile_id="single-locale-release"
+    )
+    reviewed = create_promotion_record(
+        pack,
+        request,
+        hard_report,
+        review,
+        SCHEMAS,
+        target="reviewed",
+        promotion_id="rin-promotion-reviewed-01",
+    )
+
+    verified = create_promotion_record(
+        pack,
+        request,
+        hard_report,
+        review,
+        SCHEMAS,
+        target="verified",
+        promotion_id="rin-promotion-verified-01",
+        previous_promotion=reviewed,
+        soft_evaluation_input=soft_input,
+        soft_evaluation_report=soft_report,
+    )
+
+    assert verified["to_status"] == "verified"
+    assert verified["soft_evaluation_report"] == {
+        "artifact_id": soft_report["artifact_id"],
+        "sha256": _sha256(soft_report),
+    }

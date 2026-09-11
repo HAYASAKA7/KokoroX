@@ -706,3 +706,20 @@ def test_nested_contracts_are_closed() -> None:
         invalid = deepcopy(_bundle("original-minimal.json")[fixture_key])
         _nested(invalid, path)["unknown"] = True
         _assert_invalid(schema_name, invalid)
+
+
+def test_a_single_locale_report_cannot_carry_the_cross_language_dimension() -> None:
+    report = deepcopy(_bundle("original-minimal.json")["soft_report"])
+    report["threshold_profile"]["profile_id"] = "single-locale-release"
+
+    _assert_invalid("pack-soft-evaluation-report", report)
+
+
+def test_a_default_report_must_carry_the_cross_language_dimension() -> None:
+    report = deepcopy(_bundle("original-minimal.json")["soft_report"])
+    del report["threshold_profile"]["dimensions"][
+        "cross_language_persona_equivalence"
+    ]
+    del report["results"]["cross_language_persona_equivalence"]
+
+    _assert_invalid("pack-soft-evaluation-report", report)
