@@ -12,6 +12,7 @@ dist/
 .kokoroarc/
 .kokorox/
 reports/generated/
+docs/superpowers/
 # The install-smoke job installs the suite into the checkout to verify
 # placement, so reproducing that job locally leaves four Skills here.
 ci-skills/
