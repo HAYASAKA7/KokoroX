@@ -81,6 +81,12 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- The build validation report counted evidence as one number, so a reviewer
+  could not tell unverified private assertions from externally sourced facts --
+  the distinction the construction modes exist to keep apart, in the report a
+  review is made from. `provenance_counts.evidence_by_source` now breaks the
+  count out by claim source; a label outside the four known sources is counted
+  as `unrecognized` rather than named.
 - `consent grant` replaces the permission set, and the README said "granting
   one never grants another" -- true, but it read as "granting one leaves the
   others alone", which is the opposite of what happens. Adding one permission

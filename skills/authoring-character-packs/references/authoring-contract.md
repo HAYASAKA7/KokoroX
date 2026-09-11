@@ -74,7 +74,7 @@ Treat identity mismatch, missing locale, provenance failure, unsafe path, or act
 
 1. construction mode and source path;
 2. deterministic request/draft validation result;
-3. declared-locale coverage;
+3. declared-locale coverage, and evidence counts by claim source (`provenance_counts.evidence_by_source`), so private assertions and sourced facts stay distinguishable;
 4. private draft path and fixed lifecycle fields, if compiled;
 5. advisories and missing prerequisites, plus a separate `Unresolved evidence:` line—use the literal value `none` when empty;
 6. confirmation that authoring performed no new research or external verification, and that installation, public publication, activation, and relationship-state mutation did not occur.

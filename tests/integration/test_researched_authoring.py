@@ -203,9 +203,19 @@ def test_research_backed_draft_is_deterministic_private_and_inactive(
         "ja-JP": True,
         "zh-CN": True,
     }
+    # The researched claim and, in hybrid mode, the user's override are
+    # counted apart: a reviewer can see which facts came from the bundle.
+    expected_sources = {
+        "creative_brief": 0,
+        "research_bundle": 1,
+        "user_dossier": 0,
+        "user_override": 1 if mode == "hybrid" else 0,
+        "unrecognized": 0,
+    }
     assert body["validation_report"]["provenance_counts"] == {
         "derived_profile": 5,
         "evidence": expected_evidence,
+        "evidence_by_source": expected_sources,
         "user_override": expected_overrides,
     }
     draft_path = Path(body["path"])

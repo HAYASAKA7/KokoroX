@@ -161,6 +161,7 @@ def validate_authoring_pack(
         "locale_coverage": locale_coverage,
         "provenance_counts": {
             "evidence": len(claims),
+            "evidence_by_source": _evidence_by_source(claims),
             "derived_profile": _mapping_count(
                 source.get("derived_profile"), "traits"
             ),
@@ -550,6 +551,33 @@ def _mapping_items(value: Any) -> list[Mapping[str, Any]]:
     if not isinstance(value, list):
         return []
     return [item for item in value if isinstance(item, Mapping)]
+
+
+#: Every claim source a construction mode can accept. The report counts claims
+#: under these names and folds anything else into "unrecognized": a free-text
+#: label in a malformed pack must not become a key the report schema refuses,
+#: which would turn a hard-failure finding into a crash.
+_CLAIM_SOURCES = (
+    "creative_brief",
+    "research_bundle",
+    "user_dossier",
+    "user_override",
+)
+
+
+def _evidence_by_source(claims: list[Any]) -> dict[str, int]:
+    """Count claims by where they came from.
+
+    One evidence total cannot tell a reviewer whether a pack rests on private
+    assertions or on externally sourced facts, and that is the distinction the
+    construction modes exist to keep apart.
+    """
+
+    counts = {source: 0 for source in (*_CLAIM_SOURCES, "unrecognized")}
+    for claim in claims:
+        label = claim.get("source") if isinstance(claim, Mapping) else None
+        counts[label if label in _CLAIM_SOURCES else "unrecognized"] += 1
+    return counts
 
 
 def _mapping_count(value: Any, member: str) -> int:

@@ -76,6 +76,13 @@ def valid_report() -> dict:
         "locale_coverage": {"zh-CN": True, "en-US": True, "ja-JP": True},
         "provenance_counts": {
             "evidence": 1,
+            "evidence_by_source": {
+                "creative_brief": 1,
+                "research_bundle": 0,
+                "user_dossier": 0,
+                "user_override": 0,
+                "unrecognized": 0,
+            },
             "derived_profile": 2,
             "user_override": 0,
         },
@@ -476,3 +483,17 @@ def test_invalid_report_may_have_complete_locale_coverage(
     ]
 
     SCHEMAS.validate("build-validation-report", report)
+
+
+def test_report_must_break_evidence_out_by_source(valid_report: dict) -> None:
+    report = deepcopy(valid_report)
+    del report["provenance_counts"]["evidence_by_source"]
+
+    _assert_invalid("build-validation-report", report)
+
+
+def test_report_evidence_sources_are_a_closed_set(valid_report: dict) -> None:
+    report = deepcopy(valid_report)
+    report["provenance_counts"]["evidence_by_source"]["wikipedia"] = 1
+
+    _assert_invalid("build-validation-report", report)

@@ -116,9 +116,21 @@
     "provenance_counts": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["evidence", "derived_profile", "user_override"],
+      "required": ["evidence", "evidence_by_source", "derived_profile", "user_override"],
       "properties": {
         "evidence": {"type": "integer", "minimum": 0},
+        "evidence_by_source": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["creative_brief", "research_bundle", "user_dossier", "user_override", "unrecognized"],
+          "properties": {
+            "creative_brief": {"type": "integer", "minimum": 0},
+            "research_bundle": {"type": "integer", "minimum": 0},
+            "user_dossier": {"type": "integer", "minimum": 0},
+            "user_override": {"type": "integer", "minimum": 0},
+            "unrecognized": {"type": "integer", "minimum": 0}
+          }
+        },
         "derived_profile": {"type": "integer", "minimum": 0},
         "user_override": {"type": "integer", "minimum": 0}
       }

@@ -808,6 +808,13 @@ def test_validate_authoring_pack_returns_valid_warning_only_report(
     }
     assert report["provenance_counts"] == {
         "evidence": 0,
+        "evidence_by_source": {
+            "creative_brief": 0,
+            "research_bundle": 0,
+            "user_dossier": 0,
+            "user_override": 0,
+            "unrecognized": 0,
+        },
         "derived_profile": 1,
         "user_override": 0,
     }
@@ -1191,3 +1198,36 @@ def test_hybrid_user_override_cannot_rewrite_bundle_claim_id(
     assert "AUTHORING_RESEARCH_FACT_OVERRIDE" in {
         finding["code"] for finding in report["hard_failures"]
     }
+
+
+def test_provenance_counts_keep_private_assertions_apart_from_sourced_facts(
+    registry: SchemaRegistry,
+    original_request: dict[str, Any],
+    source: dict[str, Any],
+) -> None:
+    """One evidence total hid what the dossier mode exists to keep separate."""
+
+    request = _request_for_mode(original_request, "dossier")
+    source["evidence"] = {
+        "authored_original": False,
+        "claims": [
+            {"statement": "Quoted assertion", "source": "user_dossier"},
+            {"statement": "Second assertion", "source": "user_dossier"},
+            {"statement": "Relabelled assertion", "source": "external-canon"},
+        ],
+    }
+
+    report = validate_authoring_pack(request, source, registry)
+
+    counts = report["provenance_counts"]
+    assert counts["evidence"] == 3
+    # A label the modes do not accept is counted, but never named.
+    assert counts["evidence_by_source"] == {
+        "creative_brief": 0,
+        "research_bundle": 0,
+        "user_dossier": 2,
+        "user_override": 0,
+        "unrecognized": 1,
+    }
+    assert sum(counts["evidence_by_source"].values()) == counts["evidence"]
+    registry.validate("build-validation-report", report)
