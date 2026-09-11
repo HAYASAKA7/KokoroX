@@ -240,8 +240,8 @@ def test_runtime_artifact_schemas_reject_invalid_mutations(
         ("semantic-result", "semantic_result", ("scenario",), 129),
         ("semantic-result", "semantic_result", ("format_constraints",), 128),
         ("semantic-result", "semantic_result", ("format_constraints",), 129),
-        ("render-plan", "render_plan", ("segments", 0, "expression_intent"), 128),
-        ("render-plan", "render_plan", ("segments", 0, "expression_intent"), 129),
+        ("render-plan", "render_plan", ("segments", 1, "expression_intent"), 128),
+        ("render-plan", "render_plan", ("segments", 1, "expression_intent"), 129),
         ("interaction-event", "interaction_event", ("novelty_key",), 128),
         ("interaction-event", "interaction_event", ("novelty_key",), 129),
         ("relationship-state", "relationship_state", ("recent_novelty",), 128),
@@ -353,7 +353,7 @@ def test_session_manifest_accepts_upstream_character_constraints(
         (
             "render-plan",
             lambda: deepcopy(load_fixture("runtime-artifacts.json")["render_plan"]),
-            lambda d, suffix: _set_nested(d, ("segments", 0, "expression_intent"), f"restrained_diagnosis{suffix}"),
+            lambda d, suffix: _set_nested(d, ("segments", 1, "expression_intent"), f"restrained_diagnosis{suffix}"),
         ),
         (
             "validation-result",
@@ -479,7 +479,7 @@ def test_common_artifact_id_rejects_trailing_line_terminators(
 
 def test_identifier_patterns_accept_non_newline_representatives() -> None:
     document = deepcopy(load_fixture("runtime-artifacts.json")["render_plan"])
-    document["segments"][0]["expression_intent"] = "restrained_diagnosis"
+    document["segments"][1]["expression_intent"] = "restrained_diagnosis"
 
     SchemaRegistry(Path("schemas/v1")).validate("render-plan", document)
 

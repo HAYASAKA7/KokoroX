@@ -370,6 +370,12 @@ def _build_runtime_context(
     selected_data = {
         "character_id": character_id,
         "character_version": character_version,
+        # The pair, not just the survivor. A host that sees only the locale it
+        # got cannot tell material authored for this reader from material
+        # borrowed from another; when these differ the persona is improvising
+        # and the caller deserves to know before it quotes anything.
+        "requested_locale": selected_locale,
+        "persona_locale": persona_locale,
         "identity": identity,
         "effective_profile": effective_profile,
         "locales": {persona_locale: locale_config},

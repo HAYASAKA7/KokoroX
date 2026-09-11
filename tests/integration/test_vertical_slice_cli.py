@@ -720,3 +720,162 @@ def test_session_start_rejects_redirected_compiled_file(tmp_path: Path) -> None:
         expected_returncode=2,
     )
     assert result["error"]["code"] == "COMPILED_PATH_UNSAFE"
+
+
+def bilingual_semantic() -> dict[str, Any]:
+    """A Chinese answer, so the reader's half is unmistakably not Japanese."""
+
+    return {
+        "schema_version": "1.0",
+        "artifact_id": "semantic/turn-1",
+        "created_by": {"component": "kokorox", "version": __version__},
+        "scenario": "debugging",
+        "conclusion": "读路径没有加锁。",
+        "explanation": ["两个 goroutine 同时写同一个 map。"],
+        "recommendations": ["加一个并发回归测试。"],
+        "warnings": ["不要相信重复成功的运行。"],
+        "immutable_spans": ["go test -race ./..."],
+        "format_constraints": [],
+    }
+
+
+def bilingual_plan(tmp_path: Path, locale: str) -> tuple[dict[str, Any], Path, Path]:
+    """Compile the real pack, take a context in `locale`, and plan a turn."""
+
+    compiled_session(tmp_path)
+    context = run_cli(
+        tmp_path,
+        "runtime",
+        "context",
+        "--session",
+        "s1",
+        "--locale",
+        locale,
+        "--scenario",
+        "debugging",
+    )
+    context_path = write_json(tmp_path / "context.json", context)
+    policy_input = write_json(
+        tmp_path / "policy-input.json",
+        {"mode": "mixed", "primary_language": "zh-CN"},
+    )
+    policy = run_cli(
+        tmp_path, "policy", "compile", "--input", str(policy_input)
+    )["policy"]
+    semantic_path = write_json(tmp_path / "semantic.json", bilingual_semantic())
+    policy_path = write_json(tmp_path / "policy.json", policy)
+    plan = run_cli(
+        tmp_path,
+        "runtime",
+        "plan",
+        "--semantic",
+        str(semantic_path),
+        "--policy",
+        str(policy_path),
+        "--expression-intent",
+        "restrained_diagnosis",
+        "--context",
+        str(context_path),
+    )["plan"]
+    return plan, semantic_path, policy_path
+
+
+def test_the_character_speaks_japanese_while_the_answer_stays_chinese(
+    tmp_path: Path,
+) -> None:
+    """The whole reason the design exists, walked through the real CLI."""
+
+    plan, semantic_path, _ = bilingual_plan(tmp_path, "ja-JP")
+    plan_path = write_json(tmp_path / "plan.json", plan)
+
+    assert plan["segments"][0] == {
+        "id": "s1",
+        "channel": "character_dialogue",
+        "target_language": "ja-JP",
+        "fixed_line": {
+            "intent": "restrained_diagnosis",
+            "index": 0,
+            "text": "原因は明確です。",
+        },
+    }
+    assert plan["primary_language"] == "zh-CN"
+    assert all(
+        segment["target_language"] == "zh-CN" for segment in plan["segments"][1:]
+    )
+    assert "原因は明確です。" in plan["protected_spans"]
+
+    answer = "读路径没有加锁。两个 goroutine 同时写同一个 map。加一个并发回归测试。"
+    tail = "不要相信重复成功的运行。go test -race ./..."
+    rendered_segments = [
+        {key: value for key, value in segment.items() if key != "expression_intent"}
+        for segment in plan["segments"]
+    ]
+
+    kept = write_json(
+        tmp_path / "kept.json",
+        {
+            "text": f"原因は明確です。{answer}{tail}",
+            "segments": rendered_segments,
+            "switch_count": 1,
+        },
+    )
+    validation = run_cli(
+        tmp_path,
+        "runtime",
+        "validate",
+        "--semantic",
+        str(semantic_path),
+        "--plan",
+        str(plan_path),
+        "--rendered",
+        str(kept),
+    )
+    assert validation["validation"]["valid"] is True
+
+    translated = write_json(
+        tmp_path / "translated.json",
+        {
+            "text": f"原因很明确。{answer}{tail}",
+            "segments": rendered_segments,
+            "switch_count": 1,
+        },
+    )
+    rejected = run_cli(
+        tmp_path,
+        "runtime",
+        "validate",
+        "--semantic",
+        str(semantic_path),
+        "--plan",
+        str(plan_path),
+        "--rendered",
+        str(translated),
+    )
+    assert rejected["validation"]["valid"] is False
+    assert [
+        violation["code"]
+        for violation in rejected["validation"]["violations"]
+    ] == ["MISSING_PROTECTED_SPAN"]
+
+
+def test_an_unauthored_locale_borrows_material_and_says_so(
+    tmp_path: Path,
+) -> None:
+    """Rin authors no French, so the context reports what it served instead."""
+
+    compiled_session(tmp_path)
+    context = run_cli(
+        tmp_path,
+        "runtime",
+        "context",
+        "--session",
+        "s1",
+        "--locale",
+        "fr-FR",
+        "--scenario",
+        "debugging",
+    )["context"]
+
+    assert context["requested_locale"] == "fr-FR"
+    assert context["persona_locale"] == "en-US"
+    assert set(context["locales"]) == {"en-US"}

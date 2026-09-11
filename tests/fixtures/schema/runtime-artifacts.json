@@ -10,6 +10,7 @@
     "primary_language": "zh-CN",
     "channels": {
       "character_dialogue": "ja-JP",
+      "conclusion": "zh-CN",
       "technical_explanation": "zh-CN",
       "recommendations": "zh-CN",
       "warnings": "zh-CN",
@@ -66,12 +67,22 @@
         "id": "s1",
         "channel": "character_dialogue",
         "target_language": "ja-JP",
+        "fixed_line": {
+          "intent": "restrained_diagnosis",
+          "index": 0,
+          "text": "原因は明確です。"
+        }
+      },
+      {
+        "id": "s2",
+        "channel": "conclusion",
+        "target_language": "zh-CN",
         "semantic_keys": [
           "conclusion"
         ]
       },
       {
-        "id": "s2",
+        "id": "s3",
         "channel": "technical_explanation",
         "target_language": "zh-CN",
         "semantic_keys": [
@@ -80,7 +91,8 @@
       }
     ],
     "protected_spans": [
-      "go test -race ./..."
+      "go test -race ./...",
+      "原因は明確です。"
     ],
     "max_switches": 4,
     "min_primary_ratio": 0.7

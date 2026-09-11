@@ -8,6 +8,36 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- A turn can now be genuinely bilingual: the character speaks its authored
+  line in the language it was written in, while everything the model formed
+  this turn follows the reader. A render plan gained a second segment kind --
+  a *fixed segment*, carrying `fixed_line` with the pack author's own text,
+  copied verbatim rather than generated. `runtime plan --context <file>` takes
+  the saved output of `runtime context`, and when the pack authors a line for
+  the named `--expression-intent`, that line leads the response on
+  `character_dialogue`. The planner adds it to `protected_spans`, so a
+  translated or dropped catchphrase now fails validation instead of passing
+  as characterization.
+- `runtime context` reports `requested_locale` alongside `persona_locale`.
+  A host that saw only the locale it was given could not tell material
+  authored for this reader from material borrowed from another; the pair says
+  plainly when the persona is improvising.
+
+### Changed
+
+- `conclusion` is now its own language channel. It had been sharing
+  `character_dialogue`, which made the channel's name a lie and put the
+  answer on a channel that is supposed to follow the pack rather than the
+  reader. `character_dialogue` now carries fixed segments only, and semantic
+  segments may no longer use it; the schema enforces both directions.
+- The compiled default for `character_dialogue` is `preserve` rather than
+  `en-US`. No policy compiled without sight of the pack can name the locale
+  its lines were written in, so a language tag there was a guess that would
+  silence every pack not authored in it. `preserve` means "as written", and
+  the planner resolves it to the locale the runtime context actually served.
+
+### Added
+
 - `kokorox pack recover` finishes or rolls back an interrupted install or
   removal. `recover_karc_installations` already existed, was exported, and was
   covered by three test files -- and had no call site anywhere in `src/`. A

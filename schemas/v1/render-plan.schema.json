@@ -89,6 +89,40 @@
       "pattern": "^[a-z][a-z0-9]*(?:_[a-z0-9]+)*(?![\\s\\S])"
     },
     "segment": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/semantic_segment"
+        },
+        {
+          "$ref": "#/$defs/fixed_segment"
+        }
+      ]
+    },
+    "fixed_line": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "intent",
+        "index",
+        "text"
+      ],
+      "properties": {
+        "intent": {
+          "$ref": "#/$defs/semantic_id"
+        },
+        "index": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 63
+        },
+        "text": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2000
+        }
+      }
+    },
+    "semantic_segment": {
       "type": "object",
       "additionalProperties": false,
       "required": [
@@ -105,7 +139,7 @@
         },
         "channel": {
           "enum": [
-            "character_dialogue",
+            "conclusion",
             "technical_explanation",
             "recommendations",
             "warnings",
@@ -137,6 +171,34 @@
         },
         "expression_intent": {
           "$ref": "#/$defs/semantic_id"
+        }
+      }
+    },
+    "fixed_segment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "channel",
+        "target_language",
+        "fixed_line"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^s[1-9][0-9]*(?![\\s\\S])"
+        },
+        "channel": {
+          "const": "character_dialogue"
+        },
+        "target_language": {
+          "type": "string",
+          "maxLength": 35,
+          "pattern": "^[a-z]{2,3}(-[A-Z][a-z]{3})?(-([A-Z]{2}|[0-9]{3}))?$"
+        },
+        "fixed_line": {
+          "$ref": "#/$defs/fixed_line"
         }
       }
     }

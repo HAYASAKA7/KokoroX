@@ -871,7 +871,10 @@ def _check_protected_content(
         "mode": "single",
         "primary_language": "en-US",
         "channels": {
-            "character_dialogue": "en-US",
+            # The probe passes no runtime context, so no authored line is
+            # drawn; `preserve` matches the compiled default all the same.
+            "character_dialogue": "preserve",
+            "conclusion": "en-US",
             "technical_explanation": "en-US",
             "recommendations": "en-US",
             "warnings": "en-US",

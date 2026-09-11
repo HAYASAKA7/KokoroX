@@ -35,10 +35,19 @@ _PLAN_SEGMENT_KEYS = frozenset(
 _RENDERED_SEGMENT_KEYS = frozenset(
     {"id", "channel", "target_language", "semantic_keys"}
 )
+#: A segment carrying one pack-authored line instead of formed content. It has
+#: no semantic keys because the model composed none of it.
+_FIXED_SEGMENT_KEYS = frozenset({"id", "channel", "target_language", "fixed_line"})
+_FIXED_LINE_KEYS = frozenset({"intent", "index", "text"})
+#: Lines the pack wrote are the only thing this channel carries. Formed content
+#: here is what let the answer inherit the pack's locale instead of the
+#: reader's.
+_FIXED_ONLY_CHANNEL = "character_dialogue"
 _RENDERED_KEYS = frozenset({"text", "segments", "switch_count"})
 _CHANNELS = frozenset(
     {
         "character_dialogue",
+        "conclusion",
         "technical_explanation",
         "recommendations",
         "warnings",
@@ -212,6 +221,14 @@ def _string_list(
 def _plan_segment_contract_valid(segment: Any) -> bool:
     if not isinstance(segment, Mapping):
         return False
+    if "fixed_line" in segment:
+        return (
+            set(segment.keys()) == _FIXED_SEGMENT_KEYS
+            and _segment_id(segment.get("id"))
+            and segment.get("channel") == _FIXED_ONLY_CHANNEL
+            and is_language_tag(segment.get("target_language"))
+            and _fixed_line(segment.get("fixed_line")) is not None
+        )
     keys = set(segment.keys())
     required = {"id", "channel", "target_language", "semantic_keys"}
     semantic_keys = _semantic_keys(segment.get("semantic_keys"))
@@ -241,9 +258,10 @@ def _segments_contract_valid(value: Any, *, nonempty: bool) -> bool:
             segment["id"],
             segment["channel"],
             segment["target_language"],
-            tuple(segment["semantic_keys"]),
+            tuple(segment.get("semantic_keys", ())),
             "expression_intent" in segment,
             segment.get("expression_intent"),
+            tuple(sorted((segment.get("fixed_line") or {}).items())),
         )
         for segment in value
     ]
@@ -384,6 +402,58 @@ def _artifact_id(plan: Any) -> str:
     return candidate
 
 
+def _fixed_line(value: Any) -> dict[str, Any] | None:
+    """Return a well-formed fixed line, or None."""
+
+    if not isinstance(value, Mapping) or set(value.keys()) != _FIXED_LINE_KEYS:
+        return None
+    intent = value.get("intent")
+    index = value.get("index")
+    text = value.get("text")
+    if (
+        not _semantic_id(intent)
+        or isinstance(index, bool)
+        or not isinstance(index, int)
+        or not 0 <= index <= 63
+        or not _bounded_string(text, 2000)
+    ):
+        return None
+    return {"intent": intent, "index": index, "text": text}
+
+
+def _validate_fixed_segment(
+    segment: Mapping[str, Any],
+    index: int,
+    violations: _Violations,
+    *,
+    path_root: str,
+) -> dict[str, Any] | None:
+    segment_id = _safe_segment_id(segment.get("id"))
+    line = _fixed_line(segment.get("fixed_line"))
+    if (
+        segment_id is None
+        or segment.get("channel") != _FIXED_ONLY_CHANNEL
+        # Not `is_channel_language`: an authored line exists in some language,
+        # and `preserve` would name none.
+        or not is_language_tag(segment.get("target_language"))
+        or line is None
+    ):
+        violations.add(
+            "INVALID_FIXED_SEGMENT",
+            "Fixed segment has an invalid shape.",
+            segment_id=segment_id,
+            path=[path_root, "segments", index],
+        )
+        return None
+    return {
+        "id": segment_id,
+        "channel": _FIXED_ONLY_CHANNEL,
+        "target_language": segment["target_language"],
+        "semantic_keys": [],
+        "fixed_line": line,
+    }
+
+
 def _validate_planned_segment(
     segment: Any, index: int, violations: _Violations
 ) -> dict[str, Any] | None:
@@ -394,6 +464,10 @@ def _validate_planned_segment(
             path=["plan", "segments", index],
         )
         return None
+    if "fixed_line" in segment:
+        return _validate_fixed_segment(
+            segment, index, violations, path_root="plan"
+        )
     keys = set(segment.keys())
     required = {"id", "channel", "target_language", "semantic_keys"}
     segment_id = _safe_segment_id(segment.get("id"))
@@ -403,6 +477,7 @@ def _validate_planned_segment(
         or not keys.issubset(_PLAN_SEGMENT_KEYS)
         or segment_id is None
         or not _is_enum_string(segment.get("channel"), _CHANNELS)
+        or segment.get("channel") == _FIXED_ONLY_CHANNEL
         or not is_channel_language(segment.get("target_language"))
         or semantic_keys is None
         or any(key not in _SEMANTIC_KEYS for key in semantic_keys)
@@ -436,12 +511,17 @@ def _validate_rendered_segment(
             path=["rendered", "segments", index],
         )
         return None
+    if "fixed_line" in segment:
+        return _validate_fixed_segment(
+            segment, index, violations, path_root="rendered"
+        )
     segment_id = _safe_segment_id(segment.get("id"))
     semantic_keys = _semantic_keys(segment.get("semantic_keys"))
     if (
         set(segment.keys()) != _RENDERED_SEGMENT_KEYS
         or segment_id is None
         or not _is_enum_string(segment.get("channel"), _CHANNELS)
+        or segment.get("channel") == _FIXED_ONLY_CHANNEL
         or not is_channel_language(segment.get("target_language"))
         or semantic_keys is None
         or any(key not in _SEMANTIC_KEYS for key in semantic_keys)
@@ -664,15 +744,33 @@ def validate_rendered_output(
                 plan_spans_usable = True
                 plan_protected_spans = list(candidate_plan_spans)
 
+    # A plan protects what the caller declared, plus every line the pack
+    # authored. The pack's lines are not in the Semantic Result and should not
+    # be -- the model composed none of them -- so the plan carries strictly
+    # more, in order, rather than exactly the same.
+    planned_fixed_texts = [
+        segment["fixed_line"]["text"]
+        for segment in planned_segments
+        if isinstance(segment, Mapping)
+        and isinstance(segment.get("fixed_line"), Mapping)
+        and isinstance(segment["fixed_line"].get("text"), str)
+    ]
     if plan_mapping and "protected_spans" in plan:
+        expected_spans = [*immutable_spans]
+        # Not `text`: that name holds the rendered output, and rebinding it
+        # here made the span check compare a line against itself.
+        for line_text in planned_fixed_texts:
+            if line_text not in expected_spans:
+                expected_spans.append(line_text)
         if (
             semantic_spans_usable
             and plan_spans_usable
-            and plan_protected_spans != immutable_spans
+            and plan_protected_spans != expected_spans
         ):
             violations.add(
                 "PROTECTED_SPAN_MISMATCH",
-                "Plan protected spans differ from semantic immutable spans.",
+                "Plan protected spans differ from the semantic spans and "
+                "the pack lines it carries.",
             )
 
     enforced_spans: list[str] = []
@@ -841,6 +939,12 @@ def validate_rendered_output(
             violations.add(
                 "LANGUAGE_MISMATCH",
                 "Rendered segment language differs from the plan.",
+                segment_id=segment_id,
+            )
+        if actual.get("fixed_line") != expected.get("fixed_line"):
+            violations.add(
+                "FIXED_LINE_MISMATCH",
+                "Rendered fixed line differs from the plan.",
                 segment_id=segment_id,
             )
         actual_keys = set(actual["semantic_keys"])

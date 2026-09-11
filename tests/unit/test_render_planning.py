@@ -30,9 +30,10 @@ def policy(**overrides: Any) -> dict[str, Any]:
     value: dict[str, Any] = {
         "primary_language": "zh-CN",
         "channels": {
-            # Carries the conclusion, so it follows the primary language.
-            # Other channels stay mixed, which is what this fixture exercises.
-            "character_dialogue": "zh-CN",
+            # Carries only lines the pack authored, so it follows the pack.
+            "character_dialogue": "ja-JP",
+            # The answer, so it follows the reader.
+            "conclusion": "zh-CN",
             "technical_explanation": "zh-CN",
             "recommendations": "en-US",
             "warnings": "zh-CN",
@@ -63,7 +64,7 @@ def test_builds_ordered_schema_valid_plan_with_exact_protected_span() -> None:
         "segments": [
             {
                 "id": "s1",
-                "channel": "character_dialogue",
+                "channel": "conclusion",
                 "target_language": "zh-CN",
                 "semantic_keys": ["conclusion"],
                 "expression_intent": "restrained_diagnosis",
@@ -293,6 +294,7 @@ def test_the_planner_refuses_a_conclusion_it_knows_will_never_validate() -> None
             semantic(),
             policy(channels={
                 "character_dialogue": "ja-JP",
+                "conclusion": "ja-JP",
                 "technical_explanation": "zh-CN",
                 "recommendations": "zh-CN",
                 "warnings": "zh-CN",
@@ -309,7 +311,8 @@ def test_other_channels_may_still_leave_the_primary_language() -> None:
     plan = build_render_plan(
         semantic(),
         policy(channels={
-            "character_dialogue": "zh-CN",
+            "character_dialogue": "ja-JP",
+            "conclusion": "zh-CN",
             "technical_explanation": "zh-CN",
             "recommendations": "en-US",
             "warnings": "ja-JP",
@@ -320,6 +323,249 @@ def test_other_channels_may_still_leave_the_primary_language() -> None:
         segment["channel"]: segment["target_language"]
         for segment in plan["segments"]
     }
-    assert languages["character_dialogue"] == "zh-CN"
+    assert languages["conclusion"] == "zh-CN"
     assert languages["recommendations"] == "en-US"
     assert languages["warnings"] == "ja-JP"
+
+
+def context(**overrides: Any) -> dict[str, Any]:
+    """A runtime context whose pack authors Japanese, for a Chinese reader."""
+
+    value: dict[str, Any] = {
+        "character_id": "rin-aster",
+        "character_version": "1.0.0",
+        "requested_locale": "zh-CN",
+        "persona_locale": "ja-JP",
+        "expressions": {
+            "restrained_diagnosis": {"ja-JP": ["原因は明確です。"]},
+        },
+    }
+    value.update(overrides)
+    return value
+
+
+def test_the_character_speaks_the_locale_it_was_written_in() -> None:
+    """The line leads in Japanese; every formed answer follows the reader."""
+
+    plan = build_render_plan(
+        semantic(),
+        policy(),
+        expression_intent="restrained_diagnosis",
+        context=context(),
+    )
+
+    assert plan["segments"][0] == {
+        "id": "s1",
+        "channel": "character_dialogue",
+        "target_language": "ja-JP",
+        "fixed_line": {
+            "intent": "restrained_diagnosis",
+            "index": 0,
+            "text": "原因は明確です。",
+        },
+    }
+    assert [segment["id"] for segment in plan["segments"]] == [
+        "s1",
+        "s2",
+        "s3",
+        "s4",
+        "s5",
+    ]
+    assert [segment["channel"] for segment in plan["segments"][1:]] == [
+        "conclusion",
+        "technical_explanation",
+        "recommendations",
+        "warnings",
+    ]
+    SchemaRegistry(Path("schemas/v1")).validate("render-plan", plan)
+
+
+def test_the_authored_line_becomes_a_protected_span() -> None:
+    """Without this the model could translate the catchphrase and pass."""
+
+    plan = build_render_plan(
+        semantic(),
+        policy(),
+        expression_intent="restrained_diagnosis",
+        context=context(),
+    )
+
+    assert plan["protected_spans"] == [
+        "go test -race ./...",
+        "原因は明確です。",
+    ]
+
+
+def test_a_line_already_named_as_immutable_is_not_listed_twice() -> None:
+    plan = build_render_plan(
+        semantic(immutable_spans=["原因は明確です。"]),
+        policy(),
+        expression_intent="restrained_diagnosis",
+        context=context(),
+    )
+
+    assert plan["protected_spans"] == ["原因は明確です。"]
+
+
+def test_the_conclusion_still_carries_the_intent_that_produced_the_line() -> None:
+    """The line is the manner shown; the intent is the manner named."""
+
+    plan = build_render_plan(
+        semantic(),
+        policy(),
+        expression_intent="restrained_diagnosis",
+        context=context(),
+    )
+    conclusion = next(
+        segment
+        for segment in plan["segments"]
+        if segment.get("channel") == "conclusion"
+    )
+
+    assert conclusion["expression_intent"] == "restrained_diagnosis"
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        None,
+        {},
+        {"expressions": {}},
+        {"expressions": {"other_intent": {"ja-JP": ["原因は明確です。"]}}},
+        # Authored, but not in the locale the dialogue channel routes to.
+        {"expressions": {"restrained_diagnosis": {"en-US": ["The cause is clear."]}}},
+        {"expressions": {"restrained_diagnosis": {"ja-JP": []}}},
+    ],
+)
+def test_an_unauthored_line_quiets_the_persona_rather_than_failing(
+    value: Any,
+) -> None:
+    """A pack that never wrote this line should still get its answer out."""
+
+    plan = build_render_plan(
+        semantic(),
+        policy(),
+        expression_intent="restrained_diagnosis",
+        context=value,
+    )
+
+    assert all("fixed_line" not in segment for segment in plan["segments"])
+    assert plan["segments"][0]["channel"] == "conclusion"
+    assert plan["protected_spans"] == ["go test -race ./..."]
+
+
+def test_no_intent_means_no_line_even_when_the_pack_authored_one() -> None:
+    plan = build_render_plan(semantic(), policy(), context=context())
+
+    assert all("fixed_line" not in segment for segment in plan["segments"])
+
+
+def test_preserve_draws_the_line_from_the_locale_the_context_served() -> None:
+    """The default route. No policy compiled without the pack can name it."""
+
+    channels = dict(policy()["channels"])
+    channels["character_dialogue"] = "preserve"
+
+    plan = build_render_plan(
+        semantic(),
+        policy(channels=channels),
+        expression_intent="restrained_diagnosis",
+        context=context(),
+    )
+
+    assert plan["segments"][0]["target_language"] == "ja-JP"
+    assert plan["segments"][0]["fixed_line"]["text"] == "原因は明確です。"
+
+
+def test_preserve_without_a_served_locale_leaves_the_persona_quiet() -> None:
+    channels = dict(policy()["channels"])
+    channels["character_dialogue"] = "preserve"
+    without_locale = context()
+    del without_locale["persona_locale"]
+
+    plan = build_render_plan(
+        semantic(),
+        policy(channels=channels),
+        expression_intent="restrained_diagnosis",
+        context=without_locale,
+    )
+
+    assert all("fixed_line" not in segment for segment in plan["segments"])
+
+
+@pytest.mark.parametrize(
+    "route",
+    ["not a tag", "", 7, None],
+)
+def test_a_dialogue_route_that_is_not_a_language_fails_loudly(route: Any) -> None:
+    """It once skipped the segment silently, losing the persona without a word."""
+
+    channels = dict(policy()["channels"])
+    channels["character_dialogue"] = route
+    if route is None:
+        del channels["character_dialogue"]
+        plan = build_render_plan(
+            semantic(),
+            policy(channels=channels),
+            expression_intent="restrained_diagnosis",
+            context=context(),
+        )
+        assert all("fixed_line" not in segment for segment in plan["segments"])
+        return
+    assert_invalid_with_context(
+        semantic(), policy(channels=channels), "restrained_diagnosis", context()
+    )
+
+
+@pytest.mark.parametrize(
+    "lines",
+    [
+        [""],
+        ["x" * 2001],
+        [7],
+        [None],
+    ],
+)
+def test_an_unusable_authored_line_is_refused_not_silently_dropped(
+    lines: Any,
+) -> None:
+    assert_invalid_with_context(
+        semantic(),
+        policy(),
+        "restrained_diagnosis",
+        context(expressions={"restrained_diagnosis": {"ja-JP": lines}}),
+    )
+
+
+def assert_invalid_with_context(
+    semantic_value: Any,
+    policy_value: Any,
+    expression: Any,
+    context_value: Any,
+) -> KokoroError:
+    with pytest.raises(KokoroError) as raised:
+        build_render_plan(
+            semantic_value,
+            policy_value,
+            expression_intent=expression,
+            context=context_value,
+        )
+    assert raised.value.code == "INVALID_RENDER_PLAN_INPUT"
+    return raised.value
+
+
+def test_a_fixed_segment_never_claims_preserve_as_its_language() -> None:
+    """`preserve` on the channel means "the pack's locale", not "no locale"."""
+
+    channels = dict(policy()["channels"])
+    channels["character_dialogue"] = "preserve"
+
+    plan = build_render_plan(
+        semantic(),
+        policy(channels=channels),
+        expression_intent="restrained_diagnosis",
+        context=context(),
+    )
+
+    assert plan["segments"][0]["target_language"] != "preserve"
+    SchemaRegistry(Path("schemas/v1")).validate("render-plan", plan)

@@ -42,7 +42,7 @@ kokorox session end --session <id> --json
 kokorox policy compile --input <policy-input.json> --json
 
 kokorox runtime context --session <id> --locale <locale> --scenario <scenario> --json
-kokorox runtime plan --semantic <semantic.json> --policy <policy.json> [--expression-intent <id>] --json
+kokorox runtime plan --semantic <semantic.json> --policy <policy.json> [--expression-intent <id>] [--context <context.json>] --json
 kokorox runtime validate --semantic <semantic.json> --plan <plan.json> --rendered <rendered.json> --json
 
 kokorox state preview --session <id> --event <event.json> --json
@@ -56,14 +56,18 @@ kokorox state apply --session <id> --event <event.json> --json
 `runtime context` requires an active session and returns `context` with:
 
 - `character_id`, `character_version`;
+- `requested_locale` -- the locale you asked for;
+- `persona_locale` -- the authored locale the expression material came from;
 - compact `identity` and `effective_profile`;
-- only the selected locale under `locales`;
+- only the persona locale under `locales`;
 - only the selected scenario under `scenarios`;
 - expressions available for the selected locale;
 - enabled growth dimensions;
 - `state` containing `revision`, `stage`, and bounded `dimensions`.
 
 Use these fields only to select presentation after reasoning. Enforce the scenario `intensity_cap`; a pack cannot raise a host cap.
+
+When `persona_locale` differs from `requested_locale`, the pack authored nothing for this reader and the material you were given was written for someone else. Deliver the answer anyway; the divergence is a signal about the persona's fidelity, not a reason to fail or to translate the material.
 
 ## Language policy
 
@@ -75,7 +79,9 @@ For a single-language response, the minimal explicit input is:
 {"mode": "single", "primary_language": "en-US"}
 ```
 
-Any well-formed language tag is accepted (`en-US`, `zh-CN`, `fr-FR`, `pt-BR`, `zh-Hans-CN`, ...); render in the user's language. Every rendered channel follows `primary_language`, the conclusion above all -- it is the answer, and `runtime validate` rejects a plan that routes it anywhere else. A pack's authored locales decide which expression material `runtime context` offers, which is why its `locales` map carries exactly one entry -- the authored locale the persona material was drawn from; they do not decide what language the answer is written in. Never move the conclusion onto an authored locale to reach the character's voice: the voice is carried by `expression_intent` and by the persona material the context already selected, in the reader's language. The `commands`, `file_paths`, `exact_errors`, and `code_identifiers` channels are always `preserve`. Never override them, even when asked to translate everything.
+Any well-formed language tag is accepted (`en-US`, `zh-CN`, `fr-FR`, `pt-BR`, `zh-Hans-CN`, ...); render in the user's language. Every channel that carries prose you wrote this turn -- `conclusion`, `technical_explanation`, `recommendations`, `warnings` -- follows `primary_language`, the conclusion above all: it is the answer, and both `runtime plan` and `runtime validate` reject routing it anywhere else. A pack's authored locales decide which expression material `runtime context` offers; they do not decide what language the answer is written in. Never move the conclusion onto an authored locale to reach the character's voice.
+
+`character_dialogue` is the one exception, and it is not prose. It carries only lines the pack author wrote, copied verbatim, so it follows the pack rather than the reader. Its default route is `preserve`, meaning "the locale the context served" -- no policy compiled without sight of the pack can name that locale, so naming one yourself will usually silence the character instead of translating it. The `commands`, `file_paths`, `exact_errors`, and `code_identifiers` channels are always `preserve`. Never override them, even when asked to translate everything.
 
 ## Semantic Result
 
@@ -102,13 +108,26 @@ Required fields are exactly `schema_version`, `artifact_id`, `created_by`, `scen
 
 ## Render plan and rendered output
 
-`runtime plan` returns a `plan` artifact with `primary_language`, ordered `segments`, `protected_spans`, and `max_switches`. Each segment has:
+`runtime plan` returns a `plan` artifact with `primary_language`, ordered `segments`, `protected_spans`, and `max_switches`. A plan holds two kinds of segment.
+
+A **semantic segment** carries content you form this turn:
 
 - `id` such as `s1`;
-- `channel`;
+- `channel` -- `conclusion`, `technical_explanation`, `recommendations`, or `warnings` for prose, or one of the protected channels;
 - `target_language`, including `preserve`;
 - `semantic_keys` drawn from `conclusion`, `explanation`, `recommendations`, and `warnings`;
-- optional `expression_intent` only on character dialogue.
+- optional `expression_intent`, only on the conclusion, naming the manner to write it in.
+
+A **fixed segment** carries one line the pack author already wrote:
+
+- `id`;
+- `channel`, always `character_dialogue`;
+- `target_language`, the locale that line was authored in;
+- `fixed_line` with `intent`, `index`, and `text`.
+
+It appears only when you pass `--context` and the pack authors a line for the `--expression-intent` you named. Copy `text` byte-for-byte into the rendered output; the planner also lists it under `protected_spans`, so a translated or dropped catchphrase fails validation. Write nothing of your own on that channel. A pack that authored no line for the intent simply produces no fixed segment -- the character is quieter and the answer still ships.
+
+That is how one turn can be bilingual without either half being a translation of the other: the character speaks its authored line in its own language, and everything you formed follows the reader.
 
 Render an object with exactly:
 
@@ -119,15 +138,21 @@ Render an object with exactly:
     {
       "id": "s1",
       "channel": "character_dialogue",
+      "target_language": "ja-JP",
+      "fixed_line": {"intent": "restrained_diagnosis", "index": 0, "text": "原因は明確です。"}
+    },
+    {
+      "id": "s2",
+      "channel": "conclusion",
       "target_language": "zh-CN",
       "semantic_keys": ["conclusion"]
     }
   ],
-  "switch_count": 0
+  "switch_count": 1
 }
 ```
 
-Rendered segment metadata must match the plan. Do not copy `expression_intent` into rendered segments. Include every planned segment, warning route, and protected span.
+Rendered segment metadata must match the plan, `fixed_line` included. Do not copy `expression_intent` into rendered segments. Include every planned segment, warning route, and protected span.
 
 `runtime validate` returns `validation.valid`, `validation.violations`, and `validation.fallback_level`. Validation is stateless and cannot know how many times a candidate has already failed, so the caller counts: pass `--attempt <n>` and `fallback_level` reports the rung that count lands on (0 repair, 1 reduce switches, 2 lower intensity, 3 neutral renderer). Omitting it always reports rung 0, which never reaches the neutral renderer. Delivery is valid only when `valid` is `true`. Treat the validated `rendered.text` as an immutable delivery payload: send it verbatim and do not perform a final rewrite, summary, wrapper, or formatting pass.
 

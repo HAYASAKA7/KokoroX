@@ -97,6 +97,7 @@ _PUBLIC_MESSAGES = {
     "INPUT_TOO_LARGE": "Input file exceeds the size limit.",
     "INPUT_INVALID_JSON": "Input file contains invalid JSON.",
     "INVALID_PACK_DATA": "Character pack data is invalid.",
+    "INVALID_RUNTIME_CONTEXT_INPUT": "Runtime context input is invalid.",
     # Every KARC_* code outside the DEFAULT family reached callers as
     # "Command could not be completed", including the two that deadlock a
     # scope after an interrupted install.
@@ -521,6 +522,9 @@ def build_parser() -> argparse.ArgumentParser:
     runtime_plan.add_argument("--semantic", required=True)
     runtime_plan.add_argument("--policy", required=True)
     runtime_plan.add_argument("--expression-intent")
+    # The pack's own lines live in the runtime context, so a plan that is to
+    # carry one has to be shown the context that holds it.
+    runtime_plan.add_argument("--context")
     _leaf_json(runtime_plan)
     runtime_validate = runtime_commands.add_parser("validate")
     runtime_validate.add_argument("--semantic", required=True)
@@ -2140,6 +2144,33 @@ def _handle_runtime_context(
     return {"ok": True, "context": context}
 
 
+def _runtime_context_body(value: Any) -> dict[str, Any]:
+    """Accept either a bare context or the envelope `runtime context` prints.
+
+    Callers save what the command gave them, and what it gives them is
+    `{"ok": true, "context": {...}}`. Demanding they unwrap it first would
+    turn a redirect into a scripting exercise for no gain.
+    """
+
+    if not isinstance(value, dict):
+        raise _input_error(
+            "INVALID_RUNTIME_CONTEXT_INPUT",
+            "Runtime context input is invalid.",
+        )
+    if "ok" not in value:
+        return value
+    inner = value.get("context")
+    if not isinstance(inner, dict):
+        # An envelope with no context is an error envelope. Passing one along
+        # would plan a contextless turn and leave the character silent for a
+        # reason nobody could see.
+        raise _input_error(
+            "INVALID_RUNTIME_CONTEXT_INPUT",
+            "Runtime context input is invalid.",
+        )
+    return inner
+
+
 def _handle_runtime_plan(
     args: argparse.Namespace, settings: Settings, schemas: SchemaRegistry
 ) -> dict[str, Any]:
@@ -2148,8 +2179,16 @@ def _handle_runtime_plan(
     policy = _read_json(Path(args.policy))
     schemas.validate("semantic-result", semantic)
     schemas.validate("language-policy", policy)
+    context = (
+        _runtime_context_body(_read_json(Path(args.context)))
+        if args.context is not None
+        else None
+    )
     plan = build_render_plan(
-        semantic, policy, expression_intent=args.expression_intent
+        semantic,
+        policy,
+        expression_intent=args.expression_intent,
+        context=context,
     )
     schemas.validate("render-plan", plan)
     return {"ok": True, "plan": plan}

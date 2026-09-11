@@ -105,6 +105,8 @@ def test_build_runtime_context_returns_only_the_selected_compact_view() -> None:
     assert result == {
         "character_id": "rin-aster",
         "character_version": "1.0.0",
+        "requested_locale": "zh-CN",
+        "persona_locale": "zh-CN",
         "identity": {
             "display_name": "Rin Aster",
             "declared_age": "adult",
@@ -276,6 +278,9 @@ def test_unauthored_locale_falls_back_to_primary_authored_locale() -> None:
 
     assert "zh-CN" not in result["locales"]
     assert set(result["locales"]) == {min(compiled["locales"])}
+    # The divergence is stated, not left to be inferred from a dict key.
+    assert result["requested_locale"] == "zh-CN"
+    assert result["persona_locale"] == min(compiled["locales"])
 
 
 @pytest.mark.parametrize(

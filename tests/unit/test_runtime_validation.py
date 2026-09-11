@@ -46,7 +46,7 @@ def complete_plan(**overrides: Any) -> dict[str, Any]:
     segments = [
         {
             "id": "s1",
-            "channel": "character_dialogue",
+            "channel": "conclusion",
             "target_language": "zh-CN",
             "semantic_keys": ["conclusion"],
         },
@@ -1010,7 +1010,7 @@ def _four_channel_plan(conclusion_language: str) -> dict[str, Any]:
     """A full delivery whose conclusion can be routed away from the reader."""
 
     rows = [
-        ("s1", "character_dialogue", conclusion_language, ["conclusion"]),
+        ("s1", "conclusion", conclusion_language, ["conclusion"]),
         ("s2", "technical_explanation", "zh-CN", ["explanation"]),
         ("s3", "recommendations", "zh-CN", ["recommendations"]),
         ("s4", "warnings", "zh-CN", ["warnings"]),
@@ -1095,3 +1095,151 @@ def test_a_conclusion_in_the_primary_language_is_accepted() -> None:
     )
 
     assert "CONCLUSION_LANGUAGE_MISMATCH" not in codes(result)
+
+
+FIXED_SEGMENT = {
+    "id": "s1",
+    "channel": "character_dialogue",
+    "target_language": "ja-JP",
+    "fixed_line": {
+        "intent": "restrained_diagnosis",
+        "index": 0,
+        "text": "原因は明確です。",
+    },
+}
+
+
+def bilingual_plan(**overrides: Any) -> dict[str, Any]:
+    """The pack's Japanese line leading a Chinese answer."""
+
+    value = plan(
+        segments=[
+            dict(FIXED_SEGMENT),
+            {
+                "id": "s2",
+                "channel": "technical_explanation",
+                "target_language": "zh-CN",
+                "semantic_keys": ["explanation"],
+            },
+            {
+                "id": "s3",
+                "channel": "warnings",
+                "target_language": "en-US",
+                "semantic_keys": ["warnings"],
+            },
+        ],
+        protected_spans=["go test -race ./...", "原因は明確です。"],
+        max_switches=3,
+    )
+    value.update(overrides)
+    return value
+
+
+def bilingual_rendered(**overrides: Any) -> dict[str, Any]:
+    value: dict[str, Any] = {
+        "text": "原因は明確です。 读路径没有加锁。 go test -race ./... Do not trust repeated runs.",
+        "segments": [
+            dict(FIXED_SEGMENT),
+            {
+                "id": "s2",
+                "channel": "technical_explanation",
+                "target_language": "zh-CN",
+                "semantic_keys": ["explanation"],
+            },
+            {
+                "id": "s3",
+                "channel": "warnings",
+                "target_language": "en-US",
+                "semantic_keys": ["warnings"],
+            },
+        ],
+        "switch_count": 2,
+    }
+    value.update(overrides)
+    return value
+
+
+def test_an_authored_line_kept_verbatim_validates() -> None:
+    result = validate_rendered_output(
+        bilingual_rendered(), semantic(), bilingual_plan()
+    )
+
+    assert result["valid"] is True
+    assert_schema_valid(result)
+
+
+def test_a_translated_authored_line_is_a_missing_protected_span() -> None:
+    """The point of the whole design: the catchphrase cannot be paraphrased."""
+
+    result = validate_rendered_output(
+        bilingual_rendered(
+            text="原因很明确。 读路径没有加锁。 go test -race ./... Do not trust repeated runs."
+        ),
+        semantic(),
+        bilingual_plan(),
+    )
+
+    assert codes(result) == ["MISSING_PROTECTED_SPAN"]
+
+
+def test_a_plan_carrying_a_line_it_does_not_protect_is_rejected() -> None:
+    """Otherwise a hand-built plan could ship a line nothing checks."""
+
+    result = validate_rendered_output(
+        bilingual_rendered(),
+        semantic(),
+        bilingual_plan(protected_spans=["go test -race ./..."]),
+    )
+
+    assert "PROTECTED_SPAN_MISMATCH" in codes(result)
+
+
+def test_a_rendered_line_that_drifts_from_the_plan_is_rejected() -> None:
+    drifted = dict(FIXED_SEGMENT)
+    drifted["fixed_line"] = {**FIXED_SEGMENT["fixed_line"], "index": 1}
+    segments = [drifted, *bilingual_rendered()["segments"][1:]]
+
+    result = validate_rendered_output(
+        bilingual_rendered(segments=segments), semantic(), bilingual_plan()
+    )
+
+    assert "FIXED_LINE_MISMATCH" in codes(result)
+
+
+@pytest.mark.parametrize(
+    "line",
+    [
+        {"intent": "restrained_diagnosis", "index": 0},
+        {"intent": "restrained_diagnosis", "index": -1, "text": "原因は明確です。"},
+        {"intent": "Restrained Diagnosis", "index": 0, "text": "原因は明確です。"},
+        {"intent": "restrained_diagnosis", "index": 0, "text": ""},
+        {"intent": "restrained_diagnosis", "index": True, "text": "原因は明確です。"},
+        "原因は明確です。",
+        None,
+    ],
+)
+def test_a_malformed_fixed_line_is_an_invalid_segment(line: Any) -> None:
+    broken = {**FIXED_SEGMENT, "fixed_line": line}
+
+    result = validate_rendered_output(
+        bilingual_rendered(), semantic(), bilingual_plan(segments=[broken])
+    )
+
+    assert "INVALID_FIXED_SEGMENT" in codes(result)
+
+
+def test_a_semantic_segment_may_not_use_the_dialogue_channel() -> None:
+    """The channel carries authored lines only; formed prose belongs elsewhere."""
+
+    smuggled = {
+        "id": "s1",
+        "channel": "character_dialogue",
+        "target_language": "ja-JP",
+        "semantic_keys": ["conclusion"],
+    }
+
+    result = validate_rendered_output(
+        bilingual_rendered(), semantic(), bilingual_plan(segments=[smuggled])
+    )
+
+    assert "INVALID_PLANNED_SEGMENT" in codes(result)

@@ -16,7 +16,7 @@ from kokorox.language_tags import is_channel_language, is_language_tag
 _ARTIFACT_ID = re.compile(r"^[a-z0-9][a-z0-9._/-]{0,127}\Z", re.ASCII)
 _SEMANTIC_ID = re.compile(r"^[a-z][a-z0-9]*(?:_[a-z0-9]+)*\Z", re.ASCII)
 _SEGMENT_SOURCES = (
-    ("conclusion", "character_dialogue"),
+    ("conclusion", "conclusion"),
     ("explanation", "technical_explanation"),
     ("recommendations", "recommendations"),
     ("warnings", "warnings"),
@@ -88,15 +88,70 @@ def _semantic_content(semantic: Mapping[str, Any]) -> dict[str, str | list[str] 
     }
 
 
+def _fixed_segment(
+    intent: str | None,
+    context: Mapping[str, Any] | None,
+    route: Any,
+) -> dict[str, Any] | None:
+    """Return the pack's line for `intent`, or None when it authors none.
+
+    The locale comes from the pack, not the reader: an authored line exists in
+    the language it was written in, and rendering it in another would be the
+    mechanical translation authoring forbids. `route` is the policy's dialogue
+    channel; when it says `preserve` -- the default, since no policy compiled
+    without the pack can name its locale -- the line is drawn from the locale
+    the runtime context actually served. A pack that authors no line for
+    this intent simply contributes none -- the persona is quieter and the
+    answer still arrives.
+    """
+
+    if intent is None or not isinstance(context, Mapping):
+        return None
+    if route == "preserve":
+        # "As written" -- and the context already knows which locale that was.
+        route = context.get("persona_locale")
+    if not isinstance(route, str) or not is_language_tag(route):
+        return None
+    expressions = context.get("expressions")
+    if not isinstance(expressions, Mapping):
+        return None
+    locale_set = expressions.get(intent)
+    if not isinstance(locale_set, Mapping):
+        return None
+    lines = locale_set.get(route)
+    if not isinstance(lines, list) or not lines:
+        return None
+    text = lines[0]
+    if not isinstance(text, str) or not 1 <= len(text) <= 2000:
+        raise _invalid_input()
+    return {
+        # Provisional: the caller renumbers every segment once the line takes
+        # its place at the front.
+        "id": "s1",
+        "channel": "character_dialogue",
+        "target_language": route,
+        "fixed_line": {"intent": intent, "index": 0, "text": text},
+    }
+
+
 def build_render_plan(
     semantic: Mapping[str, Any],
     policy: Mapping[str, Any],
     expression_intent: str | None = None,
+    context: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Return an ordered render plan detached from its semantic and policy inputs.
 
-    Expression styling is attached only to the character-dialogue segment. If
-    no conclusion is present, a valid expression intent is intentionally unused.
+    A plan holds two kinds of segment. Semantic segments carry content the model
+    formed this turn and follow the reader's language. A fixed segment carries
+    one line the pack author wrote, in the locale they authored it in, copied
+    verbatim from `context` -- the model never retypes it, and the planner adds
+    it to `protected_spans` so validation rejects a translated catchphrase.
+
+    `expression_intent` names the manner. With a `context` that authors a line
+    for it, the plan also emits that line on `character_dialogue`; without one
+    the intent still styles the conclusion and no fixed segment appears, so a
+    missing expression quiets the persona rather than blocking the delivery.
     """
     if not isinstance(semantic, Mapping) or not isinstance(policy, Mapping):
         raise _invalid_input()
@@ -156,6 +211,14 @@ def build_render_plan(
             if not is_channel_language(route):
                 raise _invalid_input()
 
+    # The dialogue channel emits no semantic segment, so the loop above never
+    # sees it -- but the fixed line is drawn from whatever locale it names, and
+    # a junk route there must fail rather than quietly drop the persona.
+    if "character_dialogue" in channels and not is_channel_language(
+        channels["character_dialogue"]
+    ):
+        raise _invalid_input()
+
     # The conclusion is the answer, so it renders in the reader's language.
     # `runtime validate` enforces that too, but catching it only there leaves
     # the caller stranded: every fallback rung operates on the rendered
@@ -194,9 +257,21 @@ def build_render_plan(
             "target_language": target_language,
             "semantic_keys": [semantic_key],
         }
-        if channel == "character_dialogue" and validated_expression is not None:
+        if semantic_key == "conclusion" and validated_expression is not None:
             segment["expression_intent"] = validated_expression
         segments.append(segment)
+
+    fixed = _fixed_segment(
+        validated_expression, context, channels.get("character_dialogue")
+    )
+    if fixed is not None:
+        # The line leads: the character speaks, then answers.
+        segments.insert(0, fixed)
+        for position, item in enumerate(segments, start=1):
+            item["id"] = f"s{position}"
+        line_text = fixed["fixed_line"]["text"]
+        if line_text not in protected_spans:
+            protected_spans = [*protected_spans, line_text]
 
     if not segments:
         raise _invalid_input()

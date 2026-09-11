@@ -742,3 +742,63 @@ def test_pack_testing_parser_leaves(
 def test_pack_testing_commands_require_explicit_output(arguments: list[str]) -> None:
     with pytest.raises(SystemExit):
         build_parser().parse_args(arguments)
+
+
+def test_runtime_plan_parser_accepts_an_optional_context_path() -> None:
+    parser = build_parser()
+
+    without = parser.parse_args(
+        ["runtime", "plan", "--semantic", "s.json", "--policy", "p.json", "--json"]
+    )
+    with_context = parser.parse_args(
+        [
+            "runtime",
+            "plan",
+            "--semantic",
+            "s.json",
+            "--policy",
+            "p.json",
+            "--context",
+            "c.json",
+            "--json",
+        ]
+    )
+
+    assert without.context is None
+    assert with_context.context == "c.json"
+
+
+def test_runtime_context_body_accepts_the_envelope_the_cli_prints() -> None:
+    """`runtime context > file` writes the envelope, so `--context` reads it."""
+
+    from kokorox.cli import _runtime_context_body
+
+    inner = {"character_id": "rin-aster", "expressions": {}}
+
+    assert _runtime_context_body({"ok": True, "context": inner}) == inner
+    assert _runtime_context_body(inner) == inner
+
+
+def test_runtime_context_body_refuses_an_error_envelope() -> None:
+    """Planning from a failed context would silence the character silently."""
+
+    from kokorox.cli import _runtime_context_body
+    from kokorox.errors import KokoroError
+
+    with pytest.raises(KokoroError) as raised:
+        _runtime_context_body(
+            {"ok": False, "error": {"code": "SESSION_NOT_ACTIVE"}}
+        )
+    assert raised.value.code == "INVALID_RUNTIME_CONTEXT_INPUT"
+
+
+@pytest.mark.parametrize("value", [None, [], "context", 7, True])
+def test_runtime_context_body_refuses_a_non_object(value: object) -> None:
+    """A malformed file is a caller error, not a reason to go quiet."""
+
+    from kokorox.cli import _runtime_context_body
+    from kokorox.errors import KokoroError
+
+    with pytest.raises(KokoroError) as raised:
+        _runtime_context_body(value)
+    assert raised.value.code == "INVALID_RUNTIME_CONTEXT_INPUT"

@@ -16,7 +16,8 @@ EXPECTED_DEFAULT = {
     "mode": "single",
     "primary_language": "en-US",
     "channels": {
-        "character_dialogue": "en-US",
+        "character_dialogue": "preserve",
+        "conclusion": "en-US",
         "technical_explanation": "en-US",
         "recommendations": "en-US",
         "warnings": "en-US",
@@ -56,7 +57,7 @@ def test_prose_channels_follow_the_primary_language() -> None:
 
     assert normalized["primary_language"] == "zh-CN"
     for channel in (
-        "character_dialogue",
+        "conclusion",
         "technical_explanation",
         "recommendations",
         "warnings",
@@ -92,6 +93,7 @@ def test_normalize_nested_overrides_preserve_sibling_defaults() -> None:
             # Only character_dialogue was named; the other prose channels
             # follow primary_language rather than staying English.
             "character_dialogue": "zh-CN",
+            "conclusion": "ja-JP",
             "technical_explanation": "ja-JP",
             "recommendations": "ja-JP",
             "warnings": "ja-JP",

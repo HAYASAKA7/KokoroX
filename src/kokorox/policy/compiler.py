@@ -15,6 +15,7 @@ LANGUAGES = frozenset(DEFAULT_LOCALES)  # reference defaults; not a closed set
 CHANNELS = frozenset(
     {
         "character_dialogue",
+        "conclusion",
         "technical_explanation",
         "recommendations",
         "warnings",
@@ -29,17 +30,28 @@ MANDATORY_PROTECTED_CHANNELS = frozenset(
     {"commands", "file_paths", "exact_errors", "code_identifiers"}
 )
 
-#: Channels that carry prose. Unless a caller names one explicitly, each one
-#: follows `primary_language`; hard-coding a language here would silently
-#: render every non-English request in English.
-EXPRESSIVE_CHANNELS = ("character_dialogue", "technical_explanation",
+#: Channels that carry prose the model wrote this turn. Unless a caller names
+#: one explicitly, each follows `primary_language`; hard-coding a language here
+#: would silently render every non-English request in English.
+#:
+#: `character_dialogue` is deliberately absent. It carries no prose -- only
+#: lines the pack author wrote, in the locale they authored them in -- so it
+#: follows the pack, not the reader.
+EXPRESSIVE_CHANNELS = ("conclusion", "technical_explanation",
                        "recommendations", "warnings")
 
 _DEFAULT_POLICY_TEMPLATE: dict[str, Any] = {
     "mode": "single",
     "primary_language": "en-US",
     "channels": {
-        "character_dialogue": "en-US",
+        # Not a language: the pack's lines are already in the language their
+        # author chose, and no policy compiled without sight of the pack can
+        # name it. `preserve` says "as written", and the planner reads it as
+        # the runtime context's `persona_locale`. Defaulting to a tag here
+        # would have made the character mute for every pack not authored in
+        # it -- the route would name a locale the pack never wrote.
+        "character_dialogue": "preserve",
+        "conclusion": "en-US",
         "technical_explanation": "en-US",
         "recommendations": "en-US",
         "warnings": "en-US",

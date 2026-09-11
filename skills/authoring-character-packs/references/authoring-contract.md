@@ -30,6 +30,7 @@ Require exact artifact ID and SHA-256, namespace, character ID, display name, co
 | Derived calibration | `derived-profile.yaml` | Keep numeric or inferred behavior separate from evidence. |
 | Runtime overrides | `overrides.yaml` | Record only explicit user overrides; never rewrite evidence. |
 | Locale profiles | `locales/<locale>.yaml` (one per declared locale, e.g. `en-US`, `zh-CN`, `fr-FR`) | Author each independently; intentional equivalence must be deliberate. |
+| Expression lines | `expressions.yaml` (`<intent>: {<locale>: [lines]}`) | Write each locale's line natively. The runtime speaks the first line verbatim and protects it, so it is never translated at render time; a locale you leave unwritten makes the character quiet there, not machine-translated. |
 | Behavioral fixtures | `tests/positive.yaml`, `tests/negative.yaml` | Store expected/forbidden behavior as data, never host instructions. |
 
 For a dossier revision, copy the explicit source pack to a working path under `KOKOROX_DATA_DIR` before editing. Convert original provenance to dossier provenance only when the request supplies typed `user_dossier` input. Use structured file editing; never place dossier strings in a shell command. Preserve the request JSON unchanged. Keep generated or revised artifacts and working files under `KOKOROX_DATA_DIR`; keep temporary files there or under an explicitly configured temp root. Treat both roots as trusted configuration and never invent or hard-code a drive or directory.

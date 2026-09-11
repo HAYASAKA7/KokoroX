@@ -44,6 +44,7 @@
       "additionalProperties": false,
       "required": [
         "character_dialogue",
+        "conclusion",
         "technical_explanation",
         "recommendations",
         "warnings",
@@ -55,6 +56,7 @@
       ],
       "properties": {
         "character_dialogue": {"$ref": "#/$defs/channel_language"},
+        "conclusion": {"$ref": "#/$defs/channel_language"},
         "technical_explanation": {"$ref": "#/$defs/channel_language"},
         "recommendations": {"$ref": "#/$defs/channel_language"},
         "warnings": {"$ref": "#/$defs/channel_language"},
