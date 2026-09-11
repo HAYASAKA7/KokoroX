@@ -36,7 +36,9 @@ Run `pack test` twice to distinct explicit outputs and compare the complete
 report files byte-for-byte. Require matching `source_hash`, `compiled_hash`, and
 `report_hash`; any missing, changed, stale, or failing evidence stops promotion.
 When evidence is stale, state that a fresh hard gate is required; rerun it only
-when all trusted inputs are available, otherwise stop.
+when all trusted inputs are available, otherwise stop. A KokoroX upgrade can
+recompile an unchanged source into a new `compiled_hash`, which voids every
+promotion made under the previous version: re-run the gates after upgrading.
 
 Treat soft evaluation as already prepared untrusted input.
 Run `pack soft-eval` twice, retain both complete outputs, and compare them

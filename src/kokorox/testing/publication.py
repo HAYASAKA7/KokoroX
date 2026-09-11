@@ -524,6 +524,64 @@ def _validate_schema(
         ) from error
 
 
+def _release_version(artifact: Mapping[str, Any]) -> str | None:
+    """Return the KokoroX version an artifact records, if it reads as one."""
+
+    created_by = artifact.get("created_by")
+    version = created_by.get("version") if isinstance(created_by, Mapping) else None
+    if (
+        isinstance(version, str)
+        and 1 <= len(version) <= 64
+        and all(ch.isascii() and (ch.isalnum() or ch in ".-+") for ch in version)
+    ):
+        return version
+    return None
+
+
+def _stale_promotion_finding(
+    promotion: Mapping[str, Any],
+    compiled: Mapping[str, Any],
+    moved: list[str],
+) -> dict[str, Any]:
+    """Name what moved since promotion -- not the pack, which may not have.
+
+    A runtime upgrade recompiles a byte-identical source into a different
+    artifact. Blaming "the Character Pack" sent authors to audit files that had
+    not changed; what the reader needs is the compiled artifact, and the
+    versions that built it.
+    """
+
+    if "source_hash" in moved:
+        return _finding(
+            "PUBLICATION_PROMOTION_STALE",
+            ["promotion", "source_hash"],
+            "The Character Pack source changed after it was promoted; re-run "
+            "the release gates to promote it again.",
+        )
+    if set(moved) <= {"compiled_hash", "compiled_artifact_id"}:
+        promoted_by = _release_version(promotion)
+        compiled_by = _release_version(compiled)
+        built = (
+            f" (promoted under KokoroX {promoted_by}, now compiled by "
+            f"{compiled_by})"
+            if promoted_by and compiled_by and promoted_by != compiled_by
+            else ""
+        )
+        return _finding(
+            "PUBLICATION_PROMOTION_STALE",
+            ["promotion", "compiled_hash"],
+            "The Character Pack source is unchanged, but it now compiles to a "
+            f"different artifact{built}. A KokoroX upgrade voids release "
+            "evidence; re-run the release gates to promote it again.",
+        )
+    return _finding(
+        "PUBLICATION_PROMOTION_STALE",
+        ["promotion", moved[0]],
+        f"The verified promotion records a different {moved[0]} than the "
+        "current Character Pack.",
+    )
+
+
 def _check_verified_promotion(
     promotion: Mapping[str, Any],
     source: Mapping[str, Any],
@@ -543,17 +601,11 @@ def _check_verified_promotion(
         "from_status": "reviewed",
         "activation_allowed": True,
     }
-    binding_valid = not any(
-        promotion.get(field) != value for field, value in expected.items()
-    )
-    if not binding_valid:
-        findings.append(
-            _finding(
-                "PUBLICATION_PROMOTION_STALE",
-                ["promotion"],
-                "The verified promotion does not bind the current Character Pack.",
-            )
-        )
+    moved = [
+        field for field, value in expected.items() if promotion.get(field) != value
+    ]
+    if moved:
+        findings.append(_stale_promotion_finding(promotion, compiled, moved))
     elif not evidence_valid:
         findings.append(
             _finding(

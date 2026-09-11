@@ -74,6 +74,13 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- `PUBLICATION_PROMOTION_STALE` blamed "the Character Pack" whenever any
+  promotion binding moved -- including after a KokoroX upgrade, when the
+  source was byte-identical and only the compiled artifact had changed, which
+  sent authors to audit files that had not moved. The finding now names what
+  did: the source, the compiled artifact and the versions that built it, or
+  the specific field. The testing Skill says an upgrade voids release
+  evidence.
 - 133 of the 248 error codes the runtime raises reached callers as
   "Command could not be completed", with empty `details` -- session, runtime,
   policy, promotion, publication, persistence, and migration errors alike.

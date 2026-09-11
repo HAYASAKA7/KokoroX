@@ -388,6 +388,14 @@ def test_stale_verified_promotion_is_reported_as_a_private_export_blocker(
     assert "PUBLICATION_PROMOTION_STALE" in {
         item["code"] for item in report["blockers"]
     }
+    stale = next(
+        item
+        for item in report["blockers"]
+        if item["code"] == "PUBLICATION_PROMOTION_STALE"
+    )
+    # The source is what moved here, so the finding says so, and says the fix.
+    assert stale["path"] == ["promotion", "source_hash"]
+    assert "source changed" in stale["message"]
     SCHEMAS.validate("pack-publication-readiness-report", report)
 
 
@@ -734,3 +742,39 @@ def _remove_yaml_key(path: Path, key: str) -> None:
         yaml.safe_dump(document, allow_unicode=True, sort_keys=False),
         encoding="utf-8",
     )
+
+
+def test_a_runtime_upgrade_names_the_compiled_artifact_not_the_pack(
+    tmp_path: Path,
+    rin_verified_release: dict[str, Any],
+) -> None:
+    """The source did not change; blaming it sent authors to audit their files."""
+
+    import copy
+
+    from kokorox import __version__
+
+    pack = tmp_path / "rin"
+    shutil.copytree(RIN_PACK, pack)
+    promotion = copy.deepcopy(rin_verified_release["promotion"])
+    promotion["compiled_hash"] = "0" * 64
+    promotion["created_by"]["version"] = "0.1.1"
+
+    report = assess_publication_readiness(
+        pack,
+        promotion,
+        SCHEMAS,
+        promotion_evidence=rin_verified_release["evidence"],
+        requested_visibility="private",
+    )
+
+    stale = next(
+        item
+        for item in report["blockers"]
+        if item["code"] == "PUBLICATION_PROMOTION_STALE"
+    )
+    assert stale["path"] == ["promotion", "compiled_hash"]
+    assert "source is unchanged" in stale["message"]
+    assert "0.1.1" in stale["message"]
+    assert __version__ in stale["message"]
+    SCHEMAS.validate("pack-publication-readiness-report", report)
