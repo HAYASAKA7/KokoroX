@@ -98,7 +98,9 @@ def test_orchestrates_existing_compiler_render_validator_and_state_engine(
     report = run_hard_validation(RIN_PACK, load_json(ORIGINAL_REQUEST), SCHEMAS)
 
     assert report["passed"] is True
-    assert calls == {"compile": 2, "plan": 1, "validate": 1, "state": 3}
+    # Planning and validation run once for the synthetic probe and once per
+    # authored locale, speaking that locale's own line.
+    assert calls == {"compile": 2, "plan": 4, "validate": 4, "state": 3}
 
 
 def test_changed_fixture_bytes_invalidate_report_reuse(tmp_path: Path) -> None:
@@ -549,7 +551,15 @@ def test_reports_protected_span_and_warning_pipeline_drift(
     report = run_hard_validation(RIN_PACK, load_json(ORIGINAL_REQUEST), SCHEMAS)
 
     assert report["checks"]["protected_content"]["passed"] is False
+    # The drifted planner also strips the authored line's protection in every
+    # locale's fixed-line probe, and each of those renders then fails.
     assert finding_codes(report, "protected_content") == [
+        "PACK_FIXED_LINE_UNPROTECTED",
+        "PACK_FIXED_LINE_UNPROTECTED",
+        "PACK_FIXED_LINE_UNPROTECTED",
+        "PACK_FIXED_LINE_VALIDATION_FAILED",
+        "PACK_FIXED_LINE_VALIDATION_FAILED",
+        "PACK_FIXED_LINE_VALIDATION_FAILED",
         "PACK_PROTECTED_SPAN_MISMATCH",
         "PACK_REQUIRED_WARNING_MISSING",
         "PACK_RUNTIME_VALIDATION_FAILED",
@@ -1148,3 +1158,70 @@ def test_identity_probe_does_not_mask_registry_operational_errors() -> None:
 
     assert raised.value.code == "SCHEMA_NOT_FOUND"
     assert raised.value.message == "Registry schema is unavailable."
+
+
+def test_speaks_every_authored_line_through_the_runtime_path(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Context, plan, and validation run once per locale the pack authors."""
+
+    real_plan = hard_module.build_render_plan
+    spoken: dict[str, str] = {}
+
+    def observed_plan(*args: Any, **kwargs: Any) -> dict[str, Any]:
+        plan = real_plan(*args, **kwargs)
+        for segment in plan["segments"]:
+            if "fixed_line" in segment:
+                spoken[segment["target_language"]] = segment["fixed_line"]["text"]
+        return plan
+
+    monkeypatch.setattr(hard_module, "build_render_plan", observed_plan)
+
+    report = run_hard_validation(RIN_PACK, load_json(ORIGINAL_REQUEST), SCHEMAS)
+
+    assert report["checks"]["protected_content"]["passed"] is True
+    assert spoken == {
+        "en-US": "The cause is clear.",
+        "ja-JP": "原因は明確です。",
+        "zh-CN": "原因已经明确。",
+    }
+
+
+def test_reports_a_plan_that_drops_the_authored_line(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A silent character is a finding, and it names the locale that went quiet."""
+
+    real_plan = hard_module.build_render_plan
+
+    def silent_plan(*args: Any, **kwargs: Any) -> dict[str, Any]:
+        plan = real_plan(*args, **kwargs)
+        plan["segments"] = [
+            segment for segment in plan["segments"] if "fixed_line" not in segment
+        ]
+        for position, segment in enumerate(plan["segments"], start=1):
+            segment["id"] = f"s{position}"
+        return plan
+
+    monkeypatch.setattr(hard_module, "build_render_plan", silent_plan)
+
+    report = run_hard_validation(RIN_PACK, load_json(ORIGINAL_REQUEST), SCHEMAS)
+    findings = report["checks"]["protected_content"]["findings"]
+
+    assert report["checks"]["protected_content"]["passed"] is False
+    assert finding_codes(report, "protected_content") == [
+        "PACK_FIXED_LINE_NOT_SPOKEN",
+        "PACK_FIXED_LINE_NOT_SPOKEN",
+        "PACK_FIXED_LINE_NOT_SPOKEN",
+        "PACK_FIXED_LINE_VALIDATION_FAILED",
+        "PACK_FIXED_LINE_VALIDATION_FAILED",
+        "PACK_FIXED_LINE_VALIDATION_FAILED",
+    ]
+    assert [
+        finding["path"]
+        for finding in findings
+        if finding["code"] == "PACK_FIXED_LINE_NOT_SPOKEN"
+    ] == [
+        ["expressions.yaml", "restrained_diagnosis", locale]
+        for locale in ("en-US", "ja-JP", "zh-CN")
+    ]

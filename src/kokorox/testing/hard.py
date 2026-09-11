@@ -22,6 +22,7 @@ from kokorox.packs.loader import (
     parse_yaml_bytes,
 )
 from kokorox.packs.security import PackLimits, scan_pack
+from kokorox.runtime.context import build_runtime_context
 from kokorox.runtime.planning import build_render_plan
 from kokorox.runtime.validation import validate_rendered_output
 from kokorox.schemas import SchemaRegistry
@@ -255,6 +256,11 @@ def run_hard_validation(
             schemas,
             checks["protected_content"],
             mutation_probes,
+            compiled=(
+                cast(dict[str, Any], json.loads(first_compiled_bytes))
+                if compiled_snapshot is not None
+                else None
+            ),
         )
     else:
         protected_content_hash = None
@@ -847,6 +853,8 @@ def _check_protected_content(
     schemas: SchemaRegistry,
     findings: list[dict[str, Any]],
     mutation_probes: list[_MutationProbe],
+    *,
+    compiled: dict[str, Any] | None = None,
 ) -> str:
     fixture = corpus.document("tests/protected-spans.yaml")
     multilingual = corpus.document("tests/multilingual.yaml")
@@ -887,14 +895,30 @@ def _check_protected_content(
         "mixing": {"max_switches": 0, "min_primary_ratio": 1.0},
         "subtitles": {"enabled": False, "language": None},
     }
+    fixed_probe = _fixed_line_probe(compiled, multilingual["intent"], policy)
     check_input_hash = _canonical_hash(
         {
             "fixture": fixture,
             "intent": multilingual["intent"],
             "semantic": semantic,
             "policy": policy,
+            "fixed_line_probe": fixed_probe,
         }
     )
+    # Before the main probe, whose pipeline failure returns early: the pack's
+    # own lines deserve a verdict even when the synthetic probe cannot run.
+    if compiled is not None and fixed_probe is not None:
+        _check_fixed_lines(
+            compiled,
+            fixed_probe,
+            multilingual["intent"],
+            semantic,
+            spans,
+            warning,
+            schemas,
+            findings,
+            mutation_probes,
+        )
     semantic_bytes = canonical_bytes(semantic)
     policy_bytes = canonical_bytes(policy)
     try:
@@ -1086,6 +1110,246 @@ def _check_protected_content(
             )
         )
     return check_input_hash
+
+
+_FIXED_LINE_STATE: Mapping[str, Any] = MappingProxyType(
+    {
+        "revision": 0,
+        "stage": "unknown",
+        "dimensions": MappingProxyType(
+            {
+                "familiarity": 0.0,
+                "trust": 0.0,
+                "collaboration": 0.0,
+                "tension": 0.0,
+            }
+        ),
+    }
+)
+
+
+def _protected_probe(value: Any, expected: bytes, *, output: bool) -> _MutationProbe:
+    """Watch one pipeline object with the main probe's exact finding.
+
+    Identical code, path, and message let a mutation seen by several probes
+    collapse into the one finding the check already reports.
+    """
+
+    if output:
+        return _MutationProbe(
+            check="protected_content",
+            code="PACK_PROTECTED_OUTPUT_MUTATION",
+            path=("validation",),
+            message=(
+                "The protected-content pipeline mutated a previously "
+                "returned output."
+            ),
+            value=value,
+            expected=expected,
+        )
+    return _MutationProbe(
+        check="protected_content",
+        code="PACK_PROTECTED_INPUT_MUTATION",
+        path=("validation",),
+        message="The protected-content pipeline mutated a canonical probe input.",
+        value=value,
+        expected=expected,
+    )
+
+
+def _fixed_line_probe(
+    compiled: Mapping[str, Any] | None,
+    intent: Any,
+    policy: Mapping[str, Any],
+) -> dict[str, Any] | None:
+    """Return the inputs for speaking `intent` in each authored locale."""
+
+    if compiled is None:
+        return None
+    locales = compiled.get("locales")
+    scenarios = compiled.get("scenarios")
+    expressions = compiled.get("expressions")
+    if (
+        not isinstance(locales, Mapping)
+        or not isinstance(scenarios, Mapping)
+        or not scenarios
+        or not isinstance(expressions, Mapping)
+        or not isinstance(intent, str)
+        or not isinstance(expressions.get(intent), Mapping)
+    ):
+        # Compile and locale coverage own these failures; a probe built on
+        # them could only restate their findings.
+        return None
+    authored = expressions[intent]
+    # Detached through canonical bytes: the spread policy shares its nested
+    # maps with the policy the check also hashes, and a canonical hash refuses
+    # aliased containers.
+    probe = {
+        "scenario": min(scenarios),
+        "policy": {
+            **policy,
+            "artifact_id": "policy/pack-hard-validation-fixed-line",
+            "mode": "mixed",
+            # One switch: the character's line, then the answer.
+            "mixing": {"max_switches": 1, "min_primary_ratio": 0.7},
+        },
+        "lines": {locale: authored.get(locale) for locale in sorted(locales)},
+    }
+    return cast(dict[str, Any], json.loads(canonical_bytes(probe)))
+
+
+def _check_fixed_lines(
+    compiled: dict[str, Any],
+    probe: dict[str, Any],
+    intent: str,
+    semantic: dict[str, Any],
+    spans: list[str],
+    warning: str,
+    schemas: SchemaRegistry,
+    findings: list[dict[str, Any]],
+    mutation_probes: list[_MutationProbe],
+) -> None:
+    """Speak the pack's own line in every locale it authors.
+
+    The main probe passes no runtime context, so it never reaches a fixed
+    segment, and a line that cannot survive planning and validation would
+    pass it untouched. This walks the production path -- runtime context,
+    plan, render, validate -- once per authored locale.
+    """
+
+    compiled_bytes = canonical_bytes(compiled)
+    state_bytes = canonical_bytes(
+        {
+            **_FIXED_LINE_STATE,
+            "dimensions": dict(_FIXED_LINE_STATE["dimensions"]),
+        }
+    )
+    semantic_bytes = canonical_bytes(semantic)
+    policy_bytes = canonical_bytes(probe["policy"])
+    for locale, lines in probe["lines"].items():
+        if not isinstance(lines, list) or not lines:
+            # Authoring validation already reports the unwritten locale.
+            continue
+        path = ["expressions.yaml", intent, locale]
+        try:
+            context = build_runtime_context(
+                json.loads(compiled_bytes),
+                json.loads(state_bytes),
+                locale,
+                probe["scenario"],
+            )
+            semantic_for_plan = cast(dict[str, Any], json.loads(semantic_bytes))
+            policy_for_plan = cast(dict[str, Any], json.loads(policy_bytes))
+            schemas.validate("language-policy", policy_for_plan)
+            plan = build_render_plan(
+                semantic_for_plan,
+                policy_for_plan,
+                expression_intent=intent,
+                context=context,
+            )
+            schemas.validate("render-plan", plan)
+            plan_bytes = canonical_bytes(plan)
+            plan_snapshot = cast(dict[str, Any], json.loads(plan_bytes))
+            languages = [
+                segment["target_language"]
+                for segment in plan_snapshot["segments"]
+                if segment["target_language"] != "preserve"
+            ]
+            rendered = {
+                # The authored line, not the plan's copy of it, so a plan that
+                # altered the line cannot validate against itself.
+                "text": "\n".join(
+                    [lines[0], semantic["conclusion"], *spans, warning]
+                ),
+                "segments": [
+                    {
+                        key: value
+                        for key, value in segment.items()
+                        if key != "expression_intent"
+                    }
+                    for segment in plan_snapshot["segments"]
+                ],
+                "switch_count": sum(
+                    1
+                    for before, after in zip(languages, languages[1:])
+                    if before != after
+                ),
+            }
+            rendered_bytes = canonical_bytes(rendered)
+            rendered_for_validation = cast(
+                dict[str, Any], json.loads(rendered_bytes)
+            )
+            semantic_for_validation = cast(
+                dict[str, Any], json.loads(semantic_bytes)
+            )
+            plan_for_validation = cast(dict[str, Any], json.loads(plan_bytes))
+            validation = validate_rendered_output(
+                rendered_for_validation,
+                semantic_for_validation,
+                plan_for_validation,
+            )
+            schemas.validate("validation-result", validation)
+            validation_bytes = canonical_bytes(validation)
+        except (KokoroError, KeyError, TypeError, ValueError, OverflowError):
+            findings.append(
+                _finding(
+                    "PACK_FIXED_LINE_PIPELINE_ERROR",
+                    path,
+                    "The pack's authored line could not be planned and "
+                    "validated.",
+                )
+            )
+            continue
+
+        mutation_probes.extend(
+            (
+                _protected_probe(semantic_for_plan, semantic_bytes, output=False),
+                _protected_probe(policy_for_plan, policy_bytes, output=False),
+                _protected_probe(plan, plan_bytes, output=True),
+                _protected_probe(
+                    rendered_for_validation, rendered_bytes, output=False
+                ),
+                _protected_probe(
+                    semantic_for_validation, semantic_bytes, output=False
+                ),
+                _protected_probe(plan_for_validation, plan_bytes, output=False),
+                _protected_probe(validation, validation_bytes, output=True),
+            )
+        )
+        fixed = [
+            segment
+            for segment in plan_snapshot["segments"]
+            if "fixed_line" in segment
+        ]
+        if (
+            len(fixed) != 1
+            or fixed[0]["target_language"] != locale
+            or fixed[0]["fixed_line"]["text"] != lines[0]
+        ):
+            findings.append(
+                _finding(
+                    "PACK_FIXED_LINE_NOT_SPOKEN",
+                    path,
+                    "The render plan did not carry the pack's authored line "
+                    "for this locale.",
+                )
+            )
+        if lines[0] not in plan_snapshot["protected_spans"]:
+            findings.append(
+                _finding(
+                    "PACK_FIXED_LINE_UNPROTECTED",
+                    path,
+                    "The render plan does not protect the pack's authored line.",
+                )
+            )
+        if json.loads(validation_bytes)["valid"] is not True:
+            findings.append(
+                _finding(
+                    "PACK_FIXED_LINE_VALIDATION_FAILED",
+                    path,
+                    "Runtime validation rejected the pack's authored line.",
+                )
+            )
 
 
 def _check_state_replay(

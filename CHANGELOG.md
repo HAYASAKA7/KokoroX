@@ -22,6 +22,14 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   A host that saw only the locale it was given could not tell material
   authored for this reader from material borrowed from another; the pair says
   plainly when the persona is improvising.
+- `pack validate` now speaks every authored line. The hard gate walks each
+  locale the pack authors through the production path -- runtime context,
+  plan, render, validate -- and reports, per locale, a line the plan failed
+  to carry (`PACK_FIXED_LINE_NOT_SPOKEN`), failed to protect
+  (`PACK_FIXED_LINE_UNPROTECTED`), or that validation rejected
+  (`PACK_FIXED_LINE_VALIDATION_FAILED`). Before this the gate passed no
+  runtime context at all, so no fixed segment was ever planned during
+  validation, and a pack could pass while its character stayed silent.
 
 ### Changed
 
