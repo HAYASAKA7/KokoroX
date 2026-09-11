@@ -410,10 +410,12 @@ def test_character_draft_compile_refuses_invalid_identity_report(
         data_dir=tmp_path / "data",
     )
 
+    # The envelope names what failed; this used to pin an empty object.
     _assert_error(
         completed,
         "AUTHORING_VALIDATION_FAILED",
         "Character authoring validation failed.",
+        details={"failures": ["AUTHORING_IDENTITY_MISMATCH"]},
     )
     assert not (tmp_path / "data" / "drafts").exists()
 

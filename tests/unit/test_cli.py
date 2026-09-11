@@ -802,3 +802,91 @@ def test_runtime_context_body_refuses_a_non_object(value: object) -> None:
     with pytest.raises(KokoroError) as raised:
         _runtime_context_body(value)
     assert raised.value.code == "INVALID_RUNTIME_CONTEXT_INPUT"
+
+
+def test_every_raised_error_code_has_a_public_message() -> None:
+    """A family got public messages only once a report named it, so most never did.
+
+    133 codes -- session, runtime, policy, promotion, persistence -- reached
+    callers as "Command could not be completed". This keeps the table whole:
+    every literal code raised in `src/kokorox` must carry its own message.
+    """
+
+    import ast
+    import re
+    from pathlib import Path
+
+    from kokorox.cli import _PUBLIC_MESSAGES
+
+    code_shape = re.compile(r"^[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+$")
+    missing: set[str] = set()
+    for path in Path("src/kokorox").rglob("*.py"):
+        for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
+            if not isinstance(node, ast.Call) or not node.args:
+                continue
+            func = node.func
+            name = (
+                func.id
+                if isinstance(func, ast.Name)
+                else func.attr
+                if isinstance(func, ast.Attribute)
+                else ""
+            )
+            if name != "KokoroError" and not name.endswith("_error"):
+                continue
+            first = node.args[0]
+            if (
+                isinstance(first, ast.Constant)
+                and isinstance(first.value, str)
+                and code_shape.match(first.value)
+                and first.value not in _PUBLIC_MESSAGES
+            ):
+                missing.add(first.value)
+
+    assert sorted(missing) == []
+
+
+@pytest.mark.parametrize(
+    ("code", "details", "kept"),
+    [
+        (
+            "PLAN_CONCLUSION_LANGUAGE_MISMATCH",
+            {"expected": "zh-CN", "actual": "ja-JP"},
+            {"expected": "zh-CN", "actual": "ja-JP"},
+        ),
+        (
+            "PLAN_CONCLUSION_LANGUAGE_MISMATCH",
+            {"expected": "zh-CN", "actual": "<script>"},
+            {},
+        ),
+        (
+            "AUTHORING_VALIDATION_FAILED",
+            {"failures": ["AUTHORING_IDENTITY_MISMATCH"]},
+            {"failures": ["AUTHORING_IDENTITY_MISMATCH"]},
+        ),
+        ("AUTHORING_VALIDATION_FAILED", {"failures": ["not a code"]}, {}),
+        (
+            "MIGRATION_UNAVAILABLE",
+            {"supported": ["0.9.0 -> 1.0.0"]},
+            {"supported": ["0.9.0 -> 1.0.0"]},
+        ),
+        ("MIGRATION_UNAVAILABLE", {"supported": ["../../etc/passwd"]}, {}),
+        (
+            "PERSISTENCE_INSTALLATION_STALE",
+            {"reason": "resolution"},
+            {"reason": "resolution"},
+        ),
+        ("PERSISTENCE_INSTALLATION_STALE", {"reason": "C:\\secret"}, {}),
+    ],
+)
+def test_actionable_details_survive_sanitization_and_nothing_else_does(
+    code: str, details: dict[str, object], kept: dict[str, object]
+) -> None:
+    from kokorox.cli import _public_error_envelope
+    from kokorox.errors import KokoroError
+
+    envelope = _public_error_envelope(
+        KokoroError(code, "internal detail", details=details)
+    )["error"]
+
+    assert envelope["details"] == kept

@@ -138,13 +138,16 @@ def _tree_snapshot(root: Path) -> dict[str, bytes]:
 
 
 def _assert_error(
-    completed: subprocess.CompletedProcess[str], code: str, message: str
+    completed: subprocess.CompletedProcess[str],
+    code: str,
+    message: str,
+    details: dict[str, object] | None = None,
 ) -> None:
     assert completed.returncode == 2
     assert json.loads(completed.stdout) == {
         "error": {
             "code": code,
-            "details": {},
+            "details": details if details is not None else {},
             "message": message,
             "retryable": False,
         },
@@ -375,6 +378,14 @@ def test_partial_bundle_is_ineligible_for_authoring(tmp_path: Path) -> None:
         refused,
         "AUTHORING_VALIDATION_FAILED",
         "Character authoring validation failed.",
+        details={
+            "failures": sorted(
+                {
+                    finding["code"]
+                    for finding in body["validation_report"]["hard_failures"]
+                }
+            )
+        },
     )
     assert not (data_dir / "drafts").exists()
 

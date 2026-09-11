@@ -247,3 +247,19 @@ def test_migration_never_repairs_a_stale_input_member_hash(
         "1.0.0",
         SCHEMAS,
     )
+
+
+def test_an_unregistered_target_names_the_paths_that_exist(
+    rin_verified_release: dict[str, Any],
+) -> None:
+    """A refusal that hides the working options leaves the caller guessing."""
+
+    legacy = make_legacy_090_archive(build_private_archive(rin_verified_release))
+
+    with pytest.raises(Exception) as raised:
+        preview_karc_migration(legacy, "1.1.0", SCHEMAS)
+
+    assert getattr(raised.value, "code", None) == "MIGRATION_UNAVAILABLE"
+    assert getattr(raised.value, "details", {}).get("supported") == [
+        "0.9.0 -> 1.0.0"
+    ]

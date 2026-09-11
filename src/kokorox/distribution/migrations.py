@@ -159,6 +159,7 @@ class MigrationRegistry:
         raise _error(
             "MIGRATION_UNAVAILABLE",
             "No registered migration path matches the exact archive versions.",
+            supported=_supported_paths(self),
         )
 
 
@@ -189,7 +190,9 @@ def preview_karc_migration(
         raise _error("MIGRATION_INPUT_INVALID", "Migration input must be bytes.")
     if _parse_semver(target_format_version) is None:
         raise _error(
-            "MIGRATION_UNAVAILABLE", "Migration target version is invalid."
+            "MIGRATION_UNAVAILABLE",
+            "Migration target version is invalid.",
+            supported=_supported_paths(registry),
         )
     source = _inspect_input(payload, limits)
     source_format = source.manifest.get("format_version")
@@ -872,6 +875,17 @@ def _reason(error: BaseException) -> str:
 
 def _error(code: str, message: str, **details: Any) -> KokoroError:
     return KokoroError(code, message, details=details)
+
+
+def _supported_paths(registry: MigrationRegistry) -> list[str]:
+    """Name every registered migration, so a refusal says what would work."""
+
+    return sorted(
+        {
+            f"{step.source_format_version} -> {step.target_format_version}"
+            for step in registry._steps
+        }
+    )
 
 
 DEFAULT_MIGRATIONS = MigrationRegistry(

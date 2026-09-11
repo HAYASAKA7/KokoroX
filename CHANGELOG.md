@@ -74,6 +74,17 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- 133 of the 248 error codes the runtime raises reached callers as
+  "Command could not be completed", with empty `details` -- session, runtime,
+  policy, promotion, publication, persistence, and migration errors alike.
+  Messages had been added one family at a time, only after a report named
+  that family. Every code now carries its own message, a test fails on any
+  raised code without one, and four codes return what a caller needs to act
+  on: the languages behind `PLAN_CONCLUSION_LANGUAGE_MISMATCH`, the
+  hard-failure codes behind `AUTHORING_VALIDATION_FAILED`, the registered
+  paths behind `MIGRATION_UNAVAILABLE`, and which of three situations
+  `PERSISTENCE_INSTALLATION_STALE` is -- whose message no longer calls a
+  pack that was never installed "stale".
 - The README promised that recovery from an interrupted transaction "is
   automatic on the next matching install or removal operation". It never was,
   and a test asserted the README contained that sentence, so the claim was held

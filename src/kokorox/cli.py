@@ -46,6 +46,7 @@ from kokorox.research.storage import (
 )
 from kokorox.research.validation import validate_research_workspace
 from kokorox.research.workspace import load_research_workspace
+from kokorox.language_tags import is_language_tag
 from kokorox.runtime.context import build_runtime_context
 from kokorox.runtime.planning import build_render_plan
 from kokorox.runtime.validation import validate_rendered_output
@@ -335,6 +336,272 @@ _PUBLIC_MESSAGES = {
     "STATE_REVISION_CONFLICT": "Relationship state revision conflicted.",
     "UNSAFE_PACK_PATH": "Character pack path is unsafe.",
     "UNSAFE_RESEARCH_PATH": "Research publication path is unsafe.",
+    # Every other raised code. These reached callers as "Command could not
+    # be completed" -- 133 of them, core session and runtime paths included --
+    # because a family got messages only once a report happened to name it.
+    # `test_every_raised_error_code_has_a_public_message` keeps this whole.
+    "AUTHORING_SOURCE_HASH_MISMATCH": (
+        "The character source pack does not match the draft metadata."
+    ),
+    "COMMAND_FAILED": "Command could not be completed.",
+    "COMPILED_IDENTITY_MISMATCH": "The compiled artifact identity does not match.",
+    "COMPILED_PACK_AMBIGUOUS": "Several compiled artifacts match the session.",
+    "COMPILED_PACK_NOT_FOUND": "No compiled artifact was found for the session.",
+    "COMPILED_PATH_UNSAFE": "The compiled artifact path is unsafe.",
+    "COMPILED_SCAN_FAILED": "Compiled artifacts could not be scanned.",
+    "COMPILED_SCAN_LIMIT": "The compiled artifact scan limit was exceeded.",
+    "COMPILED_WRITE_FAILED": (
+        "The compiled artifact could not be written, read back, or made "
+        "durable."
+    ),
+    "DRAFT_DURABILITY_FAILED": "Character draft publication could not be made durable.",
+    "DRAFT_RESTORE_FAILED": (
+        "Character draft publication failed; the previous draft remains in a "
+        "recovery backup."
+    ),
+    "DRAFT_STAGING_INVALID": (
+        "The character draft staging bundle failed final verification."
+    ),
+    "INVALID_DRAFT_DATA": "Character draft metadata is invalid.",
+    "INVALID_EVENT": "The interaction event is invalid.",
+    "INVALID_FALLBACK_ATTEMPT": "The fallback attempt must be a bounded integer.",
+    "INVALID_LANGUAGE_POLICY": (
+        "The language policy is invalid: check its keys, mode, channels, and "
+        "language tags."
+    ),
+    "INVALID_PACK_TEST_CORPUS": "The character pack test corpus is invalid.",
+    "INVALID_PROFILE_VALUE": "A profile field has an invalid value.",
+    "INVALID_RENDER_PLAN_INPUT": "Render plan input is invalid.",
+    "INVALID_RUNTIME_CONTEXT": "Runtime context input is invalid.",
+    "KARC_REGISTRY_WRITE_FAILED": (
+        "The installed registry could not be published atomically."
+    ),
+    "MIGRATION_CYCLE": "The migration registry contains a cycle.",
+    "MIGRATION_DOWNGRADE_UNSUPPORTED": "Archive downgrades are not supported.",
+    "MIGRATION_IDENTITY_CHANGED": (
+        "The migration would change protected character identity."
+    ),
+    "MIGRATION_INPUT_CHANGED": "The migration input changed while it was being read.",
+    "MIGRATION_INPUT_INVALID": (
+        "The migration input is not a readable, safe, canonical archive with "
+        "exact source versions."
+    ),
+    "MIGRATION_INPUT_NOT_FOUND": "The migration input does not exist.",
+    "MIGRATION_OUTPUT_CONFLICT": "The migration output must differ from its input.",
+    "MIGRATION_OUTPUT_EXISTS": "The migration output already exists.",
+    "MIGRATION_OUTPUT_INVALID": (
+        "The migration did not produce a valid archive for the target version."
+    ),
+    "MIGRATION_OUTPUT_WRITE_FAILED": (
+        "The migration output could not be written atomically."
+    ),
+    "MIGRATION_PATH_INVALID": (
+        "A migration path is invalid or changed during the operation."
+    ),
+    "MIGRATION_UNAVAILABLE": (
+        "No registered migration reaches the requested archive version."
+    ),
+    "PACK_CHANGED": "The character pack changed while hard validation was running.",
+    "PACK_LIMIT_EXCEEDED": "A character pack filesystem limit was exceeded.",
+    "PACK_LIMIT_INVALID": "Pack limits must be non-negative integers.",
+    "PACK_PROMOTION_BINDING_MISMATCH": (
+        "The promotion evidence does not bind one exact pack, review, and hard "
+        "report."
+    ),
+    "PACK_PROMOTION_BUNDLE_INVALID": "The promotion bundle is invalid.",
+    "PACK_PROMOTION_BUSY": "Another promotion publication is already in progress.",
+    "PACK_PROMOTION_CLEANUP_FAILED": (
+        "Promotion staging could not be cleaned up safely."
+    ),
+    "PACK_PROMOTION_CONFLICT": (
+        "The promotion ID is already bound to a different record."
+    ),
+    "PACK_PROMOTION_DURABILITY_FAILED": (
+        "The promotion record could not be confirmed durable."
+    ),
+    "PACK_PROMOTION_EVIDENCE_REQUIRED": (
+        "A reviewed-to-verified promotion requires previous and soft evidence."
+    ),
+    "PACK_PROMOTION_HARD_GATE_FAILED": "The hard-validation report did not pass.",
+    "PACK_PROMOTION_HARD_REPORT_STALE": (
+        "The hard-validation report is not current for the exact pack inputs; "
+        "re-run the hard gate."
+    ),
+    "PACK_PROMOTION_INPUT_INVALID": "A promotion input is not canonical JSON data.",
+    "PACK_PROMOTION_INPUT_MUTATION": "A promotion input changed during promotion.",
+    "PACK_PROMOTION_PATH_UNSAFE": (
+        "The promotion destination contains an unsafe filesystem path."
+    ),
+    "PACK_PROMOTION_PREVIOUS_MISMATCH": (
+        "The verified promotion does not extend the exact reviewed record."
+    ),
+    "PACK_PROMOTION_PREVIOUS_NOT_PUBLISHED": (
+        "The exact reviewed promotion has not been published."
+    ),
+    "PACK_PROMOTION_PUBLISH_FAILED": "Promotion record publication failed.",
+    "PACK_PROMOTION_REVIEW_ID_CONFLICT": (
+        "The review ID is already bound outside its matching transition."
+    ),
+    "PACK_PROMOTION_REVIEW_REJECTED": (
+        "The Character Pack review did not accept promotion."
+    ),
+    "PACK_PROMOTION_SOFT_GATE_FAILED": "The soft-evaluation report did not pass.",
+    "PACK_PROMOTION_SOFT_REPORT_STALE": (
+        "The soft-evaluation report is not current for its exact input; re-run "
+        "the soft evaluation."
+    ),
+    "PACK_PROMOTION_SOURCE_CHANGED": (
+        "The Character Pack source changed during promotion."
+    ),
+    "PACK_PROMOTION_STAGING_INVALID": "Promotion staging failed final validation.",
+    "PACK_PROMOTION_STORAGE_LIMIT": (
+        "The promotion report store exceeds its bounded layout."
+    ),
+    "PACK_PROMOTION_TRANSITION_INVALID": (
+        "The requested promotion transition is invalid."
+    ),
+    "PACK_PUBLICATION_COMPILE_FAILED": (
+        "The Character Pack cannot be compiled for publication readiness."
+    ),
+    "PACK_PUBLICATION_COMPLIANCE_UNEXPECTED": (
+        "A private readiness check cannot take a public compliance attestation."
+    ),
+    "PACK_PUBLICATION_INPUT_INVALID": (
+        "A publication-readiness input is not canonical JSON data."
+    ),
+    "PACK_PUBLICATION_INPUT_MUTATION": (
+        "A publication-readiness input changed during inspection."
+    ),
+    "PACK_PUBLICATION_PIPELINE_MUTATION": (
+        "A publication-readiness dependency mutated a retained value."
+    ),
+    "PACK_PUBLICATION_SOURCE_CHANGED": (
+        "The Character Pack changed during publication-readiness inspection."
+    ),
+    "PACK_PUBLICATION_SOURCE_INVALID": (
+        "The Character Pack source cannot be inspected for publication "
+        "readiness."
+    ),
+    "PACK_PUBLICATION_VALIDATOR_MUTATION": (
+        "Schema validation mutated a publication-readiness artifact."
+    ),
+    "PACK_PUBLICATION_VISIBILITY_INVALID": (
+        "The requested publication visibility is invalid."
+    ),
+    "PACK_SCAN_FAILED": "The character pack filesystem scan failed.",
+    "PACK_TEST_CORPUS_CHANGED": (
+        "The character pack test corpus changed while it was being loaded."
+    ),
+    "PACK_TEST_CORPUS_LIMIT_EXCEEDED": (
+        "The character pack test corpus exceeds a data limit."
+    ),
+    "PACK_TEST_CORPUS_LIMIT_INVALID": (
+        "Pack test corpus limits must be positive integers."
+    ),
+    "PERSISTENCE_CHANGED": "Persistent storage changed or is invalid.",
+    "PERSISTENCE_CLEANUP_FAILED": "Persistent storage cleanup failed.",
+    "PERSISTENCE_CONSENT_CONFLICT": (
+        "The persistent consent revision conflicts with the request."
+    ),
+    "PERSISTENCE_CONSENT_INVALID": "Persistent consent is invalid.",
+    "PERSISTENCE_CONSENT_NOT_FOUND": "No persistent consent was found.",
+    "PERSISTENCE_CONSENT_REVOKED": "Persistent consent is revoked.",
+    "PERSISTENCE_DURABILITY_FAILED": (
+        "Persistent storage durability could not be confirmed."
+    ),
+    "PERSISTENCE_INPUT_MUTATION": "A persistence input changed during the operation.",
+    "PERSISTENCE_INSTALLATION_STALE": (
+        "The character this consent is bound to could not be resolved as "
+        "recorded: it may not be installed in this scope, or it changed after "
+        "consent was granted."
+    ),
+    "PERSISTENCE_LIMIT_EXCEEDED": "A persistent storage limit was exceeded.",
+    "PERSISTENCE_LOCKED": "Persistent storage is busy.",
+    "PERSISTENCE_MEMORY_CONFLICT": "The memory reference conflicts with retained data.",
+    "PERSISTENCE_MEMORY_CONTENT_REJECTED": "The memory summary content was rejected.",
+    "PERSISTENCE_MEMORY_INVALID": "The memory reference is invalid.",
+    "PERSISTENCE_MEMORY_NOT_FOUND": "The memory reference was not found.",
+    "PERSISTENCE_MIGRATION_CONFLICT": (
+        "The persistent state migration conflicts with retained data."
+    ),
+    "PERSISTENCE_MIGRATION_INVALID": "The persistent state migration is invalid.",
+    "PERSISTENCE_MIGRATION_STALE": "The persistent state migration inputs changed.",
+    "PERSISTENCE_MIGRATION_UNREPLAYABLE": (
+        "The persistent state migration cannot be replayed safely."
+    ),
+    "PERSISTENCE_MIGRATION_WRITE_FAILED": (
+        "Persistent state migration publication failed."
+    ),
+    "PERSISTENCE_MOOD_INVALID": "The persistent mood event is invalid.",
+    "PERSISTENCE_PATH_UNSAFE": "The persistent storage path is unsafe.",
+    "PERSISTENCE_PERMISSION_DENIED": "Persistent permission is not granted.",
+    "PERSISTENCE_RESET_STALE": (
+        "The persistent reset preview is stale; preview it again."
+    ),
+    "PERSISTENCE_STATE_CONTRACT_UNSUPPORTED": (
+        "The persistent state contract is unsupported."
+    ),
+    "PERSISTENCE_STATE_JOURNAL_INVALID": "The persistent state journal is invalid.",
+    "PERSISTENCE_STATE_MIGRATION_REQUIRED": (
+        "Persistent state requires an explicit migration."
+    ),
+    "PERSISTENCE_STATE_REVISION_CONFLICT": (
+        "The persistent state revision conflicts with the request."
+    ),
+    "PERSISTENCE_STATE_WRITE_FAILED": (
+        "Persistent state publication was committed but incomplete."
+    ),
+    "PERSISTENCE_WRITE_FAILED": "Persistent storage write failed.",
+    "PLAN_CONCLUSION_LANGUAGE_MISMATCH": (
+        "The conclusion must route to the primary language; recompile the "
+        "policy so it does."
+    ),
+    "PROTECTED_CHANNEL_OVERRIDE": "A protected language channel cannot be overridden.",
+    "SCHEMA_INVALID": "A bundled schema is invalid.",
+    "SCHEMA_NAME_INVALID": "The schema name is invalid.",
+    "SCHEMA_NOT_FOUND": "A required schema was not found.",
+    "SCHEMA_READ_FAILED": "A schema file could not be read.",
+    "SESSION_ALREADY_ACTIVE": "The session is already active.",
+    "SESSION_CHANGED": "The session binding changed.",
+    "SESSION_DATA_INVALID": "Session data is invalid.",
+    "SESSION_LOCK_FAILED": "The session lock operation failed.",
+    "SESSION_LOCK_TIMEOUT": "Session lock acquisition timed out.",
+    "SESSION_NOT_ACTIVE": "The session is not active; start it first.",
+    "SESSION_NOT_FOUND": "The session was not found.",
+    "SESSION_PATH_UNSAFE": "The session storage path is unsafe.",
+    "SESSION_READ_FAILED": "Session data could not be read.",
+    "SESSION_RESTART_INVALID": "Session restart data is invalid.",
+    "SESSION_WRITE_FAILED": "Session data could not be written.",
+    "SOFT_EVALUATION_BINDING_MISMATCH": (
+        "The soft-evaluation identity bindings do not match."
+    ),
+    "SOFT_EVALUATION_CURRENTNESS_MUTATION": (
+        "A soft-evaluation currentness input changed during validation."
+    ),
+    "SOFT_EVALUATION_DUPLICATE_SAMPLE": (
+        "The soft-evaluation input contains a duplicate sample."
+    ),
+    "SOFT_EVALUATION_FINDING_LIMIT": (
+        "The soft-evaluation findings exceed the report limit."
+    ),
+    "SOFT_EVALUATION_INPUT_MUTATION": (
+        "The soft-evaluation input changed during aggregation."
+    ),
+    "SOFT_EVALUATION_REPORT_INVALID": "The soft-evaluation report is invalid.",
+    "SOFT_EVALUATION_RESERVED_FINDING": (
+        "The evaluator used a finding code reserved for the aggregator."
+    ),
+    "SOFT_THRESHOLD_PROFILE_UNSUPPORTED": (
+        "The soft-evaluation threshold profile is unsupported."
+    ),
+    "STATE_BUSY": "Relationship state is busy.",
+    "STATE_CAPACITY_EXCEEDED": "Relationship state capacity was exceeded.",
+    "STATE_JOURNAL_INVALID": "The session event journal is invalid.",
+    "UNKNOWN_SCENARIO": "The requested scenario is not available in this pack.",
+    "UNSAFE_DRAFT_PATH": (
+        "The character draft destination contains an unsafe filesystem path."
+    ),
+    "UNSUPPORTED_LOCALE": "The requested locale is not available.",
 }
 
 
@@ -1688,6 +1955,13 @@ def _handle_character_draft_compile(
         raise KokoroError(
             "AUTHORING_VALIDATION_FAILED",
             "Character authoring validation failed.",
+            # The report already names every hard failure; dropping them told
+            # the caller only that something, somewhere, was wrong.
+            details={
+                "failures": sorted(
+                    {item["code"] for item in report["hard_failures"]}
+                )
+            },
         )
     draft = build_character_draft(request, source, report)
     publication_inputs = (
@@ -2309,6 +2583,12 @@ def _handle_state_apply(
 
 
 _SCHEMA_NAME: Final = re.compile(r"^[a-z][a-z0-9]*(?:-[a-z0-9]+)*\Z", re.ASCII)
+_MIGRATION_PATH: Final = re.compile(
+    r"^[0-9]+\.[0-9]+\.[0-9]+ -> [0-9]+\.[0-9]+\.[0-9]+\Z", re.ASCII
+)
+_INSTALLATION_STALE_REASONS: Final = frozenset(
+    {"resolution", "installation_changed", "binding"}
+)
 
 
 def _public_error_envelope(error: KokoroError) -> dict[str, Any]:
@@ -2342,6 +2622,41 @@ def _public_error_envelope(error: KokoroError) -> dict[str, Any]:
             and actual >= 0
         ):
             details = {"expected": expected, "actual": actual}
+    # Each of these carries structure a caller can act on without echoing any
+    # input: two language tags, finding codes, registered format paths, and a
+    # fixed reason. An empty object left every one of them a guessing game.
+    if code == "PLAN_CONCLUSION_LANGUAGE_MISMATCH":
+        route_expected = error.details.get("expected")
+        route_actual = error.details.get("actual")
+        if is_language_tag(route_expected) and is_language_tag(route_actual):
+            details = {"expected": route_expected, "actual": route_actual}
+    if code == "AUTHORING_VALIDATION_FAILED":
+        failures = error.details.get("failures")
+        if (
+            isinstance(failures, list)
+            and 0 < len(failures) <= 64
+            and all(
+                isinstance(item, str)
+                and _PUBLIC_ERROR_CODE.fullmatch(item) is not None
+                for item in failures
+            )
+        ):
+            details = {"failures": list(failures)}
+    if code == "MIGRATION_UNAVAILABLE":
+        supported = error.details.get("supported")
+        if (
+            isinstance(supported, list)
+            and len(supported) <= 32
+            and all(
+                isinstance(item, str) and _MIGRATION_PATH.fullmatch(item) is not None
+                for item in supported
+            )
+        ):
+            details = {"supported": list(supported)}
+    if code == "PERSISTENCE_INSTALLATION_STALE":
+        reason = error.details.get("reason")
+        if isinstance(reason, str) and reason in _INSTALLATION_STALE_REASONS:
+            details = {"reason": reason}
     return {
         "ok": False,
         "error": {
