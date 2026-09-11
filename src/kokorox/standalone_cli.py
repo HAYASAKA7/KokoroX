@@ -26,7 +26,10 @@ from kokorox.distribution.registry import (
     list_installed_packs,
     resolve_install_scope,
 )
-from kokorox.distribution.suite import install_skill_suite
+from kokorox.distribution.suite import (
+    install_skill_suite,
+    remove_skill_suite,
+)
 from kokorox.errors import KokoroError
 from kokorox.json_compat import find_json_incompatibility
 from kokorox.packs.compiler import canonical_bytes
@@ -340,6 +343,18 @@ def add_standalone_parsers(
     suite_install.add_argument("--source")
     suite_install.add_argument("--dry-run", action="store_true")
     _add_json(suite_install, leaf_json)
+    # The same targeting as install, so whatever install placed, remove finds.
+    suite_remove = suite_commands.add_parser("remove")
+    suite_remove.add_argument(
+        "--scope",
+        choices=("user", "repo"),
+        default="user",
+    )
+    suite_remove.add_argument("--repo")
+    suite_remove.add_argument("--skills-root")
+    suite_remove.add_argument("--source")
+    suite_remove.add_argument("--dry-run", action="store_true")
+    _add_json(suite_remove, leaf_json)
 
 
 def standalone_route(args: argparse.Namespace) -> StandaloneRoute | None:
@@ -1552,6 +1567,22 @@ def _handle_suite_install(
     return {"ok": True, "skill_suite": plan}
 
 
+def _handle_suite_remove(
+    args: argparse.Namespace,
+    data_root: Path | None,
+    schemas: SchemaRegistry,
+) -> dict[str, Any]:
+    del data_root, schemas
+    plan = remove_skill_suite(
+        source_root=_optional_path(args.source),
+        scope=args.scope,
+        repo_root=_optional_path(args.repo),
+        skills_root=_optional_path(args.skills_root),
+        dry_run=args.dry_run,
+    )
+    return {"ok": True, "skill_suite": plan}
+
+
 _HANDLERS: dict[StandaloneRoute, StandaloneHandler] = {
     ("pack", "compatibility"): _handle_pack_compatibility,
     ("pack", "export"): _handle_pack_export,
@@ -1569,6 +1600,7 @@ _HANDLERS: dict[StandaloneRoute, StandaloneHandler] = {
     ("memory", "list"): _handle_memory_list,
     ("memory", "remove"): _handle_memory_remove,
     ("suite", "install"): _handle_suite_install,
+    ("suite", "remove"): _handle_suite_remove,
 }
 
 

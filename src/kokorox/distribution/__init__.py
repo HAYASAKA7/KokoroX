@@ -44,6 +44,7 @@ from kokorox.distribution.suite import (
     SkillSuiteLimits,
     install_skill_suite,
     preview_skill_suite_install,
+    remove_skill_suite,
     resolve_skill_suite_source,
 )
 
@@ -78,6 +79,7 @@ __all__ = [
     "preview_skill_suite_install",
     "recover_karc_installations",
     "remove_installed_pack",
+    "remove_skill_suite",
     "resolve_character_selection",
     "resolve_install_scope",
     "resolve_skill_suite_source",

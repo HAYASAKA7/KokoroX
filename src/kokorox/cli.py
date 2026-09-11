@@ -306,11 +306,20 @@ _PUBLIC_MESSAGES = {
         "An installed Skill differs from the KokoroX suite; remove it first."
     ),
     "SKILL_SUITE_DESTINATION_CHANGED": (
-        "The Skill destination changed during installation."
+        "The Skill destination changed during the operation."
     ),
     "SKILL_SUITE_INSTALL_FAILED": "The Skill suite could not be installed.",
     "SKILL_SUITE_LIMIT_EXCEEDED": "The Skill suite source exceeds a bound.",
     "SKILL_SUITE_PATH_INVALID": "A Skill suite path is unsafe.",
+    "SKILL_SUITE_REMOVE_CONFLICT": (
+        "An installed Skill differs from the suite source; nothing was "
+        "removed. Name the suite that installed it with --source, or remove "
+        "it by hand."
+    ),
+    "SKILL_SUITE_REMOVE_FAILED": "The Skill suite could not be removed.",
+    "SKILL_SUITE_RESTORE_FAILED": (
+        "Skill suite removal failed and could not put moved Skills back."
+    ),
     "SKILL_SUITE_ROLLBACK_FAILED": "Skill suite installation could not roll back.",
     "SKILL_SUITE_SOURCE_AMBIGUOUS": (
         "Several complete Skill suite sources were found; name one with --source."

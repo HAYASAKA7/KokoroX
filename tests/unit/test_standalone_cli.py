@@ -36,6 +36,7 @@ def test_readme_documents_installed_suite_and_data_isolation() -> None:
         'python3 -m pip install "$wheel"',
         "kokorox suite install --scope user --json",
         'kokorox suite install --scope repo --repo "$repo" --json',
+        "kokorox suite remove --scope user --json",
     ):
         assert example in readme
 
@@ -337,6 +338,11 @@ def _install_and_grant_cli(
         (
             ["suite", "install", "--dry-run", "--json"],
             ("suite", "install"),
+            False,
+        ),
+        (
+            ["suite", "remove", "--dry-run", "--json"],
+            ("suite", "remove"),
             False,
         ),
     ],
@@ -1490,3 +1496,64 @@ def test_every_karc_error_says_something_specific() -> None:
 
     # The one that strands a scope must name the way out.
     assert "pack recover" in _PUBLIC_MESSAGES["KARC_INSTALL_RECOVERY_REQUIRED"]
+
+
+def test_skill_suite_cli_removes_what_it_installed(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    skills_root = tmp_path / "consumer-home" / ".agents" / "skills"
+    monkeypatch.delenv("KOKOROX_DATA_DIR", raising=False)
+    target = ["--scope", "user", "--skills-root", str(skills_root), "--json"]
+
+    code, _ = _cli_json(["suite", "install", *target], capsys)
+    assert code == 0
+
+    code, removed = _cli_json(["suite", "remove", *target], capsys)
+    assert code == 0
+    assert removed["skill_suite"]["artifact_id"] == (
+        "kokorox/skill-suite/removal-plan"
+    )
+    assert removed["skill_suite"]["will_write"] is True
+    assert {item["action"] for item in removed["skill_suite"]["skills"]} == {
+        "remove"
+    }
+    assert skills_root.is_dir()
+    assert list(skills_root.iterdir()) == []
+
+    code, again = _cli_json(["suite", "remove", *target], capsys)
+    assert code == 0
+    assert again["skill_suite"]["will_write"] is False
+    assert {item["action"] for item in again["skill_suite"]["skills"]} == {
+        "absent"
+    }
+
+
+def test_skill_suite_cli_remove_conflict_carries_its_remedy(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """A refusal that hides how to proceed strands the caller."""
+
+    skills_root = tmp_path / "consumer-home" / ".agents" / "skills"
+    monkeypatch.delenv("KOKOROX_DATA_DIR", raising=False)
+    target = ["--scope", "user", "--skills-root", str(skills_root), "--json"]
+    code, _ = _cli_json(["suite", "install", *target], capsys)
+    assert code == 0
+    (skills_root / "using-kokorox" / "SKILL.md").write_text(
+        "edited\n", encoding="utf-8"
+    )
+
+    code, refused = _cli_json(["suite", "remove", *target], capsys)
+
+    assert code != 0
+    assert refused["error"]["code"] == "SKILL_SUITE_REMOVE_CONFLICT"
+    assert "--source" in refused["error"]["message"]
+    assert {path.name for path in skills_root.iterdir()} == {
+        "using-kokorox",
+        "authoring-character-packs",
+        "researching-characters",
+        "testing-character-packs",
+    }

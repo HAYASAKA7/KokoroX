@@ -7,10 +7,13 @@ import shutil
 
 import pytest
 
+from kokorox.distribution import suite as suite_module
 from kokorox.distribution.suite import (
     SKILL_SUITE_NAMES,
     install_skill_suite,
+    remove_skill_suite,
 )
+from kokorox.errors import KokoroError
 
 
 REPOSITORY_ROOT = Path.cwd().resolve()
@@ -175,3 +178,172 @@ def test_conflict_preflight_publishes_nothing(tmp_path: Path) -> None:
         "different\n"
     )
     _assert_no_transaction_debris(skills_root)
+
+
+def test_removal_takes_exactly_the_suite_and_leaves_the_root(
+    tmp_path: Path,
+) -> None:
+    source = _copy_source(tmp_path)
+    skills_root = tmp_path / "installed"
+    install_skill_suite(source_root=source, skills_root=skills_root)
+    other = skills_root / "someone-elses-skill"
+    other.mkdir()
+    (other / "SKILL.md").write_text("not ours\n", encoding="utf-8")
+
+    result = remove_skill_suite(source_root=source, skills_root=skills_root)
+
+    assert result["artifact_id"] == "kokorox/skill-suite/removal-plan"
+    assert result["dry_run"] is False
+    assert result["will_write"] is True
+    assert [entry["action"] for entry in result["skills"]] == ["remove"] * 4
+    assert {entry.name for entry in skills_root.iterdir()} == {
+        "someone-elses-skill"
+    }
+    assert (other / "SKILL.md").read_text(encoding="utf-8") == "not ours\n"
+    assert _coordination_lock(tmp_path, skills_root).read_bytes() == b"0"
+    _assert_no_transaction_debris(skills_root)
+
+    # The round trip closes: what removal left behind installs cleanly.
+    reinstalled = install_skill_suite(source_root=source, skills_root=skills_root)
+    assert [entry["action"] for entry in reinstalled["skills"]] == ["install"] * 4
+
+
+def test_removing_a_suite_that_is_not_there_changes_nothing(
+    tmp_path: Path,
+) -> None:
+    source = _copy_source(tmp_path)
+    skills_root = tmp_path / "installed"
+
+    result = remove_skill_suite(source_root=source, skills_root=skills_root)
+
+    assert [entry["action"] for entry in result["skills"]] == ["absent"] * 4
+    assert result["will_write"] is False
+    assert not skills_root.exists()
+    assert not _coordination_lock(tmp_path, skills_root).exists()
+
+
+def test_an_edited_skill_refuses_removal_and_nothing_is_taken(
+    tmp_path: Path,
+) -> None:
+    source = _copy_source(tmp_path)
+    skills_root = tmp_path / "installed"
+    install_skill_suite(source_root=source, skills_root=skills_root)
+    edited = skills_root / "testing-character-packs" / "SKILL.md"
+    edited.write_text("my own notes\n", encoding="utf-8")
+    before = _tree_bytes(skills_root)
+
+    with pytest.raises(Exception) as raised:
+        remove_skill_suite(source_root=source, skills_root=skills_root)
+
+    assert getattr(raised.value, "code", None) == "SKILL_SUITE_REMOVE_CONFLICT"
+    assert _tree_bytes(skills_root) == before
+    _assert_no_transaction_debris(skills_root)
+
+
+def test_a_file_added_inside_a_skill_refuses_removal(tmp_path: Path) -> None:
+    source = _copy_source(tmp_path)
+    skills_root = tmp_path / "installed"
+    install_skill_suite(source_root=source, skills_root=skills_root)
+    (skills_root / "using-kokorox" / "notes.md").write_text(
+        "mine\n", encoding="utf-8"
+    )
+    before = _tree_bytes(skills_root)
+
+    with pytest.raises(Exception) as raised:
+        remove_skill_suite(source_root=source, skills_root=skills_root)
+
+    assert getattr(raised.value, "code", None) == "SKILL_SUITE_REMOVE_CONFLICT"
+    assert _tree_bytes(skills_root) == before
+    _assert_no_transaction_debris(skills_root)
+
+
+def test_removal_dry_run_is_a_byte_and_metadata_noop(tmp_path: Path) -> None:
+    source = _copy_source(tmp_path)
+    skills_root = tmp_path / "installed"
+    install_skill_suite(source_root=source, skills_root=skills_root)
+    before_bytes = _tree_bytes(skills_root)
+    before_times = _tree_times(skills_root)
+
+    result = remove_skill_suite(
+        source_root=source,
+        skills_root=skills_root,
+        dry_run=True,
+    )
+
+    assert result["dry_run"] is True
+    assert result["will_write"] is True
+    assert [entry["action"] for entry in result["skills"]] == ["remove"] * 4
+    assert _tree_bytes(skills_root) == before_bytes
+    assert _tree_times(skills_root) == before_times
+
+
+def test_a_partial_install_loses_only_what_is_there(tmp_path: Path) -> None:
+    source = _copy_source(tmp_path)
+    skills_root = tmp_path / "installed"
+    skills_root.mkdir()
+    for name in SKILL_SUITE_NAMES[:2]:
+        shutil.copytree(source / name, skills_root / name)
+
+    result = remove_skill_suite(source_root=source, skills_root=skills_root)
+
+    assert [entry["action"] for entry in result["skills"]] == [
+        "remove",
+        "remove",
+        "absent",
+        "absent",
+    ]
+    assert list(skills_root.iterdir()) == []
+    _assert_no_transaction_debris(skills_root)
+
+
+def test_a_failure_while_moving_puts_every_skill_back(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """All-or-nothing holds until deletion starts: nothing is half removed."""
+
+    source = _copy_source(tmp_path)
+    skills_root = tmp_path / "installed"
+    install_skill_suite(source_root=source, skills_root=skills_root)
+    before = _tree_bytes(skills_root)
+    real_rename = suite_module._rename_directory_no_replace
+    calls = 0
+
+    def failing_third_move(staging: Path, final: Path) -> None:
+        nonlocal calls
+        calls += 1
+        if calls == 3:
+            raise KokoroError(
+                "KARC_INSTALL_WRITE_FAILED", "simulated rename failure"
+            )
+        real_rename(staging, final)
+
+    monkeypatch.setattr(
+        suite_module, "_rename_directory_no_replace", failing_third_move
+    )
+
+    with pytest.raises(Exception) as raised:
+        remove_skill_suite(source_root=source, skills_root=skills_root)
+
+    assert getattr(raised.value, "code", None) == "SKILL_SUITE_REMOVE_FAILED"
+    assert _tree_bytes(skills_root) == before
+    _assert_no_transaction_debris(skills_root)
+
+
+def test_removes_a_repository_scope_install(tmp_path: Path) -> None:
+    source = _copy_source(tmp_path)
+    repo_root = tmp_path / "consumer-repo"
+    repo_root.mkdir()
+    install_skill_suite(source_root=source, scope="repo", repo_root=repo_root)
+
+    result = remove_skill_suite(
+        source_root=source,
+        scope="repo",
+        repo_root=repo_root,
+    )
+
+    skills_root = repo_root / ".agents" / "skills"
+    assert result["scope"] == "repo"
+    assert [entry["action"] for entry in result["skills"]] == ["remove"] * 4
+    assert skills_root.is_dir()
+    assert list(skills_root.iterdir()) == []

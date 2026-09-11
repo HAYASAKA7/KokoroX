@@ -8,6 +8,14 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- `kokorox suite remove` uninstalls the Skill suite. There was no way to take
+  it out again short of deleting directories by hand. Install writes no
+  receipt, so removal proves ownership the way install decides a reinstall is
+  a no-op: a Skill goes only when it is byte-identical to the suite source,
+  and any difference refuses the whole removal with
+  `SKILL_SUITE_REMOVE_CONFLICT`. Every Skill is moved aside before any is
+  deleted, so a failure while moving puts them all back. The Skill root and
+  anything else in it are left alone.
 - A turn can now be genuinely bilingual: the character speaks its authored
   line in the language it was written in, while everything the model formed
   this turn follows the reader. A render plan gained a second segment kind --

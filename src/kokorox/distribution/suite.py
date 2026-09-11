@@ -1,12 +1,14 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from collections.abc import Callable
+from dataclasses import dataclass, replace
 import errno
 from hashlib import sha256
 import os
 from pathlib import Path
 import sys
 import re
+import secrets
 import site
 import stat
 import sysconfig
@@ -374,6 +376,211 @@ def install_skill_suite(
         actions=actions,
         dry_run=False,
     )
+
+
+def remove_skill_suite(
+    *,
+    source_root: Path | None = None,
+    scope: Literal["user", "repo"] = "user",
+    repo_root: Path | None = None,
+    skills_root: Path | None = None,
+    dry_run: bool = False,
+    limits: SkillSuiteLimits = SkillSuiteLimits(),
+) -> dict[str, Any]:
+    """Remove the installed suite, and only what can be proven to be it.
+
+    Install writes no receipt, so ownership is settled the way install decides
+    a reinstall is a no-op: a Skill is removed only when its tree is byte
+    identical to the suite source. An edited Skill, a user file inside one, or
+    a different suite version refuses the whole removal and removes nothing.
+    The Skills root itself always stays; other Skills may live there.
+
+    Every Skill to remove is moved aside before any is deleted, so a failure
+    while moving puts all of them back.
+    """
+
+    source = _resolve_source_snapshot(source_root, limits)
+    target = _resolve_skills_root(
+        scope=scope,
+        repo_root=repo_root,
+        skills_root=skills_root,
+    )
+    _reject_source_target_overlap(source.root, target)
+    actions = _plan_removal(source, target, limits)
+    if dry_run or not any(action == "remove" for _, action in actions):
+        return _result_document(
+            source=source,
+            target=target,
+            scope=scope,
+            actions=actions,
+            dry_run=dry_run,
+            kind="removal",
+        )
+    initial_skill_states = _capture_target_skill_states(target, limits)
+    # A Skill being removed must stay exactly as captured, and one that was
+    # absent must stay absent -- the install guard, read for this direction.
+    guarded = tuple(
+        (name, "unchanged" if action == "remove" else "install")
+        for name, action in actions
+    )
+    moved: list[_StagedSkill] = []
+    removed: list[str] = []
+    deleting: str | None = None
+    try:
+        lock_parent = _nearest_existing_directory(target.parent)
+        lock_parent_identity = _capture_directory_identity(lock_parent)
+        with _acquire_suite_lock(lock_parent, target) as transaction_lock:
+            _require_destination_directory(
+                lock_parent,
+                lock_parent_identity,
+                "lock acquisition",
+            )
+            _require_suite_lock(transaction_lock)
+            target_identity = _capture_directory_identity(target)
+            _require_actions_unchanged(
+                source,
+                target,
+                limits,
+                actions,
+                "removal",
+                planner=_plan_removal,
+            )
+            _require_target_skill_states(
+                target,
+                limits,
+                initial_skill_states,
+                guarded,
+                phase="removal",
+                require_missing=True,
+            )
+            states = {state.name: state for state in initial_skill_states}
+            for name, action in actions:
+                if action == "remove":
+                    moved.append(_move_skill_aside(target, states[name]))
+            _require_destination_directory(target, target_identity, "removal")
+            _require_suite_lock(transaction_lock)
+            for item in moved:
+                deleting = item.name
+                _remove_identity_tree(item, item.staging)
+                removed.append(item.name)
+                deleting = None
+            _fsync_directory(target)
+            _require_destination_directory(
+                target,
+                target_identity,
+                "final verification",
+            )
+            _require_suite_lock(transaction_lock)
+            for item in moved:
+                if _lstat_optional(item.final) is not None:
+                    raise _error(
+                        "SKILL_SUITE_DESTINATION_CHANGED",
+                        "A removed Skill reappeared during removal.",
+                    )
+    except BaseException as error:
+        # A tomb whose deletion had begun cannot be put back whole; every
+        # other one that was moved but not deleted goes back where it was.
+        intact = [
+            item
+            for item in moved
+            if item.name not in removed and item.name != deleting
+        ]
+        restore_error = _restore_moved_skills(intact)
+        if restore_error is not None:
+            raise _error(
+                "SKILL_SUITE_RESTORE_FAILED",
+                "Skill suite removal could not put moved Skills back.",
+                reason=_reason(restore_error),
+            ) from error
+        if isinstance(error, KokoroError):
+            raise
+        raise _error(
+            "SKILL_SUITE_REMOVE_FAILED",
+            "The KokoroX Skill suite could not be removed.",
+            reason=type(error).__name__,
+        ) from error
+    return _result_document(
+        source=source,
+        target=target,
+        scope=scope,
+        actions=actions,
+        dry_run=False,
+        kind="removal",
+    )
+
+
+def _move_skill_aside(target: Path, state: _TargetSkillState) -> _StagedSkill:
+    """Rename one installed Skill to a tomb beside it, identities recorded.
+
+    A rename keeps device and inode, so identities captured before the move
+    still name the same tree after it. That is what lets the tomb be deleted,
+    or put back, only while it is provably unchanged.
+    """
+
+    if state.root_identity is None or state.files is None:
+        raise _error(
+            "SKILL_SUITE_DESTINATION_CHANGED",
+            "A Skill to remove disappeared during removal.",
+        )
+    final = target / state.name
+    prefix = f"{state.name}/"
+    try:
+        record = _StagedSkill(
+            state.name,
+            final,
+            final,
+            state.root_identity,
+            tuple(
+                (relative, _capture_directory_identity(final / relative))
+                for relative in ("agents", "references")
+            ),
+            tuple(
+                (item.relative.removeprefix(prefix), item.identity)
+                for item in state.files
+            ),
+        )
+        _require_cleanup_identity(record, final)
+    except KokoroError as error:
+        raise _error(
+            "SKILL_SUITE_DESTINATION_CHANGED",
+            "A Skill to remove changed before it could be moved.",
+            reason=error.code,
+        ) from error
+    tomb = target / (
+        f".kokorox-skill-suite-{state.name}-removing-{secrets.token_hex(8)}"
+    )
+    try:
+        _rename_directory_no_replace(final, tomb)
+        _fsync_directory(target)
+    except KokoroError as error:
+        if error.code == "KARC_INSTALL_CONFLICT":
+            raise _error(
+                "SKILL_SUITE_DESTINATION_CHANGED",
+                "A removal path appeared before the Skill could be moved.",
+            ) from error
+        raise _error(
+            "SKILL_SUITE_REMOVE_FAILED",
+            "A Skill directory could not be moved aside.",
+            reason=error.code,
+        ) from error
+    moved = replace(record, staging=tomb)
+    _require_staged_skill(moved, tomb)
+    return moved
+
+
+def _restore_moved_skills(items: list[_StagedSkill]) -> BaseException | None:
+    """Put every moved-aside Skill back; return the first failure, if any."""
+
+    first_error: BaseException | None = None
+    for item in reversed(items):
+        try:
+            _require_staged_skill(item, item.staging)
+            _rename_directory_no_replace(item.staging, item.final)
+            _fsync_directory(item.final.parent)
+        except BaseException as error:
+            if first_error is None:
+                first_error = error
+    return first_error
 
 
 def _resolve_source_snapshot(
@@ -800,19 +1007,26 @@ def _reject_source_target_overlap(source: Path, target: Path) -> None:
         raise _path_error("Skill source and destination must be disjoint.")
 
 
-def _plan_actions(
+def _classify_installed(
     source: _SuiteSnapshot,
     target: Path,
     limits: SkillSuiteLimits,
-) -> tuple[tuple[str, str], ...]:
-    actions: list[tuple[str, str]] = []
+) -> tuple[tuple[str, bool], ...]:
+    """Return each suite Skill and whether the target holds it, byte for byte.
+
+    A present Skill that is not byte-identical to the source raises
+    `SKILL_SUITE_CONFLICT`. Install and removal share this so they agree on
+    what counts as the suite's own tree; neither acts on one it cannot prove.
+    """
+
+    present: list[tuple[str, bool]] = []
     source_files = {item.relative: item.payload for item in source.files}
     for skill_name in SKILL_SUITE_NAMES:
         skill_target = target / skill_name
         try:
             linked = skill_target.lstat()
         except FileNotFoundError:
-            actions.append((skill_name, "install"))
+            present.append((skill_name, False))
             continue
         except OSError as error:
             raise _path_error(
@@ -843,8 +1057,39 @@ def _plan_actions(
                 "SKILL_SUITE_CONFLICT",
                 "An installed Skill differs from the KokoroX suite.",
             )
-        actions.append((skill_name, "unchanged"))
-    return tuple(actions)
+        present.append((skill_name, True))
+    return tuple(present)
+
+
+def _plan_actions(
+    source: _SuiteSnapshot,
+    target: Path,
+    limits: SkillSuiteLimits,
+) -> tuple[tuple[str, str], ...]:
+    return tuple(
+        (name, "unchanged" if present else "install")
+        for name, present in _classify_installed(source, target, limits)
+    )
+
+
+def _plan_removal(
+    source: _SuiteSnapshot,
+    target: Path,
+    limits: SkillSuiteLimits,
+) -> tuple[tuple[str, str], ...]:
+    try:
+        classified = _classify_installed(source, target, limits)
+    except KokoroError as error:
+        if error.code != "SKILL_SUITE_CONFLICT":
+            raise
+        raise _error(
+            "SKILL_SUITE_REMOVE_CONFLICT",
+            "An installed Skill differs from the suite source; nothing was "
+            "removed.",
+        ) from error
+    return tuple(
+        (name, "remove" if present else "absent") for name, present in classified
+    )
 
 
 def _capture_skill_target(
@@ -1592,12 +1837,17 @@ def _require_actions_unchanged(
     limits: SkillSuiteLimits,
     expected: tuple[tuple[str, str], ...],
     phase: str,
+    *,
+    planner: Callable[
+        [_SuiteSnapshot, Path, SkillSuiteLimits], tuple[tuple[str, str], ...]
+    ] = _plan_actions,
 ) -> None:
     try:
-        current = _plan_actions(source, target, limits)
+        current = planner(source, target, limits)
     except KokoroError as error:
         if error.code in {
             "SKILL_SUITE_CONFLICT",
+            "SKILL_SUITE_REMOVE_CONFLICT",
             "SKILL_SUITE_LIMIT_EXCEEDED",
             "SKILL_SUITE_PATH_INVALID",
         }:
@@ -1682,10 +1932,11 @@ def _result_document(
     scope: str,
     actions: tuple[tuple[str, str], ...],
     dry_run: bool,
+    kind: Literal["install", "removal"] = "install",
 ) -> dict[str, Any]:
     hashes = dict(source.skill_sha256)
     return {
-        "artifact_id": "kokorox/skill-suite/install-plan",
+        "artifact_id": f"kokorox/skill-suite/{kind}-plan",
         "version": "1.0.0",
         "scope": scope,
         "skills_root": str(target),
@@ -1700,7 +1951,7 @@ def _result_document(
             for name, action in actions
         ],
         "dry_run": dry_run,
-        "will_write": any(action == "install" for _, action in actions),
+        "will_write": any(action in {"install", "remove"} for _, action in actions),
     }
 
 

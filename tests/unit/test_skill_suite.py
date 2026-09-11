@@ -135,12 +135,14 @@ def test_distribution_suite_exposes_the_frozen_public_surface() -> None:
     assert callable(suite.resolve_skill_suite_source)
     assert callable(suite.preview_skill_suite_install)
     assert callable(suite.install_skill_suite)
+    assert callable(suite.remove_skill_suite)
     for name in (
         "SKILL_SUITE_NAMES",
         "SkillSuiteLimits",
         "resolve_skill_suite_source",
         "preview_skill_suite_install",
         "install_skill_suite",
+        "remove_skill_suite",
     ):
         assert getattr(distribution, name) is getattr(suite, name)
         assert name in distribution.__all__
@@ -713,6 +715,9 @@ def test_suite_errors_reach_the_caller_with_their_own_message() -> None:
         "SKILL_SUITE_SOURCE_AMBIGUOUS",
         "SKILL_SUITE_SOURCE_INVALID",
         "SKILL_SUITE_CONFLICT",
+        "SKILL_SUITE_REMOVE_CONFLICT",
+        "SKILL_SUITE_REMOVE_FAILED",
+        "SKILL_SUITE_RESTORE_FAILED",
     ):
         envelope = _public_error_envelope(
             KokoroError(code, "internal detail", retryable=False)
@@ -726,3 +731,44 @@ def test_suite_errors_reach_the_caller_with_their_own_message() -> None:
         )
     )["error"]
     assert counted["details"] == {"sources": 2}
+
+
+def test_removal_preview_names_what_it_would_take_and_takes_nothing(
+    tmp_path: Path,
+) -> None:
+    suite = _suite_module()
+    source = _copy_source(tmp_path)
+    skills_root = tmp_path / "installed"
+    skills_root.mkdir()
+    for name in suite.SKILL_SUITE_NAMES[:2]:
+        shutil.copytree(source / name, skills_root / name)
+    before = _relative_files(skills_root)
+
+    plan = suite.remove_skill_suite(
+        source_root=source,
+        skills_root=skills_root,
+        dry_run=True,
+    )
+
+    assert plan["artifact_id"] == "kokorox/skill-suite/removal-plan"
+    assert plan["dry_run"] is True
+    assert plan["will_write"] is True
+    assert [entry["action"] for entry in plan["skills"]] == [
+        "remove",
+        "remove",
+        "absent",
+        "absent",
+    ]
+    assert _relative_files(skills_root) == before
+
+
+def test_install_plan_keeps_its_own_identity() -> None:
+    """Sharing the result document with removal must not rename install's."""
+
+    suite = _suite_module()
+    plan = suite.preview_skill_suite_install(
+        source_root=SOURCE_SKILLS,
+        skills_root=Path(REPOSITORY_ROOT.anchor) / "kokorox-never-created",
+    )
+
+    assert plan["artifact_id"] == "kokorox/skill-suite/install-plan"

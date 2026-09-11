@@ -867,3 +867,39 @@ def test_staging_identity_capture_failure_is_explicit_and_deletes_nothing(
     residual = _transaction_debris(destination)
     assert len(residual) == 1
     assert residual[0].is_dir()
+
+
+def test_a_skill_edited_after_planning_stops_removal_before_anything_moves(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The plan proved ownership; the lock must prove it again, or refuse."""
+
+    source = _copy_source(tmp_path)
+    destination = tmp_path / "installed"
+    suite.install_skill_suite(source_root=source, skills_root=destination)
+    edited = destination / "using-kokorox" / "SKILL.md"
+    real_acquire = suite._acquire_suite_lock
+
+    def acquire(lock_parent: Path, target: Path):
+        edited.write_text("edited after planning\n", encoding="utf-8")
+        return real_acquire(lock_parent, target)
+
+    monkeypatch.setattr(suite, "_acquire_suite_lock", acquire)
+
+    _assert_code(
+        "SKILL_SUITE_DESTINATION_CHANGED",
+        lambda: suite.remove_skill_suite(
+            source_root=source,
+            skills_root=destination,
+        ),
+    )
+    assert {path.name for path in destination.iterdir()} == set(
+        suite.SKILL_SUITE_NAMES
+    )
+    assert edited.read_text(encoding="utf-8") == "edited after planning\n"
+    assert not [
+        path
+        for path in destination.rglob("*")
+        if path.name.startswith(".kokorox-skill-suite-")
+    ]

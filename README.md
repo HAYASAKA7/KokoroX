@@ -49,6 +49,19 @@ returns four `unchanged` actions; a different pre-existing Skill fails closed
 instead of being overwritten. The wheel carries the Skill files as package
 data, but `pip install` alone does not copy them into a host Skill root.
 
+To remove the suite, run the same command with `remove`:
+
+```bash
+kokorox suite remove --scope user --json
+```
+
+Removal deletes a Skill only when it is byte-identical to the suite source, so
+it never takes a Skill you edited or one another tool placed there; any
+difference refuses the whole removal and removes nothing. The Skill root stays,
+along with any other Skills in it. After upgrading KokoroX the installed suite
+is the previous version, so name that version's source with `--source` or
+remove the four directories by hand.
+
 ## Use the suite in many agents
 
 The suite is agent-neutral. It installs into the vendor-neutral
