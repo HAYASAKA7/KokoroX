@@ -1101,6 +1101,9 @@ def test_validate_authoring_pack_rejects_unresolved_bundle_conflict(
     unresolved["conflicts"][0]["status"] = "unresolved"
     unresolved["conflicts"][0]["selected_claim_ids"] = []
     unresolved["conflicts"][0].pop("resolution_rationale")
+    unresolved["conflicts"][0]["incompatibility_rationale"] = (
+        "The claims name different roles."
+    )
     unhashed = dict(unresolved)
     unhashed.pop("bundle_hash")
     unresolved["bundle_hash"] = canonical_hash(unhashed)

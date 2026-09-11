@@ -74,7 +74,14 @@ def test_conflict_statuses_have_exact_selection_and_rationale_rules() -> None:
     invalid("research-conflict", conflict)
     conflict["selected_claim_ids"] = []
     conflict.pop("resolution_rationale")
+    # Filing a conflict now needs a reason, as resolving one always did.
+    invalid("research-conflict", conflict)
+    conflict["incompatibility_rationale"] = "The claims name different roles."
     SCHEMAS.validate("research-conflict", conflict)
+    # A resolution rationale still has no place on an unresolved conflict.
+    conflict["resolution_rationale"] = "Not resolved yet."
+    invalid("research-conflict", conflict)
+    conflict.pop("resolution_rationale")
     conflict.update({"status": "scope_separated", "selected_claim_ids": []})
     invalid("research-conflict", conflict)
 

@@ -19,7 +19,7 @@
   },
   "spoiler_scope": "episode-01 only",
   "request_hash": "d5b6510038ec751716ce0908831ac33d95aab376fc532ccfabb5a459e2f65702",
-  "workspace_hash": "e8261f3ed4fa29be9d97533cd66271baeed297e15c65b8b789fa435cc40103fa",
+  "workspace_hash": "656b7b91e8bb4b7bb051759cab1e37beee03cc7a72d91c765e12df34469680cf",
   "validation_report_hash": "6bdc6df186e7a3b7390827f83406e75e5f6d9dbaa925a763eb41fb368b891e35",
   "sources": [
     {
@@ -116,7 +116,8 @@
         "fixture-primary"
       ],
       "status": "unresolved",
-      "selected_claim_ids": []
+      "selected_claim_ids": [],
+      "incompatibility_rationale": "The official profile and the history record give irreconcilable wordings for the same role in the same continuity and period, so both cannot be true."
     }
   ],
   "coverage": {
@@ -166,5 +167,5 @@
   "blocking_reasons": [
     "Missing evidence for the blocked history topic."
   ],
-  "bundle_hash": "d3e13544b648b8a9f163009bef86cff66c35729d02553bf517e51ad47f19f692"
+  "bundle_hash": "835b21f953fd6c7ac174e3d0179eb02ccc930338398372ef526f2a47cd16f880"
 }

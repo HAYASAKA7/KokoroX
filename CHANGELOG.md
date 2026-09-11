@@ -48,6 +48,15 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- **Breaking:** an unresolved research conflict now needs an
+  `incompatibility_rationale` saying why its claims cannot both be true. Both
+  resolved states always had to be argued for, while `unresolved` -- the
+  state that blocks authoring -- needed nothing, and the schema forbade a
+  reason outright. Existing workspaces with an unresolved conflict fail
+  validation until one is added. The research contract now also says to
+  classify the attribute and re-read the cited excerpts first: two sources
+  giving different values for something that changes over time usually record
+  a progression, not a contradiction.
 - `conclusion` is now its own language channel. It had been sharing
   `character_dialogue`, which made the channel's name a lie and put the
   answer on a channel that is supposed to follow the pack rather than the

@@ -522,6 +522,11 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 4000
+          },
+          "incompatibility_rationale": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4000
           }
         },
         "allOf": [
@@ -537,6 +542,9 @@
               ]
             },
             "then": {
+              "required": [
+                "incompatibility_rationale"
+              ],
               "properties": {
                 "selected_claim_ids": {
                   "maxItems": 0

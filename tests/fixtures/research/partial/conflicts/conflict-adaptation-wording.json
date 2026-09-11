@@ -15,5 +15,6 @@
     "fixture-primary"
   ],
   "status": "unresolved",
-  "selected_claim_ids": []
+  "selected_claim_ids": [],
+  "incompatibility_rationale": "The official profile and the history record give irreconcilable wordings for the same role in the same continuity and period, so both cannot be true."
 }

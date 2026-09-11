@@ -28,7 +28,7 @@
   "conflicts": [
     {
       "path": "conflicts/conflict-adaptation-wording.json",
-      "sha256": "04e4bbc80de2436f6902d15c1dc7435f313a77c3183b64f5f9fb9ba7132b17ae"
+      "sha256": "b48f8baa662547ea7e1b5ef64d93973122f7be4bd6bb2ad9fa1b0671c5889881"
     }
   ],
   "coverage": {

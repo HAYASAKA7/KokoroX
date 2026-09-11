@@ -85,3 +85,17 @@ def test_injection_conflict_has_distinct_represented_scopes() -> None:
     assert set(conflict["scopes"]) == {
         f"{continuity}@{timeline}" for continuity, timeline in claim_scopes
     }
+
+
+def test_an_unresolved_conflict_must_say_why_the_claims_cannot_both_hold() -> None:
+    """Filing a conflict blocked authoring on no stated ground at all."""
+
+    conflict = load("partial", "conflicts/conflict-adaptation-wording.json")
+    bundle = load("partial", "bundle.json")
+    SCHEMAS.validate("research-conflict", conflict)
+    SCHEMAS.validate("research-bundle", bundle)
+
+    del conflict["incompatibility_rationale"]
+    invalid("research-conflict", conflict)
+    del bundle["conflicts"][0]["incompatibility_rationale"]
+    invalid("research-bundle", bundle)

@@ -44,7 +44,7 @@ Each claim is one proposition with one of four provenance classifications:
 
 Support is categorical: `direct`, `corroborated`, `indirect`, or `unsupported`. Unsupported claims may document gaps but cannot authorize downstream content. A sourced in-world quantity is allowed. A normalized personality, behavior, morality, or relationship score is never a canonical research fact.
 
-Keep incompatible claims in a Conflict Record. Resolve only through explicit evidence and rationale or valid separation by continuity, adaptation, or timeline. Popularity, source count, or agent preference is not resolution.
+Keep incompatible claims in a Conflict Record, and state in `incompatibility_rationale` why they cannot both be true: an unresolved conflict blocks authoring, so filing one needs a reason as much as resolving one does. Before filing, classify the attribute and re-read the excerpts of every source the claims cite. Most researched attributes change over time -- rank, title, tenure, residence, affiliation -- and two sources naming different values for one of them usually record a progression, not a contradiction; the answer is often already in a retained excerpt. Resolve only through explicit evidence and rationale or valid separation by continuity, adaptation, or timeline. Popularity, source count, or agent preference is not resolution.
 
 Coverage accounts for every requested topic as `covered`, `partial`, `missing`, or `blocked`. Preserve supporting claims, missing evidence, unavailable sources, spoiler restrictions, limitations, and whether the topic blocks authoring.
 

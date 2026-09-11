@@ -404,6 +404,7 @@ def test_unresolved_conflict_is_structurally_valid_but_blocks_authoring() -> Non
         conflict = value["conflicts"][0]
         conflict.update({"status": "unresolved", "selected_claim_ids": []})
         conflict.pop("resolution_rationale")
+        conflict["incompatibility_rationale"] = "The claims name different roles."
 
     report = validate_research_workspace(changed(loaded(), unresolved), SCHEMAS)
 
@@ -525,6 +526,7 @@ def test_blocking_reasons_are_sorted_and_bounded() -> None:
                 }
             )
             conflict.pop("resolution_rationale")
+            conflict["incompatibility_rationale"] = "The claims name different roles."
             conflicts.append(conflict)
         value["conflicts"] = tuple(conflicts)
 

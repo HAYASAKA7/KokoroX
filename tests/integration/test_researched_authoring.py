@@ -501,6 +501,7 @@ def test_coherently_rehashed_unresolved_conflict_is_still_ineligible(
         conflict["status"] = "unresolved"
         conflict["selected_claim_ids"] = []
         conflict.pop("resolution_rationale")
+        conflict["incompatibility_rationale"] = "The claims name different roles."
     (mutated / "workspace.json").write_bytes(canonical_bytes(workspace) + b"\n")
     bundle["workspace_hash"] = canonical_hash(workspace)
     unhashed = dict(bundle)

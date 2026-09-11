@@ -110,7 +110,7 @@ def test_loads_partial_and_injection_workspaces_without_executing_source_text() 
     assert partial.coverage["blocks_authoring"] is True
     assert (
         partial.workspace_hash
-        == "e8261f3ed4fa29be9d97533cd66271baeed297e15c65b8b789fa435cc40103fa"
+        == "656b7b91e8bb4b7bb051759cab1e37beee03cc7a72d91c765e12df34469680cf"
     )
     assert injection.request["character_id"] == "aoi-kisaragi-fixture"
     assert all(
