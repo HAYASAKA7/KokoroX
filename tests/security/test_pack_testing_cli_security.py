@@ -387,7 +387,10 @@ def test_soft_eval_revalidates_report_before_atomic_handoff(
 
     schemas = CountingSchemas()
     result = cli_module._handle_pack_soft_eval(
-        argparse.Namespace(input=str(input_path), out="soft.json"),
+        # Mirrors the parser's output, which now always carries the profile.
+        argparse.Namespace(
+            input=str(input_path), out="soft.json", profile="default-release"
+        ),
         Settings(data_dir=(tmp_path / "data").resolve(), schema_dir=SCHEMA_ROOT),
         schemas,  # type: ignore[arg-type]
     )
