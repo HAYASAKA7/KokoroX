@@ -1557,3 +1557,56 @@ def test_skill_suite_cli_remove_conflict_carries_its_remedy(
         "researching-characters",
         "testing-character-packs",
     }
+
+
+def test_consent_grant_names_what_a_replacement_withdrew(
+    rin_verified_release: dict[str, Any],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Granting one after three silently dropped two; now the result says so."""
+
+    _install_and_grant_cli(
+        rin_verified_release,
+        tmp_path,
+        monkeypatch,
+        capsys,
+        permissions="relationship_state,mood_state,memory_references",
+    )
+
+    def grant(permissions: str) -> dict[str, Any]:
+        code, body = _cli_json(
+            [
+                "consent",
+                "grant",
+                "--character",
+                "rin-aster",
+                "--scope",
+                "global",
+                "--permissions",
+                permissions,
+                "--json",
+            ],
+            capsys,
+        )
+        assert code == 0
+        return body
+
+    narrowed = grant("relationship_state")
+    assert narrowed["consent"]["permissions"] == ["relationship_state"]
+    assert narrowed["revoked_by_replacement"] == [
+        "memory_references",
+        "mood_state",
+    ]
+
+    assert grant("relationship_state")["revoked_by_replacement"] == []
+    assert grant("relationship_state,mood_state")["revoked_by_replacement"] == []
+
+    # Permissions of a revoked consent were withdrawn by the revocation, not
+    # by the grant that follows it.
+    code, _revoked = _cli_json(
+        ["consent", "revoke", "--character", "rin-aster", "--json"], capsys
+    )
+    assert code == 0
+    assert grant("memory_references")["revoked_by_replacement"] == []

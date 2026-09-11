@@ -1218,7 +1218,20 @@ def _handle_consent_grant(
         workspace_root=workspace,
         expected_revision=_consent_revision(current),
     )
-    return {"ok": True, "consent": consent}
+    # A grant sets the whole permission set, so whatever the replaced grant
+    # held and this one does not is withdrawn. Saying so is the only way a
+    # caller who meant to add one permission learns they removed two. The
+    # expected revision above pins `current` as exactly the grant replaced.
+    previous = (
+        set(current["permissions"])
+        if current is not None and current.get("status") == "active"
+        else set()
+    )
+    return {
+        "ok": True,
+        "consent": consent,
+        "revoked_by_replacement": sorted(previous - set(consent["permissions"])),
+    }
 
 
 def _handle_consent_show(

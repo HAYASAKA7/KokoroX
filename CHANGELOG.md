@@ -81,6 +81,12 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- `consent grant` replaces the permission set, and the README said "granting
+  one never grants another" -- true, but it read as "granting one leaves the
+  others alone", which is the opposite of what happens. Adding one permission
+  silently dropped the rest. The README now states the semantics, and the
+  command returns `revoked_by_replacement`, naming every permission a grant
+  withdrew from the consent it replaced.
 - `PUBLICATION_PROMOTION_STALE` blamed "the Character Pack" whenever any
   promotion binding moved -- including after a KokoroX upgrade, when the
   source was byte-identical and only the compiled artifact had changed, which

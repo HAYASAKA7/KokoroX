@@ -138,8 +138,11 @@ current host session.
 
 Session state remains session-local by default. Global or workspace persistence
 requires explicit consent for `relationship_state`, `mood_state`, and
-`memory_references`. Each permission is independent; granting one never grants
-another, and revocation blocks future writes without silently deleting data.
+`memory_references`. Each permission is independent, and `consent grant` sets
+the complete set: granting `relationship_state` alone after granting all three
+withdraws the other two, and the result names them under
+`revoked_by_replacement`. To add a permission, pass every permission you want
+to keep. Revocation blocks future writes without silently deleting data.
 
 ```bash
 kokorox consent grant --character rin-aster --scope global \
