@@ -312,13 +312,13 @@ def test_hard_report_rejects_duplicate_findings() -> None:
 
 def test_passing_hard_report_requires_every_hard_gate_to_pass() -> None:
     invalid = deepcopy(_bundle("original-minimal.json")["hard_report"])
-    invalid["checks"]["security"]["passed"] = False
-    invalid["checks"]["security"]["findings"] = [
+    invalid["checks"]["file_safety"]["passed"] = False
+    invalid["checks"]["file_safety"]["findings"] = [
         {
             "severity": "error",
-            "code": "PACK_SECURITY_FAILED",
+            "code": "PACK_FILE_SAFETY_FAILED",
             "path": ["source"],
-            "message": "The source did not pass the security gate.",
+            "message": "The source did not pass the file safety check.",
         }
     ]
 
@@ -668,7 +668,7 @@ def test_nested_contracts_are_closed() -> None:
         (
             "hard_report",
             "pack-hard-validation-report",
-            ("checks", "security"),
+            ("checks", "file_safety"),
         ),
         (
             "hard_report",

@@ -40,7 +40,7 @@ _CHECK_NAMES = (
     "source_schema",
     "pack_layout",
     "provenance",
-    "security",
+    "file_safety",
     "compile",
     "fixture_structure",
     "locale_coverage",
@@ -125,7 +125,7 @@ def run_hard_validation(
     }
     mutation_probes: list[_MutationProbe] = []
     _check_layout(initial_snapshot, checks["pack_layout"])
-    _check_security(initial_snapshot, checks["security"])
+    _check_file_safety(initial_snapshot, checks["file_safety"])
     source = assemble_source_pack_from_contents(initial_snapshot.contents)
     source_bytes = canonical_bytes(source)
     source_hash = sha256(source_bytes).hexdigest()
@@ -387,7 +387,7 @@ def run_hard_validation(
         if canonical_bytes(current_report()) == report_bytes:
             return cast(dict[str, Any], json.loads(report_bytes))
 
-    checks["security"].append(
+    checks["file_safety"].append(
         _finding(
             "PACK_FINALIZATION_UNSTABLE",
             ["report"],
@@ -741,9 +741,17 @@ def _check_layout(
         )
 
 
-def _check_security(
+def _check_file_safety(
     snapshot: _PackSnapshot, findings: list[dict[str, Any]]
 ) -> None:
+    """Flag executable-shaped files and executable permissions.
+
+    This was named `security`, and a check by that name reporting
+    `passed: true` read as if pack-borne injection had been examined. It
+    never reads pack text: content trust has no gate behind it and rests on
+    hosts treating every pack field as quoted data. The check also carries
+    the finding for pack files that kept changing while the gate ran.
+    """
     for relative in snapshot.paths:
         if Path(relative).suffix.casefold() in _EXECUTABLE_SUFFIXES:
             findings.append(

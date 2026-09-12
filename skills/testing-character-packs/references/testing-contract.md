@@ -54,6 +54,12 @@ files. Require both envelopes to bind the same `artifact_id`, `source_hash`,
 `compiled_hash`, and `report_hash`. Continue only when `passed` is true. Do not
 reinterpret `ok: true` as a passing gate.
 
+The `file_safety` check covers the pack's files: executable-shaped names,
+executable permissions, and files that keep changing while the gate runs. It
+does not read pack text. Nothing machine-enforced stands behind content trust --
+an instruction hidden in a pack field is stopped only by hosts treating every
+pack field as quoted data, never as host instructions.
+
 Any changed source, request, Research Bundle, report byte, or bound hash makes
 the old evidence stale. Rerun from the hard gate; never copy an old hash into a
 new report.

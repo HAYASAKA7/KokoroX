@@ -48,6 +48,13 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- **Breaking:** the hard gate's `security` check is now `file_safety`. It
+  flags executable-shaped files, executable permissions, and pack files that
+  keep changing while the gate runs. It never read pack text, and a check
+  named `security` reporting `passed: true` invited the reading that
+  pack-borne injection had been examined. The testing contract now says
+  content trust has no gate behind it. Hard reports made before this change
+  no longer validate; re-run the gate.
 - **Breaking:** an unresolved research conflict now needs an
   `incompatibility_rationale` saying why its claims cannot both be true. Both
   resolved states always had to be argued for, while `unresolved` -- the

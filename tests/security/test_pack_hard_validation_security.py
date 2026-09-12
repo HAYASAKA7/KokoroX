@@ -190,7 +190,7 @@ def test_unexpected_inert_file_is_a_pack_layout_failure(tmp_path: Path) -> None:
 
     assert report["checks"]["pack_layout"]["passed"] is False
     assert codes(report, "pack_layout") == ["PACK_LAYOUT_UNEXPECTED_FILE"]
-    assert report["checks"]["security"]["passed"] is True
+    assert report["checks"]["file_safety"]["passed"] is True
     assert report["passed"] is False
 
 
@@ -207,8 +207,8 @@ def test_executable_shaped_extra_file_fails_security_without_execution(
 
     report = run_hard_validation(pack, request(), SCHEMAS)
 
-    assert report["checks"]["security"]["passed"] is False
-    assert codes(report, "security") == ["PACK_EXECUTABLE_FILE"]
+    assert report["checks"]["file_safety"]["passed"] is False
+    assert codes(report, "file_safety") == ["PACK_EXECUTABLE_FILE"]
     assert report["checks"]["pack_layout"]["passed"] is False
     assert not marker.exists()
 
@@ -370,8 +370,8 @@ def test_yaml_with_executable_permission_fails_security(tmp_path: Path) -> None:
 
     report = run_hard_validation(pack, request(), SCHEMAS)
 
-    assert report["checks"]["security"]["passed"] is False
-    assert codes(report, "security") == ["PACK_EXECUTABLE_PERMISSION"]
+    assert report["checks"]["file_safety"]["passed"] is False
+    assert codes(report, "file_safety") == ["PACK_EXECUTABLE_PERMISSION"]
 
 
 def test_executable_permission_drift_invalidates_snapshot_stability(
