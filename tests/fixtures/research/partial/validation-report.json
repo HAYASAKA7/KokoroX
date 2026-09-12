@@ -7,12 +7,33 @@
   },
   "advisory_findings": [
     {
-      "code": "TOPIC_BLOCKED",
+      "code": "RESEARCH_CONFLICT_BLOCKING",
       "path": [
-        "topics",
-        1
+        "conflicts",
+        0,
+        "status"
       ],
-      "message": "The requested history topic lacks permitted evidence."
+      "message": "Unresolved conflict blocks downstream authoring."
+    },
+    {
+      "code": "RESEARCH_COVERAGE_INCOMPLETE",
+      "path": [
+        "coverage",
+        "topics",
+        0,
+        "status"
+      ],
+      "message": "Required coverage topic is incomplete."
+    },
+    {
+      "code": "RESEARCH_COVERAGE_INCOMPLETE",
+      "path": [
+        "coverage",
+        "topics",
+        1,
+        "status"
+      ],
+      "message": "Required coverage topic is incomplete."
     }
   ],
   "coverage_summary": {
@@ -22,7 +43,8 @@
     "blocked": 1
   },
   "blocking_reasons": [
-    "Missing evidence for the blocked history topic."
+    "Required coverage topic blocks authoring: missing-history.",
+    "Unresolved conflict blocks authoring: conflict-adaptation-wording."
   ],
   "valid": true,
   "authoring_allowed": false,
