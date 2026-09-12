@@ -48,6 +48,13 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- Schema validation no longer repeats work that depends only on a schema
+  file's bytes. Loading still reads and parses the file every time, so a
+  schema that changes on disk is honoured immediately, but Draft 2020-12
+  meta-validation and validator construction are now remembered per file
+  and digest. The hard gate loads eleven distinct schemas twenty-seven
+  times per run and spent most of that time re-checking the schemas
+  themselves.
 - **Breaking:** the hard gate's `security` check is now `file_safety`. It
   flags executable-shaped files, executable permissions, and pack files that
   keep changing while the gate runs. It never read pack text, and a check

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from hashlib import sha256
 import json
 from pathlib import Path
 import re
@@ -15,12 +16,24 @@ from kokorox.json_compat import find_json_incompatibility
 _DRAFT_2020_12 = "https://json-schema.org/draft/2020-12/schema"
 _SCHEMA_NAME_PATTERN = re.compile(r"[a-z0-9][a-z0-9._-]{0,127}")
 
+# Meta-validating a schema and building its validator are pure functions of the
+# file's bytes, and both are expensive: the hard gate loads eleven distinct
+# schemas twenty-seven times per run. Remember that work per path and digest.
+# Every load still reads and parses the file, so a schema whose bytes change on
+# disk is checked again before anything is validated against it.
+_VALIDATOR_CACHE_LIMIT = 128
+_validators: dict[str, tuple[str, Draft202012Validator]] = {}
+
 
 class SchemaRegistry:
     def __init__(self, root: Path) -> None:
         self.root = root.resolve()
 
     def load(self, name: str) -> dict[str, Any]:
+        schema, _ = self._checked(name)
+        return schema
+
+    def _checked(self, name: str) -> tuple[dict[str, Any], Draft202012Validator]:
         if not _SCHEMA_NAME_PATTERN.fullmatch(name):
             raise KokoroError(
                 "SCHEMA_NAME_INVALID",
@@ -89,6 +102,11 @@ class SchemaRegistry:
                     "reason": "unsupported $schema declaration",
                 },
             )
+        digest = sha256(contents.encode("utf-8")).hexdigest()
+        cached = _validators.get(str(path))
+        if cached is not None and cached[0] == digest:
+            return schema, cached[1]
+
         try:
             Draft202012Validator.check_schema(schema)
         except SchemaError as error:
@@ -101,10 +119,15 @@ class SchemaRegistry:
                     "reason": "Draft 2020-12 meta-schema validation failed",
                 },
             ) from error
-        return schema
+
+        validator = Draft202012Validator(schema)
+        if len(_validators) >= _VALIDATOR_CACHE_LIMIT:
+            _validators.clear()
+        _validators[str(path)] = (digest, validator)
+        return schema, validator
 
     def validate(self, name: str, instance: Any) -> None:
-        schema = self.load(name)
+        _, validator = self._checked(name)
         incompatibility = find_json_incompatibility(instance)
         if incompatibility is not None:
             path, message = incompatibility
@@ -115,7 +138,7 @@ class SchemaRegistry:
             )
 
         errors = sorted(
-            Draft202012Validator(schema).iter_errors(instance),
+            validator.iter_errors(instance),
             key=lambda error: list(error.absolute_path),
         )
         if errors:

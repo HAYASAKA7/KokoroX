@@ -868,6 +868,47 @@ def test_registry_rejects_invalid_draft_2020_12_schema(tmp_path: Path) -> None:
     assert raised.value.code == "SCHEMA_INVALID"
 
 
+def test_registry_rechecks_a_schema_whose_bytes_change(tmp_path: Path) -> None:
+    registry = SchemaRegistry(tmp_path)
+    path = tmp_path / "swapped.schema.json"
+    path.write_text(
+        '{"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object"}',
+        encoding="utf-8",
+    )
+    registry.validate("swapped", {})
+
+    path.write_text(
+        '{"$schema":"https://json-schema.org/draft/2020-12/schema","type":7}',
+        encoding="utf-8",
+    )
+
+    with pytest.raises(KokoroError) as raised:
+        registry.validate("swapped", {})
+
+    assert raised.value.code == "SCHEMA_INVALID"
+
+
+def test_registry_validates_against_the_schema_on_disk_now(tmp_path: Path) -> None:
+    registry = SchemaRegistry(tmp_path)
+    path = tmp_path / "tightened.schema.json"
+    path.write_text(
+        '{"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object"}',
+        encoding="utf-8",
+    )
+    registry.validate("tightened", {"a": 1})
+
+    path.write_text(
+        '{"$schema":"https://json-schema.org/draft/2020-12/schema",'
+        '"type":"object","required":["b"]}',
+        encoding="utf-8",
+    )
+
+    with pytest.raises(KokoroError) as raised:
+        registry.validate("tightened", {"a": 1})
+
+    assert raised.value.code == "SCHEMA_VALIDATION_FAILED"
+
+
 def test_registry_rejects_non_2020_12_schema_declaration(tmp_path: Path) -> None:
     registry = SchemaRegistry(tmp_path)
     (tmp_path / "draft7.schema.json").write_text(
