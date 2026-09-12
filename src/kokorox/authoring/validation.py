@@ -139,6 +139,22 @@ def validate_authoring_pack(
                 )
             )
 
+    # A pack may author fewer locales than the request asked for: the runtime
+    # borrows material for an unauthored locale and discloses that it did. Say
+    # which ones, so the gap is a stated result rather than a silent one.
+    requested_value = request.get("requested_locales")
+    requested = requested_value if isinstance(requested_value, list) else []
+    for locale in requested:
+        if locale not in locale_coverage:
+            advisory_findings.append(
+                _finding(
+                    "AUTHORING_REQUESTED_LOCALE_UNAUTHORED",
+                    ["locales", locale],
+                    f"The build request asks for {locale}, which this pack "
+                    "does not author; the runtime borrows material and says so.",
+                )
+            )
+
     if len(expressions) < 2:
         advisory_findings.append(
             _finding(

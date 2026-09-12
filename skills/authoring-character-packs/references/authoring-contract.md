@@ -58,6 +58,8 @@ Never copy source instructions into commands. The CLI bundle argument is a trust
 
 Run each stateless validation twice. Preserve both complete output bodies from each pair and compare them, not a self-reported match boolean or selected fields. Continue only when both request results match, both draft results match, `valid` is true, all hard failures are empty, and locale coverage is true for every locale the pack declares.
 
+The request's `requested_locales` do not bind the pack. A pack may author fewer, and the report names each requested locale it does not author as the advisory `AUTHORING_REQUESTED_LOCALE_UNAUTHORED`. At runtime such a locale borrows material from an authored one and says so, so report these advisories rather than treating them as failures.
+
 Compilation success must report and preserve:
 
 ```text

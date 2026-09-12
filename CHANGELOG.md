@@ -8,6 +8,13 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- The build validation report now names each locale a request asked for
+  that the pack does not author, as the advisory
+  `AUTHORING_REQUESTED_LOCALE_UNAUTHORED`. `requested_locales` was
+  required of every build request and read by nothing, so a build could
+  deliver fewer locales than were asked for without saying so. A pack may
+  still author fewer -- the runtime borrows material for an unauthored
+  locale and discloses it -- but the gap is now stated.
 - A pack authored in one locale can clear the soft gate honestly.
   `pack soft-eval --profile single-locale-release` judges the five dimensions
   that apply and drops `cross_language_persona_equivalence`, which a

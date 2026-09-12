@@ -771,6 +771,41 @@ def test_validate_authoring_pack_allows_a_locale_subset(
     ] == []
 
 
+def test_validate_authoring_pack_names_a_requested_locale_the_pack_omits(
+    registry: SchemaRegistry,
+    original_request: dict[str, Any],
+    source: dict[str, Any],
+) -> None:
+    """The request asked for three locales; a pack authoring two says which."""
+    source["locales"].pop("ja-JP")
+    for locale_set in source["expressions"].values():
+        locale_set.pop("ja-JP", None)
+
+    report = validate_authoring_pack(original_request, source, registry)
+
+    assert report["valid"] is True
+    assert report["hard_failures"] == []
+    assert [
+        item["path"]
+        for item in report["advisory_findings"]
+        if item["code"] == "AUTHORING_REQUESTED_LOCALE_UNAUTHORED"
+    ] == [["locales", "ja-JP"]]
+
+
+def test_validate_authoring_pack_is_silent_when_every_locale_is_authored(
+    registry: SchemaRegistry,
+    original_request: dict[str, Any],
+    source: dict[str, Any],
+) -> None:
+    report = validate_authoring_pack(original_request, source, registry)
+
+    assert [
+        item
+        for item in report["advisory_findings"]
+        if item["code"] == "AUTHORING_REQUESTED_LOCALE_UNAUTHORED"
+    ] == []
+
+
 @pytest.mark.parametrize("locale", ["zh-CN", "en-US", "ja-JP"])
 def test_validate_authoring_pack_requires_locale_in_every_expression(
     locale: str,
