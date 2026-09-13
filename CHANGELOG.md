@@ -56,6 +56,13 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- Verbatim delivery now leaves room for host metadata. Step 6 of
+  `using-kokorox` and the runtime contract still require `rendered.text`
+  unchanged and complete; a host that must attach a declared deviation,
+  provenance, or a diagnostic now has a legitimate place for it -- a separate
+  host field, or after the whole response behind a separator, labelled as
+  host metadata, never before or inside it. The old wording left none, so
+  every delivery that needed metadata had to declare a deviation.
 - `policy compile` now says that subtitles are not rendered. A policy could
   enable `subtitles` and pass validation, but no render plan carried it and
   nothing read it, so the setting changed nothing without a word. Compiling
