@@ -20,6 +20,7 @@ from kokorox.distribution.archive import (
     inspect_karc_container,
     load_karc_archive,
 )
+from kokorox.distribution.compatibility import inspect_karc_compatibility
 from kokorox.distribution.registry import (
     InstallScope,
     load_installed_registry,
@@ -651,6 +652,7 @@ def installed_release_problem(
     schemas: SchemaValidator,
     *,
     workspace_root: Path | None = None,
+    archive_sha256: str | None = None,
 ) -> str | None:
     """Return why one installed release cannot be used today, or None.
 
@@ -674,12 +676,52 @@ def installed_release_problem(
             workspace_root=workspace_root,
         )
     except KokoroError as error:
-        return error.code
+        if error.code != "KARC_DEFAULT_STALE" or archive_sha256 is None:
+            return error.code
+        # The resolver files every release-validation failure under its
+        # own stale code. The stored archive's compatibility report names
+        # what actually failed -- the code `pack install` reports for it.
+        return _compatibility_problem(data_root, archive_sha256, schemas) or (
+            error.code
+        )
     except Exception:
         # Persistence treats any failure here as an unresolvable
         # installation; the listing reports it the same way.
         return "KARC_DEFAULT_STALE"
     return None
+
+
+def _compatibility_problem(
+    data_root: Path,
+    archive_sha256: str,
+    schemas: SchemaValidator,
+) -> str | None:
+    if re.fullmatch(r"[a-f0-9]{64}", archive_sha256) is None:
+        return None
+    limits = KarcLimits()
+    try:
+        snapshot = _read_required_file(
+            _absolute_path(data_root) / "archives" / f"{archive_sha256}.karc",
+            limits.max_archive_bytes,
+        )
+        report = inspect_karc_compatibility(
+            cast(bytes, snapshot.payload), schemas, limits=limits
+        )
+    except KokoroError:
+        return None
+    if report.get("installation_allowed") is True:
+        return None
+    codes = sorted(
+        {
+            finding["code"]
+            for check in report.get("checks", {}).values()
+            if isinstance(check, dict)
+            for finding in check.get("findings", [])
+            if isinstance(finding, dict) and isinstance(finding.get("code"), str)
+        }
+    )
+    specific = [code for code in codes if code != "KARC_COMPATIBILITY_BLOCKED"]
+    return specific[0] if specific else None
 
 
 def _resolve_installed_binding(

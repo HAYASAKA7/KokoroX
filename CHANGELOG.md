@@ -66,6 +66,12 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- `pack list` now explains an unusable release with the failure `pack
+  install` reports for the same archive, such as
+  `KARC_RELEASE_BINDING_INVALID`. It used to pass along the default
+  resolver's generic `KARC_DEFAULT_STALE`, which named a subsystem that was
+  not involved; that code now appears only when the installed metadata
+  itself is stale.
 - Verbatim delivery now leaves room for host metadata. Step 6 of
   `using-kokorox` and the runtime contract still require `rendered.text`
   unchanged and complete; a host that must attach a declared deviation,

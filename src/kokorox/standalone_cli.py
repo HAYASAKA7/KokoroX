@@ -1105,7 +1105,11 @@ def _handle_pack_list(
         # earlier KokoroX stays in the registry after its evidence stops
         # validating, and every persistence command then refuses it.
         problem = installed_release_problem(
-            root, entry["registry_identity"], schemas, workspace_root=workspace
+            root,
+            entry["registry_identity"],
+            schemas,
+            workspace_root=workspace,
+            archive_sha256=entry.get("archive_sha256"),
         )
         annotated = {**entry, "usable": problem is None}
         if problem is not None:

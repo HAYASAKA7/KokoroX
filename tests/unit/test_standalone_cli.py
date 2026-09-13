@@ -186,7 +186,18 @@ def test_pack_list_flags_an_installed_release_that_no_longer_resolves(
     assert code == 0
     [entry] = listed["installed"]
     assert entry["usable"] is False
-    assert entry["unusable_reason"].startswith("KARC_DEFAULT_")
+    # The reason is the compatibility finding `pack install` would report
+    # for this archive, not the resolver's generic stale code.
+    code, compatibility = _cli_json(
+        ["pack", "compatibility", str(archive), "--json"], capsys
+    )
+    assert code == 0
+    findings = {
+        finding["code"]
+        for check in compatibility["compatibility"]["checks"].values()
+        for finding in check["findings"]
+    }
+    assert entry["unusable_reason"] in findings - {"KARC_COMPATIBILITY_BLOCKED"}
 
 
 def test_suite_install_replace_upgrades_an_earlier_version(
