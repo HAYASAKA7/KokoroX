@@ -343,6 +343,9 @@ def add_standalone_parsers(
     # refuse.
     suite_install.add_argument("--source")
     suite_install.add_argument("--dry-run", action="store_true")
+    # Replace an installed earlier suite version, proven unmodified by the
+    # receipt its install wrote; without it such a Skill refuses the install.
+    suite_install.add_argument("--replace", action="store_true")
     _add_json(suite_install, leaf_json)
     # The same targeting as install, so whatever install placed, remove finds.
     suite_remove = suite_commands.add_parser("remove")
@@ -1585,6 +1588,7 @@ def _handle_suite_install(
         repo_root=_optional_path(args.repo),
         skills_root=_optional_path(args.skills_root),
         dry_run=args.dry_run,
+        replace=bool(getattr(args, "replace", False)),
     )
     return {"ok": True, "skill_suite": plan}
 

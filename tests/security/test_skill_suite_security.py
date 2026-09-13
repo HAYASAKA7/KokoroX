@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from hashlib import sha256
+import json
 import os
 from pathlib import Path
 import shutil
@@ -894,12 +895,71 @@ def test_a_skill_edited_after_planning_stops_removal_before_anything_moves(
             skills_root=destination,
         ),
     )
-    assert {path.name for path in destination.iterdir()} == set(
-        suite.SKILL_SUITE_NAMES
-    )
+    assert {path.name for path in destination.iterdir()} == {
+        *suite.SKILL_SUITE_NAMES,
+        suite._RECEIPT_NAME,
+    }
     assert edited.read_text(encoding="utf-8") == "edited after planning\n"
     assert not [
         path
         for path in destination.rglob("*")
         if path.name.startswith(".kokorox-skill-suite-")
     ]
+
+
+def _later_source(tmp_path: Path) -> Path:
+    source = _copy_source(tmp_path)
+    skill = source / "using-kokorox" / "SKILL.md"
+    skill.write_bytes(skill.read_bytes() + b"\nA later version adds this line.\n")
+    return source
+
+
+def test_an_oversized_receipt_proves_no_ownership(tmp_path: Path) -> None:
+    source = _copy_source(tmp_path)
+    destination = tmp_path / "installed"
+    suite.install_skill_suite(source_root=source, skills_root=destination)
+    receipt = destination / suite._RECEIPT_NAME
+    receipt.write_bytes(receipt.read_bytes() + b" " * (suite._RECEIPT_MAX_BYTES + 1))
+    later = _later_source(tmp_path / "later")
+
+    _assert_code(
+        "SKILL_SUITE_CONFLICT",
+        lambda: suite.install_skill_suite(
+            source_root=later, skills_root=destination, replace=True
+        ),
+    )
+
+
+def test_a_receipt_naming_paths_outside_a_skill_proves_no_ownership(
+    tmp_path: Path,
+) -> None:
+    source = _copy_source(tmp_path)
+    destination = tmp_path / "installed"
+    suite.install_skill_suite(source_root=source, skills_root=destination)
+    receipt_path = destination / suite._RECEIPT_NAME
+    receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+    receipt["skills"][0]["files"].append("../outside.md")
+    receipt_path.write_text(json.dumps(receipt), encoding="utf-8")
+    later = _later_source(tmp_path / "later")
+
+    _assert_code(
+        "SKILL_SUITE_REMOVE_CONFLICT",
+        lambda: suite.remove_skill_suite(source_root=later, skills_root=destination),
+    )
+    assert sorted(path.name for path in destination.iterdir()) == sorted(
+        [*suite.SKILL_SUITE_NAMES, suite._RECEIPT_NAME]
+    )
+
+
+def test_a_directory_where_the_receipt_goes_refuses_the_install_cleanly(
+    tmp_path: Path,
+) -> None:
+    source = _copy_source(tmp_path)
+    destination = tmp_path / "installed"
+    (destination / suite._RECEIPT_NAME).mkdir(parents=True)
+
+    _assert_code(
+        "SKILL_SUITE_INSTALL_FAILED",
+        lambda: suite.install_skill_suite(source_root=source, skills_root=destination),
+    )
+    assert [path.name for path in destination.iterdir()] == [suite._RECEIPT_NAME]

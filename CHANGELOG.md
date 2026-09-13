@@ -8,6 +8,17 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- `kokorox suite install --replace` upgrades an installed Skill suite in
+  place. Install now writes a receipt, `.kokorox-skill-suite.json`, recording
+  each Skill's digest and file list. After an upgrade the installed Skills
+  match only that receipt, not the new source, so a plain install refuses
+  with `SKILL_SUITE_REPLACE_REQUIRED`. `--replace` moves the proven earlier
+  Skills aside, publishes the new ones, verifies them, rewrites the receipt,
+  and only then deletes what it replaced; a failure before that puts every
+  earlier Skill and the old receipt back. An edited Skill matches neither and
+  still refuses. Removal uses the same receipt, so the previous suite can be
+  removed after an upgrade. A malformed, oversized, or redirected receipt
+  proves nothing, and ownership falls back to the current source alone.
 - The build validation report now names each locale a request asked for
   that the pack does not author, as the advisory
   `AUTHORING_REQUESTED_LOCALE_UNAUTHORED`. `requested_locales` was
@@ -23,11 +34,10 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   records the pack's declared `locales`, and promotion refuses the profile
   unless that is exactly one locale and every sample was taken in it.
 - `kokorox suite remove` uninstalls the Skill suite. There was no way to take
-  it out again short of deleting directories by hand. Install writes no
-  receipt, so removal proves ownership the way install decides a reinstall is
-  a no-op: a Skill goes only when it is byte-identical to the suite source,
-  and any difference refuses the whole removal with
-  `SKILL_SUITE_REMOVE_CONFLICT`. Every Skill is moved aside before any is
+  it out again short of deleting directories by hand. A Skill goes only when
+  it is byte-identical to the suite source or to the earlier version its
+  install receipt records, and any other difference refuses the whole removal
+  with `SKILL_SUITE_REMOVE_CONFLICT`. Every Skill is moved aside before any is
   deleted, so a failure while moving puts them all back. The Skill root and
   anything else in it are left alone.
 - A turn can now be genuinely bilingual: the character speaks its authored

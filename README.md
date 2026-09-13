@@ -55,12 +55,24 @@ To remove the suite, run the same command with `remove`:
 kokorox suite remove --scope user --json
 ```
 
-Removal deletes a Skill only when it is byte-identical to the suite source, so
-it never takes a Skill you edited or one another tool placed there; any
-difference refuses the whole removal and removes nothing. The Skill root stays,
-along with any other Skills in it. After upgrading KokoroX the installed suite
-is the previous version, so name that version's source with `--source` or
-remove the four directories by hand.
+Install records what it wrote in `.kokorox-skill-suite.json` beside the Skills.
+Removal deletes a Skill only when it is byte-identical to the suite source or
+to the version that receipt records, so it never takes a Skill you edited or
+one another tool placed there; any difference refuses the whole removal and
+removes nothing. The Skill root stays, along with any other Skills in it.
+
+After upgrading KokoroX the installed suite is the previous version, and a
+plain install refuses with `SKILL_SUITE_REPLACE_REQUIRED`. Replace it in place:
+
+```bash
+kokorox suite install --scope user --replace --json
+```
+
+`--replace` swaps only Skills the receipt proves are an unmodified earlier
+version; an edited Skill still refuses the whole install. A suite installed
+before receipts existed has none. Before upgrading, remove it and install it
+again to record one; after upgrading, remove that suite with `suite remove
+--source` naming its source, or delete the four directories by hand.
 
 ## Use the suite in many agents
 

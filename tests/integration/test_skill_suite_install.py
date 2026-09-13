@@ -34,6 +34,15 @@ def _tree_bytes(root: Path) -> dict[str, bytes]:
     }
 
 
+def _suite_bytes(root: Path) -> dict[str, bytes]:
+    """The tree install wrote, less the receipt it records beside the Skills."""
+
+    files = _tree_bytes(root)
+    assert ".kokorox-skill-suite.json" in files
+    del files[".kokorox-skill-suite.json"]
+    return files
+
+
 def _tree_times(root: Path) -> dict[str, tuple[int, int]]:
     return {
         path.relative_to(root).as_posix(): (
@@ -81,7 +90,7 @@ def test_installs_the_complete_suite_into_an_explicit_user_root(
         "install",
         "install",
     ]
-    assert _tree_bytes(skills_root) == _tree_bytes(source)
+    assert _suite_bytes(skills_root) == _tree_bytes(source)
     lock = _coordination_lock(tmp_path, skills_root)
     assert lock.read_bytes() == b"0"
     _assert_no_transaction_debris(skills_root)
@@ -103,7 +112,7 @@ def test_installs_the_complete_suite_into_an_explicit_repo_root(
     skills_root = repo_root / ".agents" / "skills"
     assert result["scope"] == "repo"
     assert result["skills_root"] == str(skills_root.resolve(strict=True))
-    assert _tree_bytes(skills_root) == _tree_bytes(source)
+    assert _suite_bytes(skills_root) == _tree_bytes(source)
     lock = _coordination_lock(repo_root, skills_root)
     assert lock.read_bytes() == b"0"
     _assert_no_transaction_debris(skills_root)
@@ -152,7 +161,7 @@ def test_mixed_install_preserves_identical_skills(tmp_path: Path) -> None:
         "install",
         "install",
     ]
-    assert _tree_bytes(skills_root) == _tree_bytes(source)
+    assert _suite_bytes(skills_root) == _tree_bytes(source)
     assert {
         name: _tree_times(skills_root / name) for name in SKILL_SUITE_NAMES[:2]
     } == before

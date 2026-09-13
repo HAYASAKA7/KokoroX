@@ -319,8 +319,17 @@ _PUBLIC_MESSAGES = {
         "it by hand."
     ),
     "SKILL_SUITE_REMOVE_FAILED": "The Skill suite could not be removed.",
+    "SKILL_SUITE_REPLACED_NOT_DELETED": (
+        "The new Skill suite is installed, but a replaced earlier version "
+        "could not be deleted; remove the leftover "
+        "`.kokorox-skill-suite-*-removing-*` directory by hand."
+    ),
+    "SKILL_SUITE_REPLACE_REQUIRED": (
+        "An installed Skill is an earlier KokoroX suite version; run "
+        "`kokorox suite install --replace` to update it."
+    ),
     "SKILL_SUITE_RESTORE_FAILED": (
-        "Skill suite removal failed and could not put moved Skills back."
+        "A Skill suite change failed and could not put moved Skills back."
     ),
     "SKILL_SUITE_ROLLBACK_FAILED": "Skill suite installation could not roll back.",
     "SKILL_SUITE_SOURCE_AMBIGUOUS": (

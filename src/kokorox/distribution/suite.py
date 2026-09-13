@@ -4,6 +4,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, replace
 import errno
 from hashlib import sha256
+import json
 import os
 from pathlib import Path
 import sys
@@ -16,6 +17,7 @@ import tempfile
 import time
 from typing import Any, Literal
 
+from kokorox import __version__
 from kokorox.distribution.installer import _rename_directory_no_replace
 from kokorox.errors import KokoroError
 from kokorox.packs.compiler import canonical_bytes
@@ -85,6 +87,16 @@ _LOCK_CONTENTION_ERRNOS = frozenset(
     if value is not None
 )
 _LOCK_CONTENTION_WINERRORS = frozenset({32, 33})
+# Install records what it wrote beside the Skills, so a later KokoroX can prove
+# an installed Skill is an unmodified earlier version and replace or remove it.
+_RECEIPT_NAME = ".kokorox-skill-suite.json"
+_RECEIPT_ARTIFACT_ID = "kokorox/skill-suite/receipt"
+_RECEIPT_MAX_BYTES = 64 * 1024
+_RECEIPT_FILE = re.compile(
+    r"(?:(?:agents|references)/)?[A-Za-z0-9][A-Za-z0-9._-]{0,127}\Z"
+)
+_RECEIPT_DIRECTORIES = frozenset({"agents", "references"})
+_SHA256_HEX = re.compile(r"[a-f0-9]{64}\Z")
 
 
 @dataclass(frozen=True, slots=True)
@@ -142,6 +154,14 @@ class _StagedSkill:
     file_identities: tuple[tuple[str, _FileIdentity], ...]
 
 
+@dataclass(frozen=True, slots=True)
+class _ReceiptSkill:
+    """One Skill as an earlier install wrote it: its tree digest and files."""
+
+    sha256: str
+    files: frozenset[str]
+
+
 @dataclass(slots=True)
 class _SuiteLock:
     path: Path
@@ -183,6 +203,7 @@ def preview_skill_suite_install(
     scope: Literal["user", "repo"] = "user",
     repo_root: Path | None = None,
     skills_root: Path | None = None,
+    replace: bool = False,
     limits: SkillSuiteLimits = SkillSuiteLimits(),
 ) -> dict[str, Any]:
     source = _resolve_source_snapshot(source_root, limits)
@@ -192,7 +213,13 @@ def preview_skill_suite_install(
         skills_root=skills_root,
     )
     _reject_source_target_overlap(source.root, target)
-    actions = _plan_actions(source, target, limits)
+    actions = _plan_actions(
+        source,
+        target,
+        limits,
+        receipt=_read_receipt(target),
+        replace=replace,
+    )
     return _result_document(
         source=source,
         target=target,
@@ -209,14 +236,26 @@ def install_skill_suite(
     repo_root: Path | None = None,
     skills_root: Path | None = None,
     dry_run: bool = False,
+    replace: bool = False,
     limits: SkillSuiteLimits = SkillSuiteLimits(),
 ) -> dict[str, Any]:
+    """Install the suite, or bring an earlier installed version up to date.
+
+    A Skill already byte-identical to the source is left alone and a missing
+    one is installed. A Skill that differs is replaced only with `replace` and
+    only when the receipt an earlier install wrote proves it is that version,
+    unmodified; anything else refuses the whole install. Replaced Skills are
+    moved aside before the new ones are published and deleted only after the
+    new tree verifies, so a failure puts every one of them back.
+    """
+
     if dry_run:
         return preview_skill_suite_install(
             source_root=source_root,
             scope=scope,
             repo_root=repo_root,
             skills_root=skills_root,
+            replace=replace,
             limits=limits,
         )
     source = _resolve_source_snapshot(source_root, limits)
@@ -226,9 +265,33 @@ def install_skill_suite(
         skills_root=skills_root,
     )
     _reject_source_target_overlap(source.root, target)
+    # Read once: every later re-plan proves ownership against the same record,
+    # so a receipt swapped mid-transaction cannot widen what may be replaced.
+    receipt = _read_receipt(target)
+    previous_receipt = _receipt_payload_on_disk(target)
     initial_target_identity = _capture_optional_directory_identity(target)
-    initial_skill_states = _capture_target_skill_states(target, limits)
-    actions = _plan_actions(source, target, limits)
+    initial_skill_states = _capture_target_skill_states(target, limits, receipt)
+    actions = _plan_actions(
+        source,
+        target,
+        limits,
+        receipt=receipt,
+        replace=replace,
+    )
+
+    def planner(
+        snapshot: _SuiteSnapshot,
+        root: Path,
+        bounds: SkillSuiteLimits,
+    ) -> tuple[tuple[str, str], ...]:
+        return _plan_actions(
+            snapshot,
+            root,
+            bounds,
+            receipt=receipt,
+            replace=replace,
+        )
+
     _require_target_skill_states(
         target,
         limits,
@@ -236,10 +299,13 @@ def install_skill_suite(
         actions,
         phase="planning",
         require_missing=True,
+        receipt=receipt,
     )
     created_ancestors: tuple[tuple[Path, _DirectoryIdentity], ...] = ()
     staged: list[_StagedSkill] = []
     published: list[_StagedSkill] = []
+    moved: list[_StagedSkill] = []
+    receipt_written = False
     try:
         lock_parent = _nearest_existing_directory(target.parent)
         lock_parent_identity = _capture_directory_identity(lock_parent)
@@ -270,6 +336,7 @@ def install_skill_suite(
                 limits,
                 actions,
                 "installation",
+                planner=planner,
             )
             _require_target_skill_states(
                 target,
@@ -278,9 +345,10 @@ def install_skill_suite(
                 actions,
                 phase="installation",
                 require_missing=True,
+                receipt=receipt,
             )
             for name, action in actions:
-                if action == "install":
+                if action in {"install", "replace"}:
                     staged.append(_stage_skill(source, target, name, limits))
             _require_source_unchanged(source, limits)
             _require_destination_directory(
@@ -300,7 +368,12 @@ def install_skill_suite(
                 limits,
                 actions,
                 "publication",
+                planner=planner,
             )
+            states = {state.name: state for state in initial_skill_states}
+            for name, action in actions:
+                if action == "replace":
+                    moved.append(_move_skill_aside(target, states[name]))
             for item in staged:
                 _require_staged_skill(item, item.staging)
                 published.append(item)
@@ -340,6 +413,7 @@ def install_skill_suite(
                 actions,
                 phase="final verification",
                 require_missing=False,
+                receipt=receipt,
             )
             _require_complete_install(source, target, limits)
             _require_destination_directory(
@@ -353,6 +427,12 @@ def install_skill_suite(
                 "final verification",
             )
             _require_suite_lock(transaction_lock)
+            if any(action in {"install", "replace"} for _, action in actions):
+                # The receipt records what this install wrote. A no-op install
+                # writes nothing at all, receipt included.
+                receipt_written = True
+                _write_receipt(target, _receipt_payload(source))
+            _require_suite_lock(transaction_lock)
     except BaseException as error:
         cleanup_error = _rollback_transaction(staged, published)
         if cleanup_error is not None:
@@ -360,6 +440,17 @@ def install_skill_suite(
                 "SKILL_SUITE_ROLLBACK_FAILED",
                 "Skill suite rollback could not remove generated directories.",
                 reason=_reason(cleanup_error),
+            ) from error
+        # Nothing replaced has been deleted yet, so every earlier version goes
+        # back, and so does the receipt that proves it.
+        restore_error = _restore_moved_skills(moved)
+        if restore_error is None and receipt_written:
+            restore_error = _restore_receipt(target, previous_receipt)
+        if restore_error is not None:
+            raise _error(
+                "SKILL_SUITE_RESTORE_FAILED",
+                "Skill suite installation could not put replaced Skills back.",
+                reason=_reason(restore_error),
             ) from error
         _remove_created_ancestors(created_ancestors)
         if isinstance(error, KokoroError):
@@ -369,6 +460,23 @@ def install_skill_suite(
             "The KokoroX Skill suite could not be installed.",
             reason=type(error).__name__,
         ) from error
+    # The new suite is published, verified, and receipted. Deleting what it
+    # replaced is the one step that cannot be undone, so it runs only now; a
+    # failure here leaves the new suite in place and says what is left over.
+    first_error: BaseException | None = None
+    for item in moved:
+        try:
+            _remove_identity_tree(item, item.staging)
+        except BaseException as error:
+            if first_error is None:
+                first_error = error
+    if first_error is not None:
+        raise _error(
+            "SKILL_SUITE_REPLACED_NOT_DELETED",
+            "The new suite is installed, but a replaced Skill could not be "
+            "deleted.",
+            reason=_reason(first_error),
+        ) from first_error
     return _result_document(
         source=source,
         target=target,
@@ -389,11 +497,12 @@ def remove_skill_suite(
 ) -> dict[str, Any]:
     """Remove the installed suite, and only what can be proven to be it.
 
-    Install writes no receipt, so ownership is settled the way install decides
-    a reinstall is a no-op: a Skill is removed only when its tree is byte
-    identical to the suite source. An edited Skill, a user file inside one, or
-    a different suite version refuses the whole removal and removes nothing.
-    The Skills root itself always stays; other Skills may live there.
+    A Skill is removed when its tree is byte identical to the suite source, or
+    to the version the receipt of an earlier install records -- so after an
+    upgrade the previous suite can still be removed. An edited Skill, a user
+    file inside one, or a version nothing proves refuses the whole removal and
+    removes nothing. The Skills root itself always stays; other Skills may
+    live there.
 
     Every Skill to remove is moved aside before any is deleted, so a failure
     while moving puts all of them back.
@@ -406,7 +515,16 @@ def remove_skill_suite(
         skills_root=skills_root,
     )
     _reject_source_target_overlap(source.root, target)
-    actions = _plan_removal(source, target, limits)
+    receipt = _read_receipt(target)
+    actions = _plan_removal(source, target, limits, receipt=receipt)
+
+    def planner(
+        snapshot: _SuiteSnapshot,
+        root: Path,
+        bounds: SkillSuiteLimits,
+    ) -> tuple[tuple[str, str], ...]:
+        return _plan_removal(snapshot, root, bounds, receipt=receipt)
+
     if dry_run or not any(action == "remove" for _, action in actions):
         return _result_document(
             source=source,
@@ -416,7 +534,7 @@ def remove_skill_suite(
             dry_run=dry_run,
             kind="removal",
         )
-    initial_skill_states = _capture_target_skill_states(target, limits)
+    initial_skill_states = _capture_target_skill_states(target, limits, receipt)
     # A Skill being removed must stay exactly as captured, and one that was
     # absent must stay absent -- the install guard, read for this direction.
     guarded = tuple(
@@ -443,7 +561,7 @@ def remove_skill_suite(
                 limits,
                 actions,
                 "removal",
-                planner=_plan_removal,
+                planner=planner,
             )
             _require_target_skill_states(
                 target,
@@ -452,6 +570,7 @@ def remove_skill_suite(
                 guarded,
                 phase="removal",
                 require_missing=True,
+                receipt=receipt,
             )
             states = {state.name: state for state in initial_skill_states}
             for name, action in actions:
@@ -499,6 +618,10 @@ def remove_skill_suite(
             "The KokoroX Skill suite could not be removed.",
             reason=type(error).__name__,
         ) from error
+    # With every suite Skill gone the receipt proves nothing further. A copy
+    # that cannot be deleted is harmless -- it only ever vouches for exact bytes
+    # -- so it is left rather than turning a finished removal into a failure.
+    _discard_receipt(target)
     return _result_document(
         source=source,
         target=target,
@@ -1011,22 +1134,26 @@ def _classify_installed(
     source: _SuiteSnapshot,
     target: Path,
     limits: SkillSuiteLimits,
-) -> tuple[tuple[str, bool], ...]:
-    """Return each suite Skill and whether the target holds it, byte for byte.
+    receipt: dict[str, _ReceiptSkill] | None = None,
+) -> tuple[tuple[str, str], ...]:
+    """Return each suite Skill's state in the target.
 
-    A present Skill that is not byte-identical to the source raises
-    `SKILL_SUITE_CONFLICT`. Install and removal share this so they agree on
-    what counts as the suite's own tree; neither acts on one it cannot prove.
+    `missing`, `identical` -- byte for byte the source -- or `predecessor`:
+    byte for byte the version the receipt of an earlier install records. Any
+    other present Skill raises `SKILL_SUITE_CONFLICT`. Install and removal
+    share this so they agree on what counts as the suite's own tree; neither
+    acts on one it cannot prove.
     """
 
-    present: list[tuple[str, bool]] = []
+    states: list[tuple[str, str]] = []
     source_files = {item.relative: item.payload for item in source.files}
+    recorded = {} if receipt is None else receipt
     for skill_name in SKILL_SUITE_NAMES:
         skill_target = target / skill_name
         try:
             linked = skill_target.lstat()
         except FileNotFoundError:
-            present.append((skill_name, False))
+            states.append((skill_name, "missing"))
             continue
         except OSError as error:
             raise _path_error(
@@ -1034,51 +1161,117 @@ def _classify_installed(
             ) from error
         if not stat.S_ISDIR(linked.st_mode) or _is_redirect(skill_target, linked):
             raise _path_error("Installed Skill target is unsafe.")
-        try:
-            installed = _capture_skill_target(skill_target, skill_name, limits)
-        except KokoroError as error:
-            if error.code == "SKILL_SUITE_PATH_INVALID":
-                raise
-            raise _error(
-                "SKILL_SUITE_CONFLICT",
-                "An installed Skill differs from the KokoroX suite.",
-            ) from error
-        prefix = f"{skill_name}/"
-        expected = {
-            relative.removeprefix(prefix): payload
-            for relative, payload in source_files.items()
-            if relative.startswith(prefix)
-        }
-        actual = {
-            item.relative.removeprefix(prefix): item.payload for item in installed
-        }
-        if actual != expected:
-            raise _error(
-                "SKILL_SUITE_CONFLICT",
-                "An installed Skill differs from the KokoroX suite.",
-            )
-        present.append((skill_name, True))
-    return tuple(present)
+        if _matches_source(source_files, skill_target, skill_name, limits):
+            states.append((skill_name, "identical"))
+        elif skill_name in recorded and _matches_receipt(
+            recorded[skill_name], skill_target, skill_name, limits
+        ):
+            states.append((skill_name, "predecessor"))
+        else:
+            raise _conflict_error()
+    return tuple(states)
+
+
+def _matches_source(
+    source_files: dict[str, bytes],
+    skill_target: Path,
+    skill_name: str,
+    limits: SkillSuiteLimits,
+) -> bool:
+    try:
+        installed = _capture_skill_target(skill_target, skill_name, limits)
+    except KokoroError as error:
+        if error.code == "SKILL_SUITE_PATH_INVALID":
+            raise
+        return False
+    prefix = f"{skill_name}/"
+    expected = {
+        relative.removeprefix(prefix): payload
+        for relative, payload in source_files.items()
+        if relative.startswith(prefix)
+    }
+    actual = {item.relative.removeprefix(prefix): item.payload for item in installed}
+    return actual == expected
+
+
+def _matches_receipt(
+    recorded: _ReceiptSkill,
+    skill_target: Path,
+    skill_name: str,
+    limits: SkillSuiteLimits,
+) -> bool:
+    """Whether a Skill is exactly the tree an earlier install recorded.
+
+    Captured against the recorded inventory rather than today's, so a version
+    with a different file list can still be recognised -- and then compared by
+    digest over every path, size, and byte.
+    """
+
+    try:
+        installed = _capture_recorded_skill(skill_target, skill_name, recorded, limits)
+    except KokoroError as error:
+        if error.code == "SKILL_SUITE_PATH_INVALID":
+            raise
+        return False
+    return _skill_digest(skill_name, installed) == recorded.sha256
+
+
+def _capture_recorded_skill(
+    root: Path,
+    skill_name: str,
+    recorded: _ReceiptSkill,
+    limits: SkillSuiteLimits,
+) -> tuple[_CapturedFile, ...]:
+    try:
+        return _capture_closed_tree(
+            root,
+            limits,
+            source=False,
+            expected_files=recorded.files,
+            expected_directories=_RECEIPT_DIRECTORIES,
+            relative_prefix=skill_name,
+            inventory_conflict=True,
+        )
+    except KokoroError as error:
+        if error.code == "SKILL_SUITE_LIMIT_EXCEEDED":
+            raise _conflict_error() from error
+        raise
 
 
 def _plan_actions(
     source: _SuiteSnapshot,
     target: Path,
     limits: SkillSuiteLimits,
+    *,
+    receipt: dict[str, _ReceiptSkill] | None = None,
+    replace: bool = False,
 ) -> tuple[tuple[str, str], ...]:
-    return tuple(
-        (name, "unchanged" if present else "install")
-        for name, present in _classify_installed(source, target, limits)
-    )
+    actions: list[tuple[str, str]] = []
+    for name, state in _classify_installed(source, target, limits, receipt):
+        if state == "identical":
+            actions.append((name, "unchanged"))
+        elif state == "missing":
+            actions.append((name, "install"))
+        elif replace:
+            actions.append((name, "replace"))
+        else:
+            raise _error(
+                "SKILL_SUITE_REPLACE_REQUIRED",
+                "An installed Skill is an earlier KokoroX suite version; install "
+                "with replace to update it.",
+            )
+    return tuple(actions)
 
 
 def _plan_removal(
     source: _SuiteSnapshot,
     target: Path,
     limits: SkillSuiteLimits,
+    *,
+    receipt: dict[str, _ReceiptSkill] | None = None,
 ) -> tuple[tuple[str, str], ...]:
     try:
-        classified = _classify_installed(source, target, limits)
+        classified = _classify_installed(source, target, limits, receipt)
     except KokoroError as error:
         if error.code != "SKILL_SUITE_CONFLICT":
             raise
@@ -1088,7 +1281,8 @@ def _plan_removal(
             "removed.",
         ) from error
     return tuple(
-        (name, "remove" if present else "absent") for name, present in classified
+        (name, "absent" if state == "missing" else "remove")
+        for name, state in classified
     )
 
 
@@ -1116,8 +1310,10 @@ def _capture_skill_target(
 def _capture_target_skill_states(
     target: Path,
     limits: SkillSuiteLimits,
+    receipt: dict[str, _ReceiptSkill] | None = None,
 ) -> tuple[_TargetSkillState, ...]:
     states: list[_TargetSkillState] = []
+    recorded = {} if receipt is None else receipt
     for skill_name in SKILL_SUITE_NAMES:
         root = target / skill_name
         linked = _lstat_optional(root)
@@ -1127,7 +1323,16 @@ def _capture_target_skill_states(
         if not stat.S_ISDIR(linked.st_mode) or _is_redirect(root, linked):
             raise _path_error("Installed Skill target is unsafe.")
         before = _capture_directory_identity(root)
-        files = _capture_skill_target(root, skill_name, limits)
+        try:
+            files = _capture_skill_target(root, skill_name, limits)
+        except KokoroError as error:
+            # An earlier version may carry a different file list; its receipt
+            # says which, and classification then proves the bytes.
+            if error.code != "SKILL_SUITE_CONFLICT" or skill_name not in recorded:
+                raise
+            files = _capture_recorded_skill(
+                root, skill_name, recorded[skill_name], limits
+            )
         after = _capture_directory_identity(root)
         if before != after:
             raise _path_error("Installed Skill target changed during capture.")
@@ -1143,9 +1348,10 @@ def _require_target_skill_states(
     *,
     phase: str,
     require_missing: bool,
+    receipt: dict[str, _ReceiptSkill] | None = None,
 ) -> None:
     try:
-        current = _capture_target_skill_states(target, limits)
+        current = _capture_target_skill_states(target, limits, receipt)
     except KokoroError as error:
         raise _error(
             "SKILL_SUITE_DESTINATION_CHANGED",
@@ -1155,7 +1361,10 @@ def _require_target_skill_states(
     expected_by_name = {state.name: state for state in expected}
     current_by_name = {state.name: state for state in current}
     for skill_name, action in actions:
-        if action == "unchanged":
+        # A Skill to be replaced must stay exactly as captured until it is
+        # moved aside; once the new tree is published it is checked like any
+        # other install.
+        if action == "unchanged" or (action == "replace" and require_missing):
             matches = current_by_name[skill_name] == expected_by_name[skill_name]
         else:
             matches = (
@@ -1848,6 +2057,7 @@ def _require_actions_unchanged(
         if error.code in {
             "SKILL_SUITE_CONFLICT",
             "SKILL_SUITE_REMOVE_CONFLICT",
+            "SKILL_SUITE_REPLACE_REQUIRED",
             "SKILL_SUITE_LIMIT_EXCEEDED",
             "SKILL_SUITE_PATH_INVALID",
         }:
@@ -1951,7 +2161,9 @@ def _result_document(
             for name, action in actions
         ],
         "dry_run": dry_run,
-        "will_write": any(action in {"install", "remove"} for _, action in actions),
+        "will_write": any(
+            action in {"install", "remove", "replace"} for _, action in actions
+        ),
     }
 
 
@@ -1967,6 +2179,155 @@ def _skill_digest(skill_name: str, files: tuple[_CapturedFile, ...]) -> str:
         if item.relative.startswith(prefix)
     ]
     return sha256(canonical_bytes(manifest)).hexdigest()
+
+
+def _read_receipt(target: Path) -> dict[str, _ReceiptSkill]:
+    """Return the Skills an earlier install recorded, or nothing unproven.
+
+    A receipt only ever widens ownership to an exact earlier version -- a Skill
+    must still match a recorded digest over every path, size, and byte -- so a
+    missing, unreadable, or malformed receipt counts as absent rather than as
+    an error, and ownership falls back to the current source alone.
+    """
+
+    payload = _receipt_payload_on_disk(target)
+    if payload is None:
+        return {}
+    try:
+        value = json.loads(payload.decode("utf-8"))
+    except (UnicodeError, ValueError, RecursionError):
+        return {}
+    return _parse_receipt(value)
+
+
+def _receipt_payload_on_disk(target: Path) -> bytes | None:
+    path = target / _RECEIPT_NAME
+    try:
+        linked = path.lstat()
+    except OSError:
+        return None
+    if (
+        not stat.S_ISREG(linked.st_mode)
+        or _is_redirect(path, linked)
+        or int(linked.st_nlink) != 1
+    ):
+        return None
+    try:
+        payload, _identity = _read_stable_file(
+            path,
+            linked,
+            _RECEIPT_MAX_BYTES,
+            source=False,
+        )
+    except KokoroError:
+        return None
+    return payload
+
+
+def _parse_receipt(value: Any) -> dict[str, _ReceiptSkill]:
+    if (
+        not isinstance(value, dict)
+        or set(value)
+        != {"schema_version", "artifact_id", "created_by", "source_tree_sha256", "skills"}
+        or value["schema_version"] != "1.0"
+        or value["artifact_id"] != _RECEIPT_ARTIFACT_ID
+        or not isinstance(value["created_by"], dict)
+        or not isinstance(value["source_tree_sha256"], str)
+        or _SHA256_HEX.fullmatch(value["source_tree_sha256"]) is None
+        or not isinstance(value["skills"], list)
+        or len(value["skills"]) > len(SKILL_SUITE_NAMES)
+    ):
+        return {}
+    parsed: dict[str, _ReceiptSkill] = {}
+    for item in value["skills"]:
+        if not isinstance(item, dict) or set(item) != {"name", "sha256", "files"}:
+            return {}
+        name, digest, files = item["name"], item["sha256"], item["files"]
+        if (
+            not isinstance(name, str)
+            or name not in SKILL_SUITE_NAMES
+            or name in parsed
+            or not isinstance(digest, str)
+            or _SHA256_HEX.fullmatch(digest) is None
+            or not isinstance(files, list)
+            or not 0 < len(files) <= len(_EXPECTED_FILES)
+            or len(set(map(str, files))) != len(files)
+            or not all(
+                isinstance(entry, str) and _RECEIPT_FILE.fullmatch(entry) is not None
+                for entry in files
+            )
+            or {entry.split("/", 1)[0] for entry in files if "/" in entry}
+            != _RECEIPT_DIRECTORIES
+        ):
+            return {}
+        parsed[name] = _ReceiptSkill(digest, frozenset(files))
+    return parsed
+
+
+def _receipt_payload(source: _SuiteSnapshot) -> bytes:
+    files: dict[str, list[str]] = {name: [] for name in SKILL_SUITE_NAMES}
+    for item in source.files:
+        skill_name, _, relative = item.relative.partition("/")
+        if skill_name in files:
+            files[skill_name].append(relative)
+    hashes = dict(source.skill_sha256)
+    receipt = {
+        "schema_version": "1.0",
+        "artifact_id": _RECEIPT_ARTIFACT_ID,
+        "created_by": {"component": "kokorox", "version": __version__},
+        "source_tree_sha256": source.source_tree_sha256,
+        "skills": [
+            {"name": name, "sha256": hashes[name], "files": sorted(files[name])}
+            for name in SKILL_SUITE_NAMES
+        ],
+    }
+    return canonical_bytes(receipt) + b"\n"
+
+
+def _write_receipt(target: Path, payload: bytes) -> None:
+    staging = target / f".kokorox-skill-suite-receipt-{secrets.token_hex(8)}.tmp"
+    _write_exclusive_file(staging, payload)
+    try:
+        os.replace(staging, target / _RECEIPT_NAME)
+    except OSError as error:
+        try:
+            staging.unlink()
+        except OSError:
+            # The replace failure below is the one to report; a stray temp
+            # file is harmless and carries only the receipt that failed.
+            pass
+        raise _error(
+            "SKILL_SUITE_INSTALL_FAILED",
+            "The Skill suite receipt could not be written.",
+            reason=_reason(error),
+        ) from error
+    _fsync_directory(target)
+
+
+def _restore_receipt(target: Path, previous: bytes | None) -> BaseException | None:
+    """Put the receipt back as it was before this install; return any failure."""
+
+    try:
+        if previous is None:
+            _discard_receipt(target, strict=True)
+        else:
+            _write_receipt(target, previous)
+    except BaseException as error:
+        return error
+    return None
+
+
+def _discard_receipt(target: Path, *, strict: bool = False) -> None:
+    path = target / _RECEIPT_NAME
+    try:
+        linked = path.lstat()
+        if stat.S_ISREG(linked.st_mode) and not _is_redirect(path, linked):
+            path.unlink()
+    except FileNotFoundError:
+        return
+    except OSError:
+        if strict:
+            raise
 
 
 def _tree_digest(files: tuple[_CapturedFile, ...]) -> str:

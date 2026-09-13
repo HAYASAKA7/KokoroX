@@ -772,3 +772,252 @@ def test_install_plan_keeps_its_own_identity() -> None:
     )
 
     assert plan["artifact_id"] == "kokorox/skill-suite/install-plan"
+
+
+def _edit_source_skill(source: Path, skill_name: str = "using-kokorox") -> Path:
+    """Turn a copied source into a later suite version by changing one Skill."""
+
+    skill = source / skill_name / "SKILL.md"
+    skill.write_bytes(skill.read_bytes() + b"\nA later version adds this line.\n")
+    return skill
+
+
+def _receipt(destination: Path) -> dict:
+    suite = _suite_module()
+    return json.loads((destination / suite._RECEIPT_NAME).read_text(encoding="utf-8"))
+
+
+def _file_bytes(root: Path) -> dict[str, bytes]:
+    return {
+        path.relative_to(root).as_posix(): path.read_bytes()
+        for path in root.rglob("*")
+        if path.is_file()
+    }
+
+
+def test_install_records_what_it_installed_in_a_receipt(tmp_path: Path) -> None:
+    suite = _suite_module()
+    source = _copy_source(tmp_path)
+    destination = tmp_path / "installed"
+
+    plan = suite.install_skill_suite(source_root=source, skills_root=destination)
+
+    receipt = _receipt(destination)
+    assert receipt["artifact_id"] == "kokorox/skill-suite/receipt"
+    assert receipt["source_tree_sha256"] == plan["source_tree_sha256"]
+    assert {entry["name"]: entry["sha256"] for entry in receipt["skills"]} == {
+        skill["name"]: skill["source_sha256"] for skill in plan["skills"]
+    }
+    assert {entry["name"]: set(entry["files"]) for entry in receipt["skills"]} == (
+        EXPECTED_SKILL_FILES
+    )
+
+
+def test_an_earlier_version_needs_replace_and_replace_updates_it(
+    tmp_path: Path,
+) -> None:
+    suite = _suite_module()
+    source = _copy_source(tmp_path)
+    destination = tmp_path / "installed"
+    suite.install_skill_suite(source_root=source, skills_root=destination)
+    edited = _edit_source_skill(source)
+
+    _assert_error(
+        "SKILL_SUITE_REPLACE_REQUIRED",
+        lambda: suite.install_skill_suite(source_root=source, skills_root=destination),
+    )
+    preview = suite.install_skill_suite(
+        source_root=source, skills_root=destination, replace=True, dry_run=True
+    )
+    plan = suite.install_skill_suite(
+        source_root=source, skills_root=destination, replace=True
+    )
+
+    expected = {
+        name: "replace" if name == "using-kokorox" else "unchanged"
+        for name in suite.SKILL_SUITE_NAMES
+    }
+    assert {skill["name"]: skill["action"] for skill in preview["skills"]} == expected
+    assert {skill["name"]: skill["action"] for skill in plan["skills"]} == expected
+    assert plan["will_write"] is True
+    installed = destination / "using-kokorox" / "SKILL.md"
+    assert installed.read_bytes() == edited.read_bytes()
+    assert {entry["name"]: entry["sha256"] for entry in _receipt(destination)["skills"]} == {
+        skill["name"]: skill["source_sha256"] for skill in plan["skills"]
+    }
+    assert sorted(path.name for path in destination.iterdir()) == sorted(
+        [*suite.SKILL_SUITE_NAMES, suite._RECEIPT_NAME]
+    )
+
+
+def test_replace_refuses_an_earlier_version_someone_edited(tmp_path: Path) -> None:
+    suite = _suite_module()
+    source = _copy_source(tmp_path)
+    destination = tmp_path / "installed"
+    suite.install_skill_suite(source_root=source, skills_root=destination)
+    _edit_source_skill(source)
+    installed = destination / "using-kokorox" / "SKILL.md"
+    installed.write_bytes(installed.read_bytes() + b"\nA local note.\n")
+
+    _assert_error(
+        "SKILL_SUITE_CONFLICT",
+        lambda: suite.install_skill_suite(
+            source_root=source, skills_root=destination, replace=True
+        ),
+    )
+    assert installed.read_bytes().endswith(b"A local note.\n")
+
+
+def test_removal_after_an_upgrade_proves_the_earlier_version_by_its_receipt(
+    tmp_path: Path,
+) -> None:
+    suite = _suite_module()
+    source = _copy_source(tmp_path)
+    destination = tmp_path / "installed"
+    suite.install_skill_suite(source_root=source, skills_root=destination)
+    _edit_source_skill(source)
+
+    plan = suite.remove_skill_suite(source_root=source, skills_root=destination)
+
+    assert {skill["action"] for skill in plan["skills"]} == {"remove"}
+    assert list(destination.iterdir()) == []
+
+
+def test_a_malformed_receipt_proves_nothing(tmp_path: Path) -> None:
+    suite = _suite_module()
+    source = _copy_source(tmp_path)
+    destination = tmp_path / "installed"
+    suite.install_skill_suite(source_root=source, skills_root=destination)
+    _edit_source_skill(source)
+    (destination / suite._RECEIPT_NAME).write_text('{"skills": []}', encoding="utf-8")
+
+    _assert_error(
+        "SKILL_SUITE_CONFLICT",
+        lambda: suite.install_skill_suite(
+            source_root=source, skills_root=destination, replace=True
+        ),
+    )
+    _assert_error(
+        "SKILL_SUITE_REMOVE_CONFLICT",
+        lambda: suite.remove_skill_suite(source_root=source, skills_root=destination),
+    )
+
+
+def test_a_failed_replace_puts_the_earlier_version_and_its_receipt_back(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    suite = _suite_module()
+    source = _copy_source(tmp_path)
+    destination = tmp_path / "installed"
+    suite.install_skill_suite(source_root=source, skills_root=destination)
+    before = _file_bytes(destination)
+    _edit_source_skill(source)
+
+    def fail_publication(_item: object) -> None:
+        raise OSError("injected publication failure")
+
+    monkeypatch.setattr(suite, "_publish_skill", fail_publication)
+
+    _assert_error(
+        "SKILL_SUITE_INSTALL_FAILED",
+        lambda: suite.install_skill_suite(
+            source_root=source, skills_root=destination, replace=True
+        ),
+    )
+    assert _file_bytes(destination) == before
+    assert sorted(path.name for path in destination.iterdir()) == sorted(
+        [*suite.SKILL_SUITE_NAMES, suite._RECEIPT_NAME]
+    )
+
+
+def test_a_suite_without_a_receipt_gets_one_by_reinstalling(tmp_path: Path) -> None:
+    """A no-op install writes nothing; removing and installing records one."""
+
+    suite = _suite_module()
+    source = _copy_source(tmp_path)
+    destination = tmp_path / "installed"
+    shutil.copytree(source, destination)
+
+    noop = suite.install_skill_suite(source_root=source, skills_root=destination)
+
+    assert noop["will_write"] is False
+    assert not (destination / suite._RECEIPT_NAME).exists()
+
+    suite.remove_skill_suite(source_root=source, skills_root=destination)
+    plan = suite.install_skill_suite(source_root=source, skills_root=destination)
+
+    assert _receipt(destination)["source_tree_sha256"] == plan["source_tree_sha256"]
+
+
+def test_an_earlier_version_with_a_different_file_list_is_still_recognised(
+    tmp_path: Path,
+) -> None:
+    """The receipt records each Skill's files, and capture follows that list."""
+
+    suite = _suite_module()
+    source = _copy_source(tmp_path)
+    destination = tmp_path / "installed"
+    suite.install_skill_suite(source_root=source, skills_root=destination)
+    extra = destination / "using-kokorox" / "references" / "retired-notes.md"
+    extra.write_text("An earlier version shipped this file.\n", encoding="utf-8")
+    receipt_path = destination / suite._RECEIPT_NAME
+    receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+    [recorded] = [
+        entry for entry in receipt["skills"] if entry["name"] == "using-kokorox"
+    ]
+    recorded["files"] = sorted([*recorded["files"], "references/retired-notes.md"])
+    captured = suite._capture_recorded_skill(
+        destination / "using-kokorox",
+        "using-kokorox",
+        suite._ReceiptSkill(recorded["sha256"], frozenset(recorded["files"])),
+        suite.SkillSuiteLimits(),
+    )
+    recorded["sha256"] = suite._skill_digest("using-kokorox", captured)
+    receipt_path.write_text(json.dumps(receipt), encoding="utf-8")
+
+    _assert_error(
+        "SKILL_SUITE_REPLACE_REQUIRED",
+        lambda: suite.install_skill_suite(source_root=source, skills_root=destination),
+    )
+    plan = suite.install_skill_suite(
+        source_root=source, skills_root=destination, replace=True
+    )
+
+    assert {skill["name"]: skill["action"] for skill in plan["skills"]}[
+        "using-kokorox"
+    ] == "replace"
+    assert not extra.exists()
+
+
+def test_a_replaced_skill_that_cannot_be_deleted_leaves_the_new_suite_installed(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Deletion is the one irreversible step, so it runs after the commit."""
+
+    suite = _suite_module()
+    source = _copy_source(tmp_path)
+    destination = tmp_path / "installed"
+    suite.install_skill_suite(source_root=source, skills_root=destination)
+    edited = _edit_source_skill(source)
+
+    def refuse_deletion(_item: object, _root: object) -> None:
+        raise OSError("injected deletion failure")
+
+    monkeypatch.setattr(suite, "_remove_identity_tree", refuse_deletion)
+
+    _assert_error(
+        "SKILL_SUITE_REPLACED_NOT_DELETED",
+        lambda: suite.install_skill_suite(
+            source_root=source, skills_root=destination, replace=True
+        ),
+    )
+    installed = destination / "using-kokorox" / "SKILL.md"
+    assert installed.read_bytes() == edited.read_bytes()
+    assert {entry["name"]: entry["sha256"] for entry in _receipt(destination)["skills"]}[
+        "using-kokorox"
+    ] == dict(suite._resolve_source_snapshot(source, suite.SkillSuiteLimits()).skill_sha256)[
+        "using-kokorox"
+    ]
+    assert [path for path in destination.iterdir() if "-removing-" in path.name]

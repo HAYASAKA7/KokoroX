@@ -789,7 +789,10 @@ def test_built_archives_and_installed_research_cli_are_complete(
         "install",
         "install",
     ]
-    assert _relative_files(installed_skill_root) == REQUIRED_SKILL_FILES
+    # Install records what it wrote in a receipt beside the Skills.
+    assert _relative_files(installed_skill_root) == REQUIRED_SKILL_FILES | {
+        ".kokorox-skill-suite.json"
+    }
     for relative in REQUIRED_SKILL_FILES:
         assert (installed_skill_root / relative).read_bytes() == (
             installed_source / relative

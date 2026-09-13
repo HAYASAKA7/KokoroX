@@ -189,6 +189,46 @@ def test_pack_list_flags_an_installed_release_that_no_longer_resolves(
     assert entry["unusable_reason"].startswith("KARC_DEFAULT_")
 
 
+def test_suite_install_replace_upgrades_an_earlier_version(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    import shutil
+
+    source = tmp_path / "source"
+    shutil.copytree(Path("skills"), source)
+    destination = tmp_path / "installed"
+    install = [
+        "suite",
+        "install",
+        "--source",
+        str(source),
+        "--skills-root",
+        str(destination),
+        "--json",
+    ]
+    code, _installed = _cli_json(install, capsys)
+    assert code == 0
+    skill = source / "using-kokorox" / "SKILL.md"
+    skill.write_bytes(skill.read_bytes() + b"\nA later version.\n")
+
+    code, refused = _cli_json(install, capsys)
+    assert code != 0
+    assert refused["error"]["code"] == "SKILL_SUITE_REPLACE_REQUIRED"
+    assert "--replace" in refused["error"]["message"]
+
+    code, replaced = _cli_json([*install[:-1], "--replace", "--json"], capsys)
+    assert code == 0
+    actions = {
+        skill["name"]: skill["action"]
+        for skill in replaced["skill_suite"]["skills"]
+    }
+    assert actions["using-kokorox"] == "replace"
+    assert (destination / "using-kokorox" / "SKILL.md").read_bytes() == (
+        skill.read_bytes()
+    )
+
+
 def _install_and_grant_cli(
     release: dict[str, Any],
     tmp_path: Path,
@@ -1423,7 +1463,11 @@ def test_skill_suite_cli_installs_explicit_user_root_idempotently(
     assert {item["action"] for item in installed["skill_suite"]["skills"]} == {
         "install"
     }
-    assert _file_bytes(skills_root) == _file_bytes(Path("skills"))
+    installed_files = _file_bytes(skills_root)
+    assert installed_files.pop(".kokorox-skill-suite.json").startswith(
+        b'{"artifact_id":"kokorox/skill-suite/receipt"'
+    )
+    assert installed_files == _file_bytes(Path("skills"))
 
     before = _filesystem_snapshot(skills_root)
     code, repeated = _cli_json(command, capsys)
@@ -1466,9 +1510,10 @@ def test_skill_suite_cli_repo_dry_run_then_install_is_confined(
     code, installed = _cli_json(command, capsys)
     assert code == 0
     assert installed["skill_suite"]["scope"] == "repo"
-    assert _file_bytes(repo / ".agents" / "skills") == _file_bytes(
-        Path("skills")
-    )
+    installed_files = _file_bytes(repo / ".agents" / "skills")
+    assert ".kokorox-skill-suite.json" in installed_files
+    del installed_files[".kokorox-skill-suite.json"]
+    assert installed_files == _file_bytes(Path("skills"))
 
 
 @pytest.mark.parametrize(
@@ -1600,6 +1645,7 @@ def test_skill_suite_cli_remove_conflict_carries_its_remedy(
     assert refused["error"]["code"] == "SKILL_SUITE_REMOVE_CONFLICT"
     assert "--source" in refused["error"]["message"]
     assert {path.name for path in skills_root.iterdir()} == {
+        ".kokorox-skill-suite.json",
         "using-kokorox",
         "authoring-character-packs",
         "researching-characters",
