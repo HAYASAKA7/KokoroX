@@ -56,6 +56,13 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- A research workspace that fails to load now says where.
+  `RESEARCH_WORKSPACE_INVALID` carries the rejected record's position in the
+  manifest (`record`, such as `["conflicts", 0]`), the contract it broke
+  (`schema`), the field `path`, and any `missing` required properties. An
+  unresolved conflict filed without its `incompatibility_rationale` used to
+  fail with an empty `details` object; it now names the conflict and the
+  absent field. Only structure is reported, never the rejected values.
 - Schema validation no longer repeats work that depends only on a schema
   file's bytes. Loading still reads and parses the file every time, so a
   schema that changes on disk is honoured immediately, but Draft 2020-12

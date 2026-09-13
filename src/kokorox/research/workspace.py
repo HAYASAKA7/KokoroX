@@ -93,7 +93,7 @@ def load_research_workspace(
     for section, schema_name in _REFERENCE_SECTIONS:
         entries = _section_entries(cast(dict[str, Any], manifest), section)
         loaded: list[dict[str, Any]] = []
-        for entry in entries:
+        for index, entry in enumerate(entries):
             relative = cast(str, entry["path"])
             read_result = _read_regular(
                 safe_root, safe_root.joinpath(*relative.split("/")), limits
@@ -105,7 +105,13 @@ def load_research_workspace(
                     "RESEARCH_WORKSPACE_DIGEST_MISMATCH", "digest_mismatch"
                 )
             document = _parse_json(contents, "artifact")
-            _validate_schema(schemas, schema_name, document, "artifact")
+            _validate_schema(
+                schemas,
+                schema_name,
+                document,
+                "artifact",
+                [section] if section in {"request", "coverage"} else [section, index],
+            )
             file_hashes[relative] = actual_hash
             file_snapshots[relative] = read_result
             loaded.append(cast(dict[str, Any], document))
@@ -483,20 +489,34 @@ def _validate_schema(
     name: str,
     value: dict[str, Any],
     stage: str,
+    record: list[str | int] | None = None,
 ) -> None:
     try:
         schemas.validate(name, value)
     except KokoroError as error:
         if error.code != "SCHEMA_VALIDATION_FAILED":
             raise
-        raise _workspace_error("RESEARCH_WORKSPACE_INVALID", stage) from None
+        # Say where: which record, which field, which properties are absent.
+        # All of it is structure -- manifest positions and contract names --
+        # never the rejected values.
+        located: dict[str, Any] = {
+            "schema": name,
+            "path": list(error.details.get("path", [])),
+        }
+        if record is not None:
+            located["record"] = record
+        if "missing" in error.details:
+            located["missing"] = list(error.details["missing"])
+        raise _workspace_error(
+            "RESEARCH_WORKSPACE_INVALID", stage, **located
+        ) from None
 
 
-def _workspace_error(code: str, reason: str) -> KokoroError:
+def _workspace_error(code: str, reason: str, **located: Any) -> KokoroError:
     return KokoroError(
         code,
         "Research workspace could not be loaded.",
-        details={"reason": reason},
+        details={"reason": reason, **located},
     )
 
 

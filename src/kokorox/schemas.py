@@ -143,8 +143,19 @@ class SchemaRegistry:
         )
         if errors:
             first = errors[0]
+            details: dict[str, Any] = {
+                "schema": name,
+                "path": list(first.absolute_path),
+            }
+            if first.validator == "required" and isinstance(first.instance, dict):
+                # The names come from the schema, never from the input.
+                details["missing"] = sorted(
+                    str(item)
+                    for item in first.validator_value
+                    if item not in first.instance
+                )
             raise KokoroError(
                 "SCHEMA_VALIDATION_FAILED",
                 first.message,
-                details={"schema": name, "path": list(first.absolute_path)},
+                details=details,
             )

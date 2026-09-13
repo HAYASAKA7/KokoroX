@@ -909,6 +909,25 @@ def test_registry_validates_against_the_schema_on_disk_now(tmp_path: Path) -> No
     assert raised.value.code == "SCHEMA_VALIDATION_FAILED"
 
 
+def test_registry_names_the_missing_required_properties(tmp_path: Path) -> None:
+    registry = SchemaRegistry(tmp_path)
+    (tmp_path / "needs.schema.json").write_text(
+        '{"$schema":"https://json-schema.org/draft/2020-12/schema",'
+        '"type":"object","required":["kept","absent","gone"]}',
+        encoding="utf-8",
+    )
+
+    with pytest.raises(KokoroError) as raised:
+        registry.validate("needs", {"kept": 1})
+
+    assert raised.value.code == "SCHEMA_VALIDATION_FAILED"
+    assert raised.value.details == {
+        "schema": "needs",
+        "path": [],
+        "missing": ["absent", "gone"],
+    }
+
+
 def test_registry_rejects_non_2020_12_schema_declaration(tmp_path: Path) -> None:
     registry = SchemaRegistry(tmp_path)
     (tmp_path / "draft7.schema.json").write_text(

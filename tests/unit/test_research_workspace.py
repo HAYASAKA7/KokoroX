@@ -2,7 +2,9 @@ from __future__ import annotations
 
 from dataclasses import FrozenInstanceError
 from hashlib import sha256
+import json
 from pathlib import Path
+import shutil
 
 import pytest
 
@@ -151,3 +153,35 @@ def test_rejects_non_positive_limits(limits: ResearchLimits) -> None:
             limits,
         )
     assert raised.value.code == "RESEARCH_WORKSPACE_LIMIT_INVALID"
+
+
+def test_a_rejected_record_says_which_record_field_and_property(
+    tmp_path: Path,
+) -> None:
+    """An unresolved conflict filed without its rationale names all three."""
+
+    root = tmp_path / "workspace"
+    shutil.copytree(Path("tests/fixtures/research/partial"), root)
+    manifest_path = root / "workspace.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    entry = manifest["conflicts"][0]
+    record_path = root / entry["path"]
+    conflict = json.loads(record_path.read_text(encoding="utf-8"))
+    assert conflict["status"] == "unresolved"
+    del conflict["incompatibility_rationale"]
+    record_bytes = json.dumps(conflict, indent=2).encode("utf-8")
+    record_path.write_bytes(record_bytes)
+    entry["sha256"] = sha256(record_bytes).hexdigest()
+    manifest_path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
+
+    with pytest.raises(KokoroError) as raised:
+        load_research_workspace(root, SchemaRegistry(Path("schemas/v1")))
+
+    assert raised.value.code == "RESEARCH_WORKSPACE_INVALID"
+    assert raised.value.details == {
+        "reason": "artifact",
+        "schema": "research-conflict",
+        "record": ["conflicts", 0],
+        "path": [],
+        "missing": ["incompatibility_rationale"],
+    }

@@ -2608,6 +2608,70 @@ _INSTALLATION_STALE_REASONS: Final = frozenset(
 )
 
 
+_WORKSPACE_STAGES: Final = frozenset({"manifest", "artifact"})
+_WORKSPACE_SECTIONS: Final = frozenset(
+    {"request", "sources", "claims", "conflicts", "coverage"}
+)
+_PROPERTY_NAME: Final = re.compile(r"^[a-z][a-z0-9_]{0,63}\Z", re.ASCII)
+
+
+def _position(value: Any) -> bool:
+    return (
+        isinstance(value, int)
+        and not isinstance(value, bool)
+        and 0 <= value <= 1_000_000
+    )
+
+
+def _workspace_invalid_details(raw: dict[str, Any]) -> dict[str, Any]:
+    """Keep what locates a rejected workspace record, and nothing it held.
+
+    Record positions come from the manifest; schema and property names come
+    from the contract. A path segment that is not shaped like a contract
+    property name could be a key the author invented, so a path holding one
+    is dropped whole rather than echoed.
+    """
+
+    kept: dict[str, Any] = {}
+    reason = raw.get("reason")
+    if isinstance(reason, str) and reason in _WORKSPACE_STAGES:
+        kept["reason"] = reason
+    schema = raw.get("schema")
+    if isinstance(schema, str) and _SCHEMA_NAME.fullmatch(schema) is not None:
+        kept["schema"] = schema
+    record = raw.get("record")
+    if (
+        isinstance(record, list)
+        and 1 <= len(record) <= 2
+        and isinstance(record[0], str)
+        and record[0] in _WORKSPACE_SECTIONS
+        and all(_position(item) for item in record[1:])
+    ):
+        kept["record"] = list(record)
+    path = raw.get("path")
+    if (
+        isinstance(path, list)
+        and len(path) <= 32
+        and all(
+            _position(item)
+            or (isinstance(item, str) and _PROPERTY_NAME.fullmatch(item) is not None)
+            for item in path
+        )
+    ):
+        kept["path"] = list(path)
+    missing = raw.get("missing")
+    if (
+        isinstance(missing, list)
+        and 0 < len(missing) <= 32
+        and all(
+            isinstance(item, str) and _PROPERTY_NAME.fullmatch(item) is not None
+            for item in missing
+        )
+    ):
+        kept["missing"] = list(missing)
+    return kept
+
+
 def _public_error_envelope(error: KokoroError) -> dict[str, Any]:
     code = error.code
     if not isinstance(code, str) or _PUBLIC_ERROR_CODE.fullmatch(code) is None:
@@ -2674,6 +2738,8 @@ def _public_error_envelope(error: KokoroError) -> dict[str, Any]:
         reason = error.details.get("reason")
         if isinstance(reason, str) and reason in _INSTALLATION_STALE_REASONS:
             details = {"reason": reason}
+    if code == "RESEARCH_WORKSPACE_INVALID":
+        details = _workspace_invalid_details(error.details)
     return {
         "ok": False,
         "error": {
