@@ -19,6 +19,11 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   still refuses. Removal uses the same receipt, so the previous suite can be
   removed after an upgrade. A malformed, oversized, or redirected receipt
   proves nothing, and ownership falls back to the current source alone.
+  Suites installed by 0.1.0 or 0.2.0, which wrote no receipt, are recognised
+  by the exact per-Skill digests those releases shipped, so their first
+  upgrade needs no manual step. A Skill nothing vouches for refuses with
+  `SKILL_SUITE_RECEIPT_MISSING`, told apart from the `SKILL_SUITE_CONFLICT`
+  of a Skill edited after install.
 - The build validation report now names each locale a request asked for
   that the pack does not author, as the advisory
   `AUTHORING_REQUESTED_LOCALE_UNAUTHORED`. `requested_locales` was

@@ -179,7 +179,7 @@ def test_conflict_preflight_publishes_nothing(tmp_path: Path) -> None:
     with pytest.raises(Exception) as raised:
         install_skill_suite(source_root=source, skills_root=skills_root)
 
-    assert getattr(raised.value, "code", None) == "SKILL_SUITE_CONFLICT"
+    assert getattr(raised.value, "code", None) == "SKILL_SUITE_RECEIPT_MISSING"
     assert {entry.name for entry in skills_root.iterdir()} == {
         "testing-character-packs"
     }

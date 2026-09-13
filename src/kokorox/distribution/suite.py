@@ -97,6 +97,66 @@ _RECEIPT_FILE = re.compile(
 )
 _RECEIPT_DIRECTORIES = frozenset({"agents", "references"})
 _SHA256_HEX = re.compile(r"[a-f0-9]{64}\Z")
+# Suites installed by a release that predates receipts carry none. Each release's
+# Skills are recognised by the digest of the tree it shipped, so the first
+# upgrade from one needs no receipt either. The inventory is frozen here rather
+# than read from `_SKILL_FILES`, so changing today's file list cannot change
+# what a past release is recognised by. Computed from the `v0.1.0` and `v0.2.0`
+# tags with `_skill_digest`; `skills/**` is pinned to LF, so one digest covers
+# every platform an install was made on.
+_RELEASED_AGENT_PROFILES = (
+    "openai",
+    "claude",
+    "codex",
+    "cursor",
+    "gemini",
+    "copilot",
+    "kimi",
+    "deepseek",
+    "qwen",
+    "generic",
+)
+_RELEASED_SKILL_FILES = {
+    skill_name: frozenset(
+        {
+            "SKILL.md",
+            reference_file,
+            *(f"agents/{profile}.yaml" for profile in _RELEASED_AGENT_PROFILES),
+        }
+    )
+    for skill_name, reference_file in (
+        ("using-kokorox", "references/runtime-contract.md"),
+        ("authoring-character-packs", "references/authoring-contract.md"),
+        ("researching-characters", "references/research-contract.md"),
+        ("testing-character-packs", "references/testing-contract.md"),
+    )
+}
+_KNOWN_RELEASE_DIGESTS = {
+    "0.1.0": {
+        "using-kokorox": "92e7108838792d9fc5ed93e0bf66a56fdf27c32af3d2c818acb3bfa8fccb8fea",
+        "authoring-character-packs": (
+            "9ed55cb7a201ae89de10c826e5ea21345f473c68d20ad2206279108e98b300eb"
+        ),
+        "researching-characters": (
+            "eb0f6652c40a7ba49e17b727373eb92f8443778ce4c0d91aaeb6a90c47839f5f"
+        ),
+        "testing-character-packs": (
+            "4044b0e550ab6f9057086c6c020b11dbcde57e88f5fea43c3139df0d48e723cd"
+        ),
+    },
+    "0.2.0": {
+        "using-kokorox": "f80e832f6b4a8f88ce38267e3b4965249d96baff29f7edb7a7912e96a07c1415",
+        "authoring-character-packs": (
+            "5d1d3c63e0c467debb19387a69c01b81fd14f8e2036401179b335591962c36e9"
+        ),
+        "researching-characters": (
+            "b38ea44e2ec5e78ff754d1fce19b7d7dcdde6449a01b20606d05a8c33677f273"
+        ),
+        "testing-character-packs": (
+            "4044b0e550ab6f9057086c6c020b11dbcde57e88f5fea43c3139df0d48e723cd"
+        ),
+    },
+}
 
 
 @dataclass(frozen=True, slots=True)
@@ -1139,10 +1199,12 @@ def _classify_installed(
     """Return each suite Skill's state in the target.
 
     `missing`, `identical` -- byte for byte the source -- or `predecessor`:
-    byte for byte the version the receipt of an earlier install records. Any
-    other present Skill raises `SKILL_SUITE_CONFLICT`. Install and removal
-    share this so they agree on what counts as the suite's own tree; neither
-    acts on one it cannot prove.
+    byte for byte an earlier version, as the receipt of an earlier install or
+    a known release records it. A present Skill that is none of these raises
+    `SKILL_SUITE_CONFLICT` when a receipt vouches for a different tree -- it
+    changed after install -- and `SKILL_SUITE_RECEIPT_MISSING` when nothing
+    vouches for it at all. Install and removal share this so they agree on
+    what counts as the suite's own tree; neither acts on one it cannot prove.
     """
 
     states: list[tuple[str, str]] = []
@@ -1163,13 +1225,46 @@ def _classify_installed(
             raise _path_error("Installed Skill target is unsafe.")
         if _matches_source(source_files, skill_target, skill_name, limits):
             states.append((skill_name, "identical"))
-        elif skill_name in recorded and _matches_receipt(
-            recorded[skill_name], skill_target, skill_name, limits
+        elif (
+            _matching_predecessor(
+                skill_target, skill_name, recorded.get(skill_name), limits
+            )
+            is not None
         ):
             states.append((skill_name, "predecessor"))
-        else:
+        elif skill_name in recorded:
             raise _conflict_error()
+        else:
+            raise _receipt_missing_error()
     return tuple(states)
+
+
+def _predecessor_records(
+    skill_name: str,
+    receipt_record: _ReceiptSkill | None,
+) -> tuple[_ReceiptSkill, ...]:
+    """The earlier trees a Skill may prove itself against, receipt first."""
+
+    records: list[_ReceiptSkill] = [] if receipt_record is None else [receipt_record]
+    for digests in _KNOWN_RELEASE_DIGESTS.values():
+        release = _ReceiptSkill(
+            digests[skill_name], _RELEASED_SKILL_FILES[skill_name]
+        )
+        if release not in records:
+            records.append(release)
+    return tuple(records)
+
+
+def _matching_predecessor(
+    skill_target: Path,
+    skill_name: str,
+    receipt_record: _ReceiptSkill | None,
+    limits: SkillSuiteLimits,
+) -> _ReceiptSkill | None:
+    for record in _predecessor_records(skill_name, receipt_record):
+        if _matches_receipt(record, skill_target, skill_name, limits):
+            return record
+    return None
 
 
 def _matches_source(
@@ -1273,7 +1368,7 @@ def _plan_removal(
     try:
         classified = _classify_installed(source, target, limits, receipt)
     except KokoroError as error:
-        if error.code != "SKILL_SUITE_CONFLICT":
+        if error.code not in {"SKILL_SUITE_CONFLICT", "SKILL_SUITE_RECEIPT_MISSING"}:
             raise
         raise _error(
             "SKILL_SUITE_REMOVE_CONFLICT",
@@ -1326,13 +1421,16 @@ def _capture_target_skill_states(
         try:
             files = _capture_skill_target(root, skill_name, limits)
         except KokoroError as error:
-            # An earlier version may carry a different file list; its receipt
-            # says which, and classification then proves the bytes.
-            if error.code != "SKILL_SUITE_CONFLICT" or skill_name not in recorded:
+            # An earlier version may carry a different file list; the record
+            # that proves it -- its receipt or a known release -- says which.
+            if error.code != "SKILL_SUITE_CONFLICT":
                 raise
-            files = _capture_recorded_skill(
-                root, skill_name, recorded[skill_name], limits
+            record = _matching_predecessor(
+                root, skill_name, recorded.get(skill_name), limits
             )
+            if record is None:
+                raise
+            files = _capture_recorded_skill(root, skill_name, record, limits)
         after = _capture_directory_identity(root)
         if before != after:
             raise _path_error("Installed Skill target changed during capture.")
@@ -2058,6 +2156,7 @@ def _require_actions_unchanged(
             "SKILL_SUITE_CONFLICT",
             "SKILL_SUITE_REMOVE_CONFLICT",
             "SKILL_SUITE_REPLACE_REQUIRED",
+            "SKILL_SUITE_RECEIPT_MISSING",
             "SKILL_SUITE_LIMIT_EXCEEDED",
             "SKILL_SUITE_PATH_INVALID",
         }:
@@ -2404,6 +2503,14 @@ def _source_error(message: str) -> KokoroError:
 
 def _path_error(message: str) -> KokoroError:
     return _error("SKILL_SUITE_PATH_INVALID", message)
+
+
+def _receipt_missing_error() -> KokoroError:
+    return _error(
+        "SKILL_SUITE_RECEIPT_MISSING",
+        "An installed Skill differs from the KokoroX suite, and no install "
+        "receipt or known release proves it is an unedited earlier version.",
+    )
 
 
 def _conflict_error() -> KokoroError:

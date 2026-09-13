@@ -660,7 +660,7 @@ def test_skill_suite_cli_conflict_preserves_existing_skill_and_config(
     assert cli.main(["suite", "install", "--json"]) == 2
 
     error = _error(capsys)
-    assert error["code"] == "SKILL_SUITE_CONFLICT"
+    assert error["code"] == "SKILL_SUITE_RECEIPT_MISSING"
     assert _filesystem_snapshot(fake_home) == before
     assert config.read_bytes() == b"caller_owned = true\n"
 

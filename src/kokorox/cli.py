@@ -308,7 +308,9 @@ _PUBLIC_MESSAGES = {
     # before anyone could read it.
     "SKILL_SUITE_CLEANUP_FAILED": "Skill suite staging could not be cleaned up.",
     "SKILL_SUITE_CONFLICT": (
-        "An installed Skill differs from the KokoroX suite; remove it first."
+        "An installed Skill differs from the KokoroX suite and from the version "
+        "its install receipt records, so it changed after install; move your "
+        "edits aside and remove it first."
     ),
     "SKILL_SUITE_DESTINATION_CHANGED": (
         "The Skill destination changed during the operation."
@@ -316,6 +318,12 @@ _PUBLIC_MESSAGES = {
     "SKILL_SUITE_INSTALL_FAILED": "The Skill suite could not be installed.",
     "SKILL_SUITE_LIMIT_EXCEEDED": "The Skill suite source exceeds a bound.",
     "SKILL_SUITE_PATH_INVALID": "A Skill suite path is unsafe.",
+    "SKILL_SUITE_RECEIPT_MISSING": (
+        "An installed Skill differs from the KokoroX suite, and no install receipt "
+        "or known release proves it is an unedited earlier version. If you have "
+        "not edited it, remove the suite once by hand and install again; later "
+        "upgrades use `kokorox suite install --replace`."
+    ),
     "SKILL_SUITE_REMOVE_CONFLICT": (
         "An installed Skill differs from the suite source; nothing was "
         "removed. Name the suite that installed it with --source, or remove "

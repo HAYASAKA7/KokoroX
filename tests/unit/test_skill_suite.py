@@ -491,7 +491,7 @@ def test_preview_rejects_a_nonidentical_existing_skill(tmp_path: Path) -> None:
     )
 
     _assert_error(
-        "SKILL_SUITE_CONFLICT",
+        "SKILL_SUITE_RECEIPT_MISSING",
         lambda: suite.preview_skill_suite_install(
             source_root=source,
             skills_root=skills_root,
@@ -500,7 +500,7 @@ def test_preview_rejects_a_nonidentical_existing_skill(tmp_path: Path) -> None:
 
 
 @pytest.mark.parametrize("mutation", ["extra", "missing"])
-def test_preview_classifies_inventory_differences_as_conflicts(
+def test_preview_refuses_inventory_differences_nothing_vouches_for(
     tmp_path: Path,
     mutation: str,
 ) -> None:
@@ -515,7 +515,7 @@ def test_preview_classifies_inventory_differences_as_conflicts(
         (target / "references" / "runtime-contract.md").unlink()
 
     _assert_error(
-        "SKILL_SUITE_CONFLICT",
+        "SKILL_SUITE_RECEIPT_MISSING",
         lambda: suite.preview_skill_suite_install(
             source_root=source,
             skills_root=skills_root,
@@ -715,8 +715,11 @@ def test_suite_errors_reach_the_caller_with_their_own_message() -> None:
         "SKILL_SUITE_SOURCE_AMBIGUOUS",
         "SKILL_SUITE_SOURCE_INVALID",
         "SKILL_SUITE_CONFLICT",
+        "SKILL_SUITE_RECEIPT_MISSING",
         "SKILL_SUITE_REMOVE_CONFLICT",
         "SKILL_SUITE_REMOVE_FAILED",
+        "SKILL_SUITE_REPLACE_REQUIRED",
+        "SKILL_SUITE_REPLACED_NOT_DELETED",
         "SKILL_SUITE_RESTORE_FAILED",
     ):
         envelope = _public_error_envelope(
@@ -892,7 +895,7 @@ def test_a_malformed_receipt_proves_nothing(tmp_path: Path) -> None:
     (destination / suite._RECEIPT_NAME).write_text('{"skills": []}', encoding="utf-8")
 
     _assert_error(
-        "SKILL_SUITE_CONFLICT",
+        "SKILL_SUITE_RECEIPT_MISSING",
         lambda: suite.install_skill_suite(
             source_root=source, skills_root=destination, replace=True
         ),
@@ -1021,3 +1024,140 @@ def test_a_replaced_skill_that_cannot_be_deleted_leaves_the_new_suite_installed(
         "using-kokorox"
     ]
     assert [path for path in destination.iterdir() if "-removing-" in path.name]
+
+
+def _older_suite(tmp_path: Path) -> tuple[Path, dict[str, str]]:
+    """A copied source edited into an 'earlier release', and its digests."""
+
+    suite = _suite_module()
+    older = _copy_source(tmp_path / "older")
+    _edit_source_skill(older, "authoring-character-packs")
+    snapshot = suite._resolve_source_snapshot(older, suite.SkillSuiteLimits())
+    return older, dict(snapshot.skill_sha256)
+
+
+def test_a_known_release_is_proven_without_a_receipt(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A suite a receipt-less release installed upgrades on its first try."""
+
+    suite = _suite_module()
+    older, digests = _older_suite(tmp_path)
+    destination = tmp_path / "installed"
+    shutil.copytree(older, destination)
+    monkeypatch.setattr(suite, "_KNOWN_RELEASE_DIGESTS", {"9.9.9": digests})
+    source = _copy_source(tmp_path / "current")
+
+    _assert_error(
+        "SKILL_SUITE_REPLACE_REQUIRED",
+        lambda: suite.install_skill_suite(source_root=source, skills_root=destination),
+    )
+    plan = suite.install_skill_suite(
+        source_root=source, skills_root=destination, replace=True
+    )
+
+    assert {skill["name"]: skill["action"] for skill in plan["skills"]} == {
+        name: "replace" if name == "authoring-character-packs" else "unchanged"
+        for name in suite.SKILL_SUITE_NAMES
+    }
+    assert _receipt(destination)["source_tree_sha256"] == plan["source_tree_sha256"]
+
+
+def test_a_known_release_can_be_removed_without_a_receipt(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    suite = _suite_module()
+    older, digests = _older_suite(tmp_path)
+    destination = tmp_path / "installed"
+    shutil.copytree(older, destination)
+    monkeypatch.setattr(suite, "_KNOWN_RELEASE_DIGESTS", {"9.9.9": digests})
+
+    plan = suite.remove_skill_suite(
+        source_root=_copy_source(tmp_path / "current"), skills_root=destination
+    )
+
+    assert {skill["action"] for skill in plan["skills"]} == {"remove"}
+    assert list(destination.iterdir()) == []
+
+
+def test_a_skill_nothing_vouches_for_is_told_apart_from_an_edited_one(
+    tmp_path: Path,
+) -> None:
+    """No receipt and no known release: say so, not 'you changed a file'."""
+
+    suite = _suite_module()
+    older, _digests = _older_suite(tmp_path)
+    destination = tmp_path / "installed"
+    shutil.copytree(older, destination)
+    source = _copy_source(tmp_path / "current")
+
+    for replace in (False, True):
+        _assert_error(
+            "SKILL_SUITE_RECEIPT_MISSING",
+            lambda: suite.install_skill_suite(
+                source_root=source, skills_root=destination, replace=replace
+            ),
+        )
+    _assert_error(
+        "SKILL_SUITE_REMOVE_CONFLICT",
+        lambda: suite.remove_skill_suite(source_root=source, skills_root=destination),
+    )
+
+
+def test_the_known_release_digests_are_well_formed() -> None:
+    suite = _suite_module()
+
+    assert suite._KNOWN_RELEASE_DIGESTS
+    for version, digests in suite._KNOWN_RELEASE_DIGESTS.items():
+        assert re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", version)
+        assert set(digests) == set(suite.SKILL_SUITE_NAMES)
+        assert all(re.fullmatch(r"[a-f0-9]{64}", digest) for digest in digests.values())
+    assert set(suite._RELEASED_SKILL_FILES) == set(suite.SKILL_SUITE_NAMES)
+
+
+def test_the_known_release_digests_match_their_tags() -> None:
+    """Recompute each release digest from its git tag, where history is present."""
+
+    import io
+    import subprocess
+    import zipfile
+    from hashlib import sha256
+
+    from kokorox.packs.compiler import canonical_bytes
+
+    suite = _suite_module()
+    for version, digests in suite._KNOWN_RELEASE_DIGESTS.items():
+        try:
+            archived = subprocess.run(
+                ["git", "archive", "--format=zip", f"v{version}", "skills"],
+                cwd=REPOSITORY_ROOT,
+                capture_output=True,
+                check=False,
+            )
+        except OSError:
+            pytest.skip("git is unavailable")
+        if archived.returncode != 0:
+            pytest.skip(f"tag v{version} is not in this checkout")
+        with zipfile.ZipFile(io.BytesIO(archived.stdout)) as bundle:
+            members = {
+                info.filename: bundle.read(info)
+                for info in bundle.infolist()
+                if not info.is_dir()
+            }
+        for name, digest in digests.items():
+            prefix = f"skills/{name}/"
+            manifest = [
+                {
+                    "path": member.removeprefix(prefix),
+                    "size": len(payload),
+                    "sha256": sha256(payload).hexdigest(),
+                }
+                for member, payload in sorted(members.items())
+                if member.startswith(prefix)
+            ]
+            assert {entry["path"] for entry in manifest} == set(
+                suite._RELEASED_SKILL_FILES[name]
+            )
+            assert sha256(canonical_bytes(manifest)).hexdigest() == digest, (version, name)

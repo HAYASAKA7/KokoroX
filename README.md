@@ -68,11 +68,12 @@ plain install refuses with `SKILL_SUITE_REPLACE_REQUIRED`. Replace it in place:
 kokorox suite install --scope user --replace --json
 ```
 
-`--replace` swaps only Skills the receipt proves are an unmodified earlier
-version; an edited Skill still refuses the whole install. A suite installed
-before receipts existed has none. Before upgrading, remove it and install it
-again to record one; after upgrading, remove that suite with `suite remove
---source` naming its source, or delete the four directories by hand.
+`--replace` swaps only Skills proven to be an unmodified earlier version: by
+the receipt, or -- for a suite installed by KokoroX 0.1.0 or 0.2.0, which
+wrote none -- by the exact trees those releases shipped. An edited Skill still
+refuses the whole install. A Skill nothing vouches for, such as one installed
+from an unreleased checkout, refuses with `SKILL_SUITE_RECEIPT_MISSING`; if you
+have not edited it, remove the suite once by hand and install again.
 
 ## Use the suite in many agents
 

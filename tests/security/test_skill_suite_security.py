@@ -923,7 +923,7 @@ def test_an_oversized_receipt_proves_no_ownership(tmp_path: Path) -> None:
     later = _later_source(tmp_path / "later")
 
     _assert_code(
-        "SKILL_SUITE_CONFLICT",
+        "SKILL_SUITE_RECEIPT_MISSING",
         lambda: suite.install_skill_suite(
             source_root=later, skills_root=destination, replace=True
         ),
