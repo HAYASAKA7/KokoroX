@@ -541,10 +541,11 @@ def remove_installed_pack(
                             "verified.",
                             reason=error.code,
                         ) from error
-                    raise _error(
-                        "KARC_REMOVE_REFERENCED",
-                        "The selected installation is still referenced.",
-                        references=preflight_blockers,
+                    raise _referenced_error(
+                        root,
+                        preflight_entry,
+                        audited,
+                        preflight_blockers,
                     )
                 with persistence_reference_lock(
                     root,
@@ -1553,10 +1554,12 @@ def _preview_removal(
         persistence_lock=persistence_lock,
     )
     if blockers:
-        raise _error(
-            "KARC_REMOVE_REFERENCED",
-            "The selected installation is still referenced.",
-            references=blockers,
+        raise _referenced_error(
+            root,
+            entry,
+            schemas,
+            blockers,
+            session_hashes=_session_reference_hashes(entry, container),
         )
     shared = _archive_is_referenced(
         root,
@@ -1690,6 +1693,55 @@ def _reference_blockers(
     return sorted(blockers)
 
 
+def _session_blocks(
+    session: dict[str, Any],
+    entry: dict[str, Any],
+    exact_hashes: frozenset[str],
+) -> bool:
+    return (
+        session.get("active") is True
+        and session.get("character_id") == _entry_character_id(entry)
+        and session.get("character_version") == _entry_character_version(entry)
+        and session.get("compiled_pack_hash") in exact_hashes
+    )
+
+
+def _referenced_error(
+    root: Path,
+    entry: dict[str, Any],
+    schemas: _SchemaValidator,
+    blockers: list[str],
+    *,
+    session_hashes: frozenset[str] | None = None,
+) -> KokoroError:
+    """Refuse a removal and say what refers to the installation.
+
+    The kinds are a fixed vocabulary; an active session also gets its id,
+    because ending it is the one step a user can take, and finding it used
+    to mean opening every session file.
+    """
+
+    details: dict[str, Any] = {"references": blockers}
+    if "active_session" in blockers:
+        exact = session_hashes or frozenset({cast(str, entry["compiled_sha256"])})
+        details["sessions"] = sorted(
+            cast(str, session["session_id"])
+            for session in _read_reference_directory(
+                root / "sessions",
+                _MAX_SESSION_REFERENCES,
+                "session-manifest",
+                schemas,
+            )
+            if _session_blocks(session, entry, exact)
+            and isinstance(session.get("session_id"), str)
+        )
+    return _error(
+        "KARC_REMOVE_REFERENCED",
+        "The selected installation is still referenced.",
+        **details,
+    )
+
+
 def _legacy_reference_blockers(
     root: Path,
     scope: InstallScope,
@@ -1721,12 +1773,7 @@ def _legacy_reference_blockers(
         "session-manifest",
         schemas,
     ):
-        if (
-            session.get("active") is True
-            and session.get("character_id") == _entry_character_id(entry)
-            and session.get("character_version") == _entry_character_version(entry)
-            and session.get("compiled_pack_hash") in exact_session_hashes
-        ):
+        if _session_blocks(session, entry, exact_session_hashes):
             blockers.add("active_session")
     for migration in _read_reference_directory(
         root / "migrations",

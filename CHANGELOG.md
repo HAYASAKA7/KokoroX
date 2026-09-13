@@ -66,6 +66,12 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- A refused removal now says what still refers to the installation.
+  `KARC_REMOVE_REFERENCED` was raised with its blocker list and reached the
+  caller with an empty `details`, and its message named only sessions and
+  memory while the scan also covers defaults, consent, state, and
+  migrations. `details.references` now carries the blocking kinds, and
+  `details.sessions` the ids of any active sessions to end first.
 - `pack list` now explains an unusable release with the failure `pack
   install` reports for the same archive, such as
   `KARC_RELEASE_BINDING_INVALID`. It used to pass along the default

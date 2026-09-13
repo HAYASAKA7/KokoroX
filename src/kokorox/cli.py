@@ -214,7 +214,10 @@ _PUBLIC_MESSAGES = {
         "An installation path changed during removal."
     ),
     "KARC_REMOVE_REFERENCED": (
-        "The installation is still referenced by a session or memory reference."
+        "The installation is still in use. details.references names what "
+        "refers to it -- an active session, a default, consent, persistent "
+        "state, a memory reference, or a migration -- and details.sessions "
+        "lists any active sessions to end first."
     ),
     "KARC_REMOVE_REFERENCE_SCAN_INVALID": (
         "Reference scanning failed during removal."
@@ -2639,6 +2642,49 @@ _WORKSPACE_SECTIONS: Final = frozenset(
 _PROPERTY_NAME: Final = re.compile(r"^[a-z][a-z0-9_]{0,63}\Z", re.ASCII)
 
 
+_REMOVAL_REFERENCE_KINDS: Final = frozenset(
+    {
+        "active_session",
+        "default",
+        "memory_reference",
+        "migration",
+        "persistence_consent",
+        "persistent_state",
+        "state_migration",
+    }
+)
+_PUBLIC_SESSION_ID: Final = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*\Z", re.ASCII)
+
+
+def _removal_referenced_details(raw: dict[str, Any]) -> dict[str, Any]:
+    """Keep the blocking reference kinds and session ids, and nothing else."""
+
+    kept: dict[str, Any] = {}
+    references = raw.get("references")
+    if (
+        isinstance(references, list)
+        and 0 < len(references) <= len(_REMOVAL_REFERENCE_KINDS)
+        and all(
+            isinstance(item, str) and item in _REMOVAL_REFERENCE_KINDS
+            for item in references
+        )
+    ):
+        kept["references"] = list(references)
+    sessions = raw.get("sessions")
+    if (
+        isinstance(sessions, list)
+        and len(sessions) <= 32
+        and all(
+            isinstance(item, str)
+            and len(item) <= 128
+            and _PUBLIC_SESSION_ID.fullmatch(item) is not None
+            for item in sessions
+        )
+    ):
+        kept["sessions"] = list(sessions)
+    return kept
+
+
 def _position(value: Any) -> bool:
     return (
         isinstance(value, int)
@@ -2784,6 +2830,8 @@ def _public_error_envelope(error: KokoroError) -> dict[str, Any]:
             details = {"reason": reason}
     if code == "RESEARCH_WORKSPACE_INVALID":
         details = _workspace_invalid_details(error.details)
+    if code == "KARC_REMOVE_REFERENCED":
+        details = _removal_referenced_details(error.details)
     return {
         "ok": False,
         "error": {

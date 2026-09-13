@@ -345,7 +345,10 @@ def test_real_session_blocks_removal_until_it_is_ended(
         )
 
     assert caught.value.code == "KARC_REMOVE_REFERENCED"
-    assert caught.value.details == {"references": ["active_session"]}
+    assert caught.value.details == {
+        "references": ["active_session"],
+        "sessions": ["removal-session"],
+    }
     manifest = data_root / "sessions" / "removal-session.json"
     assert manifest.read_bytes().endswith(b"\n")
 
