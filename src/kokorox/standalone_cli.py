@@ -13,6 +13,7 @@ from typing import Any, Callable
 
 from kokorox.distribution.archive import KarcLimits, build_karc_archive
 from kokorox.distribution.compatibility import inspect_karc_compatibility
+from kokorox.distribution.defaults import installed_release_problem
 from kokorox.distribution.installer import (
     install_karc_archive,
     recover_karc_installations,
@@ -1094,11 +1095,19 @@ def _handle_pack_list(
 ) -> dict[str, Any]:
     workspace = _workspace_root(args)
     scope = resolve_install_scope(workspace)
-    installed = list_installed_packs(
-        _require_data_root(data_root),
-        schemas,
-        workspace_root=workspace,
-    )
+    root = _require_data_root(data_root)
+    installed = []
+    for entry in list_installed_packs(root, schemas, workspace_root=workspace):
+        # Listed is not the same as usable: a release installed under an
+        # earlier KokoroX stays in the registry after its evidence stops
+        # validating, and every persistence command then refuses it.
+        problem = installed_release_problem(
+            root, entry["registry_identity"], schemas, workspace_root=workspace
+        )
+        annotated = {**entry, "usable": problem is None}
+        if problem is not None:
+            annotated["unusable_reason"] = problem
+        installed.append(annotated)
     return {
         "ok": True,
         "scope": scope.kind,

@@ -160,6 +160,35 @@ def test_pack_install_says_why_an_archive_is_invalid(
     assert "KARC_COMPATIBILITY_BLOCKED" in body["error"]["details"]["reasons"]
 
 
+def test_pack_list_flags_an_installed_release_that_no_longer_resolves(
+    rin_verified_release: dict[str, Any],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    source = tmp_path / "rin.karc"
+    source.write_bytes(build_private_archive(rin_verified_release))
+    data_root = tmp_path / "data"
+    monkeypatch.setenv("KOKOROX_DATA_DIR", str(data_root))
+    code, _installed = _cli_json(["pack", "install", str(source), "--json"], capsys)
+    assert code == 0
+
+    code, listed = _cli_json(["pack", "list", "--json"], capsys)
+    assert code == 0
+    [entry] = listed["installed"]
+    assert entry["usable"] is True
+    assert "unusable_reason" not in entry
+
+    archive = data_root / "archives" / f"{entry['archive_sha256']}.karc"
+    archive.write_bytes(b"not the installed archive")
+
+    code, listed = _cli_json(["pack", "list", "--json"], capsys)
+    assert code == 0
+    [entry] = listed["installed"]
+    assert entry["usable"] is False
+    assert entry["unusable_reason"].startswith("KARC_DEFAULT_")
+
+
 def _install_and_grant_cli(
     release: dict[str, Any],
     tmp_path: Path,

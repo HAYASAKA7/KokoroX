@@ -56,6 +56,13 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- `pack list` now says whether each installed release can still be used.
+  A release installed under an earlier KokoroX stayed listed after an upgrade
+  even when its evidence no longer validated, while consent, state, and
+  memory refused it with `PERSISTENCE_INSTALLATION_STALE`. Each entry now
+  carries `usable`, and an `unusable_reason` code when it is false, from the
+  same revalidation those commands run. The README says what to do: rebuild
+  the release from its source pack and install the new archive.
 - The host-adapter check in the runtime contract now ties the selected
   transcript record to the request being answered. Its four conditions find
   a real user turn, but a message sent while a turn is running reaches the

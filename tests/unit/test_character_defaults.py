@@ -131,6 +131,27 @@ def test_workspace_load_uses_canonical_workspace_id(tmp_path: Path) -> None:
     assert list(workspace.iterdir()) == []
 
 
+def test_installed_release_problem_names_a_release_that_no_longer_resolves(
+    tmp_path: Path,
+    rin_verified_release: dict[str, Any],
+) -> None:
+    from persistence_support import install_rin
+
+    data_root = tmp_path / "data"
+    plan = install_rin(data_root, rin_verified_release)
+    identity = plan["registry_identity"]
+
+    assert defaults_module.installed_release_problem(
+        data_root, identity, SCHEMAS
+    ) is None
+
+    archive = data_root / "archives" / f"{plan['archive_sha256']}.karc"
+    archive.write_bytes(b"not the installed archive")
+
+    problem = defaults_module.installed_release_problem(data_root, identity, SCHEMAS)
+    assert isinstance(problem, str) and problem.startswith("KARC_DEFAULT_")
+
+
 def test_resolve_absent_registry_is_not_installed_and_read_only(
     tmp_path: Path,
 ) -> None:

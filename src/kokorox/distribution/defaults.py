@@ -645,6 +645,43 @@ def _change_character_default(
         return _detached_object(successor)
 
 
+def installed_release_problem(
+    data_root: Path,
+    registry_identity: str,
+    schemas: SchemaValidator,
+    *,
+    workspace_root: Path | None = None,
+) -> str | None:
+    """Return why one installed release cannot be used today, or None.
+
+    The registry still names a release installed under an earlier KokoroX
+    after its evidence stops validating. This runs the revalidation that
+    consent, state, and memory run before trusting an installation, so a
+    listing can say which releases they will refuse.
+    """
+
+    parts = registry_identity.split("/")
+    if len(parts) != 3:
+        return "KARC_DEFAULT_STALE"
+    namespace, character_id, version = parts
+    try:
+        _resolve_installed_binding(
+            data_root,
+            character_id,
+            schemas,
+            namespace=namespace,
+            version=version,
+            workspace_root=workspace_root,
+        )
+    except KokoroError as error:
+        return error.code
+    except Exception:
+        # Persistence treats any failure here as an unresolvable
+        # installation; the listing reports it the same way.
+        return "KARC_DEFAULT_STALE"
+    return None
+
+
 def _resolve_installed_binding(
     data_root: Path,
     character_id: str,
@@ -1839,6 +1876,7 @@ __all__ = [
     "CharacterSelection",
     "clear_character_default",
     "empty_character_default",
+    "installed_release_problem",
     "load_character_default",
     "load_selected_compiled",
     "resolve_character_selection",

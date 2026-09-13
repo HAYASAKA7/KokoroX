@@ -104,6 +104,16 @@ kokorox config default set --character rin-aster --scope global --json
 kokorox config default show --scope global --json
 ```
 
+`pack list` also says whether each installed release can still be used. A
+release installed under an earlier KokoroX stays listed after an upgrade, but
+when the upgrade changed a release contract -- renaming the hard gate's
+`security` check to `file_safety` did -- its stored evidence no longer
+validates. Such an entry shows `usable: false` with an `unusable_reason`
+code; consent, state, and memory commands refuse it with
+`PERSISTENCE_INSTALLATION_STALE`, and its own archive cannot be reinstalled.
+Rebuild the release from the source pack -- `pack test`, soft evaluation,
+review, promotion, export -- then install the new archive.
+
 Installation and default selection never activate a character. Activation
 starts only at an explicit session boundary, and ending the session is equally
 explicit:
