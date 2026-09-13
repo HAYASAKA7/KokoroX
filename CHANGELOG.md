@@ -56,6 +56,12 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- `pack install` now says why an archive is invalid. `KARC_INSTALL_ARCHIVE_INVALID`
+  carries the failing compatibility codes in `details.reasons` -- for an
+  archive released before the `file_safety` rename, the binding failure
+  that `pack compatibility` reports -- and its message names
+  `kokorox pack compatibility` for the full report. It used to state the
+  fact with an empty `details`, one command away from the reason.
 - A research workspace that fails to load now says where.
   `RESEARCH_WORKSPACE_INVALID` carries the rejected record's position in the
   manifest (`record`, such as `["conflicts", 0]`), the contract it broke

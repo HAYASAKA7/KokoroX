@@ -141,6 +141,25 @@ def _file_bytes(root: Path) -> dict[str, bytes]:
     }
 
 
+def test_pack_install_says_why_an_archive_is_invalid(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """The refusal carries the compatibility codes and names the command."""
+
+    source = tmp_path / "broken.karc"
+    source.write_bytes(b"not a karc archive")
+    monkeypatch.setenv("KOKOROX_DATA_DIR", str(tmp_path / "data"))
+
+    code, body = _cli_json(["pack", "install", str(source), "--json"], capsys)
+
+    assert code != 0
+    assert body["error"]["code"] == "KARC_INSTALL_ARCHIVE_INVALID"
+    assert "kokorox pack compatibility" in body["error"]["message"]
+    assert "KARC_COMPATIBILITY_BLOCKED" in body["error"]["details"]["reasons"]
+
+
 def _install_and_grant_cli(
     release: dict[str, Any],
     tmp_path: Path,

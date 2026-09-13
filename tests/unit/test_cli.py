@@ -910,6 +910,18 @@ def test_every_raised_error_code_has_a_public_message() -> None:
                 "missing": ["incompatibility_rationale"],
             },
         ),
+        (
+            "KARC_INSTALL_ARCHIVE_INVALID",
+            {"reasons": ["KARC_ARCHIVE_INVALID", "KARC_COMPATIBILITY_BLOCKED"]},
+            {"reasons": ["KARC_ARCHIVE_INVALID", "KARC_COMPATIBILITY_BLOCKED"]},
+        ),
+        (
+            "KARC_INSTALL_ARCHIVE_INVALID",
+            {"reason": "KARC_RELEASE_BINDING_INVALID"},
+            {"reasons": ["KARC_RELEASE_BINDING_INVALID"]},
+        ),
+        ("KARC_INSTALL_ARCHIVE_INVALID", {"reasons": ["../etc/passwd"]}, {}),
+        ("KARC_INSTALL_ARCHIVE_INVALID", {"reason": "ValueError"}, {}),
     ],
 )
 def test_actionable_details_survive_sanitization_and_nothing_else_does(

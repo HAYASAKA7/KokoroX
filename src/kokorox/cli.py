@@ -121,7 +121,8 @@ _PUBLIC_MESSAGES = {
         "Installation input changed while it was read."
     ),
     "KARC_INSTALL_ARCHIVE_INVALID": (
-        "Archive could not be installed; it is invalid."
+        "Archive could not be installed; it is invalid. Run `kokorox pack "
+        "compatibility` on it to see which check failed."
     ),
     "KARC_INSTALL_ATOMIC_UNAVAILABLE": (
         "Atomic installation is unavailable on this filesystem."
@@ -2734,6 +2735,26 @@ def _public_error_envelope(error: KokoroError) -> dict[str, Any]:
             )
         ):
             details = {"supported": list(supported)}
+    # Install refuses for reasons the compatibility report already names;
+    # they are finding codes, so they can travel without echoing the archive.
+    if code == "KARC_INSTALL_ARCHIVE_INVALID":
+        reasons = error.details.get("reasons")
+        reason = error.details.get("reason")
+        if (
+            isinstance(reasons, list)
+            and 0 < len(reasons) <= 32
+            and all(
+                isinstance(item, str)
+                and _PUBLIC_ERROR_CODE.fullmatch(item) is not None
+                for item in reasons
+            )
+        ):
+            details = {"reasons": list(reasons)}
+        elif (
+            isinstance(reason, str)
+            and _PUBLIC_ERROR_CODE.fullmatch(reason) is not None
+        ):
+            details = {"reasons": [reason]}
     if code == "PERSISTENCE_INSTALLATION_STALE":
         reason = error.details.get("reason")
         if isinstance(reason, str) and reason in _INSTALLATION_STALE_REASONS:
