@@ -119,6 +119,8 @@ def _fresh_process_replay(
         check=False,
         capture_output=True,
         text=True,
+        encoding="utf-8",
+        errors="replace",
         env=environment,
         cwd=working_directory,
     )

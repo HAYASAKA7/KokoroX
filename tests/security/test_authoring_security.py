@@ -1350,6 +1350,8 @@ def test_process_exit_auto_releases_publication_lock(
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         text=True,
+        encoding="utf-8",
+        errors="replace",
     )
     try:
         assert process.stdout is not None

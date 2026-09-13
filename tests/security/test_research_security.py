@@ -485,6 +485,8 @@ def test_rejects_real_windows_junction_or_skips_with_exact_reason(
         ["cmd", "/c", "mklink", "/J", str(junction), str(outside)],
         capture_output=True,
         text=True,
+        encoding="utf-8",
+        errors="replace",
         check=False,
     )
     if created.returncode != 0:

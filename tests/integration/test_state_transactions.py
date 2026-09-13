@@ -479,6 +479,8 @@ except KokoroError as error:
             check=True,
             capture_output=True,
             text=True,
+            encoding="utf-8",
+            errors="replace",
             timeout=20,
         )
         return json.loads(completed.stdout)

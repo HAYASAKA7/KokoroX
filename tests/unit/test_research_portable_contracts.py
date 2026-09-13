@@ -307,7 +307,7 @@ def confirm_node_patterns(patterns: list[str]) -> None:
     if node is None:
         pytest.skip("Node is unavailable; static ECMAScript subset validation remains active")
     probe = "for (const pattern of JSON.parse(require('fs').readFileSync(0, 'utf8'))) new RegExp(pattern, 'u');"
-    result = subprocess.run([node, "-e", probe], input=json.dumps(patterns), text=True, capture_output=True)
+    result = subprocess.run([node, "-e", probe], input=json.dumps(patterns), text=True, encoding="utf-8", capture_output=True)
     assert result.returncode == 0, result.stderr
 
 
@@ -361,6 +361,7 @@ def test_reported_extensions_compile_in_python_and_fail_node_unicode(pattern: st
     result = subprocess.run(
         [node, "-e", "new RegExp(process.argv[1], 'u');", pattern],
         text=True,
+        encoding="utf-8",
         capture_output=True,
     )
     assert result.returncode != 0, "Node accepted a reported Python-only extension"
@@ -399,6 +400,7 @@ def test_invalid_class_and_escape_mutations_fail_node_unicode(pattern: str) -> N
     result = subprocess.run(
         [node, "-e", "new RegExp(process.argv[1], 'u');", pattern],
         text=True,
+        encoding="utf-8",
         capture_output=True,
     )
     assert result.returncode != 0, "Node accepted an invalid class or escape mutation"
@@ -414,6 +416,7 @@ def test_repository_subset_rejects_node_valid_class_and_property_forms(pattern: 
     result = subprocess.run(
         [node, "-e", "new RegExp(process.argv[1], 'u');", pattern],
         text=True,
+        encoding="utf-8",
         capture_output=True,
     )
     assert result.returncode == 0, result.stderr

@@ -596,6 +596,8 @@ def test_storage_rejects_real_windows_junction_when_supported(
         check=False,
         capture_output=True,
         text=True,
+        encoding="utf-8",
+        errors="replace",
     )
     if result.returncode != 0:
         pytest.skip("The current account cannot create directory junctions")

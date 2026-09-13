@@ -47,6 +47,8 @@ def _build_and_install(root: Path) -> tuple[Path, Path, Path]:
         check=False,
         capture_output=True,
         text=True,
+        encoding="utf-8",
+        errors="replace",
         cwd=REPOSITORY_ROOT,
         env=environment,
     )
@@ -70,6 +72,8 @@ def _build_and_install(root: Path) -> tuple[Path, Path, Path]:
         check=False,
         capture_output=True,
         text=True,
+        encoding="utf-8",
+        errors="replace",
         cwd=root,
         env=environment,
     )
@@ -188,6 +192,8 @@ def _installed_probe(
         check=False,
         capture_output=True,
         text=True,
+        encoding="utf-8",
+        errors="replace",
         cwd=working,
         env=_isolated_environment(temporary_root, installed),
     )

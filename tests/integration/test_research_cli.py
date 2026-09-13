@@ -531,6 +531,8 @@ def test_built_archives_and_installed_research_cli_are_complete(
         check=False,
         capture_output=True,
         text=True,
+        encoding="utf-8",
+        errors="replace",
         cwd=REPOSITORY_ROOT,
     )
     assert built.returncode == 0, built.stdout + built.stderr
@@ -603,6 +605,8 @@ def test_built_archives_and_installed_research_cli_are_complete(
         check=False,
         capture_output=True,
         text=True,
+        encoding="utf-8",
+        errors="replace",
         cwd=tmp_path,
     )
     assert installed_result.returncode == 0, (
@@ -635,6 +639,8 @@ def test_built_archives_and_installed_research_cli_are_complete(
         check=False,
         capture_output=True,
         text=True,
+        encoding="utf-8",
+        errors="replace",
         env=probe_env,
         cwd=outside_repository,
     )
@@ -662,6 +668,8 @@ def test_built_archives_and_installed_research_cli_are_complete(
         check=False,
         capture_output=True,
         text=True,
+        encoding="utf-8",
+        errors="replace",
         env=probe_env,
         cwd=outside_repository,
     )
@@ -729,6 +737,8 @@ def test_built_archives_and_installed_research_cli_are_complete(
         check=False,
         capture_output=True,
         text=True,
+        encoding="utf-8",
+        errors="replace",
         env=probe_env,
         cwd=outside_repository,
     )
@@ -776,6 +786,8 @@ def test_built_archives_and_installed_research_cli_are_complete(
         check=False,
         capture_output=True,
         text=True,
+        encoding="utf-8",
+        errors="replace",
         env=probe_env,
         cwd=outside_repository,
     )
@@ -842,6 +854,8 @@ def test_built_archives_and_installed_research_cli_are_complete(
         check=False,
         capture_output=True,
         text=True,
+        encoding="utf-8",
+        errors="replace",
         env=probe_env,
         cwd=outside_repository,
     )
