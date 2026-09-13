@@ -56,6 +56,13 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- The host-adapter check in the runtime contract now ties the selected
+  transcript record to the request being answered. Its four conditions find
+  a real user turn, but a message sent while a turn is running reaches the
+  transcript too late, so the newest real turn could be the previous request
+  and pass every check. The record must now match the request by content or
+  timestamp; when neither ties it to this request, there is no lossless
+  source.
 - `pack install` now says why an archive is invalid. `KARC_INSTALL_ARCHIVE_INVALID`
   carries the failing compatibility codes in `details.reasons` -- for an
   archive released before the `file_safety` rename, the binding failure

@@ -29,6 +29,8 @@ def is_user_turn(entry: dict) -> bool:
 
 Then check the binding before continuing: the slice must be non-empty, must occur in the selected turn at the recorded offset, and must round-trip to the same byte length. A protected span that slices to an empty string means the wrong record was selected -- stop and ask for a lossless source rather than proceeding. On a host that exposes no such record, stop the rendering path; there is no valid fallback to model transcription.
 
+The four conditions find a real user turn, not necessarily this one. A message the user sends while a turn is already running is written to the transcript after that turn reads it, so the newest real turn in the file can be the previous request: every entry is non-empty and every check above passes, and the slice is still wrong. Before slicing, confirm the selected turn is the one this request answers -- its content must match the request you are serving, or, where the host records timestamps, it must be the newest user turn at or after this request arrived. When neither ties the record to this request, treat it as no lossless source: stop and ask rather than slicing from an earlier turn.
+
 ## Commands
 
 ```text
