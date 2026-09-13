@@ -99,8 +99,8 @@ def test_orchestrates_existing_compiler_render_validator_and_state_engine(
 
     assert report["passed"] is True
     # Planning and validation run once for the synthetic probe and once per
-    # authored locale, speaking that locale's own line.
-    assert calls == {"compile": 2, "plan": 4, "validate": 4, "state": 3}
+    # authored line: two intents, each in three locales.
+    assert calls == {"compile": 2, "plan": 7, "validate": 7, "state": 3}
 
 
 def test_changed_fixture_bytes_invalidate_report_reuse(tmp_path: Path) -> None:
@@ -552,14 +552,11 @@ def test_reports_protected_span_and_warning_pipeline_drift(
 
     assert report["checks"]["protected_content"]["passed"] is False
     # The drifted planner also strips the authored line's protection in every
-    # locale's fixed-line probe, and each of those renders then fails.
+    # line's fixed-line probe -- two intents in three locales -- and each of
+    # those renders then fails.
     assert finding_codes(report, "protected_content") == [
-        "PACK_FIXED_LINE_UNPROTECTED",
-        "PACK_FIXED_LINE_UNPROTECTED",
-        "PACK_FIXED_LINE_UNPROTECTED",
-        "PACK_FIXED_LINE_VALIDATION_FAILED",
-        "PACK_FIXED_LINE_VALIDATION_FAILED",
-        "PACK_FIXED_LINE_VALIDATION_FAILED",
+        *["PACK_FIXED_LINE_UNPROTECTED"] * 6,
+        *["PACK_FIXED_LINE_VALIDATION_FAILED"] * 6,
         "PACK_PROTECTED_SPAN_MISMATCH",
         "PACK_REQUIRED_WARNING_MISSING",
         "PACK_RUNTIME_VALIDATION_FAILED",
@@ -1163,16 +1160,17 @@ def test_identity_probe_does_not_mask_registry_operational_errors() -> None:
 def test_speaks_every_authored_line_through_the_runtime_path(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Context, plan, and validation run once per locale the pack authors."""
+    """Context, plan, and validation run once per line the pack authors."""
 
     real_plan = hard_module.build_render_plan
-    spoken: dict[str, str] = {}
+    spoken: dict[tuple[str, str], str] = {}
 
     def observed_plan(*args: Any, **kwargs: Any) -> dict[str, Any]:
         plan = real_plan(*args, **kwargs)
         for segment in plan["segments"]:
             if "fixed_line" in segment:
-                spoken[segment["target_language"]] = segment["fixed_line"]["text"]
+                key = (segment["fixed_line"]["intent"], segment["target_language"])
+                spoken[key] = segment["fixed_line"]["text"]
         return plan
 
     monkeypatch.setattr(hard_module, "build_render_plan", observed_plan)
@@ -1180,10 +1178,17 @@ def test_speaks_every_authored_line_through_the_runtime_path(
     report = run_hard_validation(RIN_PACK, load_json(ORIGINAL_REQUEST), SCHEMAS)
 
     assert report["checks"]["protected_content"]["passed"] is True
+    authored = yaml.safe_load(
+        (RIN_PACK / "expressions.yaml").read_text(encoding="utf-8")
+    )
     assert spoken == {
-        "en-US": "The cause is clear.",
-        "ja-JP": "原因は明確です。",
-        "zh-CN": "原因已经明确。",
+        (intent, locale): lines[0]
+        for intent, by_locale in authored.items()
+        for locale, lines in by_locale.items()
+    }
+    assert {intent for intent, _ in spoken} == {
+        "restrained_diagnosis",
+        "understated_encouragement",
     }
 
 
@@ -1210,18 +1215,15 @@ def test_reports_a_plan_that_drops_the_authored_line(
 
     assert report["checks"]["protected_content"]["passed"] is False
     assert finding_codes(report, "protected_content") == [
-        "PACK_FIXED_LINE_NOT_SPOKEN",
-        "PACK_FIXED_LINE_NOT_SPOKEN",
-        "PACK_FIXED_LINE_NOT_SPOKEN",
-        "PACK_FIXED_LINE_VALIDATION_FAILED",
-        "PACK_FIXED_LINE_VALIDATION_FAILED",
-        "PACK_FIXED_LINE_VALIDATION_FAILED",
+        *["PACK_FIXED_LINE_NOT_SPOKEN"] * 6,
+        *["PACK_FIXED_LINE_VALIDATION_FAILED"] * 6,
     ]
     assert [
         finding["path"]
         for finding in findings
         if finding["code"] == "PACK_FIXED_LINE_NOT_SPOKEN"
     ] == [
-        ["expressions.yaml", "restrained_diagnosis", locale]
+        ["expressions.yaml", intent, locale]
+        for intent in ("restrained_diagnosis", "understated_encouragement")
         for locale in ("en-US", "ja-JP", "zh-CN")
     ]

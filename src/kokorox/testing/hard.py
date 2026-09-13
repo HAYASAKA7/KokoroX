@@ -913,7 +913,7 @@ def _check_protected_content(
         "mixing": {"max_switches": 0, "min_primary_ratio": 1.0},
         "subtitles": {"enabled": False, "language": None},
     }
-    fixed_probe = _fixed_line_probe(compiled, multilingual["intent"], policy)
+    fixed_probe = _fixed_line_probe(compiled, policy)
     check_input_hash = _canonical_hash(
         {
             "fixture": fixture,
@@ -929,7 +929,6 @@ def _check_protected_content(
         _check_fixed_lines(
             compiled,
             fixed_probe,
-            multilingual["intent"],
             semantic,
             spans,
             warning,
@@ -1177,10 +1176,9 @@ def _protected_probe(value: Any, expected: bytes, *, output: bool) -> _MutationP
 
 def _fixed_line_probe(
     compiled: Mapping[str, Any] | None,
-    intent: Any,
     policy: Mapping[str, Any],
 ) -> dict[str, Any] | None:
-    """Return the inputs for speaking `intent` in each authored locale."""
+    """Return the inputs for speaking every authored line in its locale."""
 
     if compiled is None:
         return None
@@ -1192,13 +1190,10 @@ def _fixed_line_probe(
         or not isinstance(scenarios, Mapping)
         or not scenarios
         or not isinstance(expressions, Mapping)
-        or not isinstance(intent, str)
-        or not isinstance(expressions.get(intent), Mapping)
     ):
         # Compile and locale coverage own these failures; a probe built on
         # them could only restate their findings.
         return None
-    authored = expressions[intent]
     # Detached through canonical bytes: the spread policy shares its nested
     # maps with the policy the check also hashes, and a canonical hash refuses
     # aliased containers.
@@ -1211,7 +1206,18 @@ def _fixed_line_probe(
             # One switch: the character's line, then the answer.
             "mixing": {"max_switches": 1, "min_primary_ratio": 0.7},
         },
-        "lines": {locale: authored.get(locale) for locale in sorted(locales)},
+        # One entry per intent and locale: every line the pack authors
+        # travels the production path, not only the fixture's intent.
+        "lines": [
+            {
+                "intent": intent,
+                "locale": locale,
+                "lines": expressions[intent].get(locale),
+            }
+            for intent in sorted(key for key in expressions if isinstance(key, str))
+            if isinstance(expressions[intent], Mapping)
+            for locale in sorted(locales)
+        ],
     }
     return cast(dict[str, Any], json.loads(canonical_bytes(probe)))
 
@@ -1219,7 +1225,6 @@ def _fixed_line_probe(
 def _check_fixed_lines(
     compiled: dict[str, Any],
     probe: dict[str, Any],
-    intent: str,
     semantic: dict[str, Any],
     spans: list[str],
     warning: str,
@@ -1227,12 +1232,12 @@ def _check_fixed_lines(
     findings: list[dict[str, Any]],
     mutation_probes: list[_MutationProbe],
 ) -> None:
-    """Speak the pack's own line in every locale it authors.
+    """Speak every line the pack authors, in the locale it is written in.
 
     The main probe passes no runtime context, so it never reaches a fixed
     segment, and a line that cannot survive planning and validation would
     pass it untouched. This walks the production path -- runtime context,
-    plan, render, validate -- once per authored locale.
+    plan, render, validate -- once per authored intent and locale.
     """
 
     compiled_bytes = canonical_bytes(compiled)
@@ -1244,7 +1249,8 @@ def _check_fixed_lines(
     )
     semantic_bytes = canonical_bytes(semantic)
     policy_bytes = canonical_bytes(probe["policy"])
-    for locale, lines in probe["lines"].items():
+    for entry in probe["lines"]:
+        intent, locale, lines = entry["intent"], entry["locale"], entry["lines"]
         if not isinstance(lines, list) or not lines:
             # Authoring validation already reports the unwritten locale.
             continue
