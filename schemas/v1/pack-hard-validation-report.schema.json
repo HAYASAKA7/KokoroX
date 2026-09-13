@@ -34,6 +34,20 @@
       "uniqueItems": true,
       "items": {"type": "string", "maxLength": 35, "pattern": "^[a-z]{2,3}(-[A-Z][a-z]{3})?(-([A-Z]{2}|[0-9]{3}))?$"}
     },
+    "fixed_lines_spoken": {
+      "type": "array",
+      "maxItems": 16384,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["intent", "locale", "position"],
+        "properties": {
+          "intent": {"type": "string", "maxLength": 128, "pattern": "^[a-z][a-z0-9]*(?:_[a-z0-9]+)*(?![\\s\\S])"},
+          "locale": {"type": "string", "maxLength": 35, "pattern": "^[a-z]{2,3}(-[A-Z][a-z]{3})?(-([A-Z]{2}|[0-9]{3}))?$"},
+          "position": {"enum": ["opening", "closing"]}
+        }
+      }
+    },
     "character_id": {"$ref": "#/$defs/slug_id"},
     "character_version": {"$ref": "#/$defs/semantic_version"},
     "mode": {"$ref": "#/$defs/construction_mode"},

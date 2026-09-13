@@ -250,12 +250,14 @@ def run_hard_validation(
             checks["locale_coverage"], "compiled", "compiled pack"
         )
 
+    spoken_lines: list[dict[str, str]] = []
     if corpus is not None:
         protected_content_hash = _check_protected_content(
             corpus,
             schemas,
             checks["protected_content"],
             mutation_probes,
+            spoken=spoken_lines,
             compiled=(
                 cast(dict[str, Any], json.loads(first_compiled_bytes))
                 if compiled_snapshot is not None
@@ -352,6 +354,13 @@ def run_hard_validation(
                 if compiled_snapshot is not None
                 and isinstance(compiled_snapshot.get("locales"), Mapping)
                 else []
+            ),
+            # Every authored line the gate spoke, where it went, and in which
+            # locale. Findings name only failures, so without this a clean
+            # report could not show a reviewer what was exercised.
+            "fixed_lines_spoken": sorted(
+                spoken_lines,
+                key=lambda line: (line["intent"], line["locale"]),
             ),
             "corpus_hash": corpus.corpus_hash if corpus is not None else None,
             "check_input_hashes": {
@@ -873,6 +882,7 @@ def _check_protected_content(
     mutation_probes: list[_MutationProbe],
     *,
     compiled: dict[str, Any] | None = None,
+    spoken: list[dict[str, str]] | None = None,
 ) -> str:
     fixture = corpus.document("tests/protected-spans.yaml")
     multilingual = corpus.document("tests/multilingual.yaml")
@@ -935,6 +945,7 @@ def _check_protected_content(
             schemas,
             findings,
             mutation_probes,
+            spoken,
         )
     semantic_bytes = canonical_bytes(semantic)
     policy_bytes = canonical_bytes(policy)
@@ -1231,6 +1242,7 @@ def _check_fixed_lines(
     schemas: SchemaRegistry,
     findings: list[dict[str, Any]],
     mutation_probes: list[_MutationProbe],
+    spoken: list[dict[str, str]] | None = None,
 ) -> None:
     """Speak every line the pack authors, in the locale it is written in.
 
@@ -1262,6 +1274,14 @@ def _check_fixed_lines(
         if not isinstance(lines, list) or not lines:
             # Authoring validation already reports the unwritten locale.
             continue
+        if spoken is not None:
+            spoken.append(
+                {
+                    "intent": intent,
+                    "locale": locale,
+                    "position": "closing" if intent in closing_intents else "opening",
+                }
+            )
         path = ["expressions.yaml", intent, locale]
         try:
             context = build_runtime_context(

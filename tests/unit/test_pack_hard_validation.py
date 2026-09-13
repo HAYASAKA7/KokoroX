@@ -1299,3 +1299,25 @@ def test_reports_a_plan_that_opens_with_a_closing_line(
         ["expressions.yaml", "understated_encouragement", locale]
         for locale in ("en-US", "ja-JP", "zh-CN")
     ]
+
+
+def test_a_report_names_every_line_the_gate_spoke_and_where(tmp_path: Path) -> None:
+    """Findings name only failures; the trace shows what was exercised."""
+
+    pack = copy_rin(tmp_path)
+    _declare_closing(pack, "understated_encouragement")
+
+    report = run_hard_validation(pack, load_json(ORIGINAL_REQUEST), SCHEMAS)
+
+    locales = ("en-US", "ja-JP", "zh-CN")
+    assert report["fixed_lines_spoken"] == [
+        *(
+            {"intent": "restrained_diagnosis", "locale": locale, "position": "opening"}
+            for locale in locales
+        ),
+        *(
+            {"intent": "understated_encouragement", "locale": locale, "position": "closing"}
+            for locale in locales
+        ),
+    ]
+    SCHEMAS.validate("pack-hard-validation-report", report)

@@ -8,6 +8,11 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- A hard report now lists every authored line the gate spoke, in
+  `fixed_lines_spoken`: intent, locale, and whether it opens or closes the
+  turn. The gate walked every line but recorded only failures, so a clean
+  report gave a reviewer no way to see what had been exercised. The field is
+  optional in the schema, so reports made before it still validate.
 - A turn can speak more than one authored line, and a line can close the
   response. `runtime plan` accepts `--expression-intent` once per manner the
   turn calls for, and a pack lists intents that belong after the answer

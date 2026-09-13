@@ -54,6 +54,8 @@ files. Require both envelopes to bind the same `artifact_id`, `source_hash`,
 `compiled_hash`, and `report_hash`. Continue only when `passed` is true. Do not
 reinterpret `ok: true` as a passing gate.
 
+Findings name only failures, so a passing report also lists every authored line the gate spoke under `fixed_lines_spoken`: its intent, locale, and whether it opens or closes the turn. Check it against the pack before attesting -- an intent missing there was never exercised.
+
 The `file_safety` check covers the pack's files: executable-shaped names,
 executable permissions, and files that keep changing while the gate runs. It
 does not read pack text. Nothing machine-enforced stands behind content trust --
