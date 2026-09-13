@@ -2430,7 +2430,21 @@ def _handle_policy_compile(
         **normalized,
     }
     schemas.validate("language-policy", policy)
-    return {"ok": True, "policy": policy}
+    advisories: list[dict[str, Any]] = []
+    if policy["subtitles"]["enabled"]:
+        # Validated and compiled, but no plan or renderer reads it yet;
+        # enabling it would otherwise change nothing without a word.
+        advisories.append(
+            {
+                "code": "POLICY_SUBTITLES_NOT_RENDERED",
+                "path": ["subtitles", "enabled"],
+                "message": (
+                    "Subtitles are accepted in a policy but not rendered yet; "
+                    "no render plan carries them."
+                ),
+            }
+        )
+    return {"ok": True, "policy": policy, "advisories": advisories}
 
 
 def _handle_runtime_context(

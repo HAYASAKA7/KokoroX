@@ -805,6 +805,32 @@ def test_runtime_context_body_refuses_a_non_object(value: object) -> None:
     assert raised.value.code == "INVALID_RUNTIME_CONTEXT_INPUT"
 
 
+def test_policy_compile_says_subtitles_are_not_rendered(tmp_path) -> None:
+    import argparse
+    from pathlib import Path
+
+    from kokorox.cli import _handle_policy_compile
+    from kokorox.schemas import SchemaRegistry
+
+    schemas = SchemaRegistry(Path("schemas/v1"))
+    enabled = tmp_path / "enabled.json"
+    enabled.write_text(
+        json.dumps({"subtitles": {"enabled": True, "language": "en-US"}}),
+        encoding="utf-8",
+    )
+    plain = tmp_path / "plain.json"
+    plain.write_text(json.dumps({"primary_language": "zh-CN"}), encoding="utf-8")
+
+    loud = _handle_policy_compile(argparse.Namespace(input=str(enabled)), None, schemas)
+    quiet = _handle_policy_compile(argparse.Namespace(input=str(plain)), None, schemas)
+
+    assert [item["code"] for item in loud["advisories"]] == [
+        "POLICY_SUBTITLES_NOT_RENDERED"
+    ]
+    assert loud["advisories"][0]["path"] == ["subtitles", "enabled"]
+    assert quiet["advisories"] == []
+
+
 def test_every_raised_error_code_has_a_public_message() -> None:
     """A family got public messages only once a report named it, so most never did.
 

@@ -56,6 +56,11 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- `policy compile` now says that subtitles are not rendered. A policy could
+  enable `subtitles` and pass validation, but no render plan carried it and
+  nothing read it, so the setting changed nothing without a word. Compiling
+  such a policy returns the advisory `POLICY_SUBTITLES_NOT_RENDERED` in a new
+  `advisories` list, and the runtime contract states the limitation.
 - `pack list` now says whether each installed release can still be used.
   A release installed under an earlier KokoroX stayed listed after an upgrade
   even when its evidence no longer validated, while consent, state, and

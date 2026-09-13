@@ -73,7 +73,7 @@ When `persona_locale` differs from `requested_locale`, the pack authored nothing
 
 ## Language policy
 
-Policy input may partially specify `mode`, `primary_language`, `channels`, `mixing`, and `subtitles`. Compilation fills defaults and returns a complete `policy` artifact.
+Policy input may partially specify `mode`, `primary_language`, `channels`, `mixing`, and `subtitles`. Compilation fills defaults and returns a complete `policy` artifact. `subtitles` is accepted and validated but not rendered yet: no render plan carries it, and compiling a policy that enables it returns the advisory `POLICY_SUBTITLES_NOT_RENDERED`.
 
 For a single-language response, the minimal explicit input is:
 
