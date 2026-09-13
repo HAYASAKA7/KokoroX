@@ -131,6 +131,7 @@ def test_build_runtime_context_returns_only_the_selected_compact_view() -> None:
             "restrained_diagnosis": {"zh-CN": ["原因已经明确。"]},
             "calm_warning": {"zh-CN": ["先停一下。"]},
         },
+        "closing_expressions": [],
         "growth": {
             "dimensions": ["familiarity", "trust", "collaboration", "tension"]
         },
@@ -518,3 +519,29 @@ def test_build_runtime_context_preserves_expression_intent_order() -> None:
     result = build_runtime_context(compiled, _state(), "zh-CN", "debugging")
 
     assert list(result["expressions"]) == ["third_intent", "second_intent"]
+
+
+def test_context_carries_the_intents_the_pack_says_close_a_turn() -> None:
+    compiled = _compiled()
+    compiled["behavior"] = {
+        **compiled["behavior"],
+        "closing_expressions": ["restrained_diagnosis", "calm_warning"],
+    }
+
+    result = build_runtime_context(compiled, _state(), "zh-CN", "debugging")
+
+    assert result["closing_expressions"] == ["calm_warning", "restrained_diagnosis"]
+
+
+@pytest.mark.parametrize(
+    "closing",
+    ["calm_warning", [7], ["calm_warning", "calm_warning"], ["Not An Intent"]],
+)
+def test_context_refuses_a_malformed_closing_expression_list(closing: Any) -> None:
+    compiled = _compiled()
+    compiled["behavior"] = {**compiled["behavior"], "closing_expressions": closing}
+
+    with pytest.raises(KokoroError) as raised:
+        build_runtime_context(compiled, _state(), "zh-CN", "debugging")
+
+    assert raised.value.code == "INVALID_RUNTIME_CONTEXT"

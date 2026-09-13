@@ -971,3 +971,23 @@ def test_actionable_details_survive_sanitization_and_nothing_else_does(
     )["error"]
 
     assert envelope["details"] == kept
+
+
+def test_runtime_plan_accepts_several_expression_intents() -> None:
+    parsed = build_parser().parse_args(
+        [
+            "runtime",
+            "plan",
+            "--semantic",
+            "semantic.json",
+            "--policy",
+            "policy.json",
+            "--expression-intent",
+            "order_acknowledgement",
+            "--expression-intent",
+            "task_completion",
+            "--json",
+        ]
+    )
+
+    assert parsed.expression_intent == ["order_acknowledgement", "task_completion"]

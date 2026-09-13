@@ -141,7 +141,13 @@
         "default_intensity": {"$ref": "#/$defs/intensity"},
         "catchphrase_frequency": {"$ref": "#/$defs/bounded_string"},
         "correction_style": {"$ref": "#/$defs/bounded_string"},
-        "reassurance_style": {"$ref": "#/$defs/bounded_string"}
+        "reassurance_style": {"$ref": "#/$defs/bounded_string"},
+        "closing_expressions": {
+          "type": "array",
+          "maxItems": 256,
+          "uniqueItems": true,
+          "items": {"$ref": "#/$defs/semantic_id"}
+        }
       }
     },
     "stage_thresholds": {

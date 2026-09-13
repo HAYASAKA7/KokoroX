@@ -1237,9 +1237,17 @@ def _check_fixed_lines(
     The main probe passes no runtime context, so it never reaches a fixed
     segment, and a line that cannot survive planning and validation would
     pass it untouched. This walks the production path -- runtime context,
-    plan, render, validate -- once per authored intent and locale.
+    plan, render, validate -- once per authored intent and locale -- and
+    checks each line lands where the pack says it goes: before the answer,
+    or after it for an intent listed in `closing_expressions`.
     """
 
+    behavior = compiled.get("behavior")
+    closing_intents = frozenset(
+        behavior.get("closing_expressions", [])
+        if isinstance(behavior, Mapping)
+        else ()
+    )
     compiled_bytes = canonical_bytes(compiled)
     state_bytes = canonical_bytes(
         {
@@ -1282,8 +1290,12 @@ def _check_fixed_lines(
             rendered = {
                 # The authored line, not the plan's copy of it, so a plan that
                 # altered the line cannot validate against itself.
+                # In the order the pack declares, so a plan that put the line
+                # at the wrong end cannot pass by rendering itself.
                 "text": "\n".join(
-                    [lines[0], semantic["conclusion"], *spans, warning]
+                    [semantic["conclusion"], *spans, warning, lines[0]]
+                    if intent in closing_intents
+                    else [lines[0], semantic["conclusion"], *spans, warning]
                 ),
                 "segments": [
                     {
@@ -1356,6 +1368,17 @@ def _check_fixed_lines(
                     path,
                     "The render plan did not carry the pack's authored line "
                     "for this locale.",
+                )
+            )
+        elif plan_snapshot["segments"].index(fixed[0]) != (
+            len(plan_snapshot["segments"]) - 1 if intent in closing_intents else 0
+        ):
+            findings.append(
+                _finding(
+                    "PACK_FIXED_LINE_MISPLACED",
+                    path,
+                    "The render plan placed the pack's authored line at the "
+                    "wrong end of the turn.",
                 )
             )
         if lines[0] not in plan_snapshot["protected_spans"]:

@@ -155,6 +155,23 @@ def validate_authoring_pack(
                 )
             )
 
+    # A closing line is placed after the answer; naming an intent the pack
+    # never wrote would promise a line that no turn can ever say.
+    behavior_value = source.get("behavior")
+    behavior = behavior_value if isinstance(behavior_value, Mapping) else {}
+    closing_value = behavior.get("closing_expressions", [])
+    closing = closing_value if isinstance(closing_value, list) else []
+    for index, intent in enumerate(closing):
+        if intent not in expressions:
+            hard_failures.append(
+                _finding(
+                    "AUTHORING_CLOSING_EXPRESSION_UNKNOWN",
+                    ["behavior", "closing_expressions", index],
+                    "behavior.yaml closes a turn with an intent that "
+                    "expressions.yaml does not author.",
+                )
+            )
+
     if len(expressions) < 2:
         advisory_findings.append(
             _finding(

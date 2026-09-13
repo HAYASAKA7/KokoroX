@@ -569,3 +569,114 @@ def test_a_fixed_segment_never_claims_preserve_as_its_language() -> None:
 
     assert plan["segments"][0]["target_language"] != "preserve"
     SchemaRegistry(Path("schemas/v1")).validate("render-plan", plan)
+
+
+def two_line_context(**overrides: Any) -> dict[str, Any]:
+    """A pack that acknowledges an order and announces the work is done."""
+
+    value = context(
+        expressions={
+            "order_acknowledgement": {"ja-JP": ["了解しました、ご主人様。"]},
+            "task_completion": {"ja-JP": ["完成しました、ご主人様。"]},
+        },
+        closing_expressions=["task_completion"],
+    )
+    value.update(overrides)
+    return value
+
+
+def test_a_closing_line_follows_the_answer_in_the_same_turn() -> None:
+    """Taking an order and finishing it: one line opens, the other closes."""
+
+    plan = build_render_plan(
+        semantic(),
+        policy(),
+        expression_intent=["order_acknowledgement", "task_completion"],
+        context=two_line_context(),
+    )
+    segments = plan["segments"]
+
+    assert segments[0]["fixed_line"]["text"] == "了解しました、ご主人様。"
+    assert segments[-1]["fixed_line"]["text"] == "完成しました、ご主人様。"
+    assert all("fixed_line" not in segment for segment in segments[1:-1])
+    assert [segment["id"] for segment in segments] == [
+        f"s{position}" for position in range(1, len(segments) + 1)
+    ]
+    assert plan["protected_spans"][-2:] == [
+        "了解しました、ご主人様。",
+        "完成しました、ご主人様。",
+    ]
+    SchemaRegistry(Path("schemas/v1")).validate("render-plan", plan)
+
+
+def test_a_closing_intent_on_its_own_still_closes() -> None:
+    plan = build_render_plan(
+        semantic(),
+        policy(),
+        expression_intent="task_completion",
+        context=two_line_context(),
+    )
+
+    assert plan["segments"][-1]["fixed_line"]["intent"] == "task_completion"
+    assert "fixed_line" not in plan["segments"][0]
+
+
+def test_opening_lines_keep_the_order_the_turn_asked_for() -> None:
+    plan = build_render_plan(
+        semantic(),
+        policy(),
+        expression_intent=["restrained_diagnosis", "order_acknowledgement"],
+        context=context(
+            expressions={
+                "order_acknowledgement": {"ja-JP": ["了解しました、ご主人様。"]},
+                "restrained_diagnosis": {"ja-JP": ["原因は明確です。"]},
+            }
+        ),
+    )
+
+    assert [segment["fixed_line"]["intent"] for segment in plan["segments"][:2]] == [
+        "restrained_diagnosis",
+        "order_acknowledgement",
+    ]
+
+
+def test_the_first_intent_styles_the_conclusion() -> None:
+    plan = build_render_plan(
+        semantic(),
+        policy(),
+        expression_intent=["task_completion", "order_acknowledgement"],
+        context=two_line_context(),
+    )
+    conclusion = next(
+        segment for segment in plan["segments"] if segment.get("channel") == "conclusion"
+    )
+
+    assert conclusion["expression_intent"] == "task_completion"
+
+
+@pytest.mark.parametrize(
+    "intents",
+    [
+        ["order_acknowledgement", "order_acknowledgement"],
+        [],
+        [f"intent_{index}" for index in range(9)],
+        ["order_acknowledgement", 7],
+    ],
+)
+def test_rejects_duplicate_empty_oversized_or_malformed_intent_lists(
+    intents: Any,
+) -> None:
+    assert_invalid(semantic(), policy(), intents)
+
+
+@pytest.mark.parametrize("closing", ["task_completion", [7], ["Not An Intent"]])
+def test_rejects_a_malformed_closing_expression_list(closing: Any) -> None:
+    with pytest.raises(KokoroError) as raised:
+        build_render_plan(
+            semantic(),
+            policy(),
+            expression_intent="task_completion",
+            context=two_line_context(closing_expressions=closing),
+        )
+
+    assert raised.value.code == "INVALID_RENDER_PLAN_INPUT"

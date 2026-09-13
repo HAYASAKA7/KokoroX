@@ -8,6 +8,16 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- A turn can speak more than one authored line, and a line can close the
+  response. `runtime plan` accepts `--expression-intent` once per manner the
+  turn calls for, and a pack lists intents that belong after the answer
+  under `closing_expressions` in `behavior.yaml`. A persona that says one
+  line on taking an order and another on finishing could say only the first,
+  and always before the answer, so a completion line announced work that had
+  not been shown yet. Opening lines now lead in the order asked, closing lines
+  follow the answer, authoring refuses a closing intent the pack does not
+  author (`AUTHORING_CLOSING_EXPRESSION_UNKNOWN`), and the hard gate reports
+  a line planned at the wrong end (`PACK_FIXED_LINE_MISPLACED`).
 - `kokorox suite install --replace` upgrades an installed Skill suite in
   place. Install now writes a receipt, `.kokorox-skill-suite.json`, recording
   each Skill's digest and file list. After an upgrade the installed Skills

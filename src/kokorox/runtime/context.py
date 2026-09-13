@@ -216,6 +216,24 @@ def _expression_selection(expressions: Any, locale: str) -> dict[str, Any]:
     return selected
 
 
+def _closing_expressions(behavior: Any) -> list[str]:
+    """The intents the pack says close a turn, for the planner to place last."""
+
+    if behavior is None:
+        return []
+    if type(behavior) is not dict:
+        raise _InvalidContext
+    declared = behavior.get("closing_expressions", [])
+    if (
+        type(declared) is not list
+        or len(declared) > 256
+        or any(not _semantic_id(intent) for intent in declared)
+        or len(set(declared)) != len(declared)
+    ):
+        raise _InvalidContext
+    return sorted(declared)
+
+
 def _growth_dimensions(growth: Any) -> list[str]:
     if type(growth) is not dict:
         raise _InvalidContext
@@ -365,6 +383,7 @@ def _build_runtime_context(
     expressions = _expression_selection(
         compiled.get("expressions"), persona_locale
     )
+    closing_expressions = _closing_expressions(compiled.get("behavior"))
     growth_dimensions = _growth_dimensions(compiled.get("growth"))
     state_summary = _state_summary(state)
     selected_data = {
@@ -381,6 +400,8 @@ def _build_runtime_context(
         "locales": {persona_locale: locale_config},
         "scenarios": {selected_scenario: scenario_config},
         "expressions": expressions,
+        # Where each authored line goes: these close a turn, the rest open it.
+        "closing_expressions": closing_expressions,
         "growth": {"dimensions": growth_dimensions},
         "state": state_summary,
     }

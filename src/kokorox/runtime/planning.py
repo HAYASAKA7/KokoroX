@@ -58,16 +58,47 @@ def _validate_protected_spans(value: Any) -> list[str]:
     return list(value)
 
 
-def _validate_expression_intent(value: Any) -> str | None:
+_MAX_EXPRESSION_INTENTS = 8
+
+
+def _validate_expression_intents(value: Any) -> tuple[str, ...]:
+    """Accept one intent or several, in the order the turn calls for them."""
+
     if value is None:
-        return None
+        return ()
+    candidates = [value] if isinstance(value, str) else value
     if (
-        not isinstance(value, str)
-        or len(value) > 128
-        or _SEMANTIC_ID.fullmatch(value) is None
+        not isinstance(candidates, (list, tuple))
+        or not 1 <= len(candidates) <= _MAX_EXPRESSION_INTENTS
+        or len(set(map(repr, candidates))) != len(candidates)
     ):
         raise _invalid_input()
-    return value
+    for candidate in candidates:
+        if (
+            not isinstance(candidate, str)
+            or len(candidate) > 128
+            or _SEMANTIC_ID.fullmatch(candidate) is None
+        ):
+            raise _invalid_input()
+    return tuple(candidates)
+
+
+def _closing_intents(context: Mapping[str, Any] | None) -> frozenset[str]:
+    """The intents the pack says close a turn; every other one opens it."""
+
+    if not isinstance(context, Mapping):
+        return frozenset()
+    declared = context.get("closing_expressions", [])
+    if (
+        not isinstance(declared, list)
+        or len(declared) > 256
+        or any(
+            not isinstance(intent, str) or _SEMANTIC_ID.fullmatch(intent) is None
+            for intent in declared
+        )
+    ):
+        raise _invalid_input()
+    return frozenset(declared)
 
 
 def _semantic_content(semantic: Mapping[str, Any]) -> dict[str, str | list[str] | None]:
@@ -125,8 +156,8 @@ def _fixed_segment(
     if not isinstance(text, str) or not 1 <= len(text) <= 2000:
         raise _invalid_input()
     return {
-        # Provisional: the caller renumbers every segment once the line takes
-        # its place at the front.
+        # Provisional: the caller renumbers every segment once each line
+        # takes its place at the front or the end.
         "id": "s1",
         "channel": "character_dialogue",
         "target_language": route,
@@ -137,7 +168,7 @@ def _fixed_segment(
 def build_render_plan(
     semantic: Mapping[str, Any],
     policy: Mapping[str, Any],
-    expression_intent: str | None = None,
+    expression_intent: str | list[str] | tuple[str, ...] | None = None,
     context: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Return an ordered render plan detached from its semantic and policy inputs.
@@ -148,10 +179,13 @@ def build_render_plan(
     verbatim from `context` -- the model never retypes it, and the planner adds
     it to `protected_spans` so validation rejects a translated catchphrase.
 
-    `expression_intent` names the manner. With a `context` that authors a line
-    for it, the plan also emits that line on `character_dialogue`; without one
-    the intent still styles the conclusion and no fixed segment appears, so a
-    missing expression quiets the persona rather than blocking the delivery.
+    `expression_intent` names the manners this turn calls for -- one, or several
+    in order, since a turn can take an order and finish it. The first styles the
+    conclusion. With a `context` that authors a line for an intent, the plan
+    also emits that line on `character_dialogue`: before the answer, or after
+    it when the pack lists the intent in `closing_expressions`. An intent with no
+    authored line still counts and simply adds no segment, so a missing
+    expression quiets the persona rather than blocking the delivery.
     """
     if not isinstance(semantic, Mapping) or not isinstance(policy, Mapping):
         raise _invalid_input()
@@ -169,7 +203,8 @@ def build_render_plan(
     protected_spans = _validate_protected_spans(
         semantic.get("immutable_spans", [])
     )
-    validated_expression = _validate_expression_intent(expression_intent)
+    intents = _validate_expression_intents(expression_intent)
+    closing_intents = _closing_intents(context)
 
     primary_language = policy.get("primary_language")
     channels = policy.get("channels")
@@ -257,21 +292,27 @@ def build_render_plan(
             "target_language": target_language,
             "semantic_keys": [semantic_key],
         }
-        if semantic_key == "conclusion" and validated_expression is not None:
-            segment["expression_intent"] = validated_expression
+        if semantic_key == "conclusion" and intents:
+            segment["expression_intent"] = intents[0]
         segments.append(segment)
 
-    fixed = _fixed_segment(
-        validated_expression, context, channels.get("character_dialogue")
-    )
-    if fixed is not None:
-        # The line leads: the character speaks, then answers.
-        segments.insert(0, fixed)
+    opening: list[dict[str, Any]] = []
+    closing: list[dict[str, Any]] = []
+    for intent in intents:
+        fixed = _fixed_segment(intent, context, channels.get("character_dialogue"))
+        if fixed is None:
+            continue
+        # An opening line leads -- the character speaks, then answers. A closing
+        # line follows the answer, so "done" is said once the work is shown.
+        (closing if intent in closing_intents else opening).append(fixed)
+    if opening or closing:
+        segments = [*opening, *segments, *closing]
         for position, item in enumerate(segments, start=1):
             item["id"] = f"s{position}"
-        line_text = fixed["fixed_line"]["text"]
-        if line_text not in protected_spans:
-            protected_spans = [*protected_spans, line_text]
+        for fixed in (*opening, *closing):
+            line_text = fixed["fixed_line"]["text"]
+            if line_text not in protected_spans:
+                protected_spans = [*protected_spans, line_text]
 
     if not segments:
         raise _invalid_input()

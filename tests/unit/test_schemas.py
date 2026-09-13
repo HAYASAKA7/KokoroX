@@ -1060,3 +1060,15 @@ def test_character_version_schemas_accept_strict_semver(
     document["character_version"] = version
 
     SchemaRegistry(Path("schemas/v1")).validate(schema_name, document)
+
+
+def test_character_source_behavior_may_name_closing_expressions() -> None:
+    registry = SchemaRegistry(Path("schemas/v1"))
+    source = load_fixture("valid-character-source.json")
+    source["behavior"]["closing_expressions"] = ["restrained_diagnosis"]
+    registry.validate("character-source", source)
+
+    for invalid in (["restrained_diagnosis", "restrained_diagnosis"], ["Not An Intent"], "x"):
+        source["behavior"]["closing_expressions"] = invalid
+        with pytest.raises(KokoroError):
+            registry.validate("character-source", source)

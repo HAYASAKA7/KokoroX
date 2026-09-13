@@ -1227,3 +1227,75 @@ def test_reports_a_plan_that_drops_the_authored_line(
         for intent in ("restrained_diagnosis", "understated_encouragement")
         for locale in ("en-US", "ja-JP", "zh-CN")
     ]
+
+
+def _declare_closing(pack: Path, intent: str) -> None:
+    path = pack / "behavior.yaml"
+    behavior = yaml.safe_load(path.read_text(encoding="utf-8"))
+    behavior["closing_expressions"] = [intent]
+    path.write_text(
+        yaml.safe_dump(behavior, allow_unicode=True, sort_keys=False),
+        encoding="utf-8",
+    )
+
+
+def test_the_gate_speaks_a_closing_line_after_the_answer(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    pack = copy_rin(tmp_path)
+    _declare_closing(pack, "understated_encouragement")
+    real_plan = hard_module.build_render_plan
+    placements: dict[tuple[str, str], str] = {}
+
+    def observed_plan(*args: Any, **kwargs: Any) -> dict[str, Any]:
+        plan = real_plan(*args, **kwargs)
+        segments = plan["segments"]
+        for index, segment in enumerate(segments):
+            if "fixed_line" in segment:
+                key = (segment["fixed_line"]["intent"], segment["target_language"])
+                placements[key] = "last" if index == len(segments) - 1 else "first"
+        return plan
+
+    monkeypatch.setattr(hard_module, "build_render_plan", observed_plan)
+
+    report = run_hard_validation(pack, load_json(ORIGINAL_REQUEST), SCHEMAS)
+
+    assert report["checks"]["protected_content"]["passed"] is True
+    locales = ("en-US", "ja-JP", "zh-CN")
+    assert placements == {
+        **{("restrained_diagnosis", locale): "first" for locale in locales},
+        **{("understated_encouragement", locale): "last" for locale in locales},
+    }
+
+
+def test_reports_a_plan_that_opens_with_a_closing_line(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    pack = copy_rin(tmp_path)
+    _declare_closing(pack, "understated_encouragement")
+    real_plan = hard_module.build_render_plan
+
+    def front_loaded(*args: Any, **kwargs: Any) -> dict[str, Any]:
+        plan = real_plan(*args, **kwargs)
+        fixed = [segment for segment in plan["segments"] if "fixed_line" in segment]
+        rest = [segment for segment in plan["segments"] if "fixed_line" not in segment]
+        plan["segments"] = [*fixed, *rest]
+        for position, segment in enumerate(plan["segments"], start=1):
+            segment["id"] = f"s{position}"
+        return plan
+
+    monkeypatch.setattr(hard_module, "build_render_plan", front_loaded)
+
+    report = run_hard_validation(pack, load_json(ORIGINAL_REQUEST), SCHEMAS)
+
+    assert report["checks"]["protected_content"]["passed"] is False
+    assert [
+        finding["path"]
+        for finding in report["checks"]["protected_content"]["findings"]
+        if finding["code"] == "PACK_FIXED_LINE_MISPLACED"
+    ] == [
+        ["expressions.yaml", "understated_encouragement", locale]
+        for locale in ("en-US", "ja-JP", "zh-CN")
+    ]

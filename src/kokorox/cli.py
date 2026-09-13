@@ -833,7 +833,9 @@ def build_parser() -> argparse.ArgumentParser:
     runtime_plan = runtime_commands.add_parser("plan")
     runtime_plan.add_argument("--semantic", required=True)
     runtime_plan.add_argument("--policy", required=True)
-    runtime_plan.add_argument("--expression-intent")
+    # Repeat for each manner the turn calls for -- say, taking an order and
+    # finishing it; the pack decides whether each line opens or closes.
+    runtime_plan.add_argument("--expression-intent", action="append")
     # The pack's own lines live in the runtime context, so a plan that is to
     # carry one has to be shown the context that holds it.
     runtime_plan.add_argument("--context")

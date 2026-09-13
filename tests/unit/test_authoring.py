@@ -1269,3 +1269,22 @@ def test_provenance_counts_keep_private_assertions_apart_from_sourced_facts(
     }
     assert sum(counts["evidence_by_source"].values()) == counts["evidence"]
     registry.validate("build-validation-report", report)
+
+
+def test_validate_authoring_pack_refuses_a_closing_intent_the_pack_does_not_author(
+    registry: SchemaRegistry,
+    original_request: dict[str, Any],
+    source: dict[str, Any],
+) -> None:
+    """A closing line nobody wrote would be a promise no turn can keep."""
+
+    source["behavior"]["closing_expressions"] = ["task_completion"]
+
+    report = validate_authoring_pack(original_request, source, registry)
+
+    assert report["valid"] is False
+    assert [
+        item["path"]
+        for item in report["hard_failures"]
+        if item["code"] == "AUTHORING_CLOSING_EXPRESSION_UNKNOWN"
+    ] == [["behavior", "closing_expressions", 0]]

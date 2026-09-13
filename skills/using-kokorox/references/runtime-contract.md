@@ -44,7 +44,7 @@ kokorox session end --session <id> --json
 kokorox policy compile --input <policy-input.json> --json
 
 kokorox runtime context --session <id> --locale <locale> --scenario <scenario> --json
-kokorox runtime plan --semantic <semantic.json> --policy <policy.json> [--expression-intent <id>] [--context <context.json>] --json
+kokorox runtime plan --semantic <semantic.json> --policy <policy.json> [--expression-intent <id> ...] [--context <context.json>] --json
 kokorox runtime validate --semantic <semantic.json> --plan <plan.json> --rendered <rendered.json> --json
 
 kokorox state preview --session <id> --event <event.json> --json
@@ -127,9 +127,11 @@ A **fixed segment** carries one line the pack author already wrote:
 - `target_language`, the locale that line was authored in;
 - `fixed_line` with `intent`, `index`, and `text`.
 
-It appears only when you pass `--context` and the pack authors a line for the `--expression-intent` you named. Copy `text` byte-for-byte into the rendered output; the planner also lists it under `protected_spans`, so a translated or dropped catchphrase fails validation. Write nothing of your own on that channel. A pack that authored no line for the intent simply produces no fixed segment -- the character is quieter and the answer still ships.
+It appears only when you pass `--context` and the pack authors a line for an `--expression-intent` you named. Copy `text` byte-for-byte into the rendered output; the planner also lists it under `protected_spans`, so a translated or dropped catchphrase fails validation. Write nothing of your own on that channel. A pack that authored no line for the intent simply produces no fixed segment -- the character is quieter and the answer still ships.
 
 That is how one turn can be bilingual without either half being a translation of the other: the character speaks its authored line in its own language, and everything you formed follows the reader.
+
+A turn can call for more than one manner -- taking an order and finishing it are two. Pass `--expression-intent` once for each, in the order they happen; the first styles the conclusion. The pack decides where each line goes: an opening line leads the response, and an intent listed in the context's `closing_expressions` follows the answer, so a completion line is said after the work is shown rather than before it. Render every segment in plan order.
 
 Render an object with exactly:
 
