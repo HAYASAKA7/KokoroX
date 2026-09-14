@@ -167,6 +167,14 @@ withdraws the other two, and the result names them under
 `revoked_by_replacement`. To add a permission, pass every permission you want
 to keep. Revocation blocks future writes without silently deleting data.
 
+What is connected today: `memory_references` works end to end, and consent
+governs `state export` and `state reset`. `relationship_state` and
+`mood_state` are recorded and enforced by the persistence library, but no
+command yet writes a session's relationship events to durable storage, reads
+them into a new session, or performs the state migration an upgrade
+requires. Granting them today changes nothing a session sees, and
+`consent grant` says so in its `advisories`.
+
 ```bash
 kokorox consent grant --character rin-aster --scope global \
   --permissions relationship_state,mood_state,memory_references --json

@@ -1247,7 +1247,34 @@ def _handle_consent_grant(
         "ok": True,
         "consent": consent,
         "revoked_by_replacement": sorted(previous - set(consent["permissions"])),
+        "advisories": _unconnected_persistence(consent["permissions"]),
     }
+
+
+def _unconnected_persistence(permissions: list[str]) -> list[dict[str, Any]]:
+    """Say when a granted permission reaches nothing a session can see.
+
+    The persistence library writes and migrates retained relationship and
+    mood state, but no command connects a session to it yet. A user who
+    grants the permission expecting the character to remember deserves to
+    hear that before relying on it.
+    """
+
+    unconnected = sorted(
+        {"relationship_state", "mood_state"}.intersection(permissions)
+    )
+    if not unconnected:
+        return []
+    return [
+        {
+            "code": "PERSISTENCE_STATE_NOT_CONNECTED",
+            "permissions": unconnected,
+            "message": (
+                "Recorded, but no command yet writes session relationship "
+                "events to durable storage or reads them into a new session."
+            ),
+        }
+    ]
 
 
 def _handle_consent_show(

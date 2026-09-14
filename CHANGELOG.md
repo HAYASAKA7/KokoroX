@@ -86,6 +86,13 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- The README and `consent grant` now say plainly that relationship and mood
+  persistence is not connected yet. A user could grant `relationship_state`
+  and `mood_state` and expect the character to remember, but no command
+  writes session events to durable storage, reads them into a new session,
+  or performs the migration an upgrade requires. Granting either now returns
+  the advisory `PERSISTENCE_STATE_NOT_CONNECTED`; memory references, export,
+  and reset are unaffected.
 - A refused removal now says what still refers to the installation.
   `KARC_REMOVE_REFERENCED` was raised with its blocker list and reached the
   caller with an empty `details`, and its message named only sessions and
