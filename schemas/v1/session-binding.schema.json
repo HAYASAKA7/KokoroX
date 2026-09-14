@@ -1,0 +1,74 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kokorox.local/schemas/v1/session-binding.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "artifact_id",
+    "session_id",
+    "lifecycle_generation",
+    "character_id",
+    "character_version",
+    "namespace",
+    "installation_id",
+    "workspace_root",
+    "resolved_from",
+    "relationship_state"
+  ],
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "artifact_id": {
+      "type": "string",
+      "maxLength": 144,
+      "pattern": "^session-binding/[a-z0-9]+(?:-[a-z0-9]+)*(?![\\s\\S])"
+    },
+    "session_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*(?![\\s\\S])"
+    },
+    "lifecycle_generation": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{32}(?![\\s\\S])"
+    },
+    "character_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*(?![\\s\\S])"
+    },
+    "character_version": {"type": "string", "minLength": 1, "maxLength": 64},
+    "namespace": {
+      "oneOf": [
+        {"type": "null"},
+        {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*(?![\\s\\S])"
+        }
+      ]
+    },
+    "installation_id": {
+      "oneOf": [
+        {"type": "null"},
+        {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*(?![\\s\\S])"
+        }
+      ]
+    },
+    "workspace_root": {
+      "oneOf": [
+        {"type": "null"},
+        {"type": "string", "minLength": 1, "maxLength": 4096}
+      ]
+    },
+    "resolved_from": {"enum": ["compiled_path", "workspace_default", "global_default"]},
+    "relationship_state": {"enum": ["session", "durable"]}
+  }
+}

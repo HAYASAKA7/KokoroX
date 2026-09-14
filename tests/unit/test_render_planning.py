@@ -813,3 +813,60 @@ def test_rejects_a_malformed_scenario_map_in_the_context(scenarios: Any) -> None
         )
 
     assert raised.value.code == "INVALID_RENDER_PLAN_INPUT"
+
+
+def test_a_neutral_plan_forbids_the_pack_s_own_lines() -> None:
+    """Both catchphrases kept in a render against a neutral plan still validated."""
+
+    from kokorox.runtime.validation import validate_rendered_output
+
+    plan = build_render_plan(
+        semantic(),
+        policy(),
+        expression_intent=["order_acknowledgement", "task_completion"],
+        context=two_line_context(),
+        fallback_level=3,
+    )
+
+    assert plan["forbidden_spans"] == ["了解しました、ご主人様。", "完成しました、ご主人様。"]
+    rendered = {
+        "text": "了解しました、ご主人様。读路径没有加锁。 go test -race ./... 完成しました、ご主人様。",
+        "segments": [
+            {key: value for key, value in segment.items() if key != "expression_intent"}
+            for segment in plan["segments"]
+        ],
+        "switch_count": 0,
+    }
+    result = validate_rendered_output(rendered, _semantic_artifact(), plan, attempt=3)
+
+    assert [
+        violation["details"]["protected_span"]
+        for violation in result["violations"]
+        if violation["code"] == "FORBIDDEN_SPAN_PRESENT"
+    ] == ["了解しました、ご主人様。", "完成しました、ご主人様。"]
+
+
+def test_a_plan_that_is_not_neutral_forbids_nothing() -> None:
+    plan = build_render_plan(
+        semantic(),
+        policy(),
+        expression_intent=["order_acknowledgement", "task_completion"],
+        context=two_line_context(),
+    )
+
+    assert "forbidden_spans" not in plan
+
+
+def _semantic_artifact() -> dict[str, Any]:
+    return {
+        "schema_version": "1.0",
+        "artifact_id": "semantic/turn-1",
+        "created_by": {"component": "kokorox", "version": __version__},
+        "scenario": "debugging",
+        "conclusion": "The read path is unprotected.",
+        "explanation": ["Writes are locked while reads are not."],
+        "recommendations": ["Add a failing concurrent test."],
+        "warnings": ["Do not rely on repeated successful runs."],
+        "immutable_spans": ["go test -race ./..."],
+        "format_constraints": {},
+    }

@@ -101,6 +101,16 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- Every session now records what it started from, in a session binding:
+  the installation and scope a default resolved, or a compiled path. Removal
+  reads it, so removing one workspace's installation is no longer blocked by
+  another workspace's session or a compiled-path session that only share its
+  character hash. Sessions started before this change still block, as before.
+- A neutral plan now lists the pack's authored lines under the optional
+  `forbidden_spans`, and `runtime validate` refuses a render that speaks one
+  with `FORBIDDEN_SPAN_PRESENT`; a render keeping both catchphrases against a
+  `--fallback-level 3` plan used to validate. A line the Semantic Result
+  itself protects is not forbidden.
 - Smaller fixes from the eleventh QA pass. `runtime plan --policy` accepts what
   `policy compile` printed, as `--context` already did. Persistence refusals
   keep their fixed reason in `details`, so a second `state migrate` says

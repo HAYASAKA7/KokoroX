@@ -129,7 +129,9 @@ def test_without_consent_a_session_keeps_its_state_to_itself(
     assert applied["state"]["revision"] == 1
     assert "relationship_state" not in applied
     assert replay_persistent_state(data_root, "rin-aster", SCHEMAS) is None
-    assert not (data_root / "session-bindings").exists()
+    binding = json.loads((data_root / "session-bindings" / "local.json").read_text(encoding="utf-8"))
+    assert binding["relationship_state"] == "session"
+    assert binding["resolved_from"] == "global_default"
 
 
 def test_revoking_consent_lets_a_running_session_keep_answering(
@@ -519,3 +521,54 @@ def test_an_export_with_no_consent_says_nothing_was_granted(
 
     assert code != 0
     assert body["error"]["code"] == "PERSISTENCE_CONSENT_NOT_FOUND"
+
+
+def test_removal_is_not_blocked_by_sessions_of_other_installations(
+    rin_verified_release: dict[str, Any],
+    run: Callable[..., tuple[int, dict[str, Any]]],
+    tmp_path: Path,
+) -> None:
+    """Another workspace's session and a compiled-path session blocked a removal."""
+
+    data_root = tmp_path / "data"
+    first = tmp_path / "first"
+    second = tmp_path / "second"
+    first.mkdir()
+    second.mkdir()
+    install_rin(data_root, rin_verified_release, workspace_root=first)
+    shutil.copy(data_root.parent / "rin-workspace.karc", tmp_path / "rin-second.karc")
+    _ok(run(data_root, "pack", "install", str(tmp_path / "rin-second.karc"), "--workspace", str(second)))
+    for workspace in (first, second):
+        _ok(run(data_root, "config", "default", "set", "--character", "rin-aster", "--workspace", str(workspace)))
+    _ok(run(data_root, "session", "start", "--session", "in-second", "--workspace", str(second)))
+    compiled = _ok(run(data_root, "pack", "compile", "characters/original/rin-aster"))
+    _ok(run(data_root, "session", "start", "--character", compiled["path"], "--session", "from-path"))
+    for workspace in (first, second):
+        _ok(run(data_root, "config", "default", "clear", "--workspace", str(workspace)))
+
+    removed = _ok(
+        run(
+            data_root,
+            "pack",
+            "remove",
+            "rin-aster",
+            "--version",
+            "1.0.0",
+            "--workspace",
+            str(first),
+        )
+    )
+    code, blocked = run(
+        data_root,
+        "pack",
+        "remove",
+        "rin-aster",
+        "--version",
+        "1.0.0",
+        "--workspace",
+        str(second),
+    )
+
+    assert removed["ok"] is True
+    assert code != 0
+    assert blocked["error"]["details"]["sessions"] == ["in-second"]

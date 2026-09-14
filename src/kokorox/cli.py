@@ -2082,6 +2082,13 @@ def _handle_session_start(
         path = _compiled_file(settings, args.character)
         compiled = _validated_compiled(path, schemas)
         resolved_from, installation_id = "compiled_path", None
+        session_binding: dict[str, Any] = {
+            "resolved_from": "compiled_path",
+            "relationship_state": "session",
+            "namespace": None,
+            "installation_id": None,
+            "workspace_root": None,
+        }
     else:
         workspace_root = (
             _argument_path(args.workspace)
@@ -2122,13 +2129,23 @@ def _handle_session_start(
                     ),
                 }
             )
+        scoped_root = (
+            workspace_root if selection.source == "workspace_default" else None
+        )
         binding = _relationship_binding(
             settings,
             schemas,
             selection,
-            workspace_root if selection.source == "workspace_default" else None,
+            scoped_root,
             advisories,
         )
+        session_binding = {
+            "resolved_from": selection.source,
+            "relationship_state": "session" if binding is None else "durable",
+            "namespace": selection.namespace,
+            "installation_id": selection.installation_id,
+            "workspace_root": None if scoped_root is None else str(scoped_root),
+        }
     store = SessionStore(settings.data_dir)
     session = store.start(
         args.session,
@@ -2136,14 +2153,16 @@ def _handle_session_start(
         compiled["character_version"],
         compiled["source_hash"],
     )
-    if binding is not None:
-        try:
-            store.bind_relationship(args.session, binding)
-        except KokoroError:
-            # Started but unbound, the session would quietly keep its
-            # state to itself; end it rather than leave it half-connected.
-            store.end(args.session)
-            raise
+    try:
+        # Every session records what it started from, so removal can tell
+        # a session of this installation from one that only shares its
+        # character hash -- another workspace's, or a compiled path's.
+        store.bind_relationship(args.session, session_binding)
+    except KokoroError:
+        # Started but unbound, the session could keep its state to itself
+        # or block an unrelated removal; end it rather than leave it so.
+        store.end(args.session)
+        raise
     return {
         "ok": True,
         "session": session,

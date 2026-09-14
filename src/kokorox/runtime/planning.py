@@ -380,7 +380,8 @@ def build_render_plan(
         raise _invalid_input()
 
     suffix = artifact_id[len("semantic/") :]
-    return {
+    forbidden = _forbidden_lines(context, protected_spans) if neutral else []
+    plan: dict[str, Any] = {
         "schema_version": "1.0",
         "artifact_id": f"plan/{suffix}",
         "created_by": {"component": "kokorox", "version": __version__},
@@ -390,3 +391,44 @@ def build_render_plan(
         "max_switches": 0 if neutral else max_switches,
         "min_primary_ratio": min_primary_ratio,
     }
+    if forbidden:
+        plan["forbidden_spans"] = forbidden
+    return plan
+
+
+_MAX_FORBIDDEN_SPANS = 128
+
+
+def _forbidden_lines(
+    context: Mapping[str, Any] | None, protected_spans: list[str]
+) -> list[str]:
+    """The pack's authored lines a neutral render must not speak.
+
+    A neutral plan carried no lines, but nothing stopped a render against it
+    from speaking both catchphrases and validating. A line the semantic
+    result itself protects -- quoted as content -- is not forbidden.
+    """
+
+    if not isinstance(context, Mapping):
+        return []
+    expressions = context.get("expressions")
+    if not isinstance(expressions, Mapping):
+        return []
+    lines: list[str] = []
+    for intent in sorted(key for key in expressions if isinstance(key, str)):
+        locale_set = expressions[intent]
+        if not isinstance(locale_set, Mapping):
+            continue
+        for locale in sorted(key for key in locale_set if isinstance(key, str)):
+            authored = locale_set[locale]
+            if not isinstance(authored, list):
+                continue
+            for line in authored:
+                if (
+                    isinstance(line, str)
+                    and 1 <= len(line) <= 4000
+                    and line not in protected_spans
+                    and line not in lines
+                ):
+                    lines.append(line)
+    return lines[:_MAX_FORBIDDEN_SPANS]

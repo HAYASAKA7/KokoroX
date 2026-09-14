@@ -454,6 +454,10 @@ def remove_installed_pack(
         root / "sessions",
         _MAX_SESSION_REFERENCES,
     )
+    binding_boundary = _capture_reference_directory(
+        root / "session-bindings",
+        _MAX_SESSION_REFERENCES,
+    )
     migration_boundary = _capture_reference_directory(
         root / "migrations",
         _MAX_MIGRATION_REFERENCES,
@@ -482,6 +486,10 @@ def remove_installed_pack(
     audited.set_audit(
         "reference_sessions",
         lambda: _require_reference_directory(session_boundary),
+    )
+    audited.set_audit(
+        "reference_session_bindings",
+        lambda: _require_reference_directory(binding_boundary),
     )
     audited.set_audit(
         "reference_migrations",
@@ -545,6 +553,10 @@ def remove_installed_pack(
                 root / "sessions",
                 _MAX_SESSION_REFERENCES,
             )
+            binding_boundary = _capture_reference_directory(
+                root / "session-bindings",
+                _MAX_SESSION_REFERENCES,
+            )
             migration_boundary = _capture_reference_directory(
                 root / "migrations",
                 _MAX_MIGRATION_REFERENCES,
@@ -595,6 +607,7 @@ def remove_installed_pack(
                         preflight_entry,
                         audited,
                         preflight_blockers,
+                        scope=scope,
                     )
                 with persistence_reference_lock(
                     root,
@@ -1609,6 +1622,7 @@ def _preview_removal(
             schemas,
             blockers,
             session_hashes=_session_reference_hashes(entry, container),
+            scope=scope,
         )
     shared = _archive_is_referenced(
         root,
@@ -1755,6 +1769,79 @@ def _session_blocks(
     )
 
 
+def _blocking_sessions(
+    root: Path,
+    scope: InstallScope | None,
+    entry: dict[str, Any],
+    exact_hashes: frozenset[str],
+    schemas: _SchemaValidator,
+) -> list[dict[str, Any]]:
+    """Active sessions of this installation, not merely of its character hash.
+
+    A session names only a character, version, and source hash, so removing
+    one workspace's installation was blocked by sessions from another
+    workspace and by one started from a compiled path. A session's binding
+    records what it started from; one bound to a different installation,
+    or to none, does not block. A session with no binding still does.
+    """
+
+    blocking: list[dict[str, Any]] = []
+    for session in _read_reference_directory(
+        root / "sessions",
+        _MAX_SESSION_REFERENCES,
+        "session-manifest",
+        schemas,
+    ):
+        if not _session_blocks(session, entry, exact_hashes):
+            continue
+        session_id = session.get("session_id")
+        binding = (
+            _read_reference_document(
+                root / "session-bindings" / f"{session_id}.json",
+                "session-binding",
+                schemas,
+                optional=True,
+            )
+            if isinstance(session_id, str)
+            else None
+        )
+        if (
+            binding is not None
+            and binding.get("session_id") == session_id
+            and binding.get("lifecycle_generation") == session.get("lifecycle_generation")
+            and not (
+                binding.get("installation_id") == entry["installation_id"]
+                and _binding_in_scope(binding, scope)
+            )
+        ):
+            continue
+        blocking.append(session)
+    return blocking
+
+
+def _binding_in_scope(binding: dict[str, Any], scope: InstallScope | None) -> bool:
+    """Whether a session binding resolved its installation in `scope`.
+
+    Installation ids are derived from content, so the same archive installed
+    in two workspaces has one id; the scope tells the installations apart.
+    Without a scope to compare, assume the session is in it.
+    """
+
+    if scope is None:
+        return True
+    if binding.get("resolved_from") == "compiled_path":
+        return False
+    workspace_root = binding.get("workspace_root")
+    if workspace_root is None:
+        return scope.kind == "global"
+    if scope.kind != "workspace" or not isinstance(workspace_root, str):
+        return False
+    try:
+        return resolve_install_scope(Path(workspace_root)).workspace_id == scope.workspace_id
+    except (KokoroError, OSError, ValueError):
+        return False
+
+
 def _referenced_error(
     root: Path,
     entry: dict[str, Any],
@@ -1762,6 +1849,7 @@ def _referenced_error(
     blockers: list[str],
     *,
     session_hashes: frozenset[str] | None = None,
+    scope: InstallScope | None = None,
 ) -> KokoroError:
     """Refuse a removal and say what refers to the installation.
 
@@ -1775,14 +1863,8 @@ def _referenced_error(
         exact = session_hashes or frozenset({cast(str, entry["compiled_sha256"])})
         details["sessions"] = sorted(
             cast(str, session["session_id"])
-            for session in _read_reference_directory(
-                root / "sessions",
-                _MAX_SESSION_REFERENCES,
-                "session-manifest",
-                schemas,
-            )
-            if _session_blocks(session, entry, exact)
-            and isinstance(session.get("session_id"), str)
+            for session in _blocking_sessions(root, scope, entry, exact, schemas)
+            if isinstance(session.get("session_id"), str)
         )
     return _error(
         "KARC_REMOVE_REFERENCED",
@@ -1816,14 +1898,8 @@ def _legacy_reference_blockers(
     )
     if config is not None and config.get("binding") == _entry_binding(entry):
         blockers.add("default")
-    for session in _read_reference_directory(
-        root / "sessions",
-        _MAX_SESSION_REFERENCES,
-        "session-manifest",
-        schemas,
-    ):
-        if _session_blocks(session, entry, exact_session_hashes):
-            blockers.add("active_session")
+    if _blocking_sessions(root, scope, entry, exact_session_hashes, schemas):
+        blockers.add("active_session")
     for migration in _read_reference_directory(
         root / "migrations",
         _MAX_MIGRATION_REFERENCES,
@@ -1976,7 +2052,10 @@ def _read_reference_document_once(
         normalized = canonical_bytes(value)
         terminator = b""
         if payload != normalized:
-            if schema_name != "session-manifest" or payload != normalized + b"\n":
+            if (
+                schema_name not in {"session-manifest", "session-binding"}
+                or payload != normalized + b"\n"
+            ):
                 raise ValueError("noncanonical reference")
             terminator = b"\n"
         detached = cast(dict[str, Any], json.loads(payload))

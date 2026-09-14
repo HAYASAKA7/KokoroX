@@ -977,10 +977,30 @@ def test_a_tampered_binding_file_is_refused(tmp_path: Path) -> None:
     store.bind_relationship("tampered", _BINDING)
     target = tmp_path / "session-bindings" / "tampered.json"
     document = json.loads(target.read_text(encoding="utf-8"))
-    document["relationship_state"] = "session"
+    document["relationship_state"] = "remembered"
     target.write_text(json.dumps(document), encoding="utf-8")
 
     with pytest.raises(KokoroError) as raised:
         store.relationship_binding("tampered", manifest)
 
     assert raised.value.code == "SESSION_DATA_INVALID"
+
+
+def test_a_compiled_path_binding_names_no_installation(tmp_path: Path) -> None:
+    store = SessionStore(tmp_path)
+    manifest = store.start("compiled", "rin-aster", "1.0.0", "a" * 64)
+
+    written = store.bind_relationship(
+        "compiled",
+        {
+            "resolved_from": "compiled_path",
+            "relationship_state": "session",
+            "namespace": None,
+            "installation_id": None,
+            "workspace_root": None,
+        },
+    )
+
+    assert store.session_binding("compiled", manifest) == written
+    assert store.relationship_binding("compiled", manifest) is None
+    SchemaRegistry(Path("schemas/v1")).validate("session-binding", written)

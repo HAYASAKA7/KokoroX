@@ -170,7 +170,7 @@ Use this bounded fallback order after a failed validation:
 1. Repair invalid segments.
 2. Reduce language switches.
 3. Lower character intensity once.
-4. Use the neutral renderer in the primary language. Re-plan with the same inputs and `--fallback-level 3`, render that plan -- it has no authored lines and no switches -- and validate against it. The plan the turn already had protects the authored lines, so a neutral render can never pass against it.
+4. Use the neutral renderer in the primary language. Re-plan with the same inputs and `--fallback-level 3`, render that plan -- it has no authored lines and no switches, and lists the pack's lines under `forbidden_spans`, which a render must not speak (`FORBIDDEN_SPAN_PRESENT`) -- and validate against it. The plan the turn already had protects the authored lines, so a neutral render can never pass against it.
 
 Validate every repaired or fallback candidate. Urgency never removes this gate.
 

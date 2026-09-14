@@ -58,6 +58,7 @@ _BINDING_KEYS = frozenset(
         "namespace",
         "installation_id",
         "workspace_root",
+        "resolved_from",
         "relationship_state",
     }
 )
@@ -194,10 +195,8 @@ def _path_is_redirect(path: Path) -> bool:
 def _binding_is_valid(value: object, session_id: str) -> bool:
     if not isinstance(value, dict) or set(value) != _BINDING_KEYS:
         return False
-    workspace_root = value["workspace_root"]
-    installation_id = value["installation_id"]
     character_version = value["character_version"]
-    return (
+    if not (
         value["schema_version"] == "1.0"
         and value["artifact_id"] == f"session-binding/{session_id}"
         and value["session_id"] == session_id
@@ -210,6 +209,25 @@ def _binding_is_valid(value: object, session_id: str) -> bool:
         and isinstance(character_version, str)
         and 1 <= len(character_version) <= 64
         and _SEMVER.fullmatch(character_version) is not None
+    ):
+        return False
+    workspace_root = value["workspace_root"]
+    installation_id = value["installation_id"]
+    resolved_from = value["resolved_from"]
+    if resolved_from == "compiled_path":
+        # A compiled path uses no installation, scope, or retained state.
+        return (
+            value["namespace"] is None
+            and installation_id is None
+            and workspace_root is None
+            and value["relationship_state"] == "session"
+        )
+    if resolved_from not in {"workspace_default", "global_default"}:
+        return False
+    if (resolved_from == "workspace_default") != (workspace_root is not None):
+        return False
+    return (
+        value["relationship_state"] in {"session", "durable"}
         and isinstance(value["namespace"], str)
         and len(value["namespace"]) <= 64
         and _CHARACTER_ID.fullmatch(value["namespace"]) is not None
@@ -224,7 +242,6 @@ def _binding_is_valid(value: object, session_id: str) -> bool:
                 and os.path.isabs(workspace_root)
             )
         )
-        and value["relationship_state"] == "durable"
     )
 
 
@@ -1291,12 +1308,14 @@ class SessionStore:
     def bind_relationship(
         self, session_id: str, binding: Mapping[str, Any]
     ) -> dict[str, Any]:
-        """Record that this active session reads and writes durable state.
+        """Record what this active session started from and which state it uses.
 
-        The binding names the installation and scope whose consented
-        relationship the session continues. It carries the session's
-        lifecycle generation, so a later restart of the same id cannot
-        inherit it. The store never touches persistent state itself.
+        The binding names the installation and scope the session resolved,
+        or a compiled path, and whether it continues consented durable
+        relationship state. Removal reads it to tell a session of this
+        installation from one that only shares its hash. It carries the
+        session's lifecycle generation, so a restart cannot inherit it. The
+        store never touches persistent state itself.
         """
 
         session_id = _validate_session_id(session_id)
@@ -1317,7 +1336,13 @@ class SessionStore:
                 "namespace": binding.get("namespace"),
                 "installation_id": binding.get("installation_id"),
                 "workspace_root": binding.get("workspace_root"),
-                "relationship_state": "durable",
+                "resolved_from": binding.get("resolved_from")
+                or (
+                    "workspace_default"
+                    if binding.get("workspace_root") is not None
+                    else "global_default"
+                ),
+                "relationship_state": binding.get("relationship_state", "durable"),
             }
             if not _binding_is_valid(document, session_id):
                 raise _invalid_session_data()
@@ -1331,6 +1356,16 @@ class SessionStore:
         self, session_id: str, manifest: Mapping[str, Any]
     ) -> dict[str, Any] | None:
         """Return this lifecycle's durable binding, or None for local state."""
+
+        binding = self.session_binding(session_id, manifest)
+        if binding is None or binding["relationship_state"] != "durable":
+            return None
+        return binding
+
+    def session_binding(
+        self, session_id: str, manifest: Mapping[str, Any]
+    ) -> dict[str, Any] | None:
+        """Return this lifecycle's binding, whatever state it uses."""
 
         session_id = _validate_session_id(session_id)
         with self._session_lock(session_id):

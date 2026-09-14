@@ -312,7 +312,7 @@ def _semantic_contract_valid(value: Mapping[str, Any]) -> bool:
 def _plan_contract_valid(value: Mapping[str, Any]) -> bool:
     keys = set(value.keys())
     reduced = keys == _REDUCED_PLAN_KEYS
-    full = keys == _FULL_PLAN_KEYS
+    full = keys in (_FULL_PLAN_KEYS, _FULL_PLAN_KEYS | {"forbidden_spans"})
     if not reduced and not full:
         return False
     max_switches = value.get("max_switches")
@@ -335,6 +335,12 @@ def _plan_contract_valid(value: Mapping[str, Any]) -> bool:
             value.get("protected_spans"), maximum=128, unique=True
         )
         is not None
+        and (
+            "forbidden_spans" not in value
+            or bool(
+                _string_list(value.get("forbidden_spans"), maximum=128, unique=True)
+            )
+        )
     )
 
 
@@ -653,7 +659,10 @@ def validate_rendered_output(
     semantic_is_full_artifact = (
         semantic_mapping and set(semantic.keys()) == _FULL_SEMANTIC_KEYS
     )
-    plan_is_full_artifact = plan_mapping and set(plan.keys()) == _FULL_PLAN_KEYS
+    plan_is_full_artifact = plan_mapping and set(plan.keys()) in (
+        _FULL_PLAN_KEYS,
+        _FULL_PLAN_KEYS | {"forbidden_spans"},
+    )
     if not rendered_mapping:
         violations.add("INVALID_RENDERED", "Rendered output must be an object.")
     if not semantic_mapping:
@@ -864,6 +873,15 @@ def validate_rendered_output(
                     details={"protected_span": span},
                 )
         _check_fixed_line_order(text, planned_segments, violations)
+        forbidden = plan.get("forbidden_spans") if plan_mapping else None
+        if isinstance(forbidden, list):
+            for span in forbidden:
+                if isinstance(span, str) and span and span in text:
+                    violations.add(
+                        "FORBIDDEN_SPAN_PRESENT",
+                        "Rendered text speaks a pack line the neutral plan leaves out.",
+                        details={"protected_span": span},
+                    )
 
     # A digest in the span list protects only the digest. The check is literal
     # containment, so printing the hash satisfies it while the string the hash
