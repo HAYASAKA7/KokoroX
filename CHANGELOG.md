@@ -101,6 +101,19 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- Concurrent administration gives the right answer instead of a false one.
+  The second of two concurrent installs of one archive, or of two versions
+  into one workspace, failed with `KARC_INSTALL_CONFLICT`: its preview ran
+  before the scope lock and read the other install's publication as a
+  conflict. That preview now defers to the locked path, which plans again, so
+  an identical archive is idempotent. A default set while a removal ran made
+  the removal fail as `KARC_REMOVE_REFERENCE_SCAN_INVALID`; default changes
+  now take the scope's registry lock, and a removal captures its references
+  again once it holds that lock, so it answers `KARC_REMOVE_REFERENCED`. A
+  removal's audits no longer re-read every session manifest and workspace
+  registry after each document: a listing whose entries are old and unchanged
+  in size, times, and file id is not read again. One removal in a long-lived
+  data root had taken 67 seconds with the lock held.
 - A live session no longer stops answering when its consent changes. The
   changelog said revoking consent stops a running session's writes, but it
   stopped `runtime context` too, so the character could not reply; granting

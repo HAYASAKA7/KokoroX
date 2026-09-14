@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 from dataclasses import dataclass
 import errno
 from hashlib import sha256
@@ -23,6 +24,7 @@ from kokorox.distribution.archive import (
 from kokorox.distribution.compatibility import inspect_karc_compatibility
 from kokorox.distribution.registry import (
     InstallScope,
+    _acquire_registry_lock,
     load_installed_registry,
     resolve_install_scope,
 )
@@ -554,9 +556,21 @@ def _change_character_default(
 ) -> dict[str, Any]:
     root = _absolute_path(data_root)
     scope = resolve_install_scope(workspace_root)
+    registry_parent = root.joinpath(
+        *scope.registry_relative_path.split("/")
+    ).parent
     parent = _ensure_config_parent(root, scope)
     source_audits: list[Callable[[], None]] = []
-    with _acquire_config_lock(parent, scope) as lock:
+    # A removal scans this scope's default under the registry lock; changing
+    # the default while it ran made the removal fail as a corrupt scan. The
+    # change waits for the removal instead. Clearing a default in a scope
+    # with no registry cannot race one, and must not create its directory.
+    registry_lock = (
+        _acquire_registry_lock(root, scope)
+        if requested_character is not None or registry_parent.is_dir()
+        else contextlib.nullcontext()
+    )
+    with registry_lock, _acquire_config_lock(parent, scope) as lock:
         path = _default_path(root, scope)
         initial = _read_optional_config(path)
         current = load_character_default(

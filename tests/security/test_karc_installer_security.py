@@ -1781,10 +1781,13 @@ def test_archive_source_aba_across_schema_callbacks_is_rejected(
         source.write_bytes(original)
 
 
-def test_install_rejects_registry_aba_during_early_schema_callbacks(
+def test_install_rejects_registry_aba_while_the_lock_is_held(
     rin_verified_release: dict[str, Any],
     tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """A registry that changes while the scope lock is held is still refused."""
+
     source = tmp_path / "rin-aster.karc"
     source.write_bytes(build_private_archive(rin_verified_release))
     data_root = tmp_path / "data"
@@ -1806,16 +1809,65 @@ def test_install_rejects_registry_aba_during_early_schema_callbacks(
             registry.write_bytes(original)
             phase = 2
 
+    real_lock = installer_module._acquire_registry_lock
+    locked = [False]
+
+    def lock_then_mutate(root: Path, scope: Any) -> Any:
+        locked[0] = True
+        return real_lock(root, scope)
+
+    def mutate_under_lock(call: int, name: str) -> None:
+        if locked[0]:
+            mutate(call, name)
+
+    monkeypatch.setattr(installer_module, "_acquire_registry_lock", lock_then_mutate)
+
     with pytest.raises(KokoroError) as caught:
         install_karc_archive(
             source,
             data_root,
-            _CallbackSchemas(mutate),
+            _CallbackSchemas(mutate_under_lock),
         )
 
     assert caught.value.code == "KARC_INSTALL_CONFLICT"
-    assert registry.read_bytes() == original
+    # Refused at the first change it saw, before the restore could hide it.
+    assert registry.read_bytes() == canonical_bytes(changed)
     assert not (data_root / "archives").exists()
+
+
+def test_a_registry_aba_before_the_lock_is_planned_again_under_it(
+    rin_verified_release: dict[str, Any],
+    tmp_path: Path,
+) -> None:
+    """Before the lock, a changed registry is re-read; nothing decided there is used."""
+
+    source = tmp_path / "rin-aster.karc"
+    source.write_bytes(build_private_archive(rin_verified_release))
+    data_root = tmp_path / "data"
+    registry = data_root / "registry" / "global.json"
+    registry.parent.mkdir(parents=True)
+    original_document = empty_installed_registry(resolve_install_scope())
+    original = canonical_bytes(original_document)
+    registry.write_bytes(original)
+    changed = dict(original_document)
+    changed["revision"] = 9
+    phase = 0
+
+    def mutate(_call: int, _name: str) -> None:
+        nonlocal phase
+        if phase == 0:
+            registry.write_bytes(canonical_bytes(changed))
+            phase = 1
+        elif phase == 1:
+            registry.write_bytes(original)
+            phase = 2
+
+    result = install_karc_archive(source, data_root, _CallbackSchemas(mutate))
+
+    installed = load_installed_registry(data_root, SCHEMAS)
+    assert result["idempotent"] is False
+    assert installed["revision"] == original_document["revision"] + 1
+    assert list(installed["entries"]) == [result["registry_identity"]]
 
 
 def test_workspace_identity_aba_across_schema_callbacks_is_rejected(
@@ -2782,3 +2834,127 @@ def test_a_reference_that_stays_unreadable_still_fails(
         )
 
     assert caught.value.code == "KARC_REMOVE_REFERENCE_SCAN_INVALID"
+
+
+def test_an_install_that_finishes_during_another_s_preview_is_not_a_conflict(
+    rin_verified_release: dict[str, Any],
+    tmp_path: Path,
+) -> None:
+    """The second of two identical installs always failed with a false conflict."""
+
+    source = tmp_path / "rin-aster.karc"
+    source.write_bytes(build_private_archive(rin_verified_release))
+    data_root = tmp_path / "data"
+    competitor = tmp_path / "competitor.karc"
+    competitor.write_bytes(source.read_bytes())
+    raced = []
+
+    def publish_first(call: int, _name: str) -> None:
+        if call == 1 and not raced:
+            raced.append(install_karc_archive(competitor, data_root, SCHEMAS))
+
+    result = install_karc_archive(source, data_root, _CallbackSchemas(publish_first))
+
+    assert raced and raced[0]["idempotent"] is False
+    assert result["idempotent"] is True
+    assert list(load_installed_registry(data_root, SCHEMAS)["entries"]) == [
+        raced[0]["registry_identity"]
+    ]
+
+
+def test_a_default_set_before_the_removal_lock_is_a_reference_not_a_corrupt_scan(
+    rin_verified_release: dict[str, Any],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from kokorox.distribution.defaults import set_character_default
+
+    source = tmp_path / "rin-aster.karc"
+    source.write_bytes(build_private_archive(rin_verified_release))
+    data_root = tmp_path / "data"
+    install_karc_archive(source, data_root, SCHEMAS)
+    real_lock = installer_module._acquire_registry_lock
+
+    def default_set_then_lock(root: Path, scope: Any) -> Any:
+        set_character_default(data_root, "rin-aster", SCHEMAS)
+        return real_lock(root, scope)
+
+    monkeypatch.setattr(installer_module, "_acquire_registry_lock", default_set_then_lock)
+
+    with pytest.raises(KokoroError) as caught:
+        remove_installed_pack(data_root, "original", "rin-aster", "1.0.0", SCHEMAS)
+
+    assert caught.value.code == "KARC_REMOVE_REFERENCED"
+    assert caught.value.details["references"] == ["default"]
+
+
+def test_a_default_set_waits_for_the_scope_registry_lock(
+    rin_verified_release: dict[str, Any],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from kokorox.distribution.defaults import set_character_default
+
+    source = tmp_path / "rin-aster.karc"
+    source.write_bytes(build_private_archive(rin_verified_release))
+    data_root = tmp_path / "data"
+    install_karc_archive(source, data_root, SCHEMAS)
+    monkeypatch.setattr(registry_module, "_LOCK_RETRY_DELAYS", (0.0, 0.01))
+
+    with registry_module._acquire_registry_lock(data_root, resolve_install_scope()):
+        with pytest.raises(KokoroError) as caught:
+            set_character_default(data_root, "rin-aster", SCHEMAS)
+
+    assert caught.value.code == "KARC_REGISTRY_LOCKED"
+    assert caught.value.retryable is True
+
+
+def test_removal_reads_old_references_once_not_once_per_document(
+    rin_verified_release: dict[str, Any],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Reads were references times workspace registries: 67 s for one removal."""
+
+    import os
+    import time
+
+    from kokorox.state.store import SessionStore
+
+    source = tmp_path / "rin-aster.karc"
+    source.write_bytes(build_private_archive(rin_verified_release))
+    data_root = tmp_path / "data"
+    install_karc_archive(source, data_root, SCHEMAS)
+    store = SessionStore(data_root)
+    for index in range(12):
+        session_id = f"old-{index}"
+        store.start(session_id, "someone-else", "1.0.0", "a" * 64)
+        store.end(session_id)
+    workspaces = data_root / "registry" / "workspaces"
+    workspaces.mkdir(parents=True, exist_ok=True)
+    for index in range(8):
+        workspace = tmp_path / f"workspace-{index}"
+        workspace.mkdir()
+        scope = resolve_install_scope(workspace)
+        (workspaces / f"{scope.workspace_id}.json").write_bytes(
+            canonical_bytes(empty_installed_registry(scope))
+        )
+    an_hour_ago = time.time() - 3600
+    for directory in (data_root / "sessions", workspaces):
+        for path in directory.iterdir():
+            os.utime(path, (an_hour_ago, an_hour_ago))
+
+    reads = [0]
+    real_read = installer_module._read_optional_recovery_file
+
+    def counting_read(path: Path, limit: int) -> bytes | None:
+        reads[0] += 1
+        return real_read(path, limit)
+
+    monkeypatch.setattr(installer_module, "_read_optional_recovery_file", counting_read)
+
+    remove_installed_pack(data_root, "original", "rin-aster", "1.0.0", SCHEMAS)
+
+    # Two captures of 20 files each plus the references themselves; the old
+    # audits re-read all twenty on every one of dozens of validations.
+    assert reads[0] < 200, reads[0]

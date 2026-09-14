@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import ctypes
 import errno
 from hashlib import sha256
@@ -136,6 +136,10 @@ class _CapturedReferenceDirectory:
     limit: int
     identity: _NodeIdentity | None
     entries: dict[str, bytes]
+    fingerprints: dict[str, tuple[int, ...]] = field(
+        default_factory=dict, compare=False
+    )
+    captured_at_ns: int = field(default=0, compare=False)
 
 
 @dataclass(frozen=True, slots=True)
@@ -144,6 +148,10 @@ class _CapturedWorkspaceRegistries:
     excluded_name: str | None
     identity: _NodeIdentity | None
     entries: dict[str, bytes]
+    fingerprints: dict[str, tuple[int, ...]] = field(
+        default_factory=dict, compare=False
+    )
+    captured_at_ns: int = field(default=0, compare=False)
 
 
 class _BoundarySchemas:
@@ -197,36 +205,56 @@ def install_karc_archive(
     source = _capture_archive(source_path, limits.max_archive_bytes)
     registry_path = root.joinpath(*scope.registry_relative_path.split("/"))
     registry_payload = _read_optional_regular_file(registry_path)
-    audited = _BoundarySchemas(schemas)
-    audited.set_audit(
-        "archive_source",
-        lambda: _require_archive_unchanged(source, limits.max_archive_bytes),
-    )
-    audited.set_audit(
-        "data_root",
-        lambda: _require_data_root_unchanged(data_boundary),
-    )
-    audited.set_audit(
-        "registry",
-        lambda: _require_registry_payload(
-            registry_path,
-            registry_payload,
-            "KARC_INSTALL_CONFLICT",
-        ),
-    )
-    if workspace is not None:
+
+    def boundary() -> _BoundarySchemas:
+        audited = _BoundarySchemas(schemas)
         audited.set_audit(
-            "workspace",
-            lambda: _require_workspace_unchanged(workspace),
+            "archive_source",
+            lambda: _require_archive_unchanged(source, limits.max_archive_bytes),
         )
+        audited.set_audit(
+            "data_root",
+            lambda: _require_data_root_unchanged(data_boundary),
+        )
+        audited.set_audit(
+            "registry",
+            lambda: _require_registry_payload(
+                registry_path,
+                registry_payload,
+                "KARC_INSTALL_CONFLICT",
+            ),
+        )
+        if workspace is not None:
+            audited.set_audit(
+                "workspace",
+                lambda: _require_workspace_unchanged(workspace),
+            )
+        return audited
+
+    audited = boundary()
     try:
-        preview = preview_karc_install(
-            source.payload,
-            root,
-            audited,
-            workspace_root=workspace_root,
-            limits=limits,
-        )
+        try:
+            preview = preview_karc_install(
+                source.payload,
+                root,
+                audited,
+                workspace_root=workspace_root,
+                limits=limits,
+            )
+        except KokoroError as error:
+            if dry_run or error.details.get("reason") not in {
+                "registry_changed",
+                "data_root_created",
+            }:
+                raise
+            # Another install published while this one previewed. The locked
+            # path re-reads the registry and plans again -- an identical
+            # archive is then idempotent -- and its audits still refuse a
+            # registry that changes while the lock is held. Reporting the
+            # other install's success as a conflict was simply wrong.
+            data_boundary = _capture_data_root(root)
+            registry_payload = _read_optional_regular_file(registry_path)
+            audited = boundary()
         _require_archive_unchanged(source, limits.max_archive_bytes)
         if dry_run:
             audited.assert_clean()
@@ -506,6 +534,25 @@ def remove_installed_pack(
             audited.assert_clean()
             return result
         with _acquire_registry_lock(root, scope) as lock:
+            # Captured before the lock, these could already be stale: a
+            # default set, or an install that finished while this removal
+            # waited, read as a corrupt scan. Installs and default changes in
+            # this scope now wait for the lock, so captures taken under it
+            # hold for the whole removal; the audits bind these names late.
+            registry_payload = _read_optional_regular_file(registry_path)
+            config_boundary = _capture_optional_reference_file(config_path)
+            session_boundary = _capture_reference_directory(
+                root / "sessions",
+                _MAX_SESSION_REFERENCES,
+            )
+            migration_boundary = _capture_reference_directory(
+                root / "migrations",
+                _MAX_MIGRATION_REFERENCES,
+            )
+            workspace_registries = _capture_workspace_registries(
+                root / "registry" / "workspaces",
+                _selected_workspace_registry_name(scope),
+            )
             try:
                 preflight_registry, _preflight_sha256 = _registry_state(
                     root,
@@ -2438,9 +2485,16 @@ def _require_data_root_unchanged(captured: _CapturedDataRoot) -> None:
     else:
         valid = linked is None
     if not valid:
+        created = (
+            not captured.existed
+            and linked is not None
+            and stat.S_ISDIR(linked.st_mode)
+            and not _is_redirect(captured.path, linked)
+        )
         raise _error(
             "KARC_INSTALL_PATH_CHANGED",
             "Install data root changed during installation.",
+            **({"reason": "data_root_created"} if created else {}),
         )
 
 
@@ -2497,9 +2551,11 @@ def _require_registry_payload(
             "Installed registry changed across a validation callback.",
         ) from error
     if current != expected:
-        raise _error(
+        raise KokoroError(
             code,
             "Installed registry changed across a validation callback.",
+            retryable=True,
+            details={"reason": "registry_changed"},
         )
 
 
@@ -2549,16 +2605,74 @@ def _require_optional_reference_file(
         )
 
 
+# A listing whose every entry is older than this, and unchanged in size,
+# times, and file id, is not re-read. A newer entry could share a timestamp
+# tick with a write the capture missed, so it is always read.
+_RACY_WINDOW_NS = 2_000_000_000
+
+
+def _stat_fingerprint(path_stat: os.stat_result) -> tuple[int, ...]:
+    return (
+        path_stat.st_mode,
+        path_stat.st_size,
+        path_stat.st_mtime_ns,
+        path_stat.st_ctime_ns,
+        path_stat.st_ino,
+        path_stat.st_dev,
+    )
+
+
+def _listing_unchanged(
+    path: Path,
+    identity: _NodeIdentity | None,
+    fingerprints: dict[str, tuple[int, ...]],
+    captured_at_ns: int,
+) -> bool:
+    """Prove a captured listing unchanged from metadata alone, or answer False.
+
+    Every reference read during a removal runs every audit, and each audit
+    re-read every session manifest and workspace registry: 55,901 reads and
+    67 seconds for one removal in a long-lived data root, with the scope
+    lock held throughout. Content only changes with size, a timestamp, or
+    the file id, so an old, unchanged listing needs no reads. False means
+    only that the full comparison must run.
+    """
+
+    try:
+        if identity is None:
+            return _lstat_optional(path) is None
+        if not fingerprints or captured_at_ns <= 0:
+            return False
+        if _capture_node_identity(path, directory=True) != identity:
+            return False
+        threshold = captured_at_ns - _RACY_WINDOW_NS
+        current: dict[str, tuple[int, ...]] = {}
+        with os.scandir(path) as scanned:
+            for entry in scanned:
+                if len(current) >= len(fingerprints):
+                    return False
+                current[entry.name] = _stat_fingerprint(os.lstat(entry.path))
+        # Content writes move the modification time on every platform; the
+        # change time is the creation time on Windows and cannot age.
+        return current == fingerprints and all(
+            print_[2] < threshold for print_ in fingerprints.values()
+        )
+    except (KokoroError, OSError):
+        return False
+
+
 def _capture_reference_directory(
     path: Path,
     limit: int,
 ) -> _CapturedReferenceDirectory:
+    captured_at_ns = time.time_ns()
     linked = _lstat_optional(path)
     if linked is None:
         return _CapturedReferenceDirectory(path, limit, None, {})
     try:
         identity = _capture_node_identity(path, directory=True)
         entries: dict[str, bytes] = {}
+        fingerprints: dict[str, tuple[int, ...]] = {}
         with os.scandir(path) as scanned:
             for entry in scanned:
                 if len(entries) >= limit:
@@ -2570,6 +2684,8 @@ def _capture_reference_directory(
                     raise _reference_scan_error(
                         "Reference directory contains an unsafe entry."
                     )
+                # Before the read, so a write between the two shows as a change.
+                fingerprints[member.name] = _stat_fingerprint(member.lstat())
                 payload = _read_optional_recovery_file(
                     member,
                     _MAX_REFERENCE_BYTES,
@@ -2592,12 +2708,21 @@ def _capture_reference_directory(
             "Reference directory could not be captured safely.",
             reason=type(error).__name__,
         ) from error
-    return _CapturedReferenceDirectory(path, limit, identity, entries)
+    return _CapturedReferenceDirectory(
+        path, limit, identity, entries, fingerprints, captured_at_ns
+    )
 
 
 def _require_reference_directory(
     captured: _CapturedReferenceDirectory,
 ) -> None:
+    if _listing_unchanged(
+        captured.path,
+        captured.identity,
+        captured.fingerprints,
+        captured.captured_at_ns,
+    ):
+        return
     try:
         current = _capture_reference_directory(
             captured.path,
@@ -2624,12 +2749,14 @@ def _capture_workspace_registries(
     path: Path,
     excluded_name: str | None,
 ) -> _CapturedWorkspaceRegistries:
+    captured_at_ns = time.time_ns()
     linked = _lstat_optional(path)
     if linked is None:
         return _CapturedWorkspaceRegistries(path, excluded_name, None, {})
     try:
         identity = _capture_node_identity(path, directory=True)
         entries: dict[str, bytes] = {}
+        fingerprints: dict[str, tuple[int, ...]] = {}
         seen = 0
         with os.scandir(path) as scanned:
             for entry in scanned:
@@ -2644,6 +2771,7 @@ def _capture_workspace_registries(
                         "Workspace registry directory has an unsafe entry."
                     )
                 member_stat = member.lstat()
+                fingerprints[member.name] = _stat_fingerprint(member_stat)
                 safe_regular = stat.S_ISREG(
                     member_stat.st_mode
                 ) and not _is_redirect(member, member_stat)
@@ -2697,12 +2825,21 @@ def _capture_workspace_registries(
         excluded_name,
         identity,
         entries,
+        fingerprints,
+        captured_at_ns,
     )
 
 
 def _require_workspace_registries(
     captured: _CapturedWorkspaceRegistries,
 ) -> None:
+    if _listing_unchanged(
+        captured.path,
+        captured.identity,
+        captured.fingerprints,
+        captured.captured_at_ns,
+    ):
+        return
     try:
         current = _capture_workspace_registries(
             captured.path,
