@@ -835,7 +835,17 @@ def build_parser() -> argparse.ArgumentParser:
     runtime_plan.add_argument("--policy", required=True)
     # Repeat for each manner the turn calls for -- say, taking an order and
     # finishing it; the pack decides whether each line opens or closes.
-    runtime_plan.add_argument("--expression-intent", action="append")
+    runtime_plan.add_argument(
+        "--expression-intent",
+        action="append",
+        help=(
+            "Repeatable: pass it once per manner the turn calls for, in "
+            "order. A task finished in this reply usually takes two -- the "
+            "acknowledgement and the completion. The pack decides whether "
+            "each line opens or closes; runtime context lists the closing "
+            "ones under closing_expressions."
+        ),
+    )
     # The pack's own lines live in the runtime context, so a plan that is to
     # carry one has to be shown the context that holds it.
     runtime_plan.add_argument("--context")

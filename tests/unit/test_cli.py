@@ -991,3 +991,14 @@ def test_runtime_plan_accepts_several_expression_intents() -> None:
     )
 
     assert parsed.expression_intent == ["order_acknowledgement", "task_completion"]
+
+
+def test_runtime_plan_help_says_the_intent_flag_repeats(capsys) -> None:
+    """Agents read a bare flag as single-valued and never passed two intents."""
+
+    with pytest.raises(SystemExit):
+        build_parser().parse_args(["runtime", "plan", "--help"])
+
+    help_text = " ".join(capsys.readouterr().out.split())
+    assert "Repeatable" in help_text
+    assert "closing_expressions" in help_text

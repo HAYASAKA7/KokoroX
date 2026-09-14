@@ -86,6 +86,12 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- `runtime plan --help` now says `--expression-intent` is repeatable, and the
+  runtime contract and `using-kokorox` say to pass both the acknowledgement
+  and the completion when a task finishes inside the reply. The flag carried
+  no help text and the contract's "the first styles the conclusion" read as
+  singular, so across four finishable conversations no agent passed two
+  intents, and three said the CLI took only one.
 - `runtime validate` now checks where an authored line is rendered. The
   contract says to render every segment in plan order, but a completion line
   moved before the answer, or both lines swapped, still validated. The lines

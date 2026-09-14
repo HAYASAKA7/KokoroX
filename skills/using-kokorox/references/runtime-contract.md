@@ -131,7 +131,7 @@ It appears only when you pass `--context` and the pack authors a line for an `--
 
 That is how one turn can be bilingual without either half being a translation of the other: the character speaks its authored line in its own language, and everything you formed follows the reader.
 
-A turn can call for more than one manner -- taking an order and finishing it are two. Pass `--expression-intent` once for each, in the order they happen; the first styles the conclusion. The pack decides where each line goes: an opening line leads the response, and an intent listed in the context's `closing_expressions` follows the answer, so a completion line is said after the work is shown rather than before it. Render every segment in plan order.
+A turn can call for more than one manner -- taking an order and finishing it are two. `--expression-intent` is repeatable: pass it once for each, in the order they happen. When you finish the task inside this reply, pass both the acknowledgement and the completion; `closing_expressions` in the runtime context names the intents that close. The planner styles the conclusion with the first intent you pass. The pack decides where each line goes: an opening line leads the response, and an intent listed in the context's `closing_expressions` follows the answer, so a completion line is said after the work is shown rather than before it. Render every segment in plan order.
 
 Render an object with exactly:
 
