@@ -37,6 +37,11 @@ from kokorox.packs.compiler import (
     write_compiled_pack,
 )
 from kokorox.packs.loader import load_source_pack
+from kokorox.persistence.consent import load_consent
+from kokorox.persistence.state import (
+    apply_persistent_relationship_event,
+    load_connected_relationship,
+)
 from kokorox.policy.compiler import normalize_policy
 from kokorox.research.bundles import build_research_bundle
 from kokorox.research.requests import normalize_research_request
@@ -568,7 +573,8 @@ _PUBLIC_MESSAGES = {
     ),
     "PERSISTENCE_STATE_JOURNAL_INVALID": "The persistent state journal is invalid.",
     "PERSISTENCE_STATE_MIGRATION_REQUIRED": (
-        "Persistent state requires an explicit migration."
+        "Persistent state requires an explicit migration; preview it with "
+        "state migrate --dry-run, then run state migrate."
     ),
     "PERSISTENCE_STATE_REVISION_CONFLICT": (
         "The persistent state revision conflicts with the request."
@@ -2066,6 +2072,7 @@ def _handle_session_start(
     args: argparse.Namespace, settings: Settings, schemas: SchemaRegistry
 ) -> dict[str, Any]:
     advisories: list[dict[str, Any]] = []
+    binding: dict[str, Any] | None = None
     if args.character is not None:
         path = _compiled_file(settings, args.character)
         compiled = _validated_compiled(path, schemas)
@@ -2110,15 +2117,32 @@ def _handle_session_start(
                     ),
                 }
             )
-    session = SessionStore(settings.data_dir).start(
+        binding = _relationship_binding(
+            settings,
+            schemas,
+            selection,
+            workspace_root if selection.source == "workspace_default" else None,
+            advisories,
+        )
+    store = SessionStore(settings.data_dir)
+    session = store.start(
         args.session,
         compiled["character_id"],
         compiled["character_version"],
         compiled["source_hash"],
     )
+    if binding is not None:
+        try:
+            store.bind_relationship(args.session, binding)
+        except KokoroError:
+            # Started but unbound, the session would quietly keep its
+            # state to itself; end it rather than leave it half-connected.
+            store.end(args.session)
+            raise
     return {
         "ok": True,
         "session": session,
+        "relationship_state": "session" if binding is None else "durable",
         "resolved_from": resolved_from,
         "installation_id": installation_id,
         "advisories": advisories,
@@ -2540,8 +2564,15 @@ def _handle_runtime_context(
     if not manifest["active"]:
         raise KokoroError("SESSION_NOT_ACTIVE", "Session is not active.")
     compiled = _find_compiled(settings, schemas, manifest)
+    binding = store.relationship_binding(args.session, manifest)
+    if binding is not None:
+        state = _connected_relationship(settings, schemas, binding)["relationship"]
     context = build_runtime_context(compiled, state, args.locale, args.scenario)
-    return {"ok": True, "context": context}
+    return {
+        "ok": True,
+        "context": context,
+        "relationship_state": "session" if binding is None else "durable",
+    }
 
 
 def _runtime_context_body(value: Any) -> dict[str, Any]:
@@ -2737,11 +2768,15 @@ def _handle_state_preview(
     args: argparse.Namespace, settings: Settings, schemas: SchemaRegistry
 ) -> dict[str, Any]:
     event = _validated_event(args, schemas)
-    _store, _manifest, compiled, state = _active_compiled_and_state(
+    store, manifest, compiled, state = _active_compiled_and_state(
         settings, schemas, args.session
     )
+    binding = store.relationship_binding(args.session, manifest)
+    source = "session" if binding is None else "durable"
+    if binding is not None:
+        state = _connected_relationship(settings, schemas, binding)["relationship"]
     if event["event_id"] in state["applied_event_ids"]:
-        return {"ok": True, "state": state}
+        return {"ok": True, "state": state, "relationship_state": source}
     expected = event["expected_state_revision"]
     actual = state["revision"]
     if expected != actual:
@@ -2759,7 +2794,7 @@ def _handle_state_preview(
         repetition_window=repetition_window,
         stages=stages,
     )
-    return {"ok": True, "state": preview}
+    return {"ok": True, "state": preview, "relationship_state": source}
 
 
 def _handle_state_apply(
@@ -2769,6 +2804,9 @@ def _handle_state_apply(
     store, manifest, compiled, _state = _active_compiled_and_state(
         settings, schemas, args.session
     )
+    binding = store.relationship_binding(args.session, manifest)
+    if binding is not None:
+        return _apply_connected_event(settings, schemas, binding, event)
     max_delta, repetition_window, stages = _growth_config(compiled)
     state = store.apply(
         args.session,
@@ -2782,6 +2820,123 @@ def _handle_state_apply(
         expected_lifecycle_generation=manifest["lifecycle_generation"],
     )
     return {"ok": True, "state": state}
+
+
+def _relationship_binding(
+    settings: Settings,
+    schemas: SchemaRegistry,
+    selection: CharacterSelection,
+    workspace_root: Path | None,
+    advisories: list[dict[str, Any]],
+) -> dict[str, Any] | None:
+    """Bind a default-started session to consented durable relationship state.
+
+    Consent is looked up in the scope the default came from. Only an active
+    grant of `relationship_state` for the very installation the session
+    started binds it; anything else keeps the session's state to itself.
+    """
+
+    try:
+        consent = load_consent(
+            settings.data_dir,
+            cast(str, selection.character_id),
+            schemas,
+            namespace=cast(str, selection.namespace),
+            workspace_root=workspace_root,
+        )
+    except KokoroError as error:
+        # A revoked consent does not hold its installation, so the version
+        # it names can be removed and a newer one started. Sessions never
+        # read persistence before; one left behind must not block them.
+        if error.code != "PERSISTENCE_INSTALLATION_STALE":
+            raise
+        advisories.append(
+            {
+                "code": "PERSISTENCE_CONSENT_OTHER_INSTALLATION",
+                "message": (
+                    "The recorded consent names a version of this character "
+                    "that is no longer installed, so this session keeps its "
+                    "state to itself."
+                ),
+            }
+        )
+        return None
+    if (
+        consent is None
+        or consent["status"] != "active"
+        or "relationship_state" not in consent["permissions"]
+    ):
+        return None
+    if consent["installation"]["installation_id"] != selection.installation_id:
+        advisories.append(
+            {
+                "code": "PERSISTENCE_CONSENT_OTHER_INSTALLATION",
+                "message": (
+                    "relationship_state is granted for another installed "
+                    "version of this character, so this session keeps its "
+                    "state to itself."
+                ),
+            }
+        )
+        return None
+    return {
+        "namespace": selection.namespace,
+        "installation_id": selection.installation_id,
+        "workspace_root": None if workspace_root is None else str(workspace_root),
+    }
+
+
+def _binding_workspace(binding: dict[str, Any]) -> Path | None:
+    workspace = binding["workspace_root"]
+    return None if workspace is None else Path(workspace)
+
+
+def _connected_relationship(
+    settings: Settings,
+    schemas: SchemaRegistry,
+    binding: dict[str, Any],
+) -> dict[str, Any]:
+    return load_connected_relationship(
+        settings.data_dir,
+        binding["character_id"],
+        schemas,
+        installation_id=binding["installation_id"],
+        namespace=binding["namespace"],
+        workspace_root=_binding_workspace(binding),
+    )
+
+
+def _apply_connected_event(
+    settings: Settings,
+    schemas: SchemaRegistry,
+    binding: dict[str, Any],
+    event: dict[str, Any],
+) -> dict[str, Any]:
+    connected = _connected_relationship(settings, schemas, binding)
+    relationship = connected["relationship"]
+    if event["event_id"] in relationship["applied_event_ids"]:
+        # Already recorded: the same answer a session-local apply gives.
+        return {"ok": True, "state": relationship, "relationship_state": "durable"}
+    durable = apply_persistent_relationship_event(
+        settings.data_dir,
+        binding["character_id"],
+        event,
+        connected["consent_id"],
+        connected["consent_revision"],
+        schemas,
+        expected_state_revision=connected["state_revision"],
+        operation_id=(
+            "session-event-"
+            + sha256(canonical_bytes(event)).hexdigest()[:32]
+        ),
+        namespace=binding["namespace"],
+        workspace_root=_binding_workspace(binding),
+    )
+    return {
+        "ok": True,
+        "state": durable["relationship"],
+        "relationship_state": "durable",
+    }
 
 
 _SCHEMA_NAME: Final = re.compile(r"^[a-z][a-z0-9]*(?:-[a-z0-9]+)*\Z", re.ASCII)

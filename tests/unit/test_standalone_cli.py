@@ -1718,8 +1718,11 @@ def test_consent_grant_names_what_a_replacement_withdrew(
     assert code == 0
     assert grant("memory_references")["revoked_by_replacement"] == []
 
-    # Only memory references reach a session today; the grant says so.
+    # The grant says what each permission reaches, and what it does not.
     assert grant("memory_references")["advisories"] == []
-    advisories = grant("relationship_state,memory_references")["advisories"]
-    assert [item["code"] for item in advisories] == ["PERSISTENCE_STATE_NOT_CONNECTED"]
-    assert advisories[0]["permissions"] == ["relationship_state"]
+    advisories = grant("relationship_state,mood_state")["advisories"]
+    assert [item["code"] for item in advisories] == [
+        "PERSISTENCE_RELATIONSHIP_STATE_NEW_SESSIONS",
+        "PERSISTENCE_STATE_NOT_CONNECTED",
+    ]
+    assert advisories[1]["permissions"] == ["mood_state"]

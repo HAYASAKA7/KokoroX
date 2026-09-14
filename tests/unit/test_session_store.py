@@ -893,3 +893,94 @@ def test_returned_and_loaded_manifests_are_independent(tmp_path: Path) -> None:
     assert second_load == expected_manifest()
     assert returned is not first_load
     assert first_load is not second_load
+
+
+_BINDING = {
+    "namespace": "original",
+    "installation_id": "installation-0123456789abcdef",
+    "workspace_root": None,
+}
+
+
+def test_a_bound_session_reads_back_its_binding(tmp_path: Path) -> None:
+    store = SessionStore(tmp_path)
+    manifest = store.start("bound", "rin-aster", "1.0.0", "a" * 64)
+
+    written = store.bind_relationship("bound", _BINDING)
+
+    assert store.relationship_binding("bound", manifest) == written
+    assert written["lifecycle_generation"] == manifest["lifecycle_generation"]
+    assert written["relationship_state"] == "durable"
+
+
+def test_an_unbound_session_has_no_binding_and_creates_no_storage(tmp_path: Path) -> None:
+    store = SessionStore(tmp_path)
+    manifest = store.start("local", "rin-aster", "1.0.0", "a" * 64)
+
+    assert store.relationship_binding("local", manifest) is None
+    assert not (tmp_path / "session-bindings").exists()
+
+
+def test_a_restarted_session_never_inherits_a_binding(tmp_path: Path) -> None:
+    store = SessionStore(tmp_path)
+    store.start("again", "rin-aster", "1.0.0", "a" * 64)
+    store.bind_relationship("again", _BINDING)
+    store.end("again")
+
+    restarted = store.start("again", "rin-aster", "1.0.0", "a" * 64)
+
+    assert store.relationship_binding("again", restarted) is None
+
+
+def test_a_binding_from_another_lifecycle_is_ignored(tmp_path: Path) -> None:
+    store = SessionStore(tmp_path)
+    manifest = store.start("stale", "rin-aster", "1.0.0", "a" * 64)
+    store.bind_relationship("stale", _BINDING)
+
+    other = {**manifest, "lifecycle_generation": "b" * 32}
+
+    assert store.relationship_binding("stale", other) is None
+
+
+def test_an_ended_session_cannot_be_bound(tmp_path: Path) -> None:
+    store = SessionStore(tmp_path)
+    store.start("ended", "rin-aster", "1.0.0", "a" * 64)
+    store.end("ended")
+
+    with pytest.raises(KokoroError) as raised:
+        store.bind_relationship("ended", _BINDING)
+
+    assert raised.value.code == "SESSION_NOT_ACTIVE"
+
+
+@pytest.mark.parametrize(
+    "binding",
+    [
+        {**_BINDING, "installation_id": "../escape"},
+        {**_BINDING, "workspace_root": "relative/path"},
+        {**_BINDING, "namespace": None},
+    ],
+)
+def test_a_malformed_binding_is_refused(tmp_path: Path, binding: dict[str, object]) -> None:
+    store = SessionStore(tmp_path)
+    store.start("malformed", "rin-aster", "1.0.0", "a" * 64)
+
+    with pytest.raises(KokoroError) as raised:
+        store.bind_relationship("malformed", binding)
+
+    assert raised.value.code == "SESSION_DATA_INVALID"
+
+
+def test_a_tampered_binding_file_is_refused(tmp_path: Path) -> None:
+    store = SessionStore(tmp_path)
+    manifest = store.start("tampered", "rin-aster", "1.0.0", "a" * 64)
+    store.bind_relationship("tampered", _BINDING)
+    target = tmp_path / "session-bindings" / "tampered.json"
+    document = json.loads(target.read_text(encoding="utf-8"))
+    document["relationship_state"] = "session"
+    target.write_text(json.dumps(document), encoding="utf-8")
+
+    with pytest.raises(KokoroError) as raised:
+        store.relationship_binding("tampered", manifest)
+
+    assert raised.value.code == "SESSION_DATA_INVALID"

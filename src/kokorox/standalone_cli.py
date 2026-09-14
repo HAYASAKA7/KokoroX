@@ -44,6 +44,10 @@ from kokorox.persistence.memory import (
     list_memory_references,
     remove_memory_reference,
 )
+from kokorox.persistence.migrations import (
+    apply_state_migration,
+    preview_state_migration,
+)
 from kokorox.persistence.state import (
     export_persistent_data,
     preview_persistent_reset,
@@ -94,7 +98,7 @@ _PACK_ROUTES = frozenset(
         "remove",
     }
 )
-_STATE_ROUTES = frozenset({"export", "reset"})
+_STATE_ROUTES = frozenset({"export", "migrate", "reset"})
 _TOP_LEVEL_ROUTES = frozenset({"consent", "memory", "suite"})
 _DATA_ROOT_ROUTES = frozenset(
     {
@@ -107,6 +111,7 @@ _DATA_ROOT_ROUTES = frozenset(
         ("consent", "revoke"),
         ("state", "export"),
         ("state", "reset"),
+        ("state", "migrate"),
         ("memory", "add"),
         ("memory", "list"),
         ("memory", "remove"),
@@ -302,6 +307,16 @@ def add_standalone_parsers(
     )
     state_reset.add_argument("--dry-run", action="store_true")
     _add_json(state_reset, leaf_json)
+    state_migrate = state_commands.add_parser("migrate")
+    _add_character(state_migrate)
+    _add_scope(state_migrate)
+    state_migrate.add_argument(
+        "--mood-strategy",
+        choices=("preserve_identical_contract", "reset_neutral"),
+        required=True,
+    )
+    state_migrate.add_argument("--dry-run", action="store_true")
+    _add_json(state_migrate, leaf_json)
 
     memory = commands.add_parser("memory")
     memory_commands = memory.add_subparsers(
@@ -1253,34 +1268,42 @@ def _handle_consent_grant(
         "ok": True,
         "consent": consent,
         "revoked_by_replacement": sorted(previous - set(consent["permissions"])),
-        "advisories": _unconnected_persistence(consent["permissions"]),
+        "advisories": _persistence_reach(consent["permissions"]),
     }
 
 
-def _unconnected_persistence(permissions: list[str]) -> list[dict[str, Any]]:
-    """Say when a granted permission reaches nothing a session can see.
+def _persistence_reach(permissions: list[str]) -> list[dict[str, Any]]:
+    """Say what a granted permission reaches, and what it does not yet.
 
-    The persistence library writes and migrates retained relationship and
-    mood state, but no command connects a session to it yet. A user who
-    grants the permission expecting the character to remember deserves to
-    hear that before relying on it.
+    Relationship state connects to sessions started afterwards from this
+    installation's default; sessions already running keep what they had.
+    Mood state is recorded and enforced, but no command reads or writes it.
     """
 
-    unconnected = sorted(
-        {"relationship_state", "mood_state"}.intersection(permissions)
-    )
-    if not unconnected:
-        return []
-    return [
-        {
-            "code": "PERSISTENCE_STATE_NOT_CONNECTED",
-            "permissions": unconnected,
-            "message": (
-                "Recorded, but no command yet writes session relationship "
-                "events to durable storage or reads them into a new session."
-            ),
-        }
-    ]
+    advisories: list[dict[str, Any]] = []
+    if "relationship_state" in permissions:
+        advisories.append(
+            {
+                "code": "PERSISTENCE_RELATIONSHIP_STATE_NEW_SESSIONS",
+                "message": (
+                    "Sessions started after this grant from this installation's "
+                    "default read and write retained relationship state; "
+                    "sessions already running keep their own."
+                ),
+            }
+        )
+    if "mood_state" in permissions:
+        advisories.append(
+            {
+                "code": "PERSISTENCE_STATE_NOT_CONNECTED",
+                "permissions": ["mood_state"],
+                "message": (
+                    "Recorded, but no command yet reads or writes retained "
+                    "mood state."
+                ),
+            }
+        )
+    return advisories
 
 
 def _handle_consent_show(
@@ -1646,6 +1669,56 @@ def _handle_suite_remove(
     return {"ok": True, "skill_suite": plan}
 
 
+def _handle_state_migrate(
+    args: argparse.Namespace,
+    data_root: Path | None,
+    schemas: SchemaRegistry,
+) -> dict[str, Any]:
+    """Move retained state to the installation the current consent names.
+
+    After an upgrade and a regrant, writes refuse with
+    PERSISTENCE_STATE_MIGRATION_REQUIRED and nothing could perform the
+    migration. The preview is deterministic, so applying runs it again and
+    applies exactly that plan.
+    """
+
+    root = _require_data_root(data_root)
+    workspace = _workspace_root(args)
+    consent = _require_current_consent(
+        load_consent(
+            root,
+            args.character,
+            schemas,
+            namespace=args.namespace,
+            workspace_root=workspace,
+        )
+    )
+    plan = preview_state_migration(
+        root,
+        args.character,
+        consent["consent_id"],
+        consent["grant_revision"],
+        schemas,
+        mood_strategy=args.mood_strategy,
+        namespace=args.namespace,
+        workspace_root=workspace,
+    )
+    if args.dry_run:
+        return {"ok": True, "dry_run": True, "plan": plan}
+    state = apply_state_migration(
+        root,
+        args.character,
+        consent["consent_id"],
+        consent["grant_revision"],
+        plan,
+        schemas,
+        mood_strategy=args.mood_strategy,
+        namespace=args.namespace,
+        workspace_root=workspace,
+    )
+    return {"ok": True, "dry_run": False, "plan": plan, "state": state}
+
+
 _HANDLERS: dict[StandaloneRoute, StandaloneHandler] = {
     ("pack", "compatibility"): _handle_pack_compatibility,
     ("pack", "export"): _handle_pack_export,
@@ -1659,6 +1732,7 @@ _HANDLERS: dict[StandaloneRoute, StandaloneHandler] = {
     ("consent", "show"): _handle_consent_show,
     ("state", "export"): _handle_state_export,
     ("state", "reset"): _handle_state_reset,
+    ("state", "migrate"): _handle_state_migrate,
     ("memory", "add"): _handle_memory_add,
     ("memory", "list"): _handle_memory_list,
     ("memory", "remove"): _handle_memory_remove,

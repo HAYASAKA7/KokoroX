@@ -48,8 +48,13 @@ from kokorox.persistence._storage import (
 )
 from kokorox.persistence.consent import (
     ActiveConsent,
+    _consent_not_found,
+    _consent_revoked,
+    _installation_stale,
     _load_consent_state,
+    _permission_denied,
     _require_active_consent,
+    load_consent,
 )
 from kokorox.persistence.memory import (
     _cleanup_memory_reset,
@@ -335,6 +340,104 @@ def advance_persistent_mood_turn(
             limits=limits,
         )
     )
+
+
+def load_connected_relationship(
+    data_root: Path,
+    character_id: str,
+    schemas: SchemaValidator,
+    *,
+    installation_id: str,
+    namespace: str = "original",
+    workspace_root: Path | None = None,
+    limits: PersistenceLimits = PersistenceLimits(),
+) -> dict[str, Any]:
+    """Return the durable relationship a bound session continues.
+
+    The consent must still be active, grant `relationship_state`, and name
+    the installation the session started from; the retained generation
+    must belong to that consent, or a migration is required. Returns the
+    relationship -- the initial one when nothing is retained yet -- with the
+    outer state revision and the consent a write must pin. Read-only.
+    """
+
+    return _state_domain(
+        lambda: _load_connected_relationship(
+            data_root,
+            character_id,
+            schemas,
+            installation_id=installation_id,
+            namespace=namespace,
+            workspace_root=workspace_root,
+            limits=limits,
+        )
+    )
+
+
+def _load_connected_relationship(
+    data_root: Path,
+    character_id: str,
+    schemas: SchemaValidator,
+    *,
+    installation_id: str,
+    namespace: str,
+    workspace_root: Path | None,
+    limits: PersistenceLimits,
+) -> dict[str, Any]:
+    captured_workspace = _capture_workspace_root(workspace_root)
+    consent = load_consent(
+        data_root,
+        character_id,
+        schemas,
+        namespace=namespace,
+        workspace_root=captured_workspace,
+        limits=limits,
+    )
+    if consent is None:
+        raise _consent_not_found()
+    if consent["status"] != "active":
+        raise _consent_revoked()
+    if "relationship_state" not in consent["permissions"]:
+        raise _permission_denied()
+    active = _require_active_consent(
+        data_root,
+        character_id,
+        consent["consent_id"],
+        consent["grant_revision"],
+        "relationship_state",
+        schemas,
+        namespace=namespace,
+        workspace_root=captured_workspace,
+        limits=limits,
+    )
+    if active.binding.get("installation_id") != installation_id:
+        # The consent now names another installed version; this session
+        # started from the old one and cannot write into the new grant.
+        raise _installation_stale("binding")
+    state = _replay_read_only(
+        data_root,
+        character_id,
+        schemas,
+        namespace=namespace,
+        workspace_root=captured_workspace,
+        limits=limits,
+    )
+    if state is None:
+        relationship = _initial_relationship(
+            character_id, {"component": "kokorox", "version": __version__}
+        )
+        revision = 0
+    else:
+        _require_active_generation(state, active)
+        relationship = state["relationship"]
+        revision = state["revision"]
+    active.assert_clean()
+    return {
+        "relationship": deepcopy(relationship),
+        "state_revision": revision,
+        "consent_id": consent["consent_id"],
+        "consent_revision": consent["grant_revision"],
+    }
 
 
 def export_persistent_data(
@@ -2154,6 +2257,27 @@ def _initial_state_from_event(
     )
 
 
+def _initial_relationship(
+    character_id: str, created_by: dict[str, Any]
+) -> dict[str, Any]:
+    return {
+        "schema_version": "1.0",
+        "artifact_id": f"state/{character_id}/relationship",
+        "created_by": deepcopy(created_by),
+        "revision": 0,
+        "turn_index": 0,
+        "dimensions": {
+            "familiarity": 0.0,
+            "trust": 0.0,
+            "collaboration": 0.0,
+            "tension": 0.0,
+        },
+        "stage": "unknown",
+        "applied_event_ids": [],
+        "recent_novelty": {},
+    }
+
+
 def _initial_state_values(
     scope: PersistenceScope,
     *,
@@ -2177,22 +2301,7 @@ def _initial_state_values(
         "state_contract_version": _STATE_CONTRACT_VERSION,
         "transition_algorithm": _TRANSITION_ALGORITHM,
         "revision": 0,
-        "relationship": {
-            "schema_version": "1.0",
-            "artifact_id": f"state/{character_id}/relationship",
-            "created_by": deepcopy(created_by),
-            "revision": 0,
-            "turn_index": 0,
-            "dimensions": {
-                "familiarity": 0.0,
-                "trust": 0.0,
-                "collaboration": 0.0,
-                "tension": 0.0,
-            },
-            "stage": "unknown",
-            "applied_event_ids": [],
-            "recent_novelty": {},
-        },
+        "relationship": _initial_relationship(character_id, created_by),
         "mood": {
             "revision": 0,
             "primary": "neutral",

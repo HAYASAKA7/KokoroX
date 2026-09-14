@@ -1,0 +1,337 @@
+from __future__ import annotations
+
+import json
+from pathlib import Path
+import shutil
+from typing import Any, Callable
+
+import pytest
+
+import kokorox.cli as cli
+from kokorox.distribution import remove_installed_pack
+from kokorox.persistence.state import (
+    apply_persistent_relationship_event,
+    replay_persistent_state,
+)
+from kokorox.schemas import SchemaRegistry
+
+from persistence_support import (
+    ConsentedRin,
+    consented_rin,
+    install_rin,
+    install_rin_successor,
+    interaction_event,
+)
+
+
+SCHEMAS = SchemaRegistry(Path("schemas/v1"))
+__all__ = ["consented_rin"]
+
+
+@pytest.fixture
+def run(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> Callable[..., tuple[int, dict[str, Any]]]:
+    def invoke(data_root: Path, *arguments: str) -> tuple[int, dict[str, Any]]:
+        monkeypatch.setenv("KOKOROX_DATA_DIR", str(data_root))
+        code = cli.main([*arguments, "--json"])
+        captured = capsys.readouterr()
+        assert captured.err == ""
+        return code, json.loads(captured.out)
+
+    return invoke
+
+
+def _ok(result: tuple[int, dict[str, Any]]) -> dict[str, Any]:
+    code, body = result
+    assert code == 0, body
+    return body
+
+
+def _event_file(tmp_path: Path, event_id: str, revision: int) -> str:
+    path = tmp_path / f"{event_id}.json"
+    path.write_text(json.dumps(interaction_event(event_id, revision)), encoding="utf-8")
+    return str(path)
+
+
+def _context(run: Callable[..., Any], data_root: Path, session: str) -> tuple[int, dict[str, Any]]:
+    return run(
+        data_root,
+        "runtime",
+        "context",
+        "--session",
+        session,
+        "--locale",
+        "zh-CN",
+        "--scenario",
+        "debugging",
+    )
+
+
+def test_a_consented_session_continues_where_the_last_one_left_off(
+    consented_rin: ConsentedRin,
+    run: Callable[..., tuple[int, dict[str, Any]]],
+    tmp_path: Path,
+) -> None:
+    """Granted, applied, and gone: the next session started at trust 0."""
+
+    data_root = consented_rin.data_root
+    _ok(run(data_root, "config", "default", "set", "--character", "rin-aster"))
+
+    first = _ok(run(data_root, "session", "start", "--session", "per1"))
+    assert first["relationship_state"] == "durable"
+    event = _event_file(tmp_path, "durable-event-1", 0)
+    applied = _ok(run(data_root, "state", "apply", "--session", "per1", "--event", event))
+    assert applied["relationship_state"] == "durable"
+    assert applied["state"]["revision"] == 1
+    trust = applied["state"]["dimensions"]["trust"]
+    assert trust > 0
+    # The same event again is recorded once, as a session-local apply would be.
+    again = _ok(run(data_root, "state", "apply", "--session", "per1", "--event", event))
+    assert again["state"] == applied["state"]
+    _ok(run(data_root, "session", "end", "--session", "per1"))
+
+    _ok(run(data_root, "session", "start", "--session", "per2"))
+    context = _ok(_context(run, data_root, "per2"))
+
+    assert context["relationship_state"] == "durable"
+    assert context["context"]["state"]["revision"] == 1
+    assert context["context"]["state"]["dimensions"]["trust"] == trust
+    retained = replay_persistent_state(data_root, "rin-aster", SCHEMAS)
+    assert retained is not None
+    assert retained["relationship"] == applied["state"]
+
+
+def test_without_consent_a_session_keeps_its_state_to_itself(
+    rin_verified_release: dict[str, Any],
+    run: Callable[..., tuple[int, dict[str, Any]]],
+    tmp_path: Path,
+) -> None:
+    data_root = tmp_path / "data"
+    install_rin(data_root, rin_verified_release)
+    _ok(run(data_root, "config", "default", "set", "--character", "rin-aster"))
+
+    started = _ok(run(data_root, "session", "start", "--session", "local"))
+    applied = _ok(
+        run(
+            data_root,
+            "state",
+            "apply",
+            "--session",
+            "local",
+            "--event",
+            _event_file(tmp_path, "local-event-1", 0),
+        )
+    )
+
+    assert started["relationship_state"] == "session"
+    assert applied["state"]["revision"] == 1
+    assert "relationship_state" not in applied
+    assert replay_persistent_state(data_root, "rin-aster", SCHEMAS) is None
+    assert not (data_root / "session-bindings").exists()
+
+
+def test_revoking_consent_stops_a_running_durable_session(
+    consented_rin: ConsentedRin,
+    run: Callable[..., tuple[int, dict[str, Any]]],
+    tmp_path: Path,
+) -> None:
+    data_root = consented_rin.data_root
+    _ok(run(data_root, "config", "default", "set", "--character", "rin-aster"))
+    _ok(run(data_root, "session", "start", "--session", "revoked"))
+    _ok(run(data_root, "consent", "revoke", "--character", "rin-aster"))
+
+    code, body = run(
+        data_root,
+        "state",
+        "apply",
+        "--session",
+        "revoked",
+        "--event",
+        _event_file(tmp_path, "revoked-event-1", 0),
+    )
+
+    assert code != 0
+    assert body["error"]["code"] == "PERSISTENCE_CONSENT_REVOKED"
+    assert replay_persistent_state(data_root, "rin-aster", SCHEMAS) is None
+
+
+def test_an_upgrade_migrates_retained_state_through_the_cli(
+    consented_rin: ConsentedRin,
+    run: Callable[..., tuple[int, dict[str, Any]]],
+    tmp_path: Path,
+    verified_release_factory: Callable[..., dict[str, Any]],
+) -> None:
+    """The refusal named a migration no command could perform."""
+
+    data_root = consented_rin.data_root
+    source = apply_persistent_relationship_event(
+        data_root,
+        "rin-aster",
+        interaction_event("before-upgrade-1", 0),
+        consented_rin.consent["consent_id"],
+        consented_rin.consent["grant_revision"],
+        SCHEMAS,
+        expected_state_revision=0,
+        operation_id="before-upgrade-operation-1",
+    )
+    install_rin_successor(consented_rin, tmp_path, verified_release_factory)
+    _ok(
+        run(
+            data_root,
+            "config",
+            "default",
+            "set",
+            "--character",
+            "rin-aster",
+            "--version",
+            "1.1.0",
+        )
+    )
+    started = _ok(run(data_root, "session", "start", "--session", "upgraded"))
+    assert started["relationship_state"] == "durable"
+
+    code, refused = _context(run, data_root, "upgraded")
+    assert code != 0
+    assert refused["error"]["code"] == "PERSISTENCE_STATE_MIGRATION_REQUIRED"
+
+    preview = _ok(
+        run(
+            data_root,
+            "state",
+            "migrate",
+            "--character",
+            "rin-aster",
+            "--mood-strategy",
+            "preserve_identical_contract",
+            "--dry-run",
+        )
+    )
+    assert preview["dry_run"] is True
+    SCHEMAS.validate("state-migration-plan", preview["plan"])
+    migrated = _ok(
+        run(
+            data_root,
+            "state",
+            "migrate",
+            "--character",
+            "rin-aster",
+            "--mood-strategy",
+            "preserve_identical_contract",
+        )
+    )
+    assert migrated["plan"] == preview["plan"]
+    assert migrated["state"]["relationship"] == source["relationship"]
+
+    context = _ok(_context(run, data_root, "upgraded"))
+    assert context["context"]["state"]["revision"] == source["relationship"]["revision"]
+
+
+def test_a_compiled_path_session_never_reaches_retained_state(
+    consented_rin: ConsentedRin,
+    run: Callable[..., tuple[int, dict[str, Any]]],
+    tmp_path: Path,
+) -> None:
+    data_root = consented_rin.data_root
+    compiled = _ok(run(data_root, "pack", "compile", "characters/original/rin-aster"))
+
+    started = _ok(
+        run(
+            data_root,
+            "session",
+            "start",
+            "--character",
+            compiled["path"],
+            "--session",
+            "compiled",
+        )
+    )
+
+    assert started["relationship_state"] == "session"
+
+
+def test_a_consent_for_a_removed_version_never_blocks_a_new_session(
+    consented_rin: ConsentedRin,
+    run: Callable[..., tuple[int, dict[str, Any]]],
+    tmp_path: Path,
+    verified_release_factory: Callable[..., dict[str, Any]],
+) -> None:
+    """Revoke, remove 1.0.0, install 1.1.0: starting a session must still work."""
+
+    data_root = consented_rin.data_root
+    _ok(run(data_root, "consent", "revoke", "--character", "rin-aster"))
+    remove_installed_pack(data_root, "original", "rin-aster", "1.0.0", SCHEMAS)
+    source_root = tmp_path / "rin-aster-1.1.0"
+    shutil.copytree(Path("characters/original/rin-aster"), source_root)
+    manifest = source_root / "character.yaml"
+    manifest.write_text(
+        manifest.read_text(encoding="utf-8").replace(
+            "character_version: 1.0.0", "character_version: 1.1.0"
+        ),
+        encoding="utf-8",
+    )
+    request = json.loads(
+        Path("tests/fixtures/authoring/original-request.json").read_text(encoding="utf-8")
+    )
+    request["character_version"] = "1.1.0"
+    install_rin(
+        data_root,
+        verified_release_factory(source_root, request, visibility="private"),
+        source_root=source_root,
+    )
+    _ok(run(data_root, "config", "default", "set", "--character", "rin-aster"))
+
+    started = _ok(run(data_root, "session", "start", "--session", "after-removal"))
+
+    assert started["relationship_state"] == "session"
+    assert [item["code"] for item in started["advisories"]] == [
+        "SESSION_WORKSPACE_NOT_CONSULTED",
+        "PERSISTENCE_CONSENT_OTHER_INSTALLATION",
+    ]
+
+
+def test_a_workspace_consent_continues_a_workspace_session(
+    rin_verified_release: dict[str, Any],
+    run: Callable[..., tuple[int, dict[str, Any]]],
+    tmp_path: Path,
+) -> None:
+    data_root = tmp_path / "data"
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    install_rin(data_root, rin_verified_release, workspace_root=workspace)
+    scope = ("--workspace", str(workspace))
+    _ok(
+        run(
+            data_root,
+            "consent",
+            "grant",
+            "--character",
+            "rin-aster",
+            "--scope",
+            "workspace",
+            *scope,
+            "--permissions",
+            "relationship_state",
+        )
+    )
+    _ok(run(data_root, "config", "default", "set", "--character", "rin-aster", *scope))
+
+    started = _ok(run(data_root, "session", "start", "--session", "ws1", *scope))
+    event = _event_file(tmp_path, "workspace-event-1", 0)
+    preview = _ok(run(data_root, "state", "preview", "--session", "ws1", "--event", event))
+    applied = _ok(run(data_root, "state", "apply", "--session", "ws1", "--event", event))
+    _ok(run(data_root, "session", "end", "--session", "ws1"))
+    _ok(run(data_root, "session", "start", "--session", "ws2", *scope))
+    context = _ok(_context(run, data_root, "ws2"))
+
+    assert started["resolved_from"] == "workspace_default"
+    assert started["relationship_state"] == "durable"
+    assert preview["relationship_state"] == "durable"
+    assert preview["state"] == applied["state"]
+    assert context["context"]["state"]["revision"] == 1
+    retained = replay_persistent_state(
+        data_root, "rin-aster", SCHEMAS, workspace_root=workspace
+    )
+    assert retained is not None
+    assert retained["relationship"] == applied["state"]

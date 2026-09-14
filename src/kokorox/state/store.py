@@ -45,6 +45,22 @@ _COMPILED_PACK_HASH = re.compile(r"[a-f0-9]{64}")
 _LIFECYCLE_GENERATION = re.compile(r"[a-f0-9]{32}")
 _ARCHIVE_INDEX = re.compile(r"[1-9][0-9]{0,4}", re.ASCII)
 SESSION_MANIFEST_MAX_BYTES = 64 * 1024
+SESSION_BINDING_MAX_BYTES = 8 * 1024
+_BINDING_KEYS = frozenset(
+    {
+        "schema_version",
+        "artifact_id",
+        "session_id",
+        "lifecycle_generation",
+        "character_id",
+        "character_version",
+        "namespace",
+        "installation_id",
+        "workspace_root",
+        "relationship_state",
+    }
+)
+_INSTALLATION_ID = re.compile(r"[a-z0-9]+(?:[._-][a-z0-9]+)*")
 EVENT_RECORD_MAX_BYTES = 8 * 1024
 JOURNAL_MAX_BYTES = 32 * 1024 * 1024
 JOURNAL_MAX_ENTRIES = RELATIONSHIP_V1_MAX_APPLIED_EVENT_IDS
@@ -172,6 +188,43 @@ def _path_is_redirect(path: Path) -> bool:
     reparse_flag = getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0)
     attributes = getattr(path_stat, "st_file_attributes", 0)
     return bool(reparse_flag and attributes & reparse_flag)
+
+
+def _binding_is_valid(value: object, session_id: str) -> bool:
+    if not isinstance(value, dict) or set(value) != _BINDING_KEYS:
+        return False
+    workspace_root = value["workspace_root"]
+    installation_id = value["installation_id"]
+    character_version = value["character_version"]
+    return (
+        value["schema_version"] == "1.0"
+        and value["artifact_id"] == f"session-binding/{session_id}"
+        and value["session_id"] == session_id
+        and isinstance(value["lifecycle_generation"], str)
+        and _LIFECYCLE_GENERATION.fullmatch(value["lifecycle_generation"])
+        is not None
+        and isinstance(value["character_id"], str)
+        and len(value["character_id"]) <= 64
+        and _CHARACTER_ID.fullmatch(value["character_id"]) is not None
+        and isinstance(character_version, str)
+        and 1 <= len(character_version) <= 64
+        and _SEMVER.fullmatch(character_version) is not None
+        and isinstance(value["namespace"], str)
+        and len(value["namespace"]) <= 64
+        and _CHARACTER_ID.fullmatch(value["namespace"]) is not None
+        and isinstance(installation_id, str)
+        and len(installation_id) <= 128
+        and _INSTALLATION_ID.fullmatch(installation_id) is not None
+        and (
+            workspace_root is None
+            or (
+                isinstance(workspace_root, str)
+                and 1 <= len(workspace_root) <= 4096
+                and os.path.isabs(workspace_root)
+            )
+        )
+        and value["relationship_state"] == "durable"
+    )
 
 
 def _invalid(code: str, message: str) -> KokoroError:
@@ -1222,6 +1275,9 @@ class SessionStore:
             }
             if existing is not None:
                 self._begin_restart_locked(session_id, existing, manifest)
+            # A restarted session binds afresh; it never inherits the
+            # retained relationship an earlier lifecycle read.
+            self._remove_binding_locked(session_id)
             state = _initial_state(session_id, manifest["created_by"])
             state_path = self._target_path("state", session_id, create=True)
             manifest_path = self._target_path("sessions", session_id, create=True)
@@ -1230,6 +1286,100 @@ class SessionStore:
             if existing is not None:
                 self._remove_restart_intent(session_id)
             return manifest
+
+    def bind_relationship(
+        self, session_id: str, binding: Mapping[str, Any]
+    ) -> dict[str, Any]:
+        """Record that this active session reads and writes durable state.
+
+        The binding names the installation and scope whose consented
+        relationship the session continues. It carries the session's
+        lifecycle generation, so a later restart of the same id cannot
+        inherit it. The store never touches persistent state itself.
+        """
+
+        session_id = _validate_session_id(session_id)
+        with self._session_lock(session_id):
+            self._recover_restart_locked(session_id)
+            manifest = self._read_manifest(session_id)
+            if not manifest["active"]:
+                raise KokoroError(
+                    "SESSION_NOT_ACTIVE", "Session is not active."
+                )
+            document = {
+                "schema_version": "1.0",
+                "artifact_id": f"session-binding/{session_id}",
+                "session_id": session_id,
+                "lifecycle_generation": manifest["lifecycle_generation"],
+                "character_id": manifest["character_id"],
+                "character_version": manifest["character_version"],
+                "namespace": binding.get("namespace"),
+                "installation_id": binding.get("installation_id"),
+                "workspace_root": binding.get("workspace_root"),
+                "relationship_state": "durable",
+            }
+            if not _binding_is_valid(document, session_id):
+                raise _invalid_session_data()
+            target = self._target_path(
+                "session-bindings", session_id, create=True
+            )
+            _atomic_write_json(document, target)
+            return copy.deepcopy(document)
+
+    def relationship_binding(
+        self, session_id: str, manifest: Mapping[str, Any]
+    ) -> dict[str, Any] | None:
+        """Return this lifecycle's durable binding, or None for local state."""
+
+        session_id = _validate_session_id(session_id)
+        with self._session_lock(session_id):
+            target = self._target_path(
+                "session-bindings", session_id, create=False
+            )
+            try:
+                with target.open("rb") as handle:
+                    contents = handle.read(SESSION_BINDING_MAX_BYTES + 1)
+            except FileNotFoundError:
+                return None
+            except OSError as error:
+                raise KokoroError(
+                    "SESSION_READ_FAILED", "Session data could not be read."
+                ) from error
+        if len(contents) > SESSION_BINDING_MAX_BYTES:
+            raise _invalid_session_data()
+        try:
+            document = json.loads(
+                contents.decode("utf-8"),
+                object_pairs_hook=_strict_json_object,
+                parse_constant=_reject_json_constant,
+            )
+        except (
+            UnicodeDecodeError,
+            json.JSONDecodeError,
+            RecursionError,
+            ValueError,
+        ) as error:
+            raise _invalid_session_data() from error
+        if not _binding_is_valid(document, session_id):
+            raise _invalid_session_data()
+        if (
+            document["lifecycle_generation"] != manifest.get("lifecycle_generation")
+            or document["character_id"] != manifest.get("character_id")
+            or document["character_version"] != manifest.get("character_version")
+        ):
+            return None
+        return document
+
+    def _remove_binding_locked(self, session_id: str) -> None:
+        target = self._target_path("session-bindings", session_id, create=False)
+        try:
+            target.unlink()
+        except FileNotFoundError:
+            return
+        except OSError as error:
+            raise KokoroError(
+                "SESSION_WRITE_FAILED", "Session data could not be written."
+            ) from error
 
     def snapshot(
         self, session_id: str

@@ -8,6 +8,21 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- Consented relationship state now reaches sessions. A session started from
+  an installed default whose consent grants `relationship_state` returns
+  `relationship_state: durable`; `runtime context` shows the retained
+  relationship and `state preview` and `state apply` work against it, so the
+  next such session continues from it. Revoking consent stops a running
+  session's writes. Other sessions report `relationship_state: session` and
+  are unchanged. The library wrote and migrated retained state, but no
+  command called it: a user who granted consent and applied an event met the
+  character at trust 0 in the next session.
+- `kokorox state migrate --character <id> --mood-strategy <strategy>` moves
+  retained state to the installation the current consent names, with
+  `--dry-run` to preview the plan. After an upgrade, writes refused with
+  `PERSISTENCE_STATE_MIGRATION_REQUIRED` and nothing could perform one.
+  `consent grant` now advises that `relationship_state` reaches new sessions,
+  and still that `mood_state` is not connected.
 - A hard report now lists every authored line the gate spoke, in
   `fixed_lines_spoken`: intent, locale, and whether it opens or closes the
   turn. The gate walked every line but recorded only failures, so a clean

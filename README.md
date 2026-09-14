@@ -170,12 +170,17 @@ withdraws the other two, and the result names them under
 to keep. Revocation blocks future writes without silently deleting data.
 
 What is connected today: `memory_references` works end to end, and consent
-governs `state export` and `state reset`. `relationship_state` and
-`mood_state` are recorded and enforced by the persistence library, but no
-command yet writes a session's relationship events to durable storage, reads
-them into a new session, or performs the state migration an upgrade
-requires. Granting them today changes nothing a session sees, and
-`consent grant` says so in its `advisories`.
+governs `state export`, `state reset`, and `state migrate`.
+`relationship_state` reaches sessions started from an installed default:
+when the consent for that installation grants it, `session start` returns
+`relationship_state: durable`, `runtime context` shows the retained
+relationship, and `state apply` records events there, so the next such
+session continues from them. A session started from a compiled path keeps
+its state to itself. After an upgrade and a regrant for the new version,
+writes refuse with `PERSISTENCE_STATE_MIGRATION_REQUIRED` until
+`state migrate` moves the retained state across; preview it with
+`--dry-run`. `mood_state` is recorded and enforced but no command reads or
+writes it yet, and `consent grant` says so in its `advisories`.
 
 ```bash
 kokorox consent grant --character rin-aster --scope global \
@@ -184,6 +189,8 @@ kokorox consent show --character rin-aster --scope global --json
 
 state_export="$HOME/.kokorox/exports/rin-state.json"
 kokorox state export --character rin-aster --out "$state_export" --json
+kokorox state migrate --character rin-aster \
+  --mood-strategy preserve_identical_contract --dry-run --json
 kokorox state reset --character rin-aster --part all --dry-run --json
 kokorox state reset --character rin-aster --part all --json
 kokorox consent revoke --character rin-aster --json
