@@ -132,7 +132,7 @@ def test_without_consent_a_session_keeps_its_state_to_itself(
     assert not (data_root / "session-bindings").exists()
 
 
-def test_revoking_consent_stops_a_running_durable_session(
+def test_revoking_consent_lets_a_running_session_keep_answering(
     consented_rin: ConsentedRin,
     run: Callable[..., tuple[int, dict[str, Any]]],
     tmp_path: Path,
@@ -152,8 +152,14 @@ def test_revoking_consent_stops_a_running_durable_session(
         _event_file(tmp_path, "revoked-event-1", 0),
     )
 
-    assert code != 0
-    assert body["error"]["code"] == "PERSISTENCE_CONSENT_REVOKED"
+    assert code == 0, body
+    assert body["relationship_state"] == "session"
+    assert [item["cause"] for item in body["advisories"]] == ["PERSISTENCE_CONSENT_REVOKED"]
+    assert body["state"]["revision"] == 1
+    context = _ok(_context(run, data_root, "revoked"))
+    assert context["relationship_state"] == "session"
+    assert context["context"]["state"]["revision"] == 1
+    assert context["advisories"][0]["code"] == "PERSISTENCE_SESSION_DEGRADED"
     assert replay_persistent_state(data_root, "rin-aster", SCHEMAS) is None
 
 
@@ -192,9 +198,11 @@ def test_an_upgrade_migrates_retained_state_through_the_cli(
     started = _ok(run(data_root, "session", "start", "--session", "upgraded"))
     assert started["relationship_state"] == "durable"
 
-    code, refused = _context(run, data_root, "upgraded")
-    assert code != 0
-    assert refused["error"]["code"] == "PERSISTENCE_STATE_MIGRATION_REQUIRED"
+    degraded = _ok(_context(run, data_root, "upgraded"))
+    assert degraded["relationship_state"] == "session"
+    assert [item["cause"] for item in degraded["advisories"]] == [
+        "PERSISTENCE_STATE_MIGRATION_REQUIRED"
+    ]
 
     preview = _ok(
         run(
@@ -425,3 +433,22 @@ def test_granting_again_after_a_revoke_reattaches_retained_state(
 
     assert context["relationship_state"] == "durable"
     assert context["context"]["state"]["revision"] == 1
+
+
+def test_a_newer_version_granted_mid_session_leaves_the_session_answering(
+    consented_rin: ConsentedRin,
+    run: Callable[..., tuple[int, dict[str, Any]]],
+    tmp_path: Path,
+    verified_release_factory: Callable[..., dict[str, Any]],
+) -> None:
+    data_root = consented_rin.data_root
+    _ok(run(data_root, "config", "default", "set", "--character", "rin-aster"))
+    _ok(run(data_root, "session", "start", "--session", "live-old"))
+    install_rin_successor(consented_rin, tmp_path, verified_release_factory)
+
+    context = _ok(_context(run, data_root, "live-old"))
+
+    assert context["relationship_state"] == "session"
+    assert [item["cause"] for item in context["advisories"]] == [
+        "PERSISTENCE_INSTALLATION_STALE"
+    ]

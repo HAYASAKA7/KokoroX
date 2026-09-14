@@ -101,6 +101,13 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- A live session no longer stops answering when its consent changes. The
+  changelog said revoking consent stops a running session's writes, but it
+  stopped `runtime context` too, so the character could not reply; granting
+  consent to a newer version did the same. `runtime context`, `state
+  preview`, and `state apply` now continue with session state and return the
+  advisory `PERSISTENCE_SESSION_DEGRADED` naming the `cause`; nothing is
+  written durably and retained data is not read.
 - Adding a permission no longer locks a character out of its retained
   relationship. Retained state was bound to the exact grant revision that
   created it, so any later grant on the same installation -- the README's way

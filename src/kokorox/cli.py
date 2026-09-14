@@ -2565,14 +2565,18 @@ def _handle_runtime_context(
     if not manifest["active"]:
         raise KokoroError("SESSION_NOT_ACTIVE", "Session is not active.")
     compiled = _find_compiled(settings, schemas, manifest)
-    binding = store.relationship_binding(args.session, manifest)
-    if binding is not None:
-        state = _connected_relationship(settings, schemas, binding)["relationship"]
+    advisories: list[dict[str, Any]] = []
+    binding, connected = _session_relationship(
+        settings, schemas, store, args.session, manifest, advisories
+    )
+    if connected is not None:
+        state = connected["relationship"]
     context = build_runtime_context(compiled, state, args.locale, args.scenario)
     return {
         "ok": True,
         "context": context,
         "relationship_state": "session" if binding is None else "durable",
+        "advisories": advisories,
     }
 
 
@@ -2772,12 +2776,20 @@ def _handle_state_preview(
     store, manifest, compiled, state = _active_compiled_and_state(
         settings, schemas, args.session
     )
-    binding = store.relationship_binding(args.session, manifest)
+    advisories: list[dict[str, Any]] = []
+    binding, connected = _session_relationship(
+        settings, schemas, store, args.session, manifest, advisories
+    )
     source = "session" if binding is None else "durable"
-    if binding is not None:
-        state = _connected_relationship(settings, schemas, binding)["relationship"]
+    if connected is not None:
+        state = connected["relationship"]
     if event["event_id"] in state["applied_event_ids"]:
-        return {"ok": True, "state": state, "relationship_state": source}
+        return {
+            "ok": True,
+            "state": state,
+            "relationship_state": source,
+            "advisories": advisories,
+        }
     expected = event["expected_state_revision"]
     actual = state["revision"]
     if expected != actual:
@@ -2795,7 +2807,12 @@ def _handle_state_preview(
         repetition_window=repetition_window,
         stages=stages,
     )
-    return {"ok": True, "state": preview, "relationship_state": source}
+    return {
+        "ok": True,
+        "state": preview,
+        "relationship_state": source,
+        "advisories": advisories,
+    }
 
 
 def _handle_state_apply(
@@ -2805,9 +2822,12 @@ def _handle_state_apply(
     store, manifest, compiled, _state = _active_compiled_and_state(
         settings, schemas, args.session
     )
-    binding = store.relationship_binding(args.session, manifest)
-    if binding is not None:
-        return _apply_connected_event(settings, schemas, binding, event)
+    advisories: list[dict[str, Any]] = []
+    binding, connected = _session_relationship(
+        settings, schemas, store, args.session, manifest, advisories
+    )
+    if binding is not None and connected is not None:
+        return _apply_connected_event(settings, schemas, binding, event, connected)
     max_delta, repetition_window, stages = _growth_config(compiled)
     state = store.apply(
         args.session,
@@ -2820,7 +2840,67 @@ def _handle_state_apply(
         expected_compiled_pack_hash=manifest["compiled_pack_hash"],
         expected_lifecycle_generation=manifest["lifecycle_generation"],
     )
-    return {"ok": True, "state": state}
+    result: dict[str, Any] = {"ok": True, "state": state}
+    if advisories:
+        result["relationship_state"] = "session"
+        result["advisories"] = advisories
+    return result
+
+
+# A consent or installation change a live session cannot follow. The session
+# keeps answering from its own state; anything else is still an error.
+_SESSION_DEGRADING_CODES: Final = frozenset(
+    {
+        "PERSISTENCE_CONSENT_NOT_FOUND",
+        "PERSISTENCE_CONSENT_REVOKED",
+        "PERSISTENCE_INSTALLATION_STALE",
+        "PERSISTENCE_PERMISSION_DENIED",
+        "PERSISTENCE_STATE_MIGRATION_REQUIRED",
+    }
+)
+
+
+def _session_relationship(
+    settings: Settings,
+    schemas: SchemaRegistry,
+    store: SessionStore,
+    session_id: str,
+    manifest: dict[str, Any],
+    advisories: list[dict[str, Any]],
+) -> tuple[dict[str, Any] | None, dict[str, Any] | None]:
+    """Return the session's durable binding and retained relationship, if usable.
+
+    Revoking consent, or granting it to a newer version, used to make a
+    running session refuse `runtime context` -- the first call of every
+    turn -- so the character stopped answering. The user asked to stop
+    being remembered, or installed an update; not for the conversation to
+    end. Such a session now continues from its own session state, which
+    starts from zero because retained data cannot be read without consent,
+    writes nothing durable, and says why in an advisory.
+    """
+
+    binding = store.relationship_binding(session_id, manifest)
+    if binding is None:
+        return None, None
+    try:
+        return binding, _connected_relationship(settings, schemas, binding)
+    except KokoroError as error:
+        if error.code not in _SESSION_DEGRADING_CODES:
+            raise
+        advisories.append(
+            {
+                "code": "PERSISTENCE_SESSION_DEGRADED",
+                "cause": error.code,
+                "message": (
+                    "Retained relationship state is not available to this "
+                    "session, so it continues with session state and writes "
+                    "nothing durable. A session started now binds to whatever "
+                    "the current consent allows; after an upgrade, state "
+                    "migrate brings retained state across."
+                ),
+            }
+        )
+        return None, None
 
 
 def _relationship_binding(
@@ -2912,8 +2992,8 @@ def _apply_connected_event(
     schemas: SchemaRegistry,
     binding: dict[str, Any],
     event: dict[str, Any],
+    connected: dict[str, Any],
 ) -> dict[str, Any]:
-    connected = _connected_relationship(settings, schemas, binding)
     relationship = connected["relationship"]
     if event["event_id"] in relationship["applied_event_ids"]:
         # Already recorded: the same answer a session-local apply gives.
