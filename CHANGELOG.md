@@ -101,6 +101,13 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- Packs authored before `closing_expressions` no longer open with their
+  completion line unannounced. Agents now pass both the acknowledgement and
+  the completion, and such a pack places both at the top. `runtime plan`
+  advises `EXPRESSION_CLOSING_UNDECLARED` when two or more authored lines all
+  open because the pack declares no closing intent, and authoring validation
+  advises `AUTHORING_COMPLETION_LINE_OPENS` for an intent named like a
+  completion line that `closing_expressions` does not list.
 - Concurrent administration gives the right answer instead of a false one.
   The second of two concurrent installs of one archive, or of two versions
   into one workspace, failed with `KARC_INSTALL_CONFLICT`: its preview ran

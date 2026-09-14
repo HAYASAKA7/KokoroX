@@ -1428,3 +1428,37 @@ def test_more_override_claims_than_override_inputs_is_advised(
         for finding in report["hard_failures"]
         if finding["code"].startswith("AUTHORING_USER_CLAIM")
     ]
+
+
+@pytest.mark.parametrize(
+    ("intent", "advised"),
+    [
+        ("task_completion", True),
+        ("work_finished", True),
+        ("done", True),
+        ("order_acknowledgement", False),
+        ("restrained_diagnosis", False),
+        ("undone_warning", False),
+    ],
+)
+def test_a_completion_line_left_opening_is_advised(
+    intent: str,
+    advised: bool,
+    registry: SchemaRegistry,
+    original_request: dict[str, Any],
+    source: dict[str, Any],
+) -> None:
+    source["expressions"] = {
+        **source["expressions"],
+        intent: {locale: ["line"] for locale in source["locales"]},
+    }
+
+    report = validate_authoring_pack(original_request, source, registry)
+
+    codes = [item["code"] for item in report["advisory_findings"]]
+    assert ("AUTHORING_COMPLETION_LINE_OPENS" in codes) is advised
+    source["behavior"] = {**source.get("behavior", {}), "closing_expressions": [intent]}
+    declared = validate_authoring_pack(original_request, source, registry)
+    assert "AUTHORING_COMPLETION_LINE_OPENS" not in [
+        item["code"] for item in declared["advisory_findings"]
+    ]

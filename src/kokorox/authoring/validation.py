@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 import unicodedata
 from collections.abc import Mapping
 from typing import Any
@@ -21,6 +22,9 @@ _DOSSIER_CLAIM_SOURCES = frozenset(
     {"user_dossier", "creative_brief", "user_override"}
 )
 _MAX_FINDINGS = 256
+_COMPLETION_INTENT = re.compile(
+    r"(?:^|_)(?:complet[a-z0-9]*|finish[a-z0-9]*|done|conclu[a-z0-9]*)(?:_|$)"
+)
 _USER_CLAIM_SOURCES = ("user_dossier", "user_override")
 #: Short enough for a CJK phrase, long enough that a quote is words.
 _MIN_QUOTE_CHARACTERS = 4
@@ -179,6 +183,19 @@ def validate_authoring_pack(
                     ["behavior", "closing_expressions", index],
                     "behavior.yaml closes a turn with an intent that "
                     "expressions.yaml does not author.",
+                )
+            )
+
+    # An intent named for finishing work, left out of closing_expressions,
+    # opens the response: the character announces the work before showing it.
+    for intent in sorted(key for key in expressions if isinstance(key, str)):
+        if intent not in closing and _COMPLETION_INTENT.search(intent):
+            advisory_findings.append(
+                _finding(
+                    "AUTHORING_COMPLETION_LINE_OPENS",
+                    ["behavior", "closing_expressions"],
+                    f"{intent} reads as a completion line but is not listed in "
+                    "closing_expressions, so it would open the response.",
                 )
             )
 

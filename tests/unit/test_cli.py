@@ -1149,3 +1149,27 @@ def test_runtime_plan_takes_a_fallback_level_on_the_ladder() -> None:
         build_parser().parse_args(
             ["runtime", "plan", "--semantic", "s", "--policy", "p", "--fallback-level", "4"]
         )
+
+
+def test_a_pack_without_closing_expressions_advises_before_opening_with_both_lines() -> None:
+    """An older pack put 完成しました before the answer when agents passed both intents."""
+
+    from kokorox.cli import _plan_advisories
+
+    plan = {
+        "segments": [
+            {"id": "s1", "fixed_line": {"intent": "order_acknowledgement", "index": 0, "text": "a"}},
+            {"id": "s2", "fixed_line": {"intent": "task_completion", "index": 0, "text": "b"}},
+            {"id": "s3", "semantic_keys": ["conclusion"]},
+        ]
+    }
+    intents = ["order_acknowledgement", "task_completion"]
+
+    older = _plan_advisories(intents, plan, {"expressions": {}, "closing_expressions": []})
+    declared = _plan_advisories(
+        intents, plan, {"expressions": {}, "closing_expressions": ["task_completion"]}
+    )
+
+    assert [item["code"] for item in older] == ["EXPRESSION_CLOSING_UNDECLARED"]
+    assert older[0]["intents"] == intents
+    assert declared == []

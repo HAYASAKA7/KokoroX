@@ -2671,6 +2671,7 @@ def _plan_advisories(
         ]
     if not intents:
         return []
+    advisories = _closing_undeclared(plan, context)
     spoken = {
         segment["fixed_line"]["intent"]
         for segment in plan["segments"]
@@ -2678,9 +2679,10 @@ def _plan_advisories(
     }
     unspoken = [intent for intent in intents if intent not in spoken]
     if not unspoken:
-        return []
+        return advisories
     if context is None:
         return [
+            *advisories,
             {
                 "code": "EXPRESSION_CONTEXT_MISSING",
                 "intents": unspoken,
@@ -2703,6 +2705,7 @@ def _plan_advisories(
         else []
     )
     return [
+        *advisories,
         {
             "code": "EXPRESSION_INTENT_NOT_AUTHORED",
             "intents": unspoken,
@@ -2710,6 +2713,39 @@ def _plan_advisories(
             "message": (
                 "The pack authors no line for these intents in the locale this "
                 "plan draws from; authored lists the intents it does author."
+            ),
+        }
+    ]
+
+
+def _closing_undeclared(
+    plan: dict[str, Any], context: dict[str, Any] | None
+) -> list[dict[str, Any]]:
+    """Say when every authored line opens because the pack declares none that close.
+
+    Agents now pass both the acknowledgement and the completion when a task
+    finishes in the reply. A pack authored before `closing_expressions`
+    existed puts both at the top, so the character says the work is done
+    before showing it -- the reply the closing line was built to prevent.
+    """
+
+    if not isinstance(context, dict) or context.get("closing_expressions"):
+        return []
+    fixed = [
+        segment["fixed_line"]["intent"]
+        for segment in plan["segments"]
+        if "fixed_line" in segment
+    ]
+    if len(fixed) < 2:
+        return []
+    return [
+        {
+            "code": "EXPRESSION_CLOSING_UNDECLARED",
+            "intents": fixed,
+            "message": (
+                "This pack declares no closing_expressions, so every authored "
+                "line opens the response, a completion line included. Pass "
+                "only the intent that belongs at the opening."
             ),
         }
     ]
