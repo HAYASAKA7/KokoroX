@@ -61,6 +61,10 @@ class _UnsupportedLocale(Exception):
 class _UnknownScenario(Exception):
     """Private marker for an unavailable syntactically valid scenario."""
 
+    def __init__(self, available: list[str]) -> None:
+        super().__init__()
+        self.available = available
+
 
 def _invalid() -> KokoroError:
     return KokoroError(
@@ -76,10 +80,14 @@ def _unsupported_locale() -> KokoroError:
     )
 
 
-def _unknown_scenario() -> KokoroError:
+def _unknown_scenario(available: list[str]) -> KokoroError:
+    # No command lists a pack's scenarios, so a caller that guessed wrong
+    # had to read the pack's files to recover. The ids are the pack's own
+    # validated semantic ids, not anything the caller passed.
     return KokoroError(
         "UNKNOWN_SCENARIO",
         "The requested scenario is not available.",
+        details={"available": available},
     )
 
 
@@ -354,7 +362,7 @@ def _build_runtime_context(
         selected_locale if selected_locale in locales else min(locales)
     )
     if selected_scenario not in scenarios:
-        raise _UnknownScenario
+        raise _UnknownScenario(sorted(scenarios))
 
     character_id = compiled.get("character_id")
     character_version = compiled.get("character_version")
@@ -430,8 +438,8 @@ def build_runtime_context(
         return _build_runtime_context(compiled, state, locale, scenario)
     except _UnsupportedLocale:
         raise _unsupported_locale() from None
-    except _UnknownScenario:
-        raise _unknown_scenario() from None
+    except _UnknownScenario as unknown:
+        raise _unknown_scenario(unknown.available) from None
     except _InvalidContext:
         raise _invalid() from None
     except Exception:

@@ -2538,7 +2538,69 @@ def _handle_runtime_plan(
         context=context,
     )
     schemas.validate("render-plan", plan)
-    return {"ok": True, "plan": plan}
+    return {
+        "ok": True,
+        "plan": plan,
+        "advisories": _plan_advisories(args.expression_intent, plan, context),
+    }
+
+
+def _plan_advisories(
+    intents: list[str] | None,
+    plan: dict[str, Any],
+    context: dict[str, Any] | None,
+) -> list[dict[str, Any]]:
+    """Say when an intent the caller named planned no authored line.
+
+    The plan is still right -- an intent with no line quiets the persona --
+    but a misspelt intent (`task_complete`) looked exactly like a pack that
+    authored nothing, and the caller had no way to tell which.
+    """
+
+    if not intents:
+        return []
+    spoken = {
+        segment["fixed_line"]["intent"]
+        for segment in plan["segments"]
+        if "fixed_line" in segment
+    }
+    unspoken = [intent for intent in intents if intent not in spoken]
+    if not unspoken:
+        return []
+    if context is None:
+        return [
+            {
+                "code": "EXPRESSION_CONTEXT_MISSING",
+                "intents": unspoken,
+                "message": (
+                    "No runtime context was given, so no authored line could "
+                    "be planned; pass --context with what runtime context printed."
+                ),
+            }
+        ]
+    expressions = context.get("expressions")
+    authored = (
+        sorted(
+            key
+            for key in expressions
+            if isinstance(key, str)
+            and len(key) <= 128
+            and _PUBLIC_SEMANTIC_ID.fullmatch(key) is not None
+        )[:256]
+        if isinstance(expressions, dict)
+        else []
+    )
+    return [
+        {
+            "code": "EXPRESSION_INTENT_NOT_AUTHORED",
+            "intents": unspoken,
+            "authored": authored,
+            "message": (
+                "The pack authors no line for these intents in the locale this "
+                "plan draws from; authored lists the intents it does author."
+            ),
+        }
+    ]
 
 
 def _handle_runtime_validate(
@@ -2653,6 +2715,25 @@ _MIGRATION_PATH: Final = re.compile(
 _INSTALLATION_STALE_REASONS: Final = frozenset(
     {"resolution", "installation_changed", "binding"}
 )
+_PUBLIC_SEMANTIC_ID: Final = re.compile(
+    r"^[a-z][a-z0-9]*(?:_[a-z0-9]+)*\Z", re.ASCII
+)
+_RENDER_PLAN_INPUT_REASONS: Final = frozenset(
+    {
+        "expression_intent_count",
+        "expression_intent_duplicate",
+        "expression_intent_malformed",
+    }
+)
+_MIGRATION_INPUT_CHECKS: Final = frozenset(
+    {
+        "archive_structure",
+        "member_inventory",
+        "member_integrity",
+        "runtime_version",
+        "release_bindings",
+    }
+)
 
 
 _WORKSPACE_STAGES: Final = frozenset({"manifest", "artifact"})
@@ -2762,6 +2843,67 @@ def _workspace_invalid_details(raw: dict[str, Any]) -> dict[str, Any]:
     return kept
 
 
+def _available_scenarios_details(raw: dict[str, Any]) -> dict[str, Any]:
+    available = raw.get("available")
+    if (
+        isinstance(available, list)
+        and 0 < len(available) <= 128
+        and all(
+            isinstance(item, str)
+            and len(item) <= 128
+            and _PUBLIC_SEMANTIC_ID.fullmatch(item) is not None
+            for item in available
+        )
+    ):
+        return {"available": list(available)}
+    return {}
+
+
+def _render_plan_input_details(raw: dict[str, Any]) -> dict[str, Any]:
+    """Keep a fixed reason and its numeric bound, and nothing else."""
+
+    reason = raw.get("reason")
+    if not isinstance(reason, str) or reason not in _RENDER_PLAN_INPUT_REASONS:
+        return {}
+    kept: dict[str, Any] = {"reason": reason}
+    for key in ("limit", "observed"):
+        value = raw.get(key)
+        if _position(value):
+            kept[key] = value
+    return kept
+
+
+def _migration_input_details(raw: dict[str, Any]) -> dict[str, Any]:
+    """Keep the failed check names and finding codes `pack install` would give."""
+
+    kept: dict[str, Any] = {}
+    checks = raw.get("checks")
+    if (
+        isinstance(checks, list)
+        and 0 < len(checks) <= len(_MIGRATION_INPUT_CHECKS)
+        and all(
+            isinstance(item, str) and item in _MIGRATION_INPUT_CHECKS
+            for item in checks
+        )
+    ):
+        kept["checks"] = list(checks)
+    reasons = raw.get("reasons")
+    reason = raw.get("reason")
+    if (
+        isinstance(reasons, list)
+        and 0 < len(reasons) <= 32
+        and all(
+            isinstance(item, str)
+            and _PUBLIC_ERROR_CODE.fullmatch(item) is not None
+            for item in reasons
+        )
+    ):
+        kept["reasons"] = list(reasons)
+    elif isinstance(reason, str) and _PUBLIC_ERROR_CODE.fullmatch(reason) is not None:
+        kept["reasons"] = [reason]
+    return kept
+
+
 def _public_error_envelope(error: KokoroError) -> dict[str, Any]:
     code = error.code
     if not isinstance(code, str) or _PUBLIC_ERROR_CODE.fullmatch(code) is None:
@@ -2852,6 +2994,12 @@ def _public_error_envelope(error: KokoroError) -> dict[str, Any]:
         details = _workspace_invalid_details(error.details)
     if code == "KARC_REMOVE_REFERENCED":
         details = _removal_referenced_details(error.details)
+    if code == "UNKNOWN_SCENARIO":
+        details = _available_scenarios_details(error.details)
+    if code == "INVALID_RENDER_PLAN_INPUT":
+        details = _render_plan_input_details(error.details)
+    if code == "MIGRATION_INPUT_INVALID":
+        details = _migration_input_details(error.details)
     return {
         "ok": False,
         "error": {

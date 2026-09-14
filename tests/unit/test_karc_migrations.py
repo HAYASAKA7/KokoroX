@@ -263,3 +263,26 @@ def test_an_unregistered_target_names_the_paths_that_exist(
     assert getattr(raised.value, "details", {}).get("supported") == [
         "0.9.0 -> 1.0.0"
     ]
+
+
+def test_a_refused_migration_input_names_its_failed_checks(
+    rin_verified_release: dict[str, Any],
+) -> None:
+    """An edited legacy archive was refused with nothing `pack install` would name."""
+
+    legacy = make_legacy_090_archive(build_private_archive(rin_verified_release))
+
+    def mutate_without_rebinding(documents: dict[str, dict[str, Any]]) -> None:
+        documents["pack/compiled.json"]["behavior"]["correction_style"] = (
+            "quiet"
+        )
+
+    stale = rewrite_archive(legacy, mutate_without_rebinding)
+
+    with pytest.raises(KokoroError) as caught:
+        preview_karc_migration(stale, "1.0.0", SCHEMAS)
+
+    assert caught.value.code == "MIGRATION_INPUT_INVALID"
+    assert caught.value.details["checks"]
+    assert caught.value.details["reasons"]
+    assert all(code.isupper() for code in caught.value.details["reasons"])

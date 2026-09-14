@@ -86,6 +86,16 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- Refusals now say what would work. `UNKNOWN_SCENARIO` lists the pack's
+  scenario ids in `details.available` -- three of five agents guessed a
+  scenario on their first call and read the pack's files to recover.
+  `INVALID_RENDER_PLAN_INPUT` for an intent list gives a fixed `reason` and,
+  for too many, the `limit` and `observed` count. `MIGRATION_INPUT_INVALID`
+  keeps the failed `checks` and the finding codes `pack install` would give.
+  `runtime plan` also returns `advisories`: `EXPRESSION_INTENT_NOT_AUTHORED`
+  when a named intent planned no line, with the intents the pack does author,
+  so a misspelt `task_complete` no longer looks like a quiet pack; and
+  `EXPRESSION_CONTEXT_MISSING` when intents were named without `--context`.
 - `runtime plan --help` now says `--expression-intent` is repeatable, and the
   runtime contract and `using-kokorox` say to pass both the acknowledgement
   and the completion when a task finishes inside the reply. The flag carried

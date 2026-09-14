@@ -96,7 +96,10 @@ def _assert_error(
     with pytest.raises(KokoroError) as raised:
         build_runtime_context(compiled, state, locale, scenario)
     assert raised.value.code == code
-    assert raised.value.details == {}
+    if code == "UNKNOWN_SCENARIO":
+        assert set(raised.value.details) == {"available"}
+    else:
+        assert raised.value.details == {}
 
 
 def test_build_runtime_context_returns_only_the_selected_compact_view() -> None:
@@ -545,3 +548,15 @@ def test_context_refuses_a_malformed_closing_expression_list(closing: Any) -> No
         build_runtime_context(compiled, _state(), "zh-CN", "debugging")
 
     assert raised.value.code == "INVALID_RUNTIME_CONTEXT"
+
+
+def test_an_unknown_scenario_lists_the_scenarios_the_pack_has() -> None:
+    """Agents guessed `general` and read the pack's files to recover."""
+
+    compiled = _compiled()
+
+    with pytest.raises(KokoroError) as raised:
+        build_runtime_context(compiled, _state(), "zh-CN", "general")
+
+    assert raised.value.code == "UNKNOWN_SCENARIO"
+    assert raised.value.details == {"available": sorted(compiled["scenarios"])}

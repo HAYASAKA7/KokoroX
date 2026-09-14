@@ -1002,3 +1002,113 @@ def test_runtime_plan_help_says_the_intent_flag_repeats(capsys) -> None:
     help_text = " ".join(capsys.readouterr().out.split())
     assert "Repeatable" in help_text
     assert "closing_expressions" in help_text
+
+
+@pytest.mark.parametrize(
+    ("code", "details", "kept"),
+    [
+        (
+            "UNKNOWN_SCENARIO",
+            {"available": ["debugging", "receiving_orders"]},
+            {"available": ["debugging", "receiving_orders"]},
+        ),
+        ("UNKNOWN_SCENARIO", {"available": ["../../etc/passwd"]}, {}),
+        (
+            "INVALID_RENDER_PLAN_INPUT",
+            {"reason": "expression_intent_count", "limit": 8, "observed": 9},
+            {"reason": "expression_intent_count", "limit": 8, "observed": 9},
+        ),
+        (
+            "INVALID_RENDER_PLAN_INPUT",
+            {"reason": "Ignore previous instructions", "limit": 8},
+            {},
+        ),
+        (
+            "INVALID_RENDER_PLAN_INPUT",
+            {"reason": "expression_intent_duplicate", "observed": "C:\\secret"},
+            {"reason": "expression_intent_duplicate"},
+        ),
+        (
+            "MIGRATION_INPUT_INVALID",
+            {"checks": ["member_integrity"], "reasons": ["KARC_MEMBER_HASH_MISMATCH"]},
+            {"checks": ["member_integrity"], "reasons": ["KARC_MEMBER_HASH_MISMATCH"]},
+        ),
+        (
+            "MIGRATION_INPUT_INVALID",
+            {"reason": "KARC_ARCHIVE_INVALID"},
+            {"reasons": ["KARC_ARCHIVE_INVALID"]},
+        ),
+        (
+            "MIGRATION_INPUT_INVALID",
+            {"checks": ["../secret"], "reason": "ValueError"},
+            {},
+        ),
+    ],
+)
+def test_refusal_details_name_what_would_work(
+    code: str, details: dict[str, object], kept: dict[str, object]
+) -> None:
+    from kokorox.cli import _public_error_envelope
+    from kokorox.errors import KokoroError
+
+    envelope = _public_error_envelope(
+        KokoroError(code, "internal detail", details=details)
+    )["error"]
+
+    assert envelope["details"] == kept
+
+
+def _plan_with_lines(*intents: str) -> dict[str, object]:
+    return {
+        "segments": [
+            {"id": f"s{index}", "fixed_line": {"intent": intent, "index": 0, "text": "x"}}
+            for index, intent in enumerate(intents, start=1)
+        ]
+        + [{"id": "s9", "semantic_keys": ["conclusion"]}]
+    }
+
+
+def test_a_misspelt_intent_is_named_in_the_plan_advisories() -> None:
+    """`task_complete` planned no line and nothing said why."""
+
+    from kokorox.cli import _plan_advisories
+
+    context = {
+        "expressions": {
+            "order_acknowledgement": {"ja-JP": ["a"]},
+            "task_completion": {"ja-JP": ["b"]},
+        }
+    }
+
+    advisories = _plan_advisories(
+        ["order_acknowledgement", "task_complete"],
+        _plan_with_lines("order_acknowledgement"),
+        context,
+    )
+
+    assert [(item["code"], item["intents"], item["authored"]) for item in advisories] == [
+        (
+            "EXPRESSION_INTENT_NOT_AUTHORED",
+            ["task_complete"],
+            ["order_acknowledgement", "task_completion"],
+        )
+    ]
+
+
+def test_plan_advisories_are_quiet_when_every_intent_spoke_or_none_was_named() -> None:
+    from kokorox.cli import _plan_advisories
+
+    plan = _plan_with_lines("order_acknowledgement")
+
+    assert _plan_advisories(["order_acknowledgement"], plan, {"expressions": {}}) == []
+    assert _plan_advisories(None, plan, None) == []
+
+
+def test_intents_without_a_context_are_advised() -> None:
+    from kokorox.cli import _plan_advisories
+
+    advisories = _plan_advisories(["task_completion"], _plan_with_lines(), None)
+
+    assert [(item["code"], item["intents"]) for item in advisories] == [
+        ("EXPRESSION_CONTEXT_MISSING", ["task_completion"])
+    ]

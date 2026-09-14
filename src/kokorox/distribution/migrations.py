@@ -245,6 +245,7 @@ def preview_karc_migration(
             "MIGRATION_INPUT_INVALID",
             "Migration input failed required integrity checks.",
             checks=failed_input_checks,
+            reasons=_finding_codes(compatibility_before, failed_input_checks),
         )
     output = payload
     current = source
@@ -871,6 +872,19 @@ def _detached(value: dict[str, Any]) -> dict[str, Any]:
 
 def _reason(error: BaseException) -> str:
     return error.code if isinstance(error, KokoroError) else type(error).__name__
+
+
+def _finding_codes(report: Mapping[str, Any], check_names: list[str]) -> list[str]:
+    """The finding codes behind failed checks -- what `pack install` would name."""
+
+    return sorted(
+        {
+            finding["code"]
+            for name in check_names
+            for finding in report["checks"][name].get("findings", [])
+            if isinstance(finding, Mapping) and isinstance(finding.get("code"), str)
+        }
+    )[:32]
 
 
 def _error(code: str, message: str, **details: Any) -> KokoroError:

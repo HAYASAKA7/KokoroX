@@ -49,7 +49,7 @@ def assert_invalid(semantic_value: Any, policy_value: Any, expression: Any = Non
         build_render_plan(semantic_value, policy_value, expression_intent=expression)
     assert raised.value.code == "INVALID_RENDER_PLAN_INPUT"
     assert raised.value.retryable is False
-    assert raised.value.details == {}
+    assert set(raised.value.details) <= {"reason", "limit", "observed"}
     return raised.value
 
 
@@ -680,3 +680,28 @@ def test_rejects_a_malformed_closing_expression_list(closing: Any) -> None:
         )
 
     assert raised.value.code == "INVALID_RENDER_PLAN_INPUT"
+
+
+@pytest.mark.parametrize(
+    ("intents", "details"),
+    [
+        (
+            [f"intent_{index}" for index in range(9)],
+            {"reason": "expression_intent_count", "limit": 8, "observed": 9},
+        ),
+        ([], {"reason": "expression_intent_count", "limit": 8, "observed": 0}),
+        (
+            ["order_acknowledgement", "order_acknowledgement"],
+            {"reason": "expression_intent_duplicate"},
+        ),
+        (["order_acknowledgement", 7], {"reason": "expression_intent_malformed"}),
+    ],
+)
+def test_an_intent_list_refusal_says_what_is_wrong(
+    intents: Any, details: dict[str, Any]
+) -> None:
+    """Nine intents, or one twice, came back with empty details."""
+
+    raised = assert_invalid(semantic(), policy(), intents)
+
+    assert raised.details == details

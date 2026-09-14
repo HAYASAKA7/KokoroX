@@ -23,10 +23,14 @@ _SEGMENT_SOURCES = (
 )
 
 
-def _invalid_input() -> KokoroError:
+def _invalid_input(reason: str | None = None, **bounds: int) -> KokoroError:
+    # A fixed reason and a numeric bound, never the input: they say what to
+    # change without echoing what the caller passed.
+    details: dict[str, Any] = {} if reason is None else {"reason": reason, **bounds}
     return KokoroError(
         "INVALID_RENDER_PLAN_INPUT",
         "Render plan input is invalid.",
+        details=details,
     )
 
 
@@ -67,19 +71,23 @@ def _validate_expression_intents(value: Any) -> tuple[str, ...]:
     if value is None:
         return ()
     candidates = [value] if isinstance(value, str) else value
-    if (
-        not isinstance(candidates, (list, tuple))
-        or not 1 <= len(candidates) <= _MAX_EXPRESSION_INTENTS
-        or len(set(map(repr, candidates))) != len(candidates)
-    ):
-        raise _invalid_input()
+    if not isinstance(candidates, (list, tuple)):
+        raise _invalid_input("expression_intent_malformed")
+    if not 1 <= len(candidates) <= _MAX_EXPRESSION_INTENTS:
+        raise _invalid_input(
+            "expression_intent_count",
+            limit=_MAX_EXPRESSION_INTENTS,
+            observed=len(candidates),
+        )
     for candidate in candidates:
         if (
             not isinstance(candidate, str)
             or len(candidate) > 128
             or _SEMANTIC_ID.fullmatch(candidate) is None
         ):
-            raise _invalid_input()
+            raise _invalid_input("expression_intent_malformed")
+    if len(set(map(repr, candidates))) != len(candidates):
+        raise _invalid_input("expression_intent_duplicate")
     return tuple(candidates)
 
 
