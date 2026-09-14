@@ -141,7 +141,9 @@ kokorox session end --session demo --json
 An explicit compiled path still has highest precedence. Without one, a session
 started with `--workspace` resolves that workspace's default, then falls back
 to the global default. A workspace default overrides the global default only
-for that workspace:
+for that workspace. The start result's `resolved_from` and `installation_id`
+say which default answered and which installation it bound, and
+`--workspace` alone selects workspace scope for `config default` commands:
 
 ```bash
 repo="$HOME/Projects/consumer"

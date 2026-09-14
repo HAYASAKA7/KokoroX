@@ -203,7 +203,8 @@ def _add_scope(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--scope",
         choices=("global", "workspace"),
-        default="global",
+        default=None,
+        help="Defaults to workspace when --workspace is given, else global.",
     )
     parser.add_argument("--workspace")
 
@@ -1047,6 +1048,11 @@ def _handle_pack_migrate(
 def _workspace_root(args: argparse.Namespace) -> Path | None:
     scope = getattr(args, "scope", None)
     workspace = getattr(args, "workspace", None)
+    if scope is None:
+        # Naming a workspace is asking about it; demanding --scope as well
+        # refused the obvious call. An explicit --scope global with a
+        # workspace still contradicts itself and is still refused.
+        scope = "global" if workspace is None else "workspace"
     if scope == "workspace":
         if not isinstance(workspace, str) or not workspace:
             raise KokoroError(

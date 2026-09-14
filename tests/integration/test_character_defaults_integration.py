@@ -563,3 +563,96 @@ def test_explicit_session_start_ignores_a_malformed_default(
     assert started["session"]["active"] is True
     assert started["session"]["character_id"] == "rin-aster"
     assert default_path.read_bytes() == b"not-json"
+
+
+def test_a_default_start_says_which_default_and_installation_it_used(
+    rin_verified_release: dict[str, Any],
+    tmp_path: Path,
+) -> None:
+    """With both defaults set, an agent could not prove which one it started."""
+
+    data_root = tmp_path / "data"
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    global_install = _install_rin(rin_verified_release, data_root)
+    workspace_install = _install_rin(
+        rin_verified_release, data_root, workspace_root=workspace
+    )
+    _run_cli(data_root, "config", "default", "set", "--character", "rin-aster")
+    _run_cli(
+        data_root,
+        "config",
+        "default",
+        "set",
+        "--character",
+        "rin-aster",
+        "--workspace",
+        str(workspace),
+    )
+
+    shown = _run_cli(
+        data_root, "config", "default", "show", "--workspace", str(workspace)
+    )
+    in_workspace = _run_cli(
+        data_root,
+        "session",
+        "start",
+        "--session",
+        "resolved-workspace",
+        "--workspace",
+        str(workspace),
+    )
+    without_workspace = _run_cli(
+        data_root, "session", "start", "--session", "resolved-global"
+    )
+
+    assert shown["default"]["binding"]["installation_id"] == workspace_install[
+        "installation_id"
+    ]
+    assert in_workspace["resolved_from"] == "workspace_default"
+    assert in_workspace["installation_id"] == workspace_install["installation_id"]
+    assert in_workspace["advisories"] == []
+    assert without_workspace["resolved_from"] == "global_default"
+    assert without_workspace["installation_id"] == global_install["installation_id"]
+    assert [item["code"] for item in without_workspace["advisories"]] == [
+        "SESSION_WORKSPACE_NOT_CONSULTED"
+    ]
+
+
+def test_a_compiled_path_start_resolves_from_the_path(tmp_path: Path) -> None:
+    data_root = tmp_path / "data"
+    compiled = _run_cli(data_root, "pack", "compile", str(RIN_PACK))
+
+    started = _run_cli(
+        data_root,
+        "session",
+        "start",
+        "--character",
+        compiled["path"],
+        "--session",
+        "resolved-path",
+    )
+
+    assert started["resolved_from"] == "compiled_path"
+    assert started["installation_id"] is None
+    assert started["advisories"] == []
+
+
+def test_an_explicit_global_scope_with_a_workspace_is_still_refused(
+    tmp_path: Path,
+) -> None:
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+
+    refused = _run_cli_error(
+        tmp_path / "data",
+        "config",
+        "default",
+        "show",
+        "--scope",
+        "global",
+        "--workspace",
+        str(workspace),
+    )
+
+    assert refused["error"]["code"] == "ARGUMENT_INVALID"

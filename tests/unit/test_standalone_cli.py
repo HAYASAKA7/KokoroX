@@ -12,6 +12,7 @@ import kokorox.cli as cli
 from kokorox.cli import build_parser
 from kokorox.packs.compiler import canonical_bytes
 from kokorox.standalone_cli import (
+    _workspace_root,
     standalone_requires_data_root,
     standalone_route,
 )
@@ -500,8 +501,9 @@ def test_standalone_scope_defaults_are_global() -> None:
         ["memory", "list", "--character", "rin-aster", "--json"],
     ):
         parsed = parser.parse_args(arguments)
-        assert parsed.scope == "global"
+        assert parsed.scope is None
         assert parsed.workspace is None
+        assert _workspace_root(parsed) is None
 
 
 def test_consent_grant_requires_explicit_scope() -> None:

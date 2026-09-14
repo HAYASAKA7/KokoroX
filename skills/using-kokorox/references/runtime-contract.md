@@ -38,6 +38,7 @@ kokorox pack validate <pack-path> --json
 kokorox pack compile <pack-path> --json
 
 kokorox session start --character <compiled-path> --session <id> --json
+kokorox session start --workspace <repo-root> --session <id> --json
 kokorox session show --session <id> --json
 kokorox session end --session <id> --json
 
@@ -51,7 +52,7 @@ kokorox state preview --session <id> --event <event.json> --json
 kokorox state apply --session <id> --event <event.json> --json
 ```
 
-`pack compile` returns `path`, `character_id`, `character_version`, `source_hash`, and `artifact_id`. The compiled path is the only valid input to `session start`. Require a successful start before saying a character is active.
+`pack compile` returns `path`, `character_id`, `character_version`, `source_hash`, and `artifact_id`. Pass that compiled path to `session start --character`. An installed pack starts from its default instead: with `--workspace <repo-root>`, the workspace default and then the global one; without it, the global default only, even from inside the workspace. A file inside an installed pack is not a valid `--character`. The start result carries `resolved_from` -- `compiled_path`, `workspace_default`, or `global_default` -- and the `installation_id` it bound, `null` for a compiled path; a global start without `--workspace` also returns the advisory `SESSION_WORKSPACE_NOT_CONSULTED`. Require a successful start before saying a character is active.
 
 ## Runtime context
 

@@ -86,6 +86,16 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- Starting an installed character is documented and reports what it
+  started. `using-kokorox` said a compiled path was the only valid input to
+  `session start`, so an agent told to use the installed pack tried a file
+  inside the installation and was refused; the skill and runtime contract
+  now give `session start --workspace <repo-root>`. The start result adds
+  `resolved_from` (`compiled_path`, `workspace_default`, `global_default`)
+  and `installation_id`, and a global start without `--workspace` returns
+  the advisory `SESSION_WORKSPACE_NOT_CONSULTED`. `--workspace` alone now
+  selects workspace scope for scoped commands such as `config default show`,
+  which refused it without `--scope workspace`.
 - Refusals now say what would work. `UNKNOWN_SCENARIO` lists the pack's
   scenario ids in `details.available` -- three of five agents guessed a
   scenario on their first call and read the pack's files to recover.

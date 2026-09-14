@@ -798,7 +798,8 @@ def build_parser() -> argparse.ArgumentParser:
         default_command.add_argument(
             "--scope",
             choices=("global", "workspace"),
-            default="global",
+            default=None,
+            help="Defaults to workspace when --workspace is given, else global.",
         )
         default_command.add_argument("--workspace")
         _leaf_json(default_command)
@@ -806,9 +807,18 @@ def build_parser() -> argparse.ArgumentParser:
     session = commands.add_parser("session")
     session_commands = session.add_subparsers(dest="session_command", required=True)
     session_start = session_commands.add_parser("start")
-    session_start.add_argument("--character")
+    session_start.add_argument(
+        "--character",
+        help="A compiled path from pack compile. Omit it to start an installed pack.",
+    )
     session_start.add_argument("--session", required=True)
-    session_start.add_argument("--workspace")
+    session_start.add_argument(
+        "--workspace",
+        help=(
+            "Without --character: resolve this workspace's default, then the "
+            "global default. Omitted, only the global default is consulted."
+        ),
+    )
     _leaf_json(session_start)
     session_show = session_commands.add_parser("show")
     session_show.add_argument("--session")
@@ -2043,9 +2053,11 @@ def _handle_character_draft_compile(
 def _handle_session_start(
     args: argparse.Namespace, settings: Settings, schemas: SchemaRegistry
 ) -> dict[str, Any]:
+    advisories: list[dict[str, Any]] = []
     if args.character is not None:
         path = _compiled_file(settings, args.character)
         compiled = _validated_compiled(path, schemas)
+        resolved_from, installation_id = "compiled_path", None
     else:
         workspace_root = (
             _argument_path(args.workspace)
@@ -2068,13 +2080,37 @@ def _handle_session_start(
             schemas,
             workspace_root=workspace_root,
         )
+        # Which default answered, and which installation it bound. With a
+        # workspace default and a different global one, an agent could not
+        # tell from the result which character version it had started.
+        resolved_from, installation_id = (
+            selection.source,
+            selection.installation_id,
+        )
+        if workspace_root is None and selection.source == "global_default":
+            advisories.append(
+                {
+                    "code": "SESSION_WORKSPACE_NOT_CONSULTED",
+                    "message": (
+                        "Started from the global default. No --workspace was "
+                        "given, so no workspace default was consulted, even "
+                        "from inside that workspace."
+                    ),
+                }
+            )
     session = SessionStore(settings.data_dir).start(
         args.session,
         compiled["character_id"],
         compiled["character_version"],
         compiled["source_hash"],
     )
-    return {"ok": True, "session": session}
+    return {
+        "ok": True,
+        "session": session,
+        "resolved_from": resolved_from,
+        "installation_id": installation_id,
+        "advisories": advisories,
+    }
 
 
 def _publish_selected_compiled_projection(
@@ -2362,7 +2398,12 @@ def _cleanup_projection_staging(
 
 
 def _workspace_argument(args: argparse.Namespace) -> Path | None:
-    if args.scope == "workspace":
+    # --workspace alone means workspace scope; only an explicit
+    # --scope global beside a workspace contradicts itself.
+    scope = args.scope
+    if scope is None:
+        scope = "global" if args.workspace is None else "workspace"
+    if scope == "workspace":
         if args.workspace is None:
             raise KokoroError(
                 "ARGUMENT_INVALID",
