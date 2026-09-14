@@ -101,6 +101,13 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- Canonical JSON checks are faster on valid documents. Every canonical
+  write and comparison checks the document is plain JSON, thousands of times
+  per install, migration, or gate run, and that check built a path tuple and
+  sorted the keys of every object even when nothing was wrong -- a fifth to a
+  quarter of some operations. A quick pass now proves validity without
+  paths; only a document it cannot vouch for takes the exact walk, so every
+  refusal and the path it names are unchanged.
 - Bounded file reads no longer reserve their whole bound. Installing,
   recovering, migrating, and removing packs, reading registries, defaults,
   sessions, Skill files, and JSON inputs each called `read(limit + 1)`,
