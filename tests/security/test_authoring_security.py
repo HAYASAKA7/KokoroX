@@ -8,6 +8,7 @@ import shutil
 import subprocess
 import sys
 import threading
+import time
 from types import SimpleNamespace
 from typing import Any
 
@@ -1363,7 +1364,24 @@ def test_process_exit_auto_releases_publication_lock(
             process.kill()
             process.wait(timeout=10)
 
-    recovered = publish_draft_bundle(data_root, source_root, request, draft, report)
+    # The OS releases a killed holder's lock once its handles close, which on
+    # Windows can trail the exit the parent observes. The product reports
+    # that window as a retryable busy; a caller retries, and so does this.
+    deadline = time.monotonic() + 10
+    while True:
+        try:
+            recovered = publish_draft_bundle(
+                data_root, source_root, request, draft, report
+            )
+            break
+        except KokoroError as error:
+            if (
+                error.code != "DRAFT_PUBLISH_BUSY"
+                or not error.retryable
+                or time.monotonic() > deadline
+            ):
+                raise
+            time.sleep(0.05)
     assert recovered == published
 
 
