@@ -2743,3 +2743,42 @@ def test_oversized_removal_reference_is_rejected_before_validation(
         )
 
     assert caught.value.code == "KARC_REMOVE_REFERENCE_SCAN_INVALID"
+
+
+def test_a_reference_that_changes_mid_scan_is_reread(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[Path] = []
+
+    def flaky(path: Path, *_args: Any, **_kwargs: Any) -> dict[str, Any]:
+        calls.append(path)
+        if len(calls) == 1:
+            raise KokoroError("KARC_REMOVE_REFERENCE_SCAN_INVALID", "changed")
+        return {"reread": True}
+
+    monkeypatch.setattr(installer_module, "_read_reference_document_once", flaky)
+    monkeypatch.setattr(installer_module, "_REFERENCE_REREAD_DELAYS", (0.0, 0.0))
+
+    document = installer_module._read_reference_document(
+        Path("reference.json"), "session-manifest", SCHEMAS
+    )
+
+    assert document == {"reread": True}
+    assert len(calls) == 2
+
+
+def test_a_reference_that_stays_unreadable_still_fails(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def broken(*_args: Any, **_kwargs: Any) -> dict[str, Any]:
+        raise KokoroError("KARC_REMOVE_REFERENCE_SCAN_INVALID", "corrupt")
+
+    monkeypatch.setattr(installer_module, "_read_reference_document_once", broken)
+    monkeypatch.setattr(installer_module, "_REFERENCE_REREAD_DELAYS", (0.0, 0.0))
+
+    with pytest.raises(KokoroError) as caught:
+        installer_module._read_reference_document(
+            Path("reference.json"), "session-manifest", SCHEMAS
+        )
+
+    assert caught.value.code == "KARC_REMOVE_REFERENCE_SCAN_INVALID"

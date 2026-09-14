@@ -19,7 +19,10 @@ from kokorox.packs.compiler import canonical_bytes
 
 
 _MAX_REGISTRY_BYTES = 2 * 1024 * 1024
-_LOCK_RETRY_DELAYS = (0.0, 0.01, 0.02, 0.04, 0.08)
+# An install holds the scope lock for the length of its transaction -- about
+# half a second on a loaded host -- so a 150 ms wait made the second of two
+# concurrent installs lose every time. About two seconds, backing off.
+_LOCK_RETRY_DELAYS = (0.0, 0.01, 0.02, 0.04, 0.08, 0.16, 0.32, 0.5, 0.5, 0.5)
 _LOCK_CONTENTION_ERRNOS = frozenset(
     value
     for value in (
@@ -514,9 +517,10 @@ def _acquire_registry_lock(
             except OSError as error:
                 if not _is_lock_contention(error) or delay is None:
                     if _is_lock_contention(error):
-                        raise _error(
+                        raise KokoroError(
                             "KARC_REGISTRY_LOCKED",
                             "Installed registry scope is locked.",
+                            retryable=True,
                         ) from error
                     raise
                 time.sleep(delay)

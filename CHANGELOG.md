@@ -86,6 +86,14 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- Concurrent installs and removals now wait long enough and say when to
+  retry. The registry scope lock gave up after 150 ms while an install holds
+  it for about half a second, so the second of two concurrent installs always
+  failed; it now backs off for about two seconds, and
+  `KARC_REGISTRY_LOCKED` is marked retryable. A removal whose reference scan
+  landed on a concurrent atomic replace -- a default being set -- failed as
+  if the file were corrupt; it now rereads briefly and returns the right
+  answer, such as `KARC_REMOVE_REFERENCED`.
 - The README and `consent grant` now say plainly that relationship and mood
   persistence is not connected yet. A user could grant `relationship_state`
   and `mood_state` and expect the character to remember, but no command

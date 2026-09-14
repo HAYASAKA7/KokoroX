@@ -14,6 +14,7 @@ import re
 import secrets
 import stat
 import sys
+import time
 from typing import TYPE_CHECKING, Any, Callable, Protocol, cast
 
 from kokorox.distribution.archive import (
@@ -1875,7 +1876,38 @@ def _read_reference_directory(
     ]
 
 
+_REFERENCE_REREAD_DELAYS = (0.02, 0.1)
+
+
 def _read_reference_document(
+    path: Path,
+    schema_name: str,
+    schemas: _SchemaValidator,
+    *,
+    optional: bool = False,
+) -> dict[str, Any] | None:
+    """Read one reference, rereading briefly if it changes underneath.
+
+    Defaults, sessions, and consent are replaced atomically by other
+    commands while a removal scans them. A read that lands on that swap
+    failed as if the file were corrupt, and running the removal again gave
+    the right answer. Rereading reaches that answer directly; a file that is
+    still unreadable after the retries is reported as before.
+    """
+
+    for delay in (*_REFERENCE_REREAD_DELAYS, None):
+        try:
+            return _read_reference_document_once(
+                path, schema_name, schemas, optional=optional
+            )
+        except KokoroError as error:
+            if error.code != "KARC_REMOVE_REFERENCE_SCAN_INVALID" or delay is None:
+                raise
+            time.sleep(delay)
+    raise AssertionError("unreachable")
+
+
+def _read_reference_document_once(
     path: Path,
     schema_name: str,
     schemas: _SchemaValidator,

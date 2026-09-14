@@ -403,3 +403,26 @@ def test_scope_lock_contention_fails_with_a_stable_error(tmp_path: Path) -> None
             registry=registry,
             schemas=SCHEMAS,
         )
+
+
+def test_scope_lock_contention_is_retryable(tmp_path: Path) -> None:
+    """The holder finishes its transaction; the caller should try again."""
+
+    data_root = tmp_path / "data"
+    scope = resolve_install_scope()
+    registry = empty_installed_registry(scope)
+    registry["revision"] = 1
+
+    with registry_module._acquire_registry_lock(data_root, scope):
+        with pytest.raises(KokoroError) as caught:
+            write_installed_registry_cas(
+                data_root,
+                scope,
+                expected_revision=0,
+                expected_sha256=None,
+                registry=registry,
+                schemas=SCHEMAS,
+            )
+
+    assert caught.value.code == "KARC_REGISTRY_LOCKED"
+    assert caught.value.retryable is True
