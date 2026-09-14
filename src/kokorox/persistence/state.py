@@ -1963,6 +1963,12 @@ def _apply_state_operation(
             operation_id,
             scope.boundary,
         )
+        # Written under the current grant, the successor is bound to it; a
+        # regrant on this installation rebinds with the next write.
+        successor["consent"] = {
+            "consent_id": active.consent["consent_id"],
+            "grant_revision": active.consent["grant_revision"],
+        }
         record = _operation_record(
             scope,
             active,
@@ -2109,7 +2115,7 @@ def _replay_generation(
         operation_id = cast(str, record["operation_id"])
         if record["installation"] != state["installation"]:
             raise _journal_invalid("installation_binding")
-        if record["consent"] != state["consent"]:
+        if not _consent_continues(state["consent"], record["consent"]):
             raise _journal_invalid("consent_binding")
         expected_name = _event_name(expected_revision, operation_id)
         if snapshot.path.name != expected_name:
@@ -2182,6 +2188,9 @@ def _replay_generation(
             )
         else:
             raise _contract_unsupported("operation_kind")
+        # Each record carries the grant it was written under, and the state
+        # it produced is bound to that grant.
+        successor["consent"] = _detached(record["consent"])
         if record["successor_state_sha256"] != _state_sha256(successor):
             raise _journal_invalid("successor_state")
         event_sha256 = sha256(snapshot.payload).hexdigest()
@@ -2788,8 +2797,33 @@ def _require_active_generation(
     }
     if state["installation"] != active.binding:
         raise _migration_required("installation")
-    if state["consent"] != expected_consent:
+    if not _consent_continues(state["consent"], expected_consent):
         raise _migration_required("consent")
+
+
+def _consent_continues(held: Mapping[str, Any], current: Mapping[str, Any]) -> bool:
+    """Whether retained state bound to `held` may continue under `current`.
+
+    A consent's id belongs to its installation scope; each grant, narrowing,
+    or revocation only raises its grant revision. Retained state pinned to
+    the exact revision that created it stranded every user who added a
+    permission -- the generation demanded a migration and migration refuses
+    an unchanged installation. The same consent at the same or a later
+    revision continues; the installation check above still forces a
+    migration when the version changes, and every operation separately
+    requires an active grant of its own permission.
+    """
+
+    held_revision = held.get("grant_revision")
+    current_revision = current.get("grant_revision")
+    return (
+        held.get("consent_id") == current.get("consent_id")
+        and isinstance(held_revision, int)
+        and isinstance(current_revision, int)
+        and not isinstance(held_revision, bool)
+        and not isinstance(current_revision, bool)
+        and held_revision <= current_revision
+    )
 
 
 def _growth_config(

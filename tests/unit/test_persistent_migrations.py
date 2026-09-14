@@ -8,6 +8,7 @@ import pytest
 
 from kokorox.errors import KokoroError
 from kokorox.packs.compiler import canonical_bytes
+from kokorox.persistence.consent import grant_consent
 from kokorox.persistence.memory import (
     add_memory_reference,
     list_memory_references,
@@ -286,3 +287,61 @@ def test_nonzero_relationship_requires_target_relationship_permission(
             mood_strategy="preserve_identical_contract",
         ),
     )
+
+
+def test_a_regrant_on_the_same_installation_continues_retained_state(
+    consented_rin: ConsentedRin,
+) -> None:
+    """Adding a permission stranded every durable session: migration refused it."""
+
+    data_root = consented_rin.data_root
+    first = apply_persistent_relationship_event(
+        data_root,
+        "rin-aster",
+        interaction_event("before-regrant", 0),
+        consented_rin.consent["consent_id"],
+        consented_rin.consent["grant_revision"],
+        SCHEMAS,
+        expected_state_revision=0,
+        operation_id="before-regrant-operation",
+    )
+    regranted = grant_consent(
+        data_root,
+        "rin-aster",
+        ["relationship_state", "memory_references"],
+        SCHEMAS,
+        expected_revision=consented_rin.consent["grant_revision"],
+    )
+    assert regranted["grant_revision"] > consented_rin.consent["grant_revision"]
+
+    second = apply_persistent_relationship_event(
+        data_root,
+        "rin-aster",
+        interaction_event("after-regrant", 1),
+        regranted["consent_id"],
+        regranted["grant_revision"],
+        SCHEMAS,
+        expected_state_revision=first["revision"],
+        operation_id="after-regrant-operation",
+    )
+
+    assert second["relationship"]["revision"] == 2
+    assert second["consent"] == {
+        "consent_id": regranted["consent_id"],
+        "grant_revision": regranted["grant_revision"],
+    }
+    assert replay_persistent_state(data_root, "rin-aster", SCHEMAS) == second
+
+
+def test_a_state_written_under_a_later_grant_cannot_go_back(
+    consented_rin: ConsentedRin,
+) -> None:
+    from kokorox.persistence.state import _consent_continues
+
+    held = {"consent_id": "consent-a", "grant_revision": 3}
+
+    assert _consent_continues(held, {"consent_id": "consent-a", "grant_revision": 3})
+    assert _consent_continues(held, {"consent_id": "consent-a", "grant_revision": 4})
+    assert not _consent_continues(held, {"consent_id": "consent-a", "grant_revision": 2})
+    assert not _consent_continues(held, {"consent_id": "consent-b", "grant_revision": 4})
+    assert not _consent_continues(held, {"consent_id": "consent-a", "grant_revision": True})

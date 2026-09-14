@@ -335,3 +335,93 @@ def test_a_workspace_consent_continues_a_workspace_session(
     )
     assert retained is not None
     assert retained["relationship"] == applied["state"]
+
+
+def _grant(run: Callable[..., Any], data_root: Path, permissions: str) -> dict[str, Any]:
+    return _ok(
+        run(
+            data_root,
+            "consent",
+            "grant",
+            "--character",
+            "rin-aster",
+            "--scope",
+            "global",
+            "--permissions",
+            permissions,
+        )
+    )
+
+
+def test_adding_a_permission_keeps_the_character_s_memory(
+    consented_rin: ConsentedRin,
+    run: Callable[..., tuple[int, dict[str, Any]]],
+    tmp_path: Path,
+) -> None:
+    """The README's own way to add a permission left every durable session mute."""
+
+    data_root = consented_rin.data_root
+    _ok(run(data_root, "config", "default", "set", "--character", "rin-aster"))
+    _ok(run(data_root, "session", "start", "--session", "w1"))
+    applied = _ok(
+        run(
+            data_root,
+            "state",
+            "apply",
+            "--session",
+            "w1",
+            "--event",
+            _event_file(tmp_path, "regrant-event-1", 0),
+        )
+    )
+    _ok(run(data_root, "session", "end", "--session", "w1"))
+    _grant(run, data_root, "relationship_state,memory_references")
+
+    _ok(run(data_root, "session", "start", "--session", "w2"))
+    context = _ok(_context(run, data_root, "w2"))
+    second = _ok(
+        run(
+            data_root,
+            "state",
+            "apply",
+            "--session",
+            "w2",
+            "--event",
+            _event_file(tmp_path, "regrant-event-2", 1),
+        )
+    )
+
+    assert context["relationship_state"] == "durable"
+    assert context["context"]["state"]["revision"] == 1
+    assert context["context"]["state"]["dimensions"] == applied["state"]["dimensions"]
+    assert second["state"]["revision"] == 2
+
+
+def test_granting_again_after_a_revoke_reattaches_retained_state(
+    consented_rin: ConsentedRin,
+    run: Callable[..., tuple[int, dict[str, Any]]],
+    tmp_path: Path,
+) -> None:
+    data_root = consented_rin.data_root
+    _ok(run(data_root, "config", "default", "set", "--character", "rin-aster"))
+    _ok(run(data_root, "session", "start", "--session", "r1"))
+    _ok(
+        run(
+            data_root,
+            "state",
+            "apply",
+            "--session",
+            "r1",
+            "--event",
+            _event_file(tmp_path, "reattach-event-1", 0),
+        )
+    )
+    _ok(run(data_root, "session", "end", "--session", "r1"))
+    _ok(run(data_root, "consent", "revoke", "--character", "rin-aster"))
+    _grant(run, data_root, "relationship_state")
+
+    _ok(run(data_root, "session", "start", "--session", "r2"))
+    context = _ok(_context(run, data_root, "r2"))
+
+    assert context["relationship_state"] == "durable"
+    assert context["context"]["state"]["revision"] == 1

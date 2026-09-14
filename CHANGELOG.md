@@ -101,6 +101,16 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- Adding a permission no longer locks a character out of its retained
+  relationship. Retained state was bound to the exact grant revision that
+  created it, so any later grant on the same installation -- the README's way
+  to add a permission, or granting again after a revoke -- made every
+  durable session fail with `PERSISTENCE_STATE_MIGRATION_REQUIRED`, while
+  `state migrate` refused an unchanged installation and reset did not help.
+  The same consent at a later grant revision now continues the retained
+  state, and the next write binds it to the new grant. Granting again after
+  a revoke reattaches what revocation kept. A new version still requires
+  `state migrate`. Existing journals replay unchanged.
 - Canonical JSON checks are faster on valid documents. Every canonical
   write and comparison checks the document is plain JSON, thousands of times
   per install, migration, or gate run, and that check built a path tuple and
