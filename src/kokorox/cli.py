@@ -105,6 +105,10 @@ _PUBLIC_MESSAGES = {
     "INPUT_INVALID_JSON": "Input file contains invalid JSON.",
     "INVALID_PACK_DATA": "Character pack data is invalid.",
     "INVALID_RUNTIME_CONTEXT_INPUT": "Runtime context input is invalid.",
+    "INVALID_POLICY_INPUT": (
+        "Language policy input is invalid: pass a compiled policy or what "
+        "policy compile printed."
+    ),
     # Every KARC_* code outside the DEFAULT family reached callers as
     # "Command could not be completed", including the two that deadlock a
     # scope after an interrupted install.
@@ -2144,6 +2148,9 @@ def _handle_session_start(
         "ok": True,
         "session": session,
         "relationship_state": "session" if binding is None else "durable",
+        # A session's compiled_pack_hash is the pack's source hash, not the
+        # compiled file digest `pack list` calls compiled_sha256.
+        "source_hash": compiled["source_hash"],
         "resolved_from": resolved_from,
         "installation_id": installation_id,
         "advisories": advisories,
@@ -2508,13 +2515,32 @@ def _handle_default_clear(
 def _handle_session_show(
     args: argparse.Namespace, settings: Settings, schemas: SchemaRegistry
 ) -> dict[str, Any]:
-    del schemas
     if args.session is None:
         return {"ok": True, "session": None}
-    return {
+    store = SessionStore(settings.data_dir)
+    manifest = store.load(args.session)
+    if not manifest["active"]:
+        return {"ok": True, "session": manifest}
+    # A durable session's manifest keeps state_revision 0 -- its events are
+    # retained elsewhere -- and an agent that built an event from it would
+    # conflict. Report the revision the next event must name.
+    advisories: list[dict[str, Any]] = []
+    _binding, connected = _session_relationship(
+        settings, schemas, store, args.session, manifest, advisories
+    )
+    result: dict[str, Any] = {
         "ok": True,
-        "session": SessionStore(settings.data_dir).load(args.session),
+        "session": manifest,
+        "relationship_state": "session" if connected is None else "durable",
+        "relationship_revision": (
+            manifest["state_revision"]
+            if connected is None
+            else connected["relationship"]["revision"]
+        ),
     }
+    if advisories:
+        result["advisories"] = advisories
+    return result
 
 
 def _handle_session_end(
@@ -2580,6 +2606,25 @@ def _handle_runtime_context(
     }
 
 
+def _policy_body(value: Any) -> Any:
+    """Accept a bare policy or the envelope `policy compile` prints.
+
+    `--context` already took its command's envelope; `--policy` did not, and
+    three of five agents passed `policy compile`'s whole output and met a
+    schema error first.
+    """
+
+    if not isinstance(value, dict) or "ok" not in value:
+        return value
+    inner = value.get("policy")
+    if not isinstance(inner, dict):
+        raise _input_error(
+            "INVALID_POLICY_INPUT",
+            "Language policy input is invalid.",
+        )
+    return inner
+
+
 def _runtime_context_body(value: Any) -> dict[str, Any]:
     """Accept either a bare context or the envelope `runtime context` prints.
 
@@ -2612,7 +2657,7 @@ def _handle_runtime_plan(
 ) -> dict[str, Any]:
     del settings
     semantic = _read_json(Path(args.semantic))
-    policy = _read_json(Path(args.policy))
+    policy = _policy_body(_read_json(Path(args.policy)))
     schemas.validate("semantic-result", semantic)
     schemas.validate("language-policy", policy)
     context = (
@@ -3060,6 +3105,7 @@ _SCHEMA_NAME: Final = re.compile(r"^[a-z][a-z0-9]*(?:-[a-z0-9]+)*\Z", re.ASCII)
 _MIGRATION_PATH: Final = re.compile(
     r"^[0-9]+\.[0-9]+\.[0-9]+ -> [0-9]+\.[0-9]+\.[0-9]+\Z", re.ASCII
 )
+_PERSISTENCE_REASON: Final = re.compile(r"^[a-z][a-z0-9]*(?:_[a-z0-9]+){0,7}\Z", re.ASCII)
 _INSTALLATION_STALE_REASONS: Final = frozenset(
     {"resolution", "installation_changed", "binding"}
 )
@@ -3335,10 +3381,20 @@ def _public_error_envelope(error: KokoroError) -> dict[str, Any]:
             and _PUBLIC_ERROR_CODE.fullmatch(reason) is not None
         ):
             details = {"reasons": [reason]}
+    # Persistence refusals carry a fixed snake_case reason chosen by the
+    # library, never input. `same_installation` and `consent_absent` were
+    # stripped, leaving a second migration and an unconsented export to
+    # read as corruption.
+    if code.startswith("PERSISTENCE_"):
+        reason = error.details.get("reason")
+        if isinstance(reason, str) and _PERSISTENCE_REASON.fullmatch(reason):
+            details = {"reason": reason}
     if code == "PERSISTENCE_INSTALLATION_STALE":
         reason = error.details.get("reason")
         if isinstance(reason, str) and reason in _INSTALLATION_STALE_REASONS:
             details = {"reason": reason}
+        else:
+            details = {}
     if code == "RESEARCH_WORKSPACE_INVALID":
         details = _workspace_invalid_details(error.details)
     if code == "KARC_REMOVE_REFERENCED":

@@ -5,6 +5,8 @@ import os
 
 import pytest
 
+from kokorox.errors import KokoroError
+
 from kokorox.cli import build_parser
 from kokorox import __version__
 
@@ -1173,3 +1175,35 @@ def test_a_pack_without_closing_expressions_advises_before_opening_with_both_lin
     assert [item["code"] for item in older] == ["EXPRESSION_CLOSING_UNDECLARED"]
     assert older[0]["intents"] == intents
     assert declared == []
+
+
+def test_runtime_plan_accepts_the_policy_compile_envelope() -> None:
+    from kokorox.cli import _policy_body
+
+    policy = {"schema_version": "1.0", "primary_language": "zh-CN"}
+
+    assert _policy_body({"ok": True, "policy": policy, "advisories": []}) == policy
+    assert _policy_body(policy) == policy
+    with pytest.raises(KokoroError) as caught:
+        _policy_body({"ok": False, "error": {"code": "X"}})
+    assert caught.value.code == "INVALID_POLICY_INPUT"
+
+
+@pytest.mark.parametrize(
+    ("code", "details", "kept"),
+    [
+        ("PERSISTENCE_MIGRATION_INVALID", {"reason": "same_installation"}, {"reason": "same_installation"}),
+        ("PERSISTENCE_STATE_JOURNAL_INVALID", {"reason": "consent_binding"}, {"reason": "consent_binding"}),
+        ("PERSISTENCE_MIGRATION_INVALID", {"reason": "C:\\secret path"}, {}),
+        ("PERSISTENCE_MIGRATION_INVALID", {"reason": "ValueError"}, {}),
+        ("PERSISTENCE_INSTALLATION_STALE", {"reason": "not_a_known_reason"}, {}),
+    ],
+)
+def test_persistence_refusals_keep_their_fixed_reason(
+    code: str, details: dict[str, object], kept: dict[str, object]
+) -> None:
+    from kokorox.cli import _public_error_envelope
+
+    envelope = _public_error_envelope(KokoroError(code, "internal", details=details))
+
+    assert envelope["error"]["details"] == kept

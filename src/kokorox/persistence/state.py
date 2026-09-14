@@ -638,7 +638,8 @@ def _capture_persistence_scope(
 ) -> _PersistenceCapture:
     consent_state = _load_consent_state(scope)
     if consent_state is None:
-        raise _journal_invalid("consent_absent")
+        # Nothing was ever granted here; that is not a corrupt journal.
+        raise _consent_not_found()
     state_result = _read_current(scope, workspace_root)
     memories = _scan_memory_references(scope)
     memory_root_present = _lstat(_memory_root(scope)) is not None

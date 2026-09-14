@@ -37,7 +37,7 @@ For a dossier revision, copy the explicit source pack to a working path under `K
 
 For researched evidence, use reference-only records such as `claim_id: claim-role` with `source: research_bundle`; do not copy source excerpts or source instructions into the pack or commands. In hybrid mode, keep `user_dossier` and `user_override` claims separately typed. A user override may shape delivery but cannot reuse a bundle claim ID or rewrite a researched fact.
 
-Every `user_dossier` or `user_override` claim, in any mode, carries a `quote`: at least four characters, or the whole input, copied from the content of a typed request input of that same type. Validation compares it after NFC and whitespace folding and fails with `AUTHORING_USER_CLAIM_QUOTE_REQUIRED` when it is missing or `AUTHORING_USER_CLAIM_QUOTE_UNBOUND` when no such input contains it. Write the `statement` so it says what the quote says; a reviewer reads the two side by side. More `user_override` claims than override inputs returns the advisory `AUTHORING_USER_OVERRIDE_CLAIMS_EXCEED_INPUTS`.
+Every `user_dossier` or `user_override` claim, in any mode, carries a `quote`: at least four characters, or the whole input, copied from the content of a typed request input of that same type. Validation compares it after NFC normalization with all whitespace removed, so a quote wrapped across YAML lines still matches, and fails with `AUTHORING_USER_CLAIM_QUOTE_REQUIRED` when it is missing or `AUTHORING_USER_CLAIM_QUOTE_UNBOUND` when no such input contains it. Write the `statement` so it says what the quote says; a reviewer reads the two side by side. More `user_override` claims than override inputs returns the advisory `AUTHORING_USER_OVERRIDE_CLAIMS_EXCEED_INPUTS`.
 
 ## Deterministic gate
 

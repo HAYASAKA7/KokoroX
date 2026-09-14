@@ -506,19 +506,29 @@ def test_standalone_scope_defaults_are_global() -> None:
         assert _workspace_root(parsed) is None
 
 
-def test_consent_grant_requires_explicit_scope() -> None:
-    with pytest.raises(SystemExit):
-        build_parser().parse_args(
-            [
-                "consent",
-                "grant",
-                "--character",
-                "rin-aster",
-                "--permissions",
-                "relationship_state",
-                "--json",
-            ]
-        )
+def test_consent_grant_requires_explicit_scope(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.setenv("KOKOROX_DATA_DIR", str(tmp_path / "data"))
+
+    code, body = _cli_json(
+        [
+            "consent",
+            "grant",
+            "--character",
+            "rin-aster",
+            "--permissions",
+            "relationship_state",
+            "--json",
+        ],
+        capsys,
+    )
+
+    assert code == 2
+    assert body["error"]["code"] == "ARGUMENT_INVALID"
+    assert not (tmp_path / "data").exists()
 
 
 def test_suite_scope_defaults_to_user() -> None:

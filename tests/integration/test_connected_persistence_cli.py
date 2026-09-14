@@ -452,3 +452,70 @@ def test_a_newer_version_granted_mid_session_leaves_the_session_answering(
     assert [item["cause"] for item in context["advisories"]] == [
         "PERSISTENCE_INSTALLATION_STALE"
     ]
+
+
+def test_a_workspace_alone_scopes_a_grant_and_session_show_reports_durable_state(
+    rin_verified_release: dict[str, Any],
+    run: Callable[..., tuple[int, dict[str, Any]]],
+    tmp_path: Path,
+) -> None:
+    data_root = tmp_path / "data"
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    install_rin(data_root, rin_verified_release, workspace_root=workspace)
+    scope = ("--workspace", str(workspace))
+    granted = _ok(
+        run(
+            data_root,
+            "consent",
+            "grant",
+            "--character",
+            "rin-aster",
+            *scope,
+            "--permissions",
+            "relationship_state",
+        )
+    )
+    _ok(run(data_root, "config", "default", "set", "--character", "rin-aster", *scope))
+    started = _ok(run(data_root, "session", "start", "--session", "shown", *scope))
+    _ok(
+        run(
+            data_root,
+            "state",
+            "apply",
+            "--session",
+            "shown",
+            "--event",
+            _event_file(tmp_path, "shown-event-1", 0),
+        )
+    )
+
+    shown = _ok(run(data_root, "session", "show", "--session", "shown"))
+
+    assert granted["consent"]["scope"] == "workspace"
+    assert started["source_hash"] == started["session"]["compiled_pack_hash"]
+    assert shown["session"]["state_revision"] == 0
+    assert shown["relationship_state"] == "durable"
+    assert shown["relationship_revision"] == 1
+
+
+def test_an_export_with_no_consent_says_nothing_was_granted(
+    rin_verified_release: dict[str, Any],
+    run: Callable[..., tuple[int, dict[str, Any]]],
+    tmp_path: Path,
+) -> None:
+    data_root = tmp_path / "data"
+    install_rin(data_root, rin_verified_release)
+
+    code, body = run(
+        data_root,
+        "state",
+        "export",
+        "--character",
+        "rin-aster",
+        "--out",
+        str(tmp_path / "export.json"),
+    )
+
+    assert code != 0
+    assert body["error"]["code"] == "PERSISTENCE_CONSENT_NOT_FOUND"

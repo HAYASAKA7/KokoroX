@@ -583,7 +583,9 @@ def _validate_dossier_provenance(
 
 
 def _quote_text(value: str) -> str:
-    return " ".join(unicodedata.normalize("NFC", value).split())
+    # All whitespace goes, not just runs of it: YAML folds a line break into
+    # a space, and Chinese or Japanese text has no space to match it against.
+    return "".join(unicodedata.normalize("NFC", value).split())
 
 
 def _validate_user_claim_quotes(
@@ -629,8 +631,9 @@ def _validate_user_claim_quotes(
                 _finding(
                     "AUTHORING_USER_CLAIM_QUOTE_REQUIRED",
                     path,
-                    "A user-sourced claim must quote at least four characters, "
-                    "or the whole input, from the typed input it came from.",
+                    "A user-sourced claim must quote at least four characters "
+                    "besides whitespace, or the whole input, from the typed "
+                    "input it came from.",
                 )
             )
         elif not any(needle in content for content in contents[label]):

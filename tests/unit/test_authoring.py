@@ -1462,3 +1462,28 @@ def test_a_completion_line_left_opening_is_advised(
     assert "AUTHORING_COMPLETION_LINE_OPENS" not in [
         item["code"] for item in declared["advisory_findings"]
     ]
+
+
+def test_a_cjk_quote_folded_across_yaml_lines_still_binds(
+    registry: SchemaRegistry,
+    original_request: dict[str, Any],
+    source: dict[str, Any],
+) -> None:
+    """YAML folds a line break into a space the Chinese dossier never had."""
+
+    import yaml
+
+    request = _request_for_mode(original_request, "dossier")
+    request["inputs"][0]["content"] = "她是皇家图书馆的管理员，讨厌吵闹的孩子。"
+    folded = yaml.safe_load(
+        "quote: >-\n  她是皇家图书馆的管理员，\n  讨厌吵闹的孩子\n"
+    )["quote"]
+    assert " " in folded
+    source["evidence"] = {
+        "authored_original": False,
+        "claims": [{"statement": "A royal librarian.", "source": "user_dossier", "quote": folded}],
+    }
+
+    report = validate_authoring_pack(request, source, registry)
+
+    assert report["hard_failures"] == []

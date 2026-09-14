@@ -282,7 +282,8 @@ def add_standalone_parsers(
     grant.add_argument(
         "--scope",
         choices=("global", "workspace"),
-        required=True,
+        default=None,
+        help="Required unless --workspace names the workspace to grant for.",
     )
     grant.add_argument("--workspace")
     grant.add_argument("--permissions", required=True)
@@ -1237,6 +1238,12 @@ def _handle_consent_grant(
     data_root: Path | None,
     schemas: SchemaRegistry,
 ) -> dict[str, Any]:
+    # A grant is never global by default: it names a scope or a workspace.
+    if args.scope is None and args.workspace is None:
+        raise KokoroError(
+            "ARGUMENT_INVALID",
+            "Command arguments are invalid.",
+        )
     root = _require_data_root(data_root)
     workspace = _workspace_root(args)
     current = load_consent(

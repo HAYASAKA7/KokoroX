@@ -101,6 +101,17 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- Smaller fixes from the eleventh QA pass. `runtime plan --policy` accepts what
+  `policy compile` printed, as `--context` already did. Persistence refusals
+  keep their fixed reason in `details`, so a second `state migrate` says
+  `same_installation`. `state export` with no consent answers
+  `PERSISTENCE_CONSENT_NOT_FOUND` instead of a corrupt journal. `consent grant`
+  takes workspace scope from `--workspace`, and still refuses to default to
+  global. `session start` reports `source_hash`, which a session's
+  `compiled_pack_hash` is. `session show` reports `relationship_state` and the
+  `relationship_revision` a durable session's next event must name. A user
+  claim's quote folded across YAML lines binds, since whitespace is ignored
+  entirely when matching.
 - Packs authored before `closing_expressions` no longer open with their
   completion line unannounced. Agents now pass both the acknowledgement and
   the completion, and such a pack places both at the top. `runtime plan`
