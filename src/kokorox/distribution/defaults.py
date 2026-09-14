@@ -26,6 +26,7 @@ from kokorox.distribution.registry import (
     load_installed_registry,
     resolve_install_scope,
 )
+from kokorox.bounded_read import read_at_most
 from kokorox.errors import KokoroError
 from kokorox.packs.compiler import canonical_bytes
 
@@ -1319,7 +1320,7 @@ def _read_required_file(path: Path, limit: int) -> _FileSnapshot:
     try:
         with path.open("rb") as handle:
             opened = os.fstat(handle.fileno())
-            payload = handle.read(limit + 1)
+            payload = read_at_most(handle, limit + 1)
             after = os.fstat(handle.fileno())
         final = path.lstat()
     except OSError as error:

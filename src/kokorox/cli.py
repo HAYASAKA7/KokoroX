@@ -19,6 +19,7 @@ from kokorox.authoring.drafts import build_character_draft
 from kokorox.authoring.requests import normalize_build_request
 from kokorox.authoring.storage import publish_draft_bundle
 from kokorox.authoring.validation import validate_authoring_pack
+from kokorox.bounded_read import read_at_most
 from kokorox.config import Settings, resolve_schema_dir
 from kokorox.distribution.defaults import (
     CharacterSelection,
@@ -975,9 +976,9 @@ def _read_json(path: Path, *, max_bytes: int = JSON_INPUT_MAX_BYTES) -> Any:
                     "INPUT_PATH_UNSAFE",
                     "Input file path is unsafe.",
                 )
-            contents = handle.read(max_bytes + 1)
+            contents = read_at_most(handle, max_bytes + 1)
             handle.seek(0)
-            repeated = handle.read(max_bytes + 1)
+            repeated = read_at_most(handle, max_bytes + 1)
             final_open_identity = _input_identity(os.fstat(handle.fileno()))
     except FileNotFoundError as error:
         raise _input_error("INPUT_NOT_FOUND", "Input file was not found.") from error

@@ -101,6 +101,13 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- Bounded file reads no longer reserve their whole bound. Installing,
+  recovering, migrating, and removing packs, reading registries, defaults,
+  sessions, Skill files, and JSON inputs each called `read(limit + 1)`,
+  which on a buffered file allocates the full bound before reading: with the
+  64 MiB archive bound, about 17 ms and 64 MiB per call for a file of a few
+  hundred kilobytes. They now read in 1 MiB chunks up to the same bound, so
+  the limits and their refusals are unchanged.
 - **Breaking:** every `user_dossier` or `user_override` evidence claim now
   carries a `quote` copied from the content of a typed request input of the
   same type. Authoring validation checked a user claim's label and never its

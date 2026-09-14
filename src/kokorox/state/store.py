@@ -19,6 +19,7 @@ from types import MappingProxyType
 from typing import Any, BinaryIO, Callable, Iterator, NamedTuple
 
 from kokorox import __version__
+from kokorox.bounded_read import read_at_most
 from kokorox.errors import KokoroError
 from kokorox.json_compat import find_json_incompatibility
 from kokorox.packs.compiler import write_compiled_pack
@@ -556,7 +557,7 @@ def _read_bounded_json_with_size(
 ) -> tuple[Any, int]:
     try:
         with target.open("rb") as handle:
-            contents = handle.read(max_bytes + 1)
+            contents = read_at_most(handle, max_bytes + 1)
     except FileNotFoundError:
         raise
     except OSError as error:

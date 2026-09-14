@@ -14,6 +14,7 @@ import time
 from typing import Any, Callable, Literal, Protocol, cast
 
 from kokorox import __version__
+from kokorox.bounded_read import read_at_most
 from kokorox.errors import KokoroError
 from kokorox.packs.compiler import canonical_bytes
 
@@ -946,7 +947,7 @@ def _read_optional_regular_file_snapshot(
     try:
         with path.open("rb") as handle:
             opened = os.fstat(handle.fileno())
-            payload = handle.read(_MAX_REGISTRY_BYTES + 1)
+            payload = read_at_most(handle, _MAX_REGISTRY_BYTES + 1)
             after = os.fstat(handle.fileno())
         final = path.lstat()
     except OSError as error:

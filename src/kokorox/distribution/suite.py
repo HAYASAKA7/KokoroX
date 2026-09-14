@@ -19,6 +19,7 @@ from typing import Any, Literal
 
 from kokorox import __version__
 from kokorox.distribution.installer import _rename_directory_no_replace
+from kokorox.bounded_read import read_at_most
 from kokorox.errors import KokoroError
 from kokorox.packs.compiler import canonical_bytes
 from kokorox.packs.loader import parse_yaml_bytes
@@ -1018,7 +1019,7 @@ def _read_stable_file(
             raise _tree_error(source, "Skill file changed before it was read.")
         with os.fdopen(descriptor, "rb") as handle:
             descriptor = -1
-            payload = handle.read(limit + 1)
+            payload = read_at_most(handle, limit + 1)
             after = os.fstat(handle.fileno())
         final = path.lstat()
     except KokoroError:

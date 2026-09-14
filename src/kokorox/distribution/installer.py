@@ -39,6 +39,7 @@ from kokorox.distribution.registry import (
     load_installed_registry,
     resolve_install_scope,
 )
+from kokorox.bounded_read import read_at_most
 from kokorox.errors import KokoroError
 from kokorox.packs.compiler import canonical_bytes
 
@@ -2349,7 +2350,7 @@ def _capture_archive(path: Path, limit: int) -> _CapturedArchive:
             )
         with os.fdopen(descriptor, "rb") as handle:
             descriptor = -1
-            payload = handle.read(limit + 1)
+            payload = read_at_most(handle, limit + 1)
             after = os.fstat(handle.fileno())
         final = path.lstat()
     except KokoroError:
@@ -3256,7 +3257,7 @@ def _read_optional_recovery_file(path: Path, limit: int) -> bytes | None:
             raise _recovery_error("Recovery input changed or exceeds its limit.")
         with os.fdopen(descriptor, "rb") as handle:
             descriptor = -1
-            payload = handle.read(limit + 1)
+            payload = read_at_most(handle, limit + 1)
             after = os.fstat(handle.fileno())
         final = path.lstat()
     except KokoroError:

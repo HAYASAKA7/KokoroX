@@ -31,6 +31,7 @@ from kokorox.distribution.suite import (
     install_skill_suite,
     remove_skill_suite,
 )
+from kokorox.bounded_read import read_at_most
 from kokorox.errors import KokoroError
 from kokorox.json_compat import find_json_incompatibility
 from kokorox.packs.compiler import canonical_bytes
@@ -497,9 +498,9 @@ def _capture_binary(path: Path, *, max_bytes: int) -> _CapturedFile:
                     "INPUT_PATH_UNSAFE",
                     "Input file path is unsafe.",
                 )
-            contents = handle.read(max_bytes + 1)
+            contents = read_at_most(handle, max_bytes + 1)
             handle.seek(0)
-            repeated = handle.read(max_bytes + 1)
+            repeated = read_at_most(handle, max_bytes + 1)
             final_open_identity = _input_identity(os.fstat(handle.fileno()))
     except FileNotFoundError as error:
         raise _input_error("INPUT_NOT_FOUND", "Input file was not found.") from error
