@@ -541,6 +541,61 @@ def _validate_rendered_segment(
     }
 
 
+def _check_fixed_line_order(
+    text: str,
+    planned_segments: list[Any],
+    violations: _Violations,
+) -> None:
+    """Require each authored line to sit where the plan puts it.
+
+    Where a line lands is part of what it says: a completion line said
+    before the work is shown, or an acknowledgement said after it, is a
+    different turn. Presence alone let a render put them anywhere. The
+    lines must appear in plan order; a plan that opens with one must have
+    the text open with it, and a plan that closes with one must have the
+    text close with it. A missing line is already MISSING_PROTECTED_SPAN.
+    """
+
+    fixed = [
+        (index, segment)
+        for index, segment in enumerate(planned_segments)
+        if isinstance(segment, Mapping)
+        and isinstance(segment.get("fixed_line"), Mapping)
+        and isinstance(segment["fixed_line"].get("text"), str)
+        and segment["fixed_line"]["text"]
+        and segment["fixed_line"]["text"] in text
+    ]
+    if not fixed:
+        return
+
+    def out_of_order(segment: Mapping[str, Any]) -> None:
+        line = segment["fixed_line"]["text"]
+        segment_id = segment.get("id")
+        violations.add(
+            "FIXED_LINE_OUT_OF_ORDER",
+            "An authored line is not where the plan places it.",
+            segment_id=segment_id if isinstance(segment_id, str) else None,
+            details={"protected_span": line},
+        )
+
+    cursor = 0
+    for _index, segment in fixed:
+        found = text.find(segment["fixed_line"]["text"], cursor)
+        if found < 0:
+            out_of_order(segment)
+            return
+        cursor = found + len(segment["fixed_line"]["text"])
+    first_index, first = fixed[0]
+    if first_index == 0 and not text.lstrip().startswith(first["fixed_line"]["text"]):
+        out_of_order(first)
+        return
+    last_index, last = fixed[-1]
+    if last_index == len(planned_segments) - 1 and not text.rstrip().endswith(
+        last["fixed_line"]["text"]
+    ):
+        out_of_order(last)
+
+
 def _segment_switches(segments: list[Any]) -> int:
     """Count the language changes between consecutive rendered segments.
 
@@ -808,6 +863,7 @@ def validate_rendered_output(
                     "Rendered text omitted an immutable span.",
                     details={"protected_span": span},
                 )
+        _check_fixed_line_order(text, planned_segments, violations)
 
     # A digest in the span list protects only the digest. The check is literal
     # containment, so printing the hash satisfies it while the string the hash

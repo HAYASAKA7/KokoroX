@@ -1282,3 +1282,53 @@ def test_the_switch_limit_counts_what_the_segments_make() -> None:
         violation for violation in result["violations"] if violation["code"] == "TOO_MANY_SWITCHES"
     ]
     assert limit["details"] == {"limit": 1, "observed": 2}
+
+
+def _two_line_plan() -> dict[str, Any]:
+    return plan(
+        segments=[
+            {"id": "s1", "channel": "character_dialogue", "target_language": "ja-JP", "fixed_line": {"intent": "order_acknowledgement", "index": 0, "text": "了解しました、ご主人様。"}},
+            {"id": "s2", "channel": "technical_explanation", "target_language": "zh-CN", "semantic_keys": ["explanation"]},
+            {"id": "s3", "channel": "warnings", "target_language": "zh-CN", "semantic_keys": ["warnings"]},
+            {"id": "s4", "channel": "character_dialogue", "target_language": "ja-JP", "fixed_line": {"intent": "task_completion", "index": 0, "text": "完成しました、ご主人様。"}},
+        ],
+        protected_spans=["go test -race ./...", "了解しました、ご主人様。", "完成しました、ご主人様。"],
+        max_switches=2,
+        min_primary_ratio=0.0,
+    )
+
+
+def _render_two_lines(text: str) -> dict[str, Any]:
+    return rendered(
+        text=text,
+        segments=[
+            {"id": "s1", "channel": "character_dialogue", "target_language": "ja-JP", "fixed_line": {"intent": "order_acknowledgement", "index": 0, "text": "了解しました、ご主人様。"}},
+            {"id": "s2", "channel": "technical_explanation", "target_language": "zh-CN", "semantic_keys": ["explanation"]},
+            {"id": "s3", "channel": "warnings", "target_language": "zh-CN", "semantic_keys": ["warnings"]},
+            {"id": "s4", "channel": "character_dialogue", "target_language": "ja-JP", "fixed_line": {"intent": "task_completion", "index": 0, "text": "完成しました、ご主人様。"}},
+        ],
+        switch_count=2,
+    )
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "完成しました、ご主人様。\n了解しました、ご主人様。\n原因已经明确。 go test -race ./...",
+        "完成しました、ご主人様。\n原因已经明确。 go test -race ./...\n了解しました、ご主人様。",
+        "了解しました、ご主人様。\n完成しました、ご主人様。\n原因已经明确。 go test -race ./...",
+    ],
+)
+def test_authored_lines_must_sit_where_the_plan_puts_them(text: str) -> None:
+    result = validate_rendered_output(_render_two_lines(text), semantic(), _two_line_plan())
+
+    assert "FIXED_LINE_OUT_OF_ORDER" in codes(result)
+    assert_schema_valid(result)
+
+
+def test_authored_lines_in_plan_order_pass_the_order_check() -> None:
+    text = "了解しました、ご主人様。\n原因已经明确。 go test -race ./...\n完成しました、ご主人様。\n"
+
+    result = validate_rendered_output(_render_two_lines(text), semantic(), _two_line_plan())
+
+    assert "FIXED_LINE_OUT_OF_ORDER" not in codes(result)

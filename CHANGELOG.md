@@ -86,6 +86,12 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- `runtime validate` now checks where an authored line is rendered. The
+  contract says to render every segment in plan order, but a completion line
+  moved before the answer, or both lines swapped, still validated. The lines
+  must now appear in plan order, a plan that opens with one must have the
+  text open with it, and one that closes with one must have the text close
+  with it; otherwise `FIXED_LINE_OUT_OF_ORDER`.
 - `runtime validate` no longer takes a render's `switch_count` on trust. A
   render whose segments went `ja-JP`, `zh-CN`, `ja-JP` could declare no
   switches and pass. The language changes between consecutive segments are
