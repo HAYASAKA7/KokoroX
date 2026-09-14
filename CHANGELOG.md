@@ -86,6 +86,11 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- `runtime validate` no longer takes a render's `switch_count` on trust. A
+  render whose segments went `ja-JP`, `zh-CN`, `ja-JP` could declare no
+  switches and pass. The language changes between consecutive segments are
+  now a floor: a lower declared count is `SWITCH_COUNT_UNDERSTATED`, and the
+  switch limit is checked against whichever of the two is higher.
 - Concurrent installs and removals now wait long enough and say when to
   retry. The registry scope lock gave up after 150 ms while an install holds
   it for about half a second, so the second of two concurrent installs always

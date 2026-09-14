@@ -1243,3 +1243,42 @@ def test_a_semantic_segment_may_not_use_the_dialogue_channel() -> None:
     )
 
     assert "INVALID_PLANNED_SEGMENT" in codes(result)
+
+
+def test_a_declared_switch_count_cannot_undercut_the_segments() -> None:
+    """ja-JP, zh-CN, ja-JP is two switches, whatever the render declares."""
+
+    segments = [
+        {"id": "s1", "channel": "technical_explanation", "target_language": "ja-JP", "semantic_keys": ["explanation"]},
+        {"id": "s2", "channel": "warnings", "target_language": "zh-CN", "semantic_keys": ["warnings"]},
+        {"id": "s3", "channel": "recommendations", "target_language": "ja-JP", "semantic_keys": ["recommendations"]},
+    ]
+    actual = rendered(segments=segments, switch_count=0)
+
+    result = validate_rendered_output(actual, semantic(), plan(segments=segments))
+
+    [understated] = [
+        violation
+        for violation in result["violations"]
+        if violation["code"] == "SWITCH_COUNT_UNDERSTATED"
+    ]
+    assert understated["details"] == {"expected": 2, "actual": 0}
+    assert_schema_valid(result)
+
+
+def test_the_switch_limit_counts_what_the_segments_make() -> None:
+    segments = [
+        {"id": "s1", "channel": "technical_explanation", "target_language": "ja-JP", "semantic_keys": ["explanation"]},
+        {"id": "s2", "channel": "warnings", "target_language": "zh-CN", "semantic_keys": ["warnings"]},
+        {"id": "s3", "channel": "recommendations", "target_language": "ja-JP", "semantic_keys": ["recommendations"]},
+    ]
+    actual = rendered(segments=segments, switch_count=0)
+
+    result = validate_rendered_output(
+        actual, semantic(), plan(segments=segments, max_switches=1)
+    )
+
+    [limit] = [
+        violation for violation in result["violations"] if violation["code"] == "TOO_MANY_SWITCHES"
+    ]
+    assert limit["details"] == {"limit": 1, "observed": 2}

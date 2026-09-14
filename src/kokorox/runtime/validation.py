@@ -541,6 +541,29 @@ def _validate_rendered_segment(
     }
 
 
+def _segment_switches(segments: list[Any]) -> int:
+    """Count the language changes between consecutive rendered segments.
+
+    A segment repeated under the same id is reported as a duplicate, not
+    counted again as a switch.
+    """
+
+    languages: list[str] = []
+    seen: set[str] = set()
+    for segment in segments:
+        if not isinstance(segment, Mapping):
+            continue
+        segment_id = segment.get("id")
+        if isinstance(segment_id, str):
+            if segment_id in seen:
+                continue
+            seen.add(segment_id)
+        language = segment.get("target_language")
+        if isinstance(language, str) and language != "preserve":
+            languages.append(language)
+    return sum(1 for before, after in zip(languages, languages[1:]) if before != after)
+
+
 def validate_rendered_output(
     rendered: Any,
     semantic: Any,
@@ -802,12 +825,25 @@ def validate_rendered_output(
             details={"protected_span": enforced_spans[0]},
         )
 
+    # Inline switches need language identification; segment boundaries do
+    # not. Every change of language between consecutive rendered segments is
+    # a switch the render made, whatever it declares -- taken on trust, a
+    # render that went ja-JP, zh-CN, ja-JP could declare none.
+    boundary_switches = _segment_switches(rendered_segments)
+    if switch_count is not None and switch_count < boundary_switches:
+        violations.add(
+            "SWITCH_COUNT_UNDERSTATED",
+            "Rendered output declares fewer language switches than its "
+            "segments make; expected is the least they make.",
+            details={"expected": boundary_switches, "actual": switch_count},
+        )
     if switch_count is not None and max_switches is not None:
-        if switch_count > max_switches:
+        observed = max(switch_count, boundary_switches)
+        if observed > max_switches:
             violations.add(
                 "TOO_MANY_SWITCHES",
                 "Rendered output exceeds the planned switch limit.",
-                details={"limit": max_switches, "observed": switch_count},
+                details={"limit": max_switches, "observed": observed},
             )
 
     valid_planned: list[dict[str, Any]] = []
