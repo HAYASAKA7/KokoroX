@@ -1321,3 +1321,35 @@ def test_a_report_names_every_line_the_gate_spoke_and_where(tmp_path: Path) -> N
         ),
     ]
     SCHEMAS.validate("pack-hard-validation-report", report)
+
+
+def _add_neutral_scenario(pack: Path, name: str) -> None:
+    (pack / "scenarios" / f"{name}.yaml").write_text(
+        "first_action: acknowledge_then_restate_scope\n"
+        "hypothesis_style: ranked\n"
+        "correction_style: direct\n"
+        "reassurance: subtle\n"
+        "intensity_cap: neutral\n",
+        encoding="utf-8",
+    )
+    manifest_path = pack / "character.yaml"
+    manifest = yaml.safe_load(manifest_path.read_text(encoding="utf-8"))
+    manifest["scenario_files"][name] = f"scenarios/{name}.yaml"
+    manifest_path.write_text(
+        yaml.safe_dump(manifest, allow_unicode=True, sort_keys=False),
+        encoding="utf-8",
+    )
+
+
+def test_the_gate_speaks_lines_through_a_scenario_that_is_not_neutral(
+    tmp_path: Path,
+) -> None:
+    """A neutral scenario plans no lines; probing through it would fail a sound pack."""
+
+    pack = copy_rin(tmp_path)
+    _add_neutral_scenario(pack, "code_review")
+
+    report = run_hard_validation(pack, load_json(ORIGINAL_REQUEST), SCHEMAS)
+
+    assert report["checks"]["protected_content"]["passed"] is True
+    assert len(report["fixed_lines_spoken"]) == 6

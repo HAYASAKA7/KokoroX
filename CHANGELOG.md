@@ -86,6 +86,17 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- `runtime plan` now honours a `neutral` scenario intensity cap and the
+  neutral fallback rung. A scenario capped at `neutral` still planned the
+  pack's lines, so an agent that honoured the cap failed validation and one
+  that ignored it passed; and the plan a turn already had protected those
+  lines, so the contract's last rung, the neutral renderer, could never
+  validate. With `--context` naming a neutral scenario, or with the new
+  `--fallback-level 3`, the plan carries no authored lines and no intent,
+  routes every segment that is not `preserve` to the primary language, and
+  allows no switches; the command returns the advisory `PLAN_NEUTRAL` with
+  the reasons. The hard gate speaks authored lines through a scenario that
+  is not capped at neutral.
 - Starting an installed character is documented and reports what it
   started. `using-kokorox` said a compiled path was the only valid input to
   `session start`, so an agent told to use the installed pack tried a file

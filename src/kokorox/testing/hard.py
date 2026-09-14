@@ -1205,11 +1205,22 @@ def _fixed_line_probe(
         # Compile and locale coverage own these failures; a probe built on
         # them could only restate their findings.
         return None
+    # A scenario capped at neutral plans no authored lines, so it cannot
+    # carry them. A pack whose every scenario is neutral never speaks one.
+    speaking = sorted(
+        name
+        for name, config in scenarios.items()
+        if not (
+            isinstance(config, Mapping) and config.get("intensity_cap") == "neutral"
+        )
+    )
+    if not speaking:
+        return None
     # Detached through canonical bytes: the spread policy shares its nested
     # maps with the policy the check also hashes, and a canonical hash refuses
     # aliased containers.
     probe = {
-        "scenario": min(scenarios),
+        "scenario": speaking[0],
         "policy": {
             **policy,
             "artifact_id": "policy/pack-hard-validation-fixed-line",

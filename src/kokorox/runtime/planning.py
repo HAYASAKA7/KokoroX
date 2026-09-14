@@ -109,6 +109,51 @@ def _closing_intents(context: Mapping[str, Any] | None) -> frozenset[str]:
     return frozenset(declared)
 
 
+_NEUTRAL_FALLBACK_LEVEL = 3
+
+
+def _scenario_caps_neutral(context: Mapping[str, Any] | None) -> bool:
+    if not isinstance(context, Mapping) or "scenarios" not in context:
+        return False
+    scenarios = context["scenarios"]
+    if (
+        not isinstance(scenarios, Mapping)
+        or len(scenarios) > 128
+        or any(not isinstance(config, Mapping) for config in scenarios.values())
+    ):
+        raise _invalid_input()
+    return any(
+        config.get("intensity_cap") == "neutral" for config in scenarios.values()
+    )
+
+
+def neutral_plan_reasons(
+    context: Mapping[str, Any] | None, fallback_level: int = 0
+) -> list[str]:
+    """Say why a plan must be neutral, or return nothing when it need not be.
+
+    Two rules said so and nothing enforced them. A scenario capped at
+    `neutral` still planned the pack's lines, so an agent that honoured the
+    cap by dropping them failed validation and one that ignored it passed.
+    The ladder's last rung is the neutral renderer, but the plan the turn
+    already had protected the authored lines, so no neutral render could
+    ever validate against it.
+    """
+
+    if (
+        isinstance(fallback_level, bool)
+        or not isinstance(fallback_level, int)
+        or not 0 <= fallback_level <= _NEUTRAL_FALLBACK_LEVEL
+    ):
+        raise _invalid_input("fallback_level_invalid")
+    reasons: list[str] = []
+    if _scenario_caps_neutral(context):
+        reasons.append("intensity_cap")
+    if fallback_level == _NEUTRAL_FALLBACK_LEVEL:
+        reasons.append("fallback_level")
+    return reasons
+
+
 def _semantic_content(semantic: Mapping[str, Any]) -> dict[str, str | list[str] | None]:
     conclusion: str | None = None
     if "conclusion" in semantic:
@@ -178,6 +223,7 @@ def build_render_plan(
     policy: Mapping[str, Any],
     expression_intent: str | list[str] | tuple[str, ...] | None = None,
     context: Mapping[str, Any] | None = None,
+    fallback_level: int = 0,
 ) -> dict[str, Any]:
     """Return an ordered render plan detached from its semantic and policy inputs.
 
@@ -194,6 +240,11 @@ def build_render_plan(
     it when the pack lists the intent in `closing_expressions`. An intent with no
     authored line still counts and simply adds no segment, so a missing
     expression quiets the persona rather than blocking the delivery.
+
+    A plan is neutral when the context's scenario caps intensity at
+    `neutral` or `fallback_level` reaches the neutral renderer (3): it
+    carries no authored lines and no intent, routes every semantic segment
+    that is not `preserve` to the primary language, and allows no switches.
     """
     if not isinstance(semantic, Mapping) or not isinstance(policy, Mapping):
         raise _invalid_input()
@@ -213,6 +264,7 @@ def build_render_plan(
     )
     intents = _validate_expression_intents(expression_intent)
     closing_intents = _closing_intents(context)
+    neutral = bool(neutral_plan_reasons(context, fallback_level))
 
     primary_language = policy.get("primary_language")
     channels = policy.get("channels")
@@ -294,19 +346,21 @@ def build_render_plan(
             or not is_channel_language(target_language)
         ):
             raise _invalid_input()
+        if neutral and target_language != "preserve":
+            target_language = primary_language
         segment: dict[str, Any] = {
             "id": f"s{len(segments) + 1}",
             "channel": channel,
             "target_language": target_language,
             "semantic_keys": [semantic_key],
         }
-        if semantic_key == "conclusion" and intents:
+        if semantic_key == "conclusion" and intents and not neutral:
             segment["expression_intent"] = intents[0]
         segments.append(segment)
 
     opening: list[dict[str, Any]] = []
     closing: list[dict[str, Any]] = []
-    for intent in intents:
+    for intent in () if neutral else intents:
         fixed = _fixed_segment(intent, context, channels.get("character_dialogue"))
         if fixed is None:
             continue
@@ -333,6 +387,6 @@ def build_render_plan(
         "primary_language": primary_language,
         "segments": segments,
         "protected_spans": protected_spans,
-        "max_switches": max_switches,
+        "max_switches": 0 if neutral else max_switches,
         "min_primary_ratio": min_primary_ratio,
     }

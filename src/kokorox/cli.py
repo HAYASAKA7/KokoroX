@@ -48,7 +48,7 @@ from kokorox.research.validation import validate_research_workspace
 from kokorox.research.workspace import load_research_workspace
 from kokorox.language_tags import is_language_tag
 from kokorox.runtime.context import build_runtime_context
-from kokorox.runtime.planning import build_render_plan
+from kokorox.runtime.planning import build_render_plan, neutral_plan_reasons
 from kokorox.runtime.validation import validate_rendered_output
 from kokorox.schemas import SchemaRegistry
 from kokorox.standalone_cli import (
@@ -859,6 +859,18 @@ def build_parser() -> argparse.ArgumentParser:
     # The pack's own lines live in the runtime context, so a plan that is to
     # carry one has to be shown the context that holds it.
     runtime_plan.add_argument("--context")
+    runtime_plan.add_argument(
+        "--fallback-level",
+        type=int,
+        choices=range(4),
+        default=0,
+        help=(
+            "The rung runtime validate reported. At 3, plan for the neutral "
+            "renderer: no authored lines, the primary language only, no "
+            "switches. A scenario capped at neutral in --context plans the "
+            "same at any level."
+        ),
+    )
     _leaf_json(runtime_plan)
     runtime_validate = runtime_commands.add_parser("validate")
     runtime_validate.add_argument("--semantic", required=True)
@@ -2577,12 +2589,18 @@ def _handle_runtime_plan(
         policy,
         expression_intent=args.expression_intent,
         context=context,
+        fallback_level=args.fallback_level,
     )
     schemas.validate("render-plan", plan)
     return {
         "ok": True,
         "plan": plan,
-        "advisories": _plan_advisories(args.expression_intent, plan, context),
+        "advisories": _plan_advisories(
+            args.expression_intent,
+            plan,
+            context,
+            neutral_plan_reasons(context, args.fallback_level),
+        ),
     }
 
 
@@ -2590,6 +2608,7 @@ def _plan_advisories(
     intents: list[str] | None,
     plan: dict[str, Any],
     context: dict[str, Any] | None,
+    neutral_reasons: list[str] | tuple[str, ...] = (),
 ) -> list[dict[str, Any]]:
     """Say when an intent the caller named planned no authored line.
 
@@ -2598,6 +2617,22 @@ def _plan_advisories(
     authored nothing, and the caller had no way to tell which.
     """
 
+    if neutral_reasons:
+        # Silent by rule, not by accident: say which rule, so the missing
+        # lines are not mistaken for a quiet pack or a misspelt intent.
+        return [
+            {
+                "code": "PLAN_NEUTRAL",
+                "reasons": list(neutral_reasons),
+                "intents": list(intents or []),
+                "message": (
+                    "Planned for the neutral renderer: no authored lines, the "
+                    "primary language only, and no switches. reasons says "
+                    "whether the scenario intensity_cap or the fallback level "
+                    "asked for it."
+                ),
+            }
+        ]
     if not intents:
         return []
     spoken = {
@@ -2764,6 +2799,7 @@ _RENDER_PLAN_INPUT_REASONS: Final = frozenset(
         "expression_intent_count",
         "expression_intent_duplicate",
         "expression_intent_malformed",
+        "fallback_level_invalid",
     }
 )
 _MIGRATION_INPUT_CHECKS: Final = frozenset(

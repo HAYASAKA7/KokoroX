@@ -45,7 +45,7 @@ kokorox session end --session <id> --json
 kokorox policy compile --input <policy-input.json> --json
 
 kokorox runtime context --session <id> --locale <locale> --scenario <scenario> --json
-kokorox runtime plan --semantic <semantic.json> --policy <policy.json> [--expression-intent <id> ...] [--context <context.json>] --json
+kokorox runtime plan --semantic <semantic.json> --policy <policy.json> [--expression-intent <id> ...] [--context <context.json>] [--fallback-level <0-3>] --json
 kokorox runtime validate --semantic <semantic.json> --plan <plan.json> --rendered <rendered.json> --json
 
 kokorox state preview --session <id> --event <event.json> --json
@@ -68,7 +68,7 @@ kokorox state apply --session <id> --event <event.json> --json
 - enabled growth dimensions;
 - `state` containing `revision`, `stage`, and bounded `dimensions`.
 
-Use these fields only to select presentation after reasoning. Enforce the scenario `intensity_cap`; a pack cannot raise a host cap.
+Use these fields only to select presentation after reasoning. Enforce the scenario `intensity_cap`; a pack cannot raise a host cap. `runtime plan` enforces a `neutral` cap itself when you pass `--context`: the plan carries no authored lines, routes every segment to the primary language, and allows no switches, and the command returns the advisory `PLAN_NEUTRAL`.
 
 A scenario the pack does not define is refused with `UNKNOWN_SCENARIO`; its `details.available` lists the scenario ids the pack does define.
 
@@ -170,7 +170,7 @@ Use this bounded fallback order after a failed validation:
 1. Repair invalid segments.
 2. Reduce language switches.
 3. Lower character intensity once.
-4. Use the neutral renderer in the primary language.
+4. Use the neutral renderer in the primary language. Re-plan with the same inputs and `--fallback-level 3`, render that plan -- it has no authored lines and no switches -- and validate against it. The plan the turn already had protects the authored lines, so a neutral render can never pass against it.
 
 Validate every repaired or fallback candidate. Urgency never removes this gate.
 

@@ -705,3 +705,111 @@ def test_an_intent_list_refusal_says_what_is_wrong(
     raised = assert_invalid(semantic(), policy(), intents)
 
     assert raised.details == details
+
+
+def _neutral_plan_assertions(plan: dict[str, Any]) -> None:
+    assert all("fixed_line" not in segment for segment in plan["segments"])
+    assert all("expression_intent" not in segment for segment in plan["segments"])
+    assert {
+        segment["target_language"]
+        for segment in plan["segments"]
+        if segment["target_language"] != "preserve"
+    } == {"zh-CN"}
+    assert plan["max_switches"] == 0
+    assert plan["protected_spans"] == ["go test -race ./..."]
+
+
+def test_a_neutral_scenario_cap_plans_no_authored_lines() -> None:
+    """The cap changed nothing: both lines planned, an effusive render passed."""
+
+    plan = build_render_plan(
+        semantic(),
+        policy(),
+        expression_intent=["order_acknowledgement", "task_completion"],
+        context=two_line_context(
+            scenarios={"receiving_orders": {"intensity_cap": "neutral"}}
+        ),
+    )
+
+    _neutral_plan_assertions(plan)
+
+
+def test_the_neutral_rung_plans_what_a_neutral_render_can_pass() -> None:
+    from kokorox.runtime.validation import validate_rendered_output
+
+    plan = build_render_plan(
+        semantic(),
+        policy(),
+        expression_intent=["order_acknowledgement", "task_completion"],
+        context=two_line_context(),
+        fallback_level=3,
+    )
+    _neutral_plan_assertions(plan)
+
+    rendered = {
+        "text": "读路径没有加锁。写入有锁而读取没有。先写一个并发测试。 go test -race ./... 不要依赖多次运行成功。",
+        "segments": [
+            {key: value for key, value in segment.items() if key != "expression_intent"}
+            for segment in plan["segments"]
+        ],
+        "switch_count": 0,
+    }
+    semantic_result = {
+        "schema_version": "1.0",
+        "artifact_id": "semantic/turn-1",
+        "created_by": {"component": "kokorox", "version": __version__},
+        "scenario": "debugging",
+        "conclusion": "The read path is unprotected.",
+        "explanation": ["Writes are locked while reads are not."],
+        "recommendations": ["Add a failing concurrent test."],
+        "warnings": ["Do not rely on repeated successful runs."],
+        "immutable_spans": ["go test -race ./..."],
+        "format_constraints": {},
+    }
+
+    result = validate_rendered_output(rendered, semantic_result, plan, attempt=3)
+
+    assert not [
+        violation
+        for violation in result["violations"]
+        if violation["code"]
+        in {"MISSING_PROTECTED_SPAN", "MISSING_SEGMENT", "LANGUAGE_MISMATCH", "TOO_MANY_SWITCHES"}
+    ]
+
+
+@pytest.mark.parametrize("level", [0, 1, 2])
+def test_rungs_below_neutral_keep_the_authored_lines(level: int) -> None:
+    plan = build_render_plan(
+        semantic(),
+        policy(),
+        expression_intent=["order_acknowledgement", "task_completion"],
+        context=two_line_context(
+            scenarios={"receiving_orders": {"intensity_cap": "balanced"}}
+        ),
+        fallback_level=level,
+    )
+
+    assert [
+        segment["fixed_line"]["intent"]
+        for segment in plan["segments"]
+        if "fixed_line" in segment
+    ] == ["order_acknowledgement", "task_completion"]
+
+
+@pytest.mark.parametrize("level", [-1, 4, True, "3", 3.0])
+def test_rejects_a_fallback_level_off_the_ladder(level: Any) -> None:
+    with pytest.raises(KokoroError) as raised:
+        build_render_plan(semantic(), policy(), fallback_level=level)
+
+    assert raised.value.code == "INVALID_RENDER_PLAN_INPUT"
+    assert raised.value.details == {"reason": "fallback_level_invalid"}
+
+
+@pytest.mark.parametrize("scenarios", [["receiving_orders"], {"receiving_orders": "neutral"}])
+def test_rejects_a_malformed_scenario_map_in_the_context(scenarios: Any) -> None:
+    with pytest.raises(KokoroError) as raised:
+        build_render_plan(
+            semantic(), policy(), context=two_line_context(scenarios=scenarios)
+        )
+
+    assert raised.value.code == "INVALID_RENDER_PLAN_INPUT"

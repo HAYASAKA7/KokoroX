@@ -1112,3 +1112,40 @@ def test_intents_without_a_context_are_advised() -> None:
     assert [(item["code"], item["intents"]) for item in advisories] == [
         ("EXPRESSION_CONTEXT_MISSING", ["task_completion"])
     ]
+
+
+def test_a_neutral_plan_says_which_rule_silenced_the_character() -> None:
+    from kokorox.cli import _plan_advisories
+
+    advisories = _plan_advisories(
+        ["task_completion"],
+        _plan_with_lines(),
+        {"expressions": {"task_completion": {"ja-JP": ["b"]}}},
+        ["intensity_cap"],
+    )
+
+    assert [(item["code"], item["reasons"], item["intents"]) for item in advisories] == [
+        ("PLAN_NEUTRAL", ["intensity_cap"], ["task_completion"])
+    ]
+
+
+def test_runtime_plan_takes_a_fallback_level_on_the_ladder() -> None:
+    parsed = build_parser().parse_args(
+        [
+            "runtime",
+            "plan",
+            "--semantic",
+            "semantic.json",
+            "--policy",
+            "policy.json",
+            "--fallback-level",
+            "3",
+            "--json",
+        ]
+    )
+
+    assert parsed.fallback_level == 3
+    with pytest.raises(SystemExit):
+        build_parser().parse_args(
+            ["runtime", "plan", "--semantic", "s", "--policy", "p", "--fallback-level", "4"]
+        )
