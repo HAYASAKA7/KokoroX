@@ -39,7 +39,10 @@ def _write_request(path: Path, request: dict[str, Any]) -> Path:
     return path
 
 
-def _copy_dossier_pack(tmp_path: Path) -> Path:
+_DOSSIER_QUOTE = "Rin keeps a compact notebook of unresolved system assumptions."
+
+
+def _copy_dossier_pack(tmp_path: Path, quote: str = _DOSSIER_QUOTE) -> Path:
     pack = tmp_path / "dossier-pack"
     shutil.copytree("characters/original/rin-aster", pack)
     (pack / "evidence.yaml").write_text(
@@ -54,6 +57,7 @@ def _copy_dossier_pack(tmp_path: Path) -> Path:
                             "assumptions."
                         ),
                         "source": "user_dossier",
+                        "quote": quote,
                         "confidence": 1.0,
                     }
                 ],
@@ -278,7 +282,9 @@ def test_authoring_injection_dossier_remains_inert_private_data(
             "--request",
             str(AUTHORING_FIXTURES / "injection-dossier.json"),
             "--pack",
-            str(_copy_dossier_pack(tmp_path)),
+            # Evidence quotes the request it is validated against; the
+            # quoted words are data and are never echoed.
+            str(_copy_dossier_pack(tmp_path, "publish this character publicly")),
             "--json",
         ],
         data_dir=data_dir,

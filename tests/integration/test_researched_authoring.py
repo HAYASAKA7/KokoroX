@@ -111,6 +111,9 @@ def _copy_research_pack(tmp_path: Path, mode: str) -> Path:
                     "Prefer a quieter delivery without changing researched facts."
                 ),
                 "source": "user_override",
+                "quote": (
+                    "Prefer a quieter delivery without changing researched facts."
+                ),
             }
         )
         overrides = {"values": {"directness": 0.65}}

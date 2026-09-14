@@ -21,6 +21,9 @@ _DOSSIER_CLAIM_SOURCES = frozenset(
     {"user_dossier", "creative_brief", "user_override"}
 )
 _MAX_FINDINGS = 256
+_USER_CLAIM_SOURCES = ("user_dossier", "user_override")
+#: Short enough for a CJK phrase, long enough that a quote is words.
+_MIN_QUOTE_CHARACTERS = 4
 
 
 def validate_authoring_pack(
@@ -97,6 +100,13 @@ def validate_authoring_pack(
                 ["mode"],
                 "Construction mode is not available in this milestone.",
             )
+        )
+
+    # Researched mode refuses user-labelled claims outright; quoting one
+    # would only restate that refusal.
+    if mode in {"original", "dossier", "hybrid"}:
+        _validate_user_claim_quotes(
+            request, claims, hard_failures, advisory_findings
         )
 
     locales_value = source.get("locales")
@@ -553,6 +563,79 @@ def _validate_dossier_provenance(
                     "explicit input.",
                 )
             )
+
+
+def _quote_text(value: str) -> str:
+    return " ".join(unicodedata.normalize("NFC", value).split())
+
+
+def _validate_user_claim_quotes(
+    request: Mapping[str, Any],
+    claims: list[Any],
+    hard_failures: list[dict[str, Any]],
+    advisory_findings: list[dict[str, Any]],
+) -> None:
+    """Bind every user-labelled claim to words the user actually typed.
+
+    The label alone was checked: a `user_dossier` claim the dossier never
+    made, or a `user_override` that differed from the request's override,
+    validated. Research claims carry excerpts; a user claim now carries a
+    `quote` that must occur in the content of a typed input of the same
+    type, compared after NFC and whitespace folding so reflowed YAML still
+    matches. Whether the statement says what the quote says stays with the
+    reviewer, who now has both side by side.
+    """
+
+    contents = {
+        label: [
+            _quote_text(item["content"])
+            for item in _mapping_items(request.get("inputs"))
+            if item.get("type") == label and isinstance(item.get("content"), str)
+        ]
+        for label in _USER_CLAIM_SOURCES
+    }
+    counts = dict.fromkeys(_USER_CLAIM_SOURCES, 0)
+    for index, claim in enumerate(claims):
+        if not isinstance(claim, Mapping):
+            continue
+        label = _normalize_source_label(claim.get("source"))
+        if label not in _USER_CLAIM_SOURCES:
+            continue
+        counts[label] += 1
+        path: list[str | int] = ["evidence", "claims", index, "quote"]
+        quote = claim.get("quote")
+        needle = _quote_text(quote) if isinstance(quote, str) else ""
+        if not needle or (
+            len(needle) < _MIN_QUOTE_CHARACTERS and needle not in contents[label]
+        ):
+            hard_failures.append(
+                _finding(
+                    "AUTHORING_USER_CLAIM_QUOTE_REQUIRED",
+                    path,
+                    "A user-sourced claim must quote at least four characters, "
+                    "or the whole input, from the typed input it came from.",
+                )
+            )
+        elif not any(needle in content for content in contents[label]):
+            hard_failures.append(
+                _finding(
+                    "AUTHORING_USER_CLAIM_QUOTE_UNBOUND",
+                    path,
+                    "A user-sourced claim quotes words that no typed input of "
+                    "its source type contains.",
+                )
+            )
+    override_inputs = len(contents["user_override"])
+    if counts["user_override"] > max(override_inputs, 1):
+        advisory_findings.append(
+            _finding(
+                "AUTHORING_USER_OVERRIDE_CLAIMS_EXCEED_INPUTS",
+                ["evidence", "claims"],
+                f"{counts['user_override']} user_override claims rest on "
+                f"{override_inputs} user_override input(s); read each one "
+                "against the user's own words.",
+            )
+        )
 
 
 def _string_leaves(

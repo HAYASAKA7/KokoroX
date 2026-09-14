@@ -86,6 +86,16 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- **Breaking:** every `user_dossier` or `user_override` evidence claim now
+  carries a `quote` copied from the content of a typed request input of the
+  same type. Authoring validation checked a user claim's label and never its
+  content, so a dossier claim the dossier never made, or an override that
+  differed from the request's, validated. A missing or too-short quote is
+  `AUTHORING_USER_CLAIM_QUOTE_REQUIRED`; one no such input contains is
+  `AUTHORING_USER_CLAIM_QUOTE_UNBOUND`. Quotes match after NFC and whitespace
+  folding. More `user_override` claims than override inputs returns the
+  advisory `AUTHORING_USER_OVERRIDE_CLAIMS_EXCEED_INPUTS`. Packs with user
+  claims need a `quote` added to each before they validate again.
 - `runtime plan` now honours a `neutral` scenario intensity cap and the
   neutral fallback rung. A scenario capped at `neutral` still planned the
   pack's lines, so an agent that honoured the cap failed validation and one

@@ -112,6 +112,7 @@ def _research_authoring_case(
             {
                 "statement": "Prefer quieter delivery.",
                 "source": "user_override",
+                "quote": "Prefer quieter delivery.",
             }
         )
     return request, researched_source
@@ -415,7 +416,7 @@ def test_validate_normalizes_structural_canon_source_labels(
     if mode == "dossier":
         source["evidence"]["authored_original"] = False
         claims.append(
-            {"statement": "Quoted assertion", "source": "user_dossier"}
+            {"statement": "Quoted assertion", "source": "user_dossier", "quote": "private user dossier"}
         )
     claims.append({"statement": "Relabelled assertion", "source": source_label})
     source["evidence"]["claims"] = claims
@@ -448,9 +449,16 @@ def test_validate_allows_normalized_mode_specific_provenance_labels(
     claims = []
     if mode == "dossier" and source_label != "User Dossier":
         claims.append(
-            {"statement": "Quoted assertion", "source": "user_dossier"}
+            {"statement": "Quoted assertion", "source": "user_dossier", "quote": "private user dossier"}
         )
-    claims.append({"statement": "Typed assertion", "source": source_label})
+    claim = {"statement": "Typed assertion", "source": source_label}
+    label = "_".join(source_label.casefold().replace("-", " ").split())
+    if label == "user_override":
+        request["inputs"].append({"type": "user_override", "content": "Typed assertion"})
+        claim["quote"] = "Typed assertion"
+    elif label == "user_dossier":
+        claim["quote"] = "private user dossier"
+    claims.append(claim)
     source["evidence"] = {
         "authored_original": mode == "original",
         "claims": claims,
@@ -487,7 +495,7 @@ def test_validate_fails_closed_for_unknown_or_untyped_claim_provenance(
     claims = []
     if mode == "dossier":
         claims.append(
-            {"statement": "Quoted assertion", "source": "user_dossier"}
+            {"statement": "Quoted assertion", "source": "user_dossier", "quote": "private user dossier"}
         )
     claims.append(claim)
     source["evidence"] = {
@@ -532,7 +540,7 @@ def test_validate_dossier_rejects_claim_relabelled_as_external_canon(
     source["evidence"] = {
         "authored_original": False,
         "claims": [
-            {"statement": "Quoted assertion", "source": "user_dossier"},
+            {"statement": "Quoted assertion", "source": "user_dossier", "quote": "private user dossier"},
             {"statement": "Relabelled assertion", "source": "external-canon"},
         ],
     }
@@ -559,7 +567,7 @@ def test_validate_dossier_rejects_authored_original_flag(
     source["evidence"] = {
         "authored_original": True,
         "claims": [
-            {"statement": "Quoted assertion", "source": "user_dossier"}
+            {"statement": "Quoted assertion", "source": "user_dossier", "quote": "private user dossier"}
         ],
     }
 
@@ -583,7 +591,7 @@ def test_validate_dossier_rejects_claim_copied_into_immutable_identity(
     source["evidence"] = {
         "authored_original": False,
         "claims": [
-            {"statement": "systems architect", "source": "user_dossier"}
+            {"statement": "systems architect", "source": "user_dossier", "quote": "private user dossier"}
         ],
     }
 
@@ -616,7 +624,7 @@ def test_validate_dossier_normalizes_identity_collapse_equality(
     source["evidence"] = {
         "authored_original": False,
         "claims": [
-            {"statement": claim_statement, "source": "user_dossier"}
+            {"statement": claim_statement, "source": "user_dossier", "quote": "private user dossier"}
         ],
     }
 
@@ -640,7 +648,7 @@ def test_validate_dossier_normalizes_explicit_identity_override(
     source["evidence"] = {
         "authored_original": False,
         "claims": [
-            {"statement": "Systems Architect.", "source": "user_dossier"}
+            {"statement": "Systems Architect.", "source": "user_dossier", "quote": "private user dossier"}
         ],
     }
 
@@ -662,7 +670,7 @@ def test_validate_dossier_allows_explicit_identity_override(
     source["evidence"] = {
         "authored_original": False,
         "claims": [
-            {"statement": "systems architect", "source": "user_dossier"}
+            {"statement": "systems architect", "source": "user_dossier", "quote": "private user dossier"}
         ],
     }
 
@@ -684,7 +692,7 @@ def test_validate_dossier_identity_collapse_ignores_non_dossier_claims(
     source["evidence"] = {
         "authored_original": False,
         "claims": [
-            {"statement": "Quoted assertion", "source": "user_dossier"},
+            {"statement": "Quoted assertion", "source": "user_dossier", "quote": "private user dossier"},
             {"statement": "systems architect", "source": "creative_brief"},
         ],
     }
@@ -1249,8 +1257,8 @@ def test_provenance_counts_keep_private_assertions_apart_from_sourced_facts(
     source["evidence"] = {
         "authored_original": False,
         "claims": [
-            {"statement": "Quoted assertion", "source": "user_dossier"},
-            {"statement": "Second assertion", "source": "user_dossier"},
+            {"statement": "Quoted assertion", "source": "user_dossier", "quote": "private user dossier"},
+            {"statement": "Second assertion", "source": "user_dossier", "quote": "private user dossier"},
             {"statement": "Relabelled assertion", "source": "external-canon"},
         ],
     }
@@ -1288,3 +1296,135 @@ def test_validate_authoring_pack_refuses_a_closing_intent_the_pack_does_not_auth
         for item in report["hard_failures"]
         if item["code"] == "AUTHORING_CLOSING_EXPRESSION_UNKNOWN"
     ] == [["behavior", "closing_expressions", 0]]
+
+
+def _dossier_claim_case(
+    original_request: dict[str, Any], source: dict[str, Any], claim: dict[str, Any]
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    request = _request_for_mode(original_request, "dossier")
+    source["evidence"] = {"authored_original": False, "claims": [claim]}
+    return request, source
+
+
+@pytest.mark.parametrize(
+    ("claim", "code"),
+    [
+        (
+            {"statement": "Royal court librarian.", "source": "user_dossier"},
+            "AUTHORING_USER_CLAIM_QUOTE_REQUIRED",
+        ),
+        (
+            {"statement": "Royal court librarian.", "source": "user_dossier", "quote": "A p"},
+            "AUTHORING_USER_CLAIM_QUOTE_REQUIRED",
+        ),
+        (
+            {
+                "statement": "Royal court librarian.",
+                "source": "user_dossier",
+                "quote": "royal court librarian",
+            },
+            "AUTHORING_USER_CLAIM_QUOTE_UNBOUND",
+        ),
+        (
+            # The dossier's words, but labelled as an override nobody typed.
+            {
+                "statement": "A private dossier.",
+                "source": "user_override",
+                "quote": "private user dossier",
+            },
+            "AUTHORING_USER_CLAIM_QUOTE_UNBOUND",
+        ),
+    ],
+)
+def test_a_user_claim_must_quote_the_users_own_input(
+    claim: dict[str, Any],
+    code: str,
+    registry: SchemaRegistry,
+    original_request: dict[str, Any],
+    source: dict[str, Any],
+) -> None:
+    """A dossier claim the dossier never made validated on its label alone."""
+
+    request, source = _dossier_claim_case(original_request, source, claim)
+    if claim["source"] == "user_override":
+        source["evidence"]["claims"].insert(
+            0,
+            {"statement": "Quoted assertion", "source": "user_dossier", "quote": "private user dossier"},
+        )
+
+    report = validate_authoring_pack(request, source, registry)
+
+    assert [(item["code"], item["path"][-1]) for item in report["hard_failures"]] == [
+        (code, "quote")
+    ]
+    registry.validate("character-source", source)
+
+
+def test_a_quote_matches_across_reflowed_whitespace_and_unicode_forms(
+    registry: SchemaRegistry,
+    original_request: dict[str, Any],
+    source: dict[str, Any],
+) -> None:
+    request, source = _dossier_claim_case(
+        original_request,
+        source,
+        {"statement": "Keeps a dossier.", "source": "user_dossier", "quote": "private\n  user dossier"},
+    )
+    request["inputs"][0]["content"] = "A private user dossier, Cafe\u0301 notes."
+    source["evidence"]["claims"].append(
+        {"statement": "Keeps notes.", "source": "user_dossier", "quote": "Caf\u00e9 notes"}
+    )
+
+    report = validate_authoring_pack(request, source, registry)
+
+    assert report["hard_failures"] == []
+
+
+def test_a_whole_short_input_is_a_valid_quote(
+    registry: SchemaRegistry,
+    original_request: dict[str, Any],
+    source: dict[str, Any],
+) -> None:
+    request, source = _dossier_claim_case(
+        original_request,
+        source,
+        {"statement": "Quiet.", "source": "user_dossier", "quote": "静か"},
+    )
+    request["inputs"][0]["content"] = "静か"
+
+    report = validate_authoring_pack(request, source, registry)
+
+    assert report["hard_failures"] == []
+
+
+def test_more_override_claims_than_override_inputs_is_advised(
+    registry: SchemaRegistry,
+    original_request: dict[str, Any],
+    source: dict[str, Any],
+    complete_research_bundle: dict[str, Any],
+) -> None:
+    """Three override claims from one override input validated without a word."""
+
+    request, researched_source = _research_authoring_case(
+        original_request, source, complete_research_bundle, "hybrid"
+    )
+    for statement in ("Quieter.", "Much quieter."):
+        researched_source["evidence"]["claims"].append(
+            {"statement": statement, "source": "user_override", "quote": "quieter delivery"}
+        )
+
+    report = validate_authoring_pack(
+        request,
+        researched_source,
+        registry,
+        research_bundle=complete_research_bundle,
+    )
+
+    assert "AUTHORING_USER_OVERRIDE_CLAIMS_EXCEED_INPUTS" in {
+        finding["code"] for finding in report["advisory_findings"]
+    }
+    assert not [
+        finding
+        for finding in report["hard_failures"]
+        if finding["code"].startswith("AUTHORING_USER_CLAIM")
+    ]

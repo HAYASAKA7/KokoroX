@@ -119,6 +119,7 @@
             "claim_id": {"$ref": "#/$defs/slug_id"},
             "statement": {"$ref": "#/$defs/bounded_string"},
             "source": {"$ref": "#/$defs/bounded_string"},
+            "quote": {"$ref": "#/$defs/bounded_string"},
             "confidence": {"type": "number", "minimum": 0, "maximum": 1},
             "notes": {"$ref": "#/$defs/bounded_string"}
           }
