@@ -2990,7 +2990,14 @@ def test_two_real_concurrent_installs_of_one_archive_both_succeed(
     rin_verified_release: dict[str, Any],
     tmp_path: Path,
 ) -> None:
-    """Checked with real processes: a simulated interleaving hid the stale re-read."""
+    """Checked with real processes: a simulated interleaving hid the stale re-read.
+
+    The defect was a false, non-retryable KARC_INSTALL_CONFLICT. On a slow
+    runner an install can hold the scope lock past the lock wait, and the
+    other then answers a retryable KARC_REGISTRY_LOCKED -- the documented
+    busy -- so it is retried here as any caller would, a bounded number of
+    times. A non-retryable refusal still fails the test.
+    """
 
     source = tmp_path / "rin-aster.karc"
     source.write_bytes(build_private_archive(rin_verified_release))
@@ -3001,6 +3008,16 @@ def test_two_real_concurrent_installs_of_one_archive_both_succeed(
         command = ["pack", "install", str(source), "--workspace", str(workspace)]
 
         results = _two_processes([command, command], data_root)
+        for attempt in range(3):
+            busy = [
+                body for code, body in results
+                if code != 0 and body["error"]["retryable"] is True
+            ]
+            if not busy:
+                break
+            results = [
+                result for result in results if result[0] == 0
+            ] + _two_processes([command] * len(busy), data_root)
 
         assert [code for code, _body in results] == [0, 0], results
         registry = load_installed_registry(data_root, SCHEMAS, workspace_root=workspace)
