@@ -2165,10 +2165,18 @@ def _handle_session_start(
         # or block an unrelated removal; end it rather than leave it so.
         store.end(args.session)
         raise
+    connected = None
+    if binding is not None:
+        # Report the state the session actually gets. Bound but unable to
+        # read retained state -- started after an upgrade, before migration --
+        # it answered durable while every context came back degraded.
+        _bound, connected = _session_relationship(
+            settings, schemas, store, args.session, session, advisories
+        )
     return {
         "ok": True,
         "session": session,
-        "relationship_state": "session" if binding is None else "durable",
+        "relationship_state": "session" if connected is None else "durable",
         # A session's compiled_pack_hash is the pack's source hash, not the
         # compiled file digest `pack list` calls compiled_sha256.
         "source_hash": compiled["source_hash"],
@@ -2983,6 +2991,24 @@ def _session_relationship(
 
     binding = store.relationship_binding(session_id, manifest)
     if binding is None:
+        return None, None
+    # A durable session writes session state only while degraded. Once it
+    # has, reconnecting would drop those events without a word -- after a
+    # regrant the session jumped back to retained state and they were gone.
+    # It stays on session state; a new session continues the retained one.
+    if manifest.get("state_revision", 0) > 0:
+        advisories.append(
+            {
+                "code": "PERSISTENCE_SESSION_DEGRADED",
+                "cause": "SESSION_EVENTS_KEPT",
+                "message": (
+                    "This session recorded events in session state while "
+                    "retained state was unavailable, so it stays on session "
+                    "state to keep them. Start a new session to continue the "
+                    "retained relationship."
+                ),
+            }
+        )
         return None, None
     try:
         return binding, _connected_relationship(settings, schemas, binding)

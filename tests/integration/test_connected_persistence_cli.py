@@ -198,7 +198,12 @@ def test_an_upgrade_migrates_retained_state_through_the_cli(
         )
     )
     started = _ok(run(data_root, "session", "start", "--session", "upgraded"))
-    assert started["relationship_state"] == "durable"
+    # Bound to the upgrade, but its retained state needs migrating first.
+    assert started["relationship_state"] == "session"
+    assert [(item["code"], item.get("cause")) for item in started["advisories"]] == [
+        ("SESSION_WORKSPACE_NOT_CONSULTED", None),
+        ("PERSISTENCE_SESSION_DEGRADED", "PERSISTENCE_STATE_MIGRATION_REQUIRED"),
+    ]
 
     degraded = _ok(_context(run, data_root, "upgraded"))
     assert degraded["relationship_state"] == "session"
@@ -572,3 +577,54 @@ def test_removal_is_not_blocked_by_sessions_of_other_installations(
     assert removed["ok"] is True
     assert code != 0
     assert blocked["error"]["details"]["sessions"] == ["in-second"]
+
+
+def test_a_session_that_wrote_while_degraded_keeps_its_events_after_a_regrant(
+    consented_rin: ConsentedRin,
+    run: Callable[..., tuple[int, dict[str, Any]]],
+    tmp_path: Path,
+) -> None:
+    """After the regrant the session jumped back to retained state and the event was gone."""
+
+    data_root = consented_rin.data_root
+    _ok(run(data_root, "config", "default", "set", "--character", "rin-aster"))
+    _ok(run(data_root, "session", "start", "--session", "kept"))
+    _ok(run(data_root, "consent", "revoke", "--character", "rin-aster"))
+    degraded = _ok(
+        run(
+            data_root,
+            "state",
+            "apply",
+            "--session",
+            "kept",
+            "--event",
+            _event_file(tmp_path, "kept-event-1", 0),
+        )
+    )
+    _grant(run, data_root, "relationship_state")
+
+    context = _ok(_context(run, data_root, "kept"))
+
+    assert degraded["relationship_state"] == "session"
+    assert context["relationship_state"] == "session"
+    assert context["context"]["state"]["revision"] == 1
+    assert [item["cause"] for item in context["advisories"]] == ["SESSION_EVENTS_KEPT"]
+    fresh = _ok(run(data_root, "session", "start", "--session", "after-kept"))
+    assert fresh["relationship_state"] == "durable"
+
+
+def test_a_session_that_wrote_nothing_while_degraded_reconnects(
+    consented_rin: ConsentedRin,
+    run: Callable[..., tuple[int, dict[str, Any]]],
+) -> None:
+    data_root = consented_rin.data_root
+    _ok(run(data_root, "config", "default", "set", "--character", "rin-aster"))
+    _ok(run(data_root, "session", "start", "--session", "quiet"))
+    _ok(run(data_root, "consent", "revoke", "--character", "rin-aster"))
+    assert _ok(_context(run, data_root, "quiet"))["relationship_state"] == "session"
+    _grant(run, data_root, "relationship_state")
+
+    context = _ok(_context(run, data_root, "quiet"))
+
+    assert context["relationship_state"] == "durable"
+    assert context["advisories"] == []

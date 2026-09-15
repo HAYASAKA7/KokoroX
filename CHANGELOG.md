@@ -101,6 +101,14 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- A session that applied events while degraded no longer loses them when
+  consent returns. It jumped back to retained state without a word and the
+  events were gone; it now stays on session state with the advisory cause
+  `SESSION_EVENTS_KEPT`, and a new session continues the retained
+  relationship. A degraded session that wrote nothing still reconnects.
+  `session start` reports the state a session actually gets: one started
+  after an upgrade but before migration answered `durable` while every
+  context came back degraded.
 - Two commands creating the same data directory at once no longer fail. Two
   installs into a fresh data root both found the registry directory missing,
   both created it, and the second reported `KARC_REGISTRY_PATH_INVALID`;
