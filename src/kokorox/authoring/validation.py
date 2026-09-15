@@ -11,6 +11,7 @@ from typing import Any
 
 from kokorox import __version__
 from kokorox.errors import KokoroError
+from kokorox.text_folding import fold_spacing
 from kokorox.language_tags import is_language_tag
 from kokorox.packs.compiler import canonical_bytes
 from kokorox.research.validation import timeline_label
@@ -586,15 +587,6 @@ def _validate_dossier_provenance(
             )
 
 
-_UNSPACED_SCRIPT = (
-    "\u3000-\u303f\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff"
-    "\uf900-\ufaff\uff00-\uffef\U00020000-\U0002fa1f"
-)
-_SPACE_BESIDE_UNSPACED = re.compile(
-    f" (?=[{_UNSPACED_SCRIPT}])|(?<=[{_UNSPACED_SCRIPT}]) "
-)
-
-
 _CITABLE_IDENTITY_TEXT = ("display_name", "declared_age", "role")
 
 
@@ -676,8 +668,7 @@ def _quote_text(value: str) -> str:
     # Chinese but let "is notable" stand for "is not able"; a space only
     # disappears where it meets Chinese or Japanese script, which a line
     # fold inserted and the dossier never had.
-    folded = " ".join(unicodedata.normalize("NFC", value).split())
-    return _SPACE_BESIDE_UNSPACED.sub("", folded)
+    return fold_spacing(unicodedata.normalize("NFC", value))
 
 
 def _validate_user_claim_quotes(

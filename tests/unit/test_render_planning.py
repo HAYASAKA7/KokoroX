@@ -904,3 +904,24 @@ def test_a_forbidden_line_is_refused_in_its_variants(spoken: str) -> None:
     result = validate_rendered_output(rendered, _semantic_artifact(), plan, attempt=3)
 
     assert "FORBIDDEN_SPAN_PRESENT" in [item["code"] for item in result["violations"]]
+
+
+@pytest.mark.parametrize(
+    ("line", "spoken", "refused"),
+    [
+        ("This ends soon.", "The build ends. Soon after, run the tests.", False),
+        ("Right away!", "The bright away team won.", False),
+        ("Right away!", "Right away, I will check the lock.", True),
+        ("Understood.", "Understood, here is the fix.", True),
+        ("了解しました、ご主人様。", "了解しました\nご主人様", False),
+    ],
+    ids=["across-sentences", "inside-a-word", "latin-variant", "latin-prefix", "across-lines"],
+)
+def test_forbidden_line_matching_keeps_sentence_and_word_boundaries(
+    line: str, spoken: str, refused: bool
+) -> None:
+    """Flattening the whole response let a line's words match across sentences."""
+
+    from kokorox.runtime.validation import _span_words, _speaks_line
+
+    assert _speaks_line(_span_words(spoken), _span_words(line)) is refused

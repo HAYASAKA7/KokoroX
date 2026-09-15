@@ -11,6 +11,7 @@ from typing import Any
 
 from kokorox import __version__
 from kokorox.errors import KokoroError
+from kokorox.text_folding import fold_spacing
 from kokorox.language_tags import PRESERVE, is_channel_language, is_language_tag
 
 
@@ -310,20 +311,55 @@ def _semantic_contract_valid(value: Mapping[str, Any]) -> bool:
     )
 
 
-_MIN_FORBIDDEN_CORE = 4
+_MIN_FORBIDDEN_CHARACTERS = 4
+_SENTENCE_BREAKS = frozenset(".!?\u3002\n\r")
 
 
-def _span_core(value: str) -> str:
-    """The words of a line: compatibility-normalized and casefolded, without
-    whitespace or punctuation."""
+def _span_words(value: str) -> str:
+    """A line's words for matching, with its sentence breaks kept.
+
+    Compatibility-normalized and casefolded; a sentence break becomes a line
+    break, other punctuation a space, and spacing folds as for quotes. A
+    first version stripped every space and mark from the whole response,
+    so a line's words could match across two unrelated sentences.
+    """
 
     folded = unicodedata.normalize("NFKC", value).casefold()
-    return "".join(
-        character
-        for character in folded
-        if not character.isspace()
-        and not unicodedata.category(character).startswith("P")
-    )
+    pieces = []
+    for character in folded:
+        if character in _SENTENCE_BREAKS:
+            pieces.append("\n")
+        elif character.isspace() or unicodedata.category(character).startswith("P"):
+            pieces.append(" ")
+        else:
+            pieces.append(character)
+    lines = (fold_spacing(line) for line in "".join(pieces).split("\n"))
+    return "\n".join(line for line in lines if line)
+
+
+def _is_latin_word_character(character: str) -> bool:
+    return character.isascii() and character.isalnum()
+
+
+def _speaks_line(text_words: str, line_words: str) -> bool:
+    """Whether the text contains the line's words, on word boundaries in Latin script."""
+
+    if len(line_words.replace(" ", "").replace("\n", "")) < _MIN_FORBIDDEN_CHARACTERS:
+        return False
+    start = 0
+    while True:
+        found = text_words.find(line_words, start)
+        if found < 0:
+            return False
+        end = found + len(line_words)
+        before = text_words[found - 1] if found else ""
+        after = text_words[end] if end < len(text_words) else ""
+        # "right away" inside "bright away" is not the line.
+        joined_before = before and _is_latin_word_character(before) and _is_latin_word_character(line_words[0])
+        joined_after = after and _is_latin_word_character(after) and _is_latin_word_character(line_words[-1])
+        if not joined_before and not joined_after:
+            return True
+        start = found + 1
 
 
 def _plan_contract_valid(value: Mapping[str, Any]) -> bool:
@@ -892,16 +928,13 @@ def validate_rendered_output(
         _check_fixed_line_order(text, planned_segments, violations)
         forbidden = plan.get("forbidden_spans") if plan_mapping else None
         if isinstance(forbidden, list):
-            text_core = _span_core(text)
+            text_words = _span_words(text)
             for span in forbidden:
                 if not isinstance(span, str) or not span:
                     continue
-                core = _span_core(span)
                 # Exact, or the same words: dropping the 。, a halfwidth comma,
                 # or an inserted space each got a pack line past a neutral plan.
-                if span in text or (
-                    len(core) >= _MIN_FORBIDDEN_CORE and core in text_core
-                ):
+                if span in text or _speaks_line(text_words, _span_words(span)):
                     violations.add(
                         "FORBIDDEN_SPAN_PRESENT",
                         "Rendered text speaks a pack line the neutral plan leaves out.",
