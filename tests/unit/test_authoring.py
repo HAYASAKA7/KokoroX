@@ -1586,3 +1586,35 @@ def test_supports_names_only_identity_fields(
 
     with pytest.raises(KokoroError):
         registry.validate("character-source", source)
+
+
+def test_an_uncited_identity_role_is_advised_in_research_modes(
+    registry: SchemaRegistry,
+    original_request: dict[str, Any],
+    source: dict[str, Any],
+    complete_research_bundle: dict[str, Any],
+) -> None:
+    """Without supports, a contradicting role validated with no word at all."""
+
+    request, researched_source = _research_authoring_case(
+        original_request, source, complete_research_bundle
+    )
+
+    uncited = validate_authoring_pack(
+        request, researched_source, registry, research_bundle=complete_research_bundle
+    )
+    researched_source["evidence"]["claims"][0]["supports"] = ["identity.role"]
+    cited = validate_authoring_pack(
+        request, researched_source, registry, research_bundle=complete_research_bundle
+    )
+
+    assert ["identity", "role"] in [
+        finding["path"]
+        for finding in uncited["advisory_findings"]
+        if finding["code"] == "AUTHORING_IDENTITY_UNCITED"
+    ]
+    assert ["identity", "role"] not in [
+        finding["path"]
+        for finding in cited["advisory_findings"]
+        if finding["code"] == "AUTHORING_IDENTITY_UNCITED"
+    ]

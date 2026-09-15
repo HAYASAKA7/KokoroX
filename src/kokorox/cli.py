@@ -12,6 +12,7 @@ import re
 import stat
 import sys
 import tempfile
+import time
 from typing import Any, Callable, Final, cast
 
 from kokorox import __version__
@@ -2174,7 +2175,8 @@ def _handle_session_start(
     }
 
 
-_DEFAULT_START_ATTEMPTS = 3
+_DEFAULT_START_ATTEMPTS = 4
+_DEFAULT_RACE_CODES: Final = frozenset({"KARC_DEFAULT_INPUT_MUTATION", "KARC_DEFAULT_STALE"})
 
 
 def _start_from_default(
@@ -2193,11 +2195,25 @@ def _start_from_default(
     refused: KokoroError | None = None
     refused_selection: tuple[Any, ...] | None = None
     for attempt in range(_DEFAULT_START_ATTEMPTS):
-        selection = resolve_character_selection(
-            settings.data_dir,
-            schemas,
-            workspace_root=workspace_root,
-        )
+        if attempt:
+            # Let the concurrent default write finish before looking again.
+            time.sleep(0.05 * attempt)
+        try:
+            selection = resolve_character_selection(
+                settings.data_dir,
+                schemas,
+                workspace_root=workspace_root,
+            )
+        except KokoroError as error:
+            # The lookup reads the default while a clear replaces it; the
+            # retry was only around the projection, so the race still
+            # answered MUTATION or STALE instead of NOT_CONFIGURED.
+            if (
+                error.code not in _DEFAULT_RACE_CODES
+                or attempt == _DEFAULT_START_ATTEMPTS - 1
+            ):
+                raise
+            continue
         if selection.source == "none":
             raise KokoroError(
                 "KARC_DEFAULT_NOT_CONFIGURED",
@@ -2216,7 +2232,7 @@ def _start_from_default(
                 workspace_root=workspace_root,
             )
         except KokoroError as error:
-            if error.code != "KARC_DEFAULT_INPUT_MUTATION":
+            if error.code not in _DEFAULT_RACE_CODES:
                 raise
             refused, refused_selection = error, identity
             if attempt == _DEFAULT_START_ATTEMPTS - 1:

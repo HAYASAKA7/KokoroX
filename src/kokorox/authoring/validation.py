@@ -645,7 +645,22 @@ def _validate_supported_identity(
     for name in _CITABLE_IDENTITY_TEXT:
         value = identity.get(name)
         claim_ids = researched.get(f"identity.{name}", [])
-        if not isinstance(value, str) or not claim_ids:
+        if not isinstance(value, str):
+            continue
+        if not claim_ids and name != "display_name":
+            # Without supports nothing can be compared, so a contradiction
+            # validated silently. The display name is already bound to the
+            # bundle's own.
+            advisory_findings.append(
+                _finding(
+                    "AUTHORING_IDENTITY_UNCITED",
+                    ["identity", name],
+                    "No Research Bundle claim declares that it supports this "
+                    "identity field; add supports to the claim it rests on.",
+                )
+            )
+            continue
+        if not claim_ids:
             continue
         needle = _normalize_identity_text(value)
         if needle and not any(

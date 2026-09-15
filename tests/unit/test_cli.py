@@ -1296,3 +1296,36 @@ def test_a_pack_replaced_while_the_default_stays_is_refused_not_retried(
     assert caught.value.code == "KARC_DEFAULT_INPUT_MUTATION"
     assert caught.value.retryable is False
     assert len(attempts) == 1
+
+
+def test_a_default_cleared_during_the_lookup_says_none_is_configured(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The race hit the lookup, outside the retry, and answered MUTATION or STALE."""
+
+    from types import SimpleNamespace
+
+    import kokorox.cli as cli_module
+    from kokorox.distribution.defaults import CharacterSelection
+
+    outcomes = iter(
+        [
+            KokoroError("KARC_DEFAULT_STALE", "cleared under the lookup"),
+            CharacterSelection(source="none"),
+        ]
+    )
+
+    def resolve(*_args: object, **_kwargs: object) -> CharacterSelection:
+        outcome = next(outcomes)
+        if isinstance(outcome, KokoroError):
+            raise outcome
+        return outcome
+
+    monkeypatch.setattr(cli_module, "resolve_character_selection", resolve)
+
+    with pytest.raises(KokoroError) as caught:
+        cli_module._start_from_default(
+            SimpleNamespace(data_dir=None), object(), None  # type: ignore[arg-type]
+        )
+
+    assert caught.value.code == "KARC_DEFAULT_NOT_CONFIGURED"

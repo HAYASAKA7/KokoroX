@@ -913,7 +913,7 @@ def test_a_forbidden_line_is_refused_in_its_variants(spoken: str) -> None:
         ("Right away!", "The bright away team won.", False),
         ("Right away!", "Right away, I will check the lock.", True),
         ("Understood.", "Understood, here is the fix.", True),
-        ("了解しました、ご主人様。", "了解しました\nご主人様", False),
+        ("了解しました、ご主人様。", "了解しました、\nご主人様。", True),
     ],
     ids=["across-sentences", "inside-a-word", "latin-variant", "latin-prefix", "across-lines"],
 )

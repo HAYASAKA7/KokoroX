@@ -1990,6 +1990,12 @@ def _read_reference_directory(
                 path = Path(entry.path)
                 path_stat = path.lstat()
                 if (
+                    stat.S_ISREG(path_stat.st_mode)
+                    and not _is_redirect(path, path_stat)
+                    and _is_transient_staging(path.name)
+                ):
+                    continue
+                if (
                     not stat.S_ISREG(path_stat.st_mode)
                     or _is_redirect(path, path_stat)
                     or path.suffix != ".json"
@@ -2078,7 +2084,20 @@ def _read_reference_document_once(
             raise ValueError("schema callback mutated reference")
         repeated = _read_removal_file(path, _MAX_REFERENCE_BYTES)
         if repeated != payload:
-            raise ValueError("reference changed during validation")
+            raise _ReferenceChanged("reference changed during validation")
+    except KokoroError as error:
+        # A retryable concurrent change an audit reported during the schema
+        # callback was rewrapped here as a plain, non-retryable scan failure.
+        if error.retryable and error.details.get("reason") == "concurrent_change":
+            raise
+        raise _reference_scan_error(
+            "Reference artifact is invalid or changed.",
+            reason=_reason(error),
+        ) from error
+    except _ReferenceChanged as error:
+        raise _concurrent_reference_change(
+            "Reference artifact changed while it was read."
+        ) from error
     except Exception as error:
         raise _reference_scan_error(
             "Reference artifact is invalid or changed.",
@@ -2147,7 +2166,7 @@ def _archive_is_referenced(
                         and path.name.endswith(".lock")
                         and _HEX_SHA256.fullmatch(lock_scope) is not None
                     )
-                    if safe_regular and known_lock:
+                    if safe_regular and (known_lock or _is_transient_staging(path.name)):
                         continue
                     if not safe_regular or path.suffix != ".json":
                         raise _reference_scan_error(
@@ -2250,6 +2269,20 @@ def _remove_exact_archive(path: Path, digest: str, limits: KarcLimits) -> None:
             "Unreferenced archive could not be removed.",
             reason=type(error).__name__,
         ) from error
+
+
+_TRANSIENT_STAGING = re.compile(r"\.[A-Za-z0-9._-]+\.json\.[A-Za-z0-9_-]+\.tmp\Z")
+
+
+def _is_transient_staging(name: str) -> bool:
+    # Another command's atomic write in flight: a session starting, a
+    # registry published in another scope. It was refused as an unsafe entry,
+    # not retryable; its rename into place is caught as a change instead.
+    return _TRANSIENT_STAGING.fullmatch(name) is not None
+
+
+class _ReferenceChanged(ValueError):
+    """A readable reference that another command replaced while it was read."""
 
 
 def _reference_scan_error(message: str, **details: Any) -> KokoroError:
@@ -2814,6 +2847,10 @@ def _capture_reference_directory(
                         "Reference directory exceeds its entry limit."
                     )
                 member = Path(entry.path)
+                if member.parent == path and _is_transient_staging(member.name):
+                    staged = member.lstat()
+                    if stat.S_ISREG(staged.st_mode) and not _is_redirect(member, staged):
+                        continue
                 if member.parent != path or member.suffix != ".json":
                     raise _reference_scan_error(
                         "Reference directory contains an unsafe entry."
@@ -2855,6 +2892,7 @@ def _require_reference_directory(
         captured.identity,
         captured.fingerprints,
         captured.captured_at_ns,
+        _is_transient_staging,
     ):
         return
     try:
@@ -2894,6 +2932,7 @@ def _workspace_registry_ignored(name: str, excluded_name: str | None) -> bool:
             and name.endswith(".tmp")
         )
         or name == excluded_name
+        or _is_transient_staging(name)
     )
 
 
@@ -2944,7 +2983,7 @@ def _capture_workspace_registries(
                     excluded_name is not None
                     and member.name.startswith(f".{excluded_name}.")
                     and member.name.endswith(".tmp")
-                )
+                ) or _is_transient_staging(member.name)
                 if safe_regular and (known_lock or known_selected_staging):
                     continue
                 if (

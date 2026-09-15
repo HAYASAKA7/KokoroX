@@ -628,3 +628,46 @@ def test_a_session_that_wrote_nothing_while_degraded_reconnects(
 
     assert context["relationship_state"] == "durable"
     assert context["advisories"] == []
+
+
+def test_a_real_session_start_racing_a_default_clear_has_a_remedy(
+    consented_rin: ConsentedRin,
+    tmp_path: Path,
+) -> None:
+    """Real processes: the faked race missed that the lookup itself was racing."""
+
+    import os
+    import subprocess
+    import sys
+    import time
+
+    data_root = consented_rin.data_root
+    environment = os.environ.copy()
+    environment["KOKOROX_DATA_DIR"] = str(data_root)
+    environment["PYTHONPATH"] = str(Path("src").resolve())
+
+    def cli(*arguments: str) -> subprocess.Popen[str]:
+        return subprocess.Popen(
+            [sys.executable, "-m", "kokorox.cli", *arguments, "--json"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            encoding="utf-8",
+            env=environment,
+        )
+
+    outcomes = []
+    for round_index in range(4):
+        setter = cli("config", "default", "set", "--character", "rin-aster")
+        assert setter.wait(timeout=120) == 0
+        start = cli("session", "start", "--session", f"race-{round_index}")
+        time.sleep(0.05 * round_index)
+        clear = cli("config", "default", "clear")
+        start_out, _ = start.communicate(timeout=120)
+        clear.communicate(timeout=120)
+        body = json.loads(start_out)
+        outcomes.append("ok" if body["ok"] else body["error"]["code"])
+        if body["ok"]:
+            assert cli("session", "end", "--session", f"race-{round_index}").wait(timeout=120) == 0
+
+    assert set(outcomes) <= {"ok", "KARC_DEFAULT_NOT_CONFIGURED"}, outcomes

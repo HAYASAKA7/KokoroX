@@ -109,6 +109,18 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- A session start racing a default clear now answers
+  `KARC_DEFAULT_NOT_CONFIGURED`: the race usually hit the default lookup,
+  outside the earlier retry, and answered `KARC_DEFAULT_INPUT_MUTATION` or
+  `KARC_DEFAULT_STALE`. Verified with real concurrent processes.
+- A removal racing another command is refused retryably every time. A
+  concurrent change an audit reported inside a reference read was rewrapped as
+  a non-retryable scan failure, and another command's in-flight staging file
+  read as an unsafe entry.
+- A forbidden pack line wrapped across a line break is refused; only sentence
+  punctuation separates. In researched and hybrid modes an `identity.role` or
+  `identity.declared_age` no research claim supports returns the advisory
+  `AUTHORING_IDENTITY_UNCITED`.
 - The closing-line advisories state a fact instead of guessing from intent
   names, which missed `wrap_up` and `sign_off` and flagged two honest opening
   lines. Runtime context now reports `closing_expressions_declared`;

@@ -312,7 +312,9 @@ def _semantic_contract_valid(value: Mapping[str, Any]) -> bool:
 
 
 _MIN_FORBIDDEN_CHARACTERS = 4
-_SENTENCE_BREAKS = frozenset(".!?\u3002\n\r")
+# Sentence punctuation separates; a line break does not -- a render can wrap
+# a pack line across lines, and 了解しました、⏎ご主人様。 was not recognised.
+_SENTENCE_BREAKS = frozenset(".!?\u3002")
 
 
 def _span_words(value: str) -> str:

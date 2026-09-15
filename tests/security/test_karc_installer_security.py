@@ -3161,3 +3161,42 @@ def test_a_link_created_in_the_race_is_still_refused(
         registry_module._ensure_directory(target)
 
     assert caught.value.code == "KARC_REGISTRY_PATH_INVALID"
+
+
+def test_another_command_s_staging_file_is_not_an_unsafe_reference(
+    rin_verified_release: dict[str, Any],
+    tmp_path: Path,
+) -> None:
+    """A session written during a removal left a .tmp that read as an unsafe entry."""
+
+    source = tmp_path / "rin-aster.karc"
+    source.write_bytes(build_private_archive(rin_verified_release))
+    data_root = tmp_path / "data"
+    install_karc_archive(source, data_root, SCHEMAS)
+    sessions = data_root / "sessions"
+    sessions.mkdir(parents=True, exist_ok=True)
+    (sessions / ".someone.json.abc123.tmp").write_bytes(b"{partial")
+    workspaces = data_root / "registry" / "workspaces"
+    workspaces.mkdir(parents=True, exist_ok=True)
+    (workspaces / f".{'c' * 64}.json.k9x2.tmp").write_bytes(b"{partial")
+
+    remove_installed_pack(data_root, "original", "rin-aster", "1.0.0", SCHEMAS)
+
+    assert load_installed_registry(data_root, SCHEMAS)["entries"] == {}
+
+
+def test_a_concurrent_change_reported_inside_a_reference_read_stays_retryable(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def changed_during_validation(*_args: Any, **_kwargs: Any) -> None:
+        raise installer_module._concurrent_reference_change("changed")
+
+    path = Path("reference.json")
+    monkeypatch.setattr(installer_module, "_read_removal_file", lambda *_a, **_k: b'{"a":1}')
+    schemas = SimpleNamespace(validate=changed_during_validation)
+
+    with pytest.raises(KokoroError) as caught:
+        installer_module._read_reference_document_once(path, "session-manifest", schemas)
+
+    assert caught.value.retryable is True
+    assert caught.value.details == {"reason": "concurrent_change"}
