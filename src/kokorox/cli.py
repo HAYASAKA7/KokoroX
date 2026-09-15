@@ -2190,6 +2190,8 @@ def _start_from_default(
     that keeps changing is refused as retryable.
     """
 
+    refused: KokoroError | None = None
+    refused_selection: tuple[Any, ...] | None = None
     for attempt in range(_DEFAULT_START_ATTEMPTS):
         selection = resolve_character_selection(
             settings.data_dir,
@@ -2201,6 +2203,11 @@ def _start_from_default(
                 "KARC_DEFAULT_NOT_CONFIGURED",
                 "No character default is configured.",
             )
+        identity = _selection_identity(selection)
+        if refused is not None and identity == refused_selection:
+            # The default did not change, so what changed was the pack being
+            # projected. That is refused as before, never retried into.
+            raise refused
         try:
             return selection, _publish_selected_compiled_projection(
                 settings,
@@ -2211,6 +2218,7 @@ def _start_from_default(
         except KokoroError as error:
             if error.code != "KARC_DEFAULT_INPUT_MUTATION":
                 raise
+            refused, refused_selection = error, identity
             if attempt == _DEFAULT_START_ATTEMPTS - 1:
                 raise KokoroError(
                     "KARC_DEFAULT_INPUT_MUTATION",
@@ -2218,6 +2226,18 @@ def _start_from_default(
                     retryable=True,
                 ) from error
     raise AssertionError("unreachable")
+
+
+def _selection_identity(selection: CharacterSelection) -> tuple[Any, ...]:
+    return (
+        selection.source,
+        selection.installation_id,
+        selection.namespace,
+        selection.character_id,
+        selection.character_version,
+        selection.archive_sha256,
+        selection.compiled_sha256,
+    )
 
 
 def _publish_selected_compiled_projection(

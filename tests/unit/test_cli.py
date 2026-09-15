@@ -1262,3 +1262,37 @@ def test_a_default_cleared_while_a_session_starts_says_none_is_configured(
         )
 
     assert caught.value.code == "KARC_DEFAULT_NOT_CONFIGURED"
+
+
+def test_a_pack_replaced_while_the_default_stays_is_refused_not_retried(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Only a changed default is worth another attempt; a replaced pack is refused."""
+
+    from types import SimpleNamespace
+
+    import kokorox.cli as cli_module
+    from kokorox.distribution.defaults import CharacterSelection
+
+    selection = CharacterSelection(
+        source="global_default", installation_id="x", namespace="original",
+        character_id="rin-aster", character_version="1.0.0",
+        archive_sha256="a" * 64, compiled_sha256="b" * 64,
+    )
+    attempts = []
+
+    def replaced(*_args: object, **_kwargs: object) -> dict[str, object]:
+        attempts.append(True)
+        raise KokoroError("KARC_DEFAULT_INPUT_MUTATION", "source replaced")
+
+    monkeypatch.setattr(cli_module, "resolve_character_selection", lambda *a, **k: selection)
+    monkeypatch.setattr(cli_module, "_publish_selected_compiled_projection", replaced)
+
+    with pytest.raises(KokoroError) as caught:
+        cli_module._start_from_default(
+            SimpleNamespace(data_dir=None), object(), None  # type: ignore[arg-type]
+        )
+
+    assert caught.value.code == "KARC_DEFAULT_INPUT_MUTATION"
+    assert caught.value.retryable is False
+    assert len(attempts) == 1

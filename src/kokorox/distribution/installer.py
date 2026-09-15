@@ -248,10 +248,11 @@ def install_karc_archive(
                 limits=limits,
             )
         except KokoroError as error:
-            if dry_run or error.details.get("reason") not in {
-                "registry_changed",
-                "data_root_created",
-            }:
+            concurrent = (
+                error.code == "KARC_REGISTRY_CHANGED"
+                or error.details.get("reason") in {"registry_changed", "data_root_created"}
+            )
+            if dry_run or not concurrent:
                 raise
             # Another install published while this one previewed. The locked
             # path re-reads the registry and plans again -- an identical
