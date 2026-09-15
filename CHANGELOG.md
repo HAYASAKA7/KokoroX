@@ -8,6 +8,14 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- Evidence claims can name the identity fields they support, as
+  `supports: [identity.role]`. Nothing linked a claim to the identity it
+  backs, so a quoted override contradicting a research claim, or an
+  `identity.role` contradicting the claim it rests on, validated. A user claim
+  that supports a field a Research Bundle claim supports now fails with
+  `AUTHORING_RESEARCH_FACT_OVERRIDE`, and an identity value its cited
+  research statement does not contain returns the advisory
+  `AUTHORING_IDENTITY_NOT_IN_CITED_CLAIM`, by path and without echoing text.
 - Consented relationship state now reaches sessions. A session started from
   an installed default whose consent grants `relationship_state` returns
   `relationship_state: durable`; `runtime context` shows the retained

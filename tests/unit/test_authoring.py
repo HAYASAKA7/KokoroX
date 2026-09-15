@@ -1518,3 +1518,71 @@ def test_a_quote_keeps_its_word_boundaries(
         item["code"] for item in report["hard_failures"]
     ]
     assert unbound is not binds
+
+
+def test_a_user_claim_cannot_support_a_field_research_supports(
+    registry: SchemaRegistry,
+    original_request: dict[str, Any],
+    source: dict[str, Any],
+    complete_research_bundle: dict[str, Any],
+) -> None:
+    """A quoted override contradicting claim-role validated under a new claim id."""
+
+    request, researched_source = _research_authoring_case(
+        original_request, source, complete_research_bundle, "hybrid"
+    )
+    researched_source["evidence"]["claims"][0]["supports"] = ["identity.role"]
+    researched_source["evidence"]["claims"][1]["supports"] = ["identity.role"]
+    registry.validate("character-source", researched_source)
+
+    report = validate_authoring_pack(
+        request, researched_source, registry, research_bundle=complete_research_bundle
+    )
+
+    assert [
+        (finding["code"], finding["path"])
+        for finding in report["hard_failures"]
+        if finding["code"] == "AUTHORING_RESEARCH_FACT_OVERRIDE"
+    ] == [("AUTHORING_RESEARCH_FACT_OVERRIDE", ["evidence", "claims", 1, "supports"])]
+
+
+@pytest.mark.parametrize(
+    ("role", "advised"),
+    [("starship captain", True), ("observatory apprentice", False)],
+)
+def test_an_identity_value_its_cited_claim_does_not_state_is_advised(
+    role: str,
+    advised: bool,
+    registry: SchemaRegistry,
+    original_request: dict[str, Any],
+    source: dict[str, Any],
+    complete_research_bundle: dict[str, Any],
+) -> None:
+    request, researched_source = _research_authoring_case(
+        original_request, source, complete_research_bundle
+    )
+    researched_source["identity"]["role"] = role
+    researched_source["evidence"]["claims"][0]["supports"] = ["identity.role"]
+
+    report = validate_authoring_pack(
+        request, researched_source, registry, research_bundle=complete_research_bundle
+    )
+
+    codes = [finding["code"] for finding in report["advisory_findings"]]
+    assert ("AUTHORING_IDENTITY_NOT_IN_CITED_CLAIM" in codes) is advised
+    assert "AUTHORING_RESEARCH_CLAIM_UNBOUND" not in [
+        finding["code"] for finding in report["hard_failures"]
+    ]
+    assert role not in json.dumps(report["advisory_findings"])
+
+
+def test_supports_names_only_identity_fields(
+    registry: SchemaRegistry, source: dict[str, Any]
+) -> None:
+    source["evidence"] = {
+        "authored_original": True,
+        "claims": [{"statement": "x", "source": "creative_brief", "supports": ["behavior.tone"]}],
+    }
+
+    with pytest.raises(KokoroError):
+        registry.validate("character-source", source)

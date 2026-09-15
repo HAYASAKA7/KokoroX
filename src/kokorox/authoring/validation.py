@@ -103,6 +103,11 @@ def validate_authoring_pack(
             )
         )
 
+    if mode in {"researched", "hybrid"} and isinstance(research_bundle, Mapping):
+        _validate_supported_identity(
+            source, claims, research_bundle, hard_failures, advisory_findings
+        )
+
     # Researched mode refuses user-labelled claims outright; quoting one
     # would only restate that refusal.
     if mode in {"original", "dossier", "hybrid"}:
@@ -404,9 +409,9 @@ def _validate_research_provenance(
         claim_id = claim.get("claim_id")
         if source_label == "research_bundle":
             research_reference_count += 1
-            if (
-                claim_id not in supported_claim_ids
-                or set(claim) != {"claim_id", "source"}
+            if claim_id not in supported_claim_ids or not (
+                set(claim) == {"claim_id", "source"}
+                or set(claim) == {"claim_id", "source", "supports"}
             ):
                 findings.append(
                     _finding(
@@ -588,6 +593,81 @@ _UNSPACED_SCRIPT = (
 _SPACE_BESIDE_UNSPACED = re.compile(
     f" (?=[{_UNSPACED_SCRIPT}])|(?<=[{_UNSPACED_SCRIPT}]) "
 )
+
+
+_CITABLE_IDENTITY_TEXT = ("display_name", "declared_age", "role")
+
+
+def _validate_supported_identity(
+    source: Mapping[str, Any],
+    claims: list[Any],
+    bundle: Mapping[str, Any],
+    hard_failures: list[dict[str, Any]],
+    advisory_findings: list[dict[str, Any]],
+) -> None:
+    """Check identity fields against the claims that say they support them.
+
+    Nothing linked a claim to the identity it backs, so a quoted override
+    contradicting `claim-role`, or an `identity.role` contradicting the claim
+    it rests on, validated. With `supports`, a user claim backing a field a
+    research claim backs is refused -- users cannot rewrite a researched
+    fact -- and an identity value the cited research statement does not
+    contain is advised by path, without echoing either text. A quote proves
+    where words came from, not what they mean; this only points the
+    reviewer at the pair to read.
+    """
+
+    statements = {
+        claim["claim_id"]: claim["statement"]
+        for claim in _mapping_items(bundle.get("claims"))
+        if isinstance(claim.get("claim_id"), str) and isinstance(claim.get("statement"), str)
+    }
+    researched: dict[str, list[str]] = {}
+    user_claims: list[tuple[int, list[str]]] = []
+    for index, claim in enumerate(claims):
+        if not isinstance(claim, Mapping):
+            continue
+        supports = claim.get("supports")
+        if not isinstance(supports, list):
+            continue
+        fields = [item for item in supports if isinstance(item, str) and item.startswith("identity.")]
+        label = _normalize_source_label(claim.get("source"))
+        if label == "research_bundle" and isinstance(claim.get("claim_id"), str):
+            for field in fields:
+                researched.setdefault(field, []).append(claim["claim_id"])
+        elif label in {"user_dossier", "user_override"}:
+            user_claims.append((index, fields))
+    for index, fields in user_claims:
+        if any(field in researched for field in fields):
+            hard_failures.append(
+                _finding(
+                    "AUTHORING_RESEARCH_FACT_OVERRIDE",
+                    ["evidence", "claims", index, "supports"],
+                    "A user claim cannot support an identity field a Research "
+                    "Bundle claim supports.",
+                )
+            )
+    identity = source.get("identity")
+    if not isinstance(identity, Mapping):
+        return
+    for name in _CITABLE_IDENTITY_TEXT:
+        value = identity.get(name)
+        claim_ids = researched.get(f"identity.{name}", [])
+        if not isinstance(value, str) or not claim_ids:
+            continue
+        needle = _normalize_identity_text(value)
+        if needle and not any(
+            needle in _normalize_identity_text(statements.get(claim_id, ""))
+            for claim_id in claim_ids
+        ):
+            advisory_findings.append(
+                _finding(
+                    "AUTHORING_IDENTITY_NOT_IN_CITED_CLAIM",
+                    ["identity", name],
+                    "The Research Bundle claim this identity field cites does not "
+                    "state its value; read the two side by side.",
+                )
+            )
 
 
 def _quote_text(value: str) -> str:

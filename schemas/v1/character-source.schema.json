@@ -120,6 +120,13 @@
             "statement": {"$ref": "#/$defs/bounded_string"},
             "source": {"$ref": "#/$defs/bounded_string"},
             "quote": {"$ref": "#/$defs/bounded_string"},
+            "supports": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 5,
+              "uniqueItems": true,
+              "items": {"enum": ["identity.display_name", "identity.declared_age", "identity.role", "identity.worldview", "identity.non_negotiables"]}
+            },
             "confidence": {"type": "number", "minimum": 0, "maximum": 1},
             "notes": {"$ref": "#/$defs/bounded_string"}
           }
