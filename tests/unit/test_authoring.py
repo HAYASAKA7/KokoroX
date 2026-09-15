@@ -1430,36 +1430,31 @@ def test_more_override_claims_than_override_inputs_is_advised(
     ]
 
 
-@pytest.mark.parametrize(
-    ("intent", "advised"),
-    [
-        ("task_completion", True),
-        ("work_finished", True),
-        ("done", True),
-        ("order_acknowledgement", False),
-        ("restrained_diagnosis", False),
-        ("undone_warning", False),
-    ],
-)
-def test_a_completion_line_left_opening_is_advised(
-    intent: str,
-    advised: bool,
+def test_a_pack_that_never_declares_closing_lines_is_advised(
     registry: SchemaRegistry,
     original_request: dict[str, Any],
     source: dict[str, Any],
 ) -> None:
+    """A name guess missed wrap_up and flagged honest opening lines."""
+
     source["expressions"] = {
         **source["expressions"],
-        intent: {locale: ["line"] for locale in source["locales"]},
+        "wrap_up": {locale: ["line"] for locale in source["locales"]},
+        "standing_by": {locale: ["line"] for locale in source["locales"]},
+    }
+    source["behavior"] = {
+        key: value for key, value in source.get("behavior", {}).items()
+        if key != "closing_expressions"
     }
 
-    report = validate_authoring_pack(original_request, source, registry)
-
-    codes = [item["code"] for item in report["advisory_findings"]]
-    assert ("AUTHORING_COMPLETION_LINE_OPENS" in codes) is advised
-    source["behavior"] = {**source.get("behavior", {}), "closing_expressions": [intent]}
+    undeclared = validate_authoring_pack(original_request, source, registry)
+    source["behavior"] = {**source["behavior"], "closing_expressions": []}
     declared = validate_authoring_pack(original_request, source, registry)
-    assert "AUTHORING_COMPLETION_LINE_OPENS" not in [
+
+    assert "AUTHORING_CLOSING_EXPRESSIONS_UNDECLARED" in [
+        item["code"] for item in undeclared["advisory_findings"]
+    ]
+    assert "AUTHORING_CLOSING_EXPRESSIONS_UNDECLARED" not in [
         item["code"] for item in declared["advisory_findings"]
     ]
 

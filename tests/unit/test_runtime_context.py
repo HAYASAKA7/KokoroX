@@ -135,6 +135,7 @@ def test_build_runtime_context_returns_only_the_selected_compact_view() -> None:
             "calm_warning": {"zh-CN": ["先停一下。"]},
         },
         "closing_expressions": [],
+        "closing_expressions_declared": False,
         "growth": {
             "dimensions": ["familiarity", "trust", "collaboration", "tension"]
         },

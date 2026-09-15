@@ -392,6 +392,12 @@ def _build_runtime_context(
         compiled.get("expressions"), persona_locale
     )
     closing_expressions = _closing_expressions(compiled.get("behavior"))
+    # Absent and empty mean different things: a pack authored before closing
+    # lines existed never said which of its lines close.
+    closing_declared = (
+        type(compiled.get("behavior")) is dict
+        and "closing_expressions" in compiled["behavior"]
+    )
     growth_dimensions = _growth_dimensions(compiled.get("growth"))
     state_summary = _state_summary(state)
     selected_data = {
@@ -410,6 +416,7 @@ def _build_runtime_context(
         "expressions": expressions,
         # Where each authored line goes: these close a turn, the rest open it.
         "closing_expressions": closing_expressions,
+        "closing_expressions_declared": closing_declared,
         "growth": {"dimensions": growth_dimensions},
         "state": state_summary,
     }

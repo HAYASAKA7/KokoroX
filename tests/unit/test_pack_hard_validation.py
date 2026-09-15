@@ -885,7 +885,8 @@ def test_rejects_provenance_input_mutated_during_later_compile(
     assert report["mode"] == "original"
     assert report["checks"]["provenance"]["passed"] is False
     assert finding_codes(report, "provenance") == [
-        "PACK_PROVENANCE_INPUT_MUTATION"
+        "PACK_PROVENANCE_INPUT_MUTATION",
+        "AUTHORING_CLOSING_EXPRESSIONS_UNDECLARED",
     ]
     assert report["passed"] is False
 

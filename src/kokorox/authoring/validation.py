@@ -22,9 +22,6 @@ _DOSSIER_CLAIM_SOURCES = frozenset(
     {"user_dossier", "creative_brief", "user_override"}
 )
 _MAX_FINDINGS = 256
-_COMPLETION_INTENT = re.compile(
-    r"(?:^|_)(?:complet[a-z0-9]*|finish[a-z0-9]*|done|conclu[a-z0-9]*)(?:_|$)"
-)
 _USER_CLAIM_SOURCES = ("user_dossier", "user_override")
 #: Short enough for a CJK phrase, long enough that a quote is words.
 _MIN_QUOTE_CHARACTERS = 4
@@ -186,18 +183,20 @@ def validate_authoring_pack(
                 )
             )
 
-    # An intent named for finishing work, left out of closing_expressions,
-    # opens the response: the character announces the work before showing it.
-    for intent in sorted(key for key in expressions if isinstance(key, str)):
-        if intent not in closing and _COMPLETION_INTENT.search(intent):
-            advisory_findings.append(
-                _finding(
-                    "AUTHORING_COMPLETION_LINE_OPENS",
-                    ["behavior", "closing_expressions"],
-                    f"{intent} reads as a completion line but is not listed in "
-                    "closing_expressions, so it would open the response.",
-                )
+    # A pack says which authored lines close a turn by declaring
+    # closing_expressions, [] included. Guessing from intent names missed
+    # wrap_up and sign_off and flagged honest opening lines; an undeclared list
+    # is a fact the author can settle.
+    if "closing_expressions" not in behavior and len(expressions) >= 2:
+        advisory_findings.append(
+            _finding(
+                "AUTHORING_CLOSING_EXPRESSIONS_UNDECLARED",
+                ["behavior", "closing_expressions"],
+                "behavior.yaml does not declare closing_expressions; list the "
+                "intents whose lines belong after the answer, or [] when every "
+                "authored line opens the response.",
             )
+        )
 
     if len(expressions) < 2:
         advisory_findings.append(

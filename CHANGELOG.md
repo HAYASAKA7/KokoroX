@@ -101,6 +101,13 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- The closing-line advisories state a fact instead of guessing from intent
+  names, which missed `wrap_up` and `sign_off` and flagged two honest opening
+  lines. Runtime context now reports `closing_expressions_declared`;
+  `runtime plan` advises `EXPRESSION_CLOSING_UNDECLARED` only for a pack that
+  never declared `closing_expressions`, and authoring validation advises
+  `AUTHORING_CLOSING_EXPRESSIONS_UNDECLARED` so authors declare it, `[]`
+  included. `AUTHORING_COMPLETION_LINE_OPENS` is gone.
 - Fixes to last pass's own fixes. A user claim's quote no longer matches with
   whitespace removed, which let "is notable" stand for "is not able"; runs of
   whitespace fold to one space, dropped only beside Chinese or Japanese script.

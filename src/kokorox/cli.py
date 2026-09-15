@@ -2851,7 +2851,9 @@ def _closing_undeclared(
     before showing it -- the reply the closing line was built to prevent.
     """
 
-    if not isinstance(context, dict) or context.get("closing_expressions"):
+    # Only a pack that never declared closing_expressions: two opening
+    # lines in a pack that declared none close are exactly what it meant.
+    if not isinstance(context, dict) or context.get("closing_expressions_declared") is not False:
         return []
     fixed = [
         segment["fixed_line"]["intent"]
@@ -2865,9 +2867,9 @@ def _closing_undeclared(
             "code": "EXPRESSION_CLOSING_UNDECLARED",
             "intents": fixed,
             "message": (
-                "This pack declares no closing_expressions, so every authored "
-                "line opens the response, a completion line included. Pass "
-                "only the intent that belongs at the opening."
+                "This pack never declared closing_expressions, so every authored "
+                "line opens the response. If one of these belongs after the "
+                "answer, as a completion line does, pass only the opening one."
             ),
         }
     ]

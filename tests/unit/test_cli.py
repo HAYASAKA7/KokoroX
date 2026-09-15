@@ -1167,14 +1167,23 @@ def test_a_pack_without_closing_expressions_advises_before_opening_with_both_lin
     }
     intents = ["order_acknowledgement", "task_completion"]
 
-    older = _plan_advisories(intents, plan, {"expressions": {}, "closing_expressions": []})
+    older = _plan_advisories(
+        intents,
+        plan,
+        {"expressions": {}, "closing_expressions": [], "closing_expressions_declared": False},
+    )
     declared = _plan_advisories(
-        intents, plan, {"expressions": {}, "closing_expressions": ["task_completion"]}
+        intents, plan, {"expressions": {}, "closing_expressions": ["task_completion"], "closing_expressions_declared": True}
+    )
+    two_openings = _plan_advisories(
+        intents, plan, {"expressions": {}, "closing_expressions": [], "closing_expressions_declared": True}
     )
 
     assert [item["code"] for item in older] == ["EXPRESSION_CLOSING_UNDECLARED"]
     assert older[0]["intents"] == intents
     assert declared == []
+    # A pack that declared none close meant both lines to open.
+    assert two_openings == []
 
 
 def test_runtime_plan_accepts_the_policy_compile_envelope() -> None:
