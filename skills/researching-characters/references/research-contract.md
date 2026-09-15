@@ -73,7 +73,7 @@ A semantically partial workspace may compile only when structurally valid. Its b
 
 Compile once. Compilation may add only the expected bundle below the configured private research root. It must not create or modify drafts, compiled packs, installed/public characters, sessions, relationship state, events, workspace memory, or global configuration.
 
-Validate the returned bundle path twice. Retain and compare both complete outputs. Require matching artifact ID, request/workspace/report hashes, bundle hash, scope, coverage, conflicts, limitations, and lifecycle:
+The bundle path mirrors the bundle's artifact id beneath the private research root, so it reads `research/<character>/research/<hash>` below that root's own `research` directory. The repetition is intentional: the artifact id, `research` namespace included, is part of every authoring request binding, and the path must never be rebuilt from anything else. Validate the returned bundle path twice. Retain and compare both complete outputs. Require matching artifact ID, request/workspace/report hashes, bundle hash, scope, coverage, conflicts, limitations, and lifecycle:
 
 ```text
 build_status: research

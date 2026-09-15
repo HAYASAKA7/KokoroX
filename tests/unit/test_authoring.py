@@ -1487,3 +1487,39 @@ def test_a_cjk_quote_folded_across_yaml_lines_still_binds(
     report = validate_authoring_pack(request, source, registry)
 
     assert report["hard_failures"] == []
+
+
+@pytest.mark.parametrize(
+    ("content", "quote", "binds"),
+    [
+        ("Kaede is not able to lie.", "is notable", False),
+        ("Kaede does not like crowds.", "doesnot like crowds", False),
+        ("Kaede does not like crowds.", "does not\n  like crowds", True),
+        ("她是皇家图书馆的管理员，讨厌吵闹的孩子。", "她是皇家图书馆的管理员， 讨厌吵闹的孩子", True),
+        ("凛は systems architect です。", "凛は systems architect です", True),
+    ],
+    ids=["no-space-join", "dropped-space", "reflowed-english", "folded-chinese", "mixed-script"],
+)
+def test_a_quote_keeps_its_word_boundaries(
+    content: str,
+    quote: str,
+    binds: bool,
+    registry: SchemaRegistry,
+    original_request: dict[str, Any],
+    source: dict[str, Any],
+) -> None:
+    """Removing all whitespace let "is notable" stand for "is not able"."""
+
+    request = _request_for_mode(original_request, "dossier")
+    request["inputs"][0]["content"] = content
+    source["evidence"] = {
+        "authored_original": False,
+        "claims": [{"statement": "A claim.", "source": "user_dossier", "quote": quote}],
+    }
+
+    report = validate_authoring_pack(request, source, registry)
+
+    unbound = "AUTHORING_USER_CLAIM_QUOTE_UNBOUND" in [
+        item["code"] for item in report["hard_failures"]
+    ]
+    assert unbound is not binds

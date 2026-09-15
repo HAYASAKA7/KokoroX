@@ -101,6 +101,18 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- Fixes to last pass's own fixes. A user claim's quote no longer matches with
+  whitespace removed, which let "is notable" stand for "is not able"; runs of
+  whitespace fold to one space, dropped only beside Chinese or Japanese script.
+  A forbidden pack line is refused with its punctuation, width, or spacing
+  changed, not only verbatim. `runtime validate --plan` accepts what
+  `runtime plan` printed. A default cleared while a session starts answers
+  `KARC_DEFAULT_NOT_CONFIGURED`, and one that keeps changing is retryable.
+- The runtime contract says a verified task outcome is one the host's tools
+  or the user established, never the model's own re-check; `using-kokorox`
+  says to carry the character through its prose with the locale profile's
+  addressing and the authored `display_name`; the research contract explains
+  why the bundle path repeats `research`.
 - A session that applied events while degraded no longer loses them when
   consent returns. It jumped back to retained state without a word and the
   events were gone; it now stays on session state with the advisory cause

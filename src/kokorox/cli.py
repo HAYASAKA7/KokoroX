@@ -105,6 +105,9 @@ _PUBLIC_MESSAGES = {
     "INPUT_INVALID_JSON": "Input file contains invalid JSON.",
     "INVALID_PACK_DATA": "Character pack data is invalid.",
     "INVALID_RUNTIME_CONTEXT_INPUT": "Runtime context input is invalid.",
+    "INVALID_PLAN_INPUT": (
+        "Render plan input is invalid: pass a plan or what runtime plan printed."
+    ),
     "INVALID_POLICY_INPUT": (
         "Language policy input is invalid: pass a compiled policy or what "
         "policy compile printed."
@@ -2097,22 +2100,7 @@ def _handle_session_start(
             if args.workspace is not None
             else None
         )
-        selection = resolve_character_selection(
-            settings.data_dir,
-            schemas,
-            workspace_root=workspace_root,
-        )
-        if selection.source == "none":
-            raise KokoroError(
-                "KARC_DEFAULT_NOT_CONFIGURED",
-                "No character default is configured.",
-            )
-        compiled = _publish_selected_compiled_projection(
-            settings,
-            selection,
-            schemas,
-            workspace_root=workspace_root,
-        )
+        selection, compiled = _start_from_default(settings, schemas, workspace_root)
         # Which default answered, and which installation it bound. With a
         # workspace default and a different global one, an agent could not
         # tell from the result which character version it had started.
@@ -2184,6 +2172,52 @@ def _handle_session_start(
         "installation_id": installation_id,
         "advisories": advisories,
     }
+
+
+_DEFAULT_START_ATTEMPTS = 3
+
+
+def _start_from_default(
+    settings: Settings,
+    schemas: SchemaRegistry,
+    workspace_root: Path | None,
+) -> tuple[CharacterSelection, dict[str, Any]]:
+    """Resolve a default and project its pack, again if the default changes.
+
+    A default cleared or replaced while a session started failed with a
+    non-retryable `KARC_DEFAULT_INPUT_MUTATION`, when the answer was that no
+    default is configured, or the new one. Resolution starts over; a default
+    that keeps changing is refused as retryable.
+    """
+
+    for attempt in range(_DEFAULT_START_ATTEMPTS):
+        selection = resolve_character_selection(
+            settings.data_dir,
+            schemas,
+            workspace_root=workspace_root,
+        )
+        if selection.source == "none":
+            raise KokoroError(
+                "KARC_DEFAULT_NOT_CONFIGURED",
+                "No character default is configured.",
+            )
+        try:
+            return selection, _publish_selected_compiled_projection(
+                settings,
+                selection,
+                schemas,
+                workspace_root=workspace_root,
+            )
+        except KokoroError as error:
+            if error.code != "KARC_DEFAULT_INPUT_MUTATION":
+                raise
+            if attempt == _DEFAULT_START_ATTEMPTS - 1:
+                raise KokoroError(
+                    "KARC_DEFAULT_INPUT_MUTATION",
+                    "The character default kept changing while the session started.",
+                    retryable=True,
+                ) from error
+    raise AssertionError("unreachable")
 
 
 def _publish_selected_compiled_projection(
@@ -2654,6 +2688,20 @@ def _policy_body(value: Any) -> Any:
     return inner
 
 
+def _plan_body(value: Any) -> Any:
+    """Accept a bare plan or the envelope `runtime plan` prints, as --policy does."""
+
+    if not isinstance(value, dict) or "ok" not in value:
+        return value
+    inner = value.get("plan")
+    if not isinstance(inner, dict):
+        raise _input_error(
+            "INVALID_PLAN_INPUT",
+            "Render plan input is invalid.",
+        )
+    return inner
+
+
 def _runtime_context_body(value: Any) -> dict[str, Any]:
     """Accept either a bare context or the envelope `runtime context` prints.
 
@@ -2830,7 +2878,7 @@ def _handle_runtime_validate(
 ) -> dict[str, Any]:
     del settings
     semantic = _read_json(Path(args.semantic))
-    plan = _read_json(Path(args.plan))
+    plan = _plan_body(_read_json(Path(args.plan)))
     rendered = _read_json(Path(args.rendered))
     schemas.validate("semantic-result", semantic)
     schemas.validate("render-plan", plan)

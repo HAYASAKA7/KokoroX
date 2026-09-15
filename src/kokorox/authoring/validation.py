@@ -582,10 +582,23 @@ def _validate_dossier_provenance(
             )
 
 
+_UNSPACED_SCRIPT = (
+    "\u3000-\u303f\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff"
+    "\uf900-\ufaff\uff00-\uffef\U00020000-\U0002fa1f"
+)
+_SPACE_BESIDE_UNSPACED = re.compile(
+    f" (?=[{_UNSPACED_SCRIPT}])|(?<=[{_UNSPACED_SCRIPT}]) "
+)
+
+
 def _quote_text(value: str) -> str:
-    # All whitespace goes, not just runs of it: YAML folds a line break into
-    # a space, and Chinese or Japanese text has no space to match it against.
-    return "".join(unicodedata.normalize("NFC", value).split())
+    # Runs of whitespace fold to one space, so a quote reflowed across YAML
+    # lines still matches. Removing whitespace entirely did the same for
+    # Chinese but let "is notable" stand for "is not able"; a space only
+    # disappears where it meets Chinese or Japanese script, which a line
+    # fold inserted and the dossier never had.
+    folded = " ".join(unicodedata.normalize("NFC", value).split())
+    return _SPACE_BESIDE_UNSPACED.sub("", folded)
 
 
 def _validate_user_claim_quotes(
@@ -631,9 +644,8 @@ def _validate_user_claim_quotes(
                 _finding(
                     "AUTHORING_USER_CLAIM_QUOTE_REQUIRED",
                     path,
-                    "A user-sourced claim must quote at least four characters "
-                    "besides whitespace, or the whole input, from the typed "
-                    "input it came from.",
+                    "A user-sourced claim must quote at least four characters, "
+                    "or the whole input, from the typed input it came from.",
                 )
             )
         elif not any(needle in content for content in contents[label]):

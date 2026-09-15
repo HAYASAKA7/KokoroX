@@ -6,6 +6,7 @@ from collections.abc import Mapping
 import re
 from math import isfinite
 import sys
+import unicodedata
 from typing import Any
 
 from kokorox import __version__
@@ -306,6 +307,22 @@ def _semantic_contract_valid(value: Mapping[str, Any]) -> bool:
             semantic_ids=True,
         )
         is not None
+    )
+
+
+_MIN_FORBIDDEN_CORE = 4
+
+
+def _span_core(value: str) -> str:
+    """The words of a line: compatibility-normalized and casefolded, without
+    whitespace or punctuation."""
+
+    folded = unicodedata.normalize("NFKC", value).casefold()
+    return "".join(
+        character
+        for character in folded
+        if not character.isspace()
+        and not unicodedata.category(character).startswith("P")
     )
 
 
@@ -875,8 +892,16 @@ def validate_rendered_output(
         _check_fixed_line_order(text, planned_segments, violations)
         forbidden = plan.get("forbidden_spans") if plan_mapping else None
         if isinstance(forbidden, list):
+            text_core = _span_core(text)
             for span in forbidden:
-                if isinstance(span, str) and span and span in text:
+                if not isinstance(span, str) or not span:
+                    continue
+                core = _span_core(span)
+                # Exact, or the same words: dropping the 。, a halfwidth comma,
+                # or an inserted space each got a pack line past a neutral plan.
+                if span in text or (
+                    len(core) >= _MIN_FORBIDDEN_CORE and core in text_core
+                ):
                     violations.add(
                         "FORBIDDEN_SPAN_PRESENT",
                         "Rendered text speaks a pack line the neutral plan leaves out.",

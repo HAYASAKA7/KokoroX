@@ -1207,3 +1207,49 @@ def test_persistence_refusals_keep_their_fixed_reason(
     envelope = _public_error_envelope(KokoroError(code, "internal", details=details))
 
     assert envelope["error"]["details"] == kept
+
+
+def test_runtime_validate_accepts_the_runtime_plan_envelope() -> None:
+    from kokorox.cli import _plan_body
+
+    plan = {"schema_version": "1.0", "segments": []}
+
+    assert _plan_body({"ok": True, "plan": plan, "advisories": []}) == plan
+    assert _plan_body(plan) == plan
+    with pytest.raises(KokoroError) as caught:
+        _plan_body({"ok": False, "error": {}})
+    assert caught.value.code == "INVALID_PLAN_INPUT"
+
+
+def test_a_default_cleared_while_a_session_starts_says_none_is_configured(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from types import SimpleNamespace
+
+    import kokorox.cli as cli_module
+    from kokorox.distribution.defaults import CharacterSelection
+
+    selections = iter(
+        [
+            CharacterSelection(source="global_default", installation_id="x", namespace="original",
+                               character_id="rin-aster", character_version="1.0.0",
+                               archive_sha256="a" * 64, compiled_sha256="b" * 64),
+            CharacterSelection(source="none"),
+        ]
+    )
+
+    def resolve(*_args: object, **_kwargs: object) -> CharacterSelection:
+        return next(selections)
+
+    def cleared_during_projection(*_args: object, **_kwargs: object) -> dict[str, object]:
+        raise KokoroError("KARC_DEFAULT_INPUT_MUTATION", "changed")
+
+    monkeypatch.setattr(cli_module, "resolve_character_selection", resolve)
+    monkeypatch.setattr(cli_module, "_publish_selected_compiled_projection", cleared_during_projection)
+
+    with pytest.raises(KokoroError) as caught:
+        cli_module._start_from_default(
+            SimpleNamespace(data_dir=None), object(), None  # type: ignore[arg-type]
+        )
+
+    assert caught.value.code == "KARC_DEFAULT_NOT_CONFIGURED"

@@ -170,7 +170,7 @@ Use this bounded fallback order after a failed validation:
 1. Repair invalid segments.
 2. Reduce language switches.
 3. Lower character intensity once.
-4. Use the neutral renderer in the primary language. Re-plan with the same inputs and `--fallback-level 3`, render that plan -- it has no authored lines and no switches, and lists the pack's lines under `forbidden_spans`, which a render must not speak (`FORBIDDEN_SPAN_PRESENT`) -- and validate against it. The plan the turn already had protects the authored lines, so a neutral render can never pass against it.
+4. Use the neutral renderer in the primary language. Re-plan with the same inputs and `--fallback-level 3`, render that plan -- it has no authored lines and no switches, and lists the pack's lines under `forbidden_spans`, which a render must not speak even with its punctuation, width, or spacing changed (`FORBIDDEN_SPAN_PRESENT`) -- and validate against it. The plan the turn already had protects the authored lines, so a neutral render can never pass against it.
 
 Validate every repaired or fallback candidate. Urgency never removes this gate.
 
@@ -197,7 +197,7 @@ An event is a closed JSON object:
 }
 ```
 
-Allowed origins are `verified_task_outcome` and `explicit_user_feedback`. `artifact_id` must equal `event/<event_id>`. Effects may contain `familiarity`, `trust`, `collaboration`, or `tension`; each per-event delta is bounded from -4 to 4. `event_id` is the idempotency key. Set `expected_state_revision` from the current context/session state.
+Allowed origins are `verified_task_outcome` and `explicit_user_feedback`. `verified_task_outcome` needs an outcome something outside the model established: a test or tool the host ran (`test_result`, `tool_result`) or a delivery the host confirmed (`delivery_result`). Your own re-check, reasoning, or arithmetic is not verification; when nothing outside the model established the outcome, record no event. `explicit_user_feedback` needs the user's own words about the work. `artifact_id` must equal `event/<event_id>`. Effects may contain `familiarity`, `trust`, `collaboration`, or `tension`; each per-event delta is bounded from -4 to 4. `event_id` is the idempotency key. Set `expected_state_revision` from the current context/session state.
 
 Do not call state tools before delivery. In a host post-delivery hook or later turn, run `state preview` first; preview must not mutate state. Run `state apply` only with the same reviewed event. On a revision or session-change error, reload context, reassess the evidence, and create a new event if still justified. Never edit session, state, or journal files directly; never assign a stage or relationship score.
 

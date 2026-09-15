@@ -870,3 +870,37 @@ def _semantic_artifact() -> dict[str, Any]:
         "immutable_spans": ["go test -race ./..."],
         "format_constraints": {},
     }
+
+
+@pytest.mark.parametrize(
+    "spoken",
+    [
+        "了解しました、ご主人様",
+        "了解しました、 ご主人様。",
+        "了解しました,ご主人様。",
+        "了解しました，ご主人様",
+    ],
+    ids=["no-full-stop", "space", "halfwidth-comma", "fullwidth-comma"],
+)
+def test_a_forbidden_line_is_refused_in_its_variants(spoken: str) -> None:
+    from kokorox.runtime.validation import validate_rendered_output
+
+    plan = build_render_plan(
+        semantic(),
+        policy(),
+        expression_intent=["order_acknowledgement"],
+        context=two_line_context(),
+        fallback_level=3,
+    )
+    rendered = {
+        "text": f"{spoken}读路径没有加锁。 go test -race ./...",
+        "segments": [
+            {key: value for key, value in segment.items() if key != "expression_intent"}
+            for segment in plan["segments"]
+        ],
+        "switch_count": 0,
+    }
+
+    result = validate_rendered_output(rendered, _semantic_artifact(), plan, attempt=3)
+
+    assert "FORBIDDEN_SPAN_PRESENT" in [item["code"] for item in result["violations"]]
