@@ -101,6 +101,27 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- Two commands creating the same data directory at once no longer fail. Two
+  installs into a fresh data root both found the registry directory missing,
+  both created it, and the second reported `KARC_REGISTRY_PATH_INVALID`;
+  concurrent default changes could do the same. A directory another command
+  just created is accepted once it is confirmed to be a plain directory.
+- Concurrent installs now actually both succeed. The previous fix re-read
+  the registry after a failed preview but still before taking the scope
+  lock, so when the other install had not yet published, the locked path
+  audited against a stale capture and refused with `KARC_INSTALL_CONFLICT`.
+  The baseline is now taken once the lock is held, verified with real
+  concurrent processes, and the lock wait is about six seconds so several
+  queued installs do not give up.
+- A removal on a long-lived data root is fast again. Its audits skipped
+  re-reading unchanged listings, but the removal's own scope lock and
+  registry sit in the workspace-registries directory, so every audit took
+  the slow path; the installed tree was also re-read after each validation.
+  Both now use metadata when nothing changed.
+- A reference another command changes during a removal -- an install into
+  another workspace, a session starting -- is still refused, but as a
+  retryable `KARC_REMOVE_REFERENCE_SCAN_INVALID` with reason
+  `concurrent_change`, since the same removal run again answers correctly.
 - Every session now records what it started from, in a session binding:
   the installation and scope a default resolved, or a compiled path. Removal
   reads it, so removing one workspace's installation is no longer blocked by

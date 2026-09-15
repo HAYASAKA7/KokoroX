@@ -2958,3 +2958,189 @@ def test_removal_reads_old_references_once_not_once_per_document(
     # Two captures of 20 files each plus the references themselves; the old
     # audits re-read all twenty on every one of dozens of validations.
     assert reads[0] < 200, reads[0]
+
+
+def _two_processes(arguments: list[list[str]], data_root: Path) -> list[tuple[int, dict[str, Any]]]:
+    import os
+    import subprocess
+    import sys
+
+    environment = os.environ.copy()
+    environment["KOKOROX_DATA_DIR"] = str(data_root)
+    environment["PYTHONPATH"] = str(Path("src").resolve())
+    processes = [
+        subprocess.Popen(
+            [sys.executable, "-m", "kokorox.cli", *argv, "--json"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            encoding="utf-8",
+            env=environment,
+        )
+        for argv in arguments
+    ]
+    results = []
+    for process in processes:
+        stdout, _stderr = process.communicate(timeout=120)
+        results.append((process.returncode, json.loads(stdout)))
+    return results
+
+
+def test_two_real_concurrent_installs_of_one_archive_both_succeed(
+    rin_verified_release: dict[str, Any],
+    tmp_path: Path,
+) -> None:
+    """Checked with real processes: a simulated interleaving hid the stale re-read."""
+
+    source = tmp_path / "rin-aster.karc"
+    source.write_bytes(build_private_archive(rin_verified_release))
+    for round_index in range(3):
+        data_root = tmp_path / f"data-{round_index}"
+        workspace = tmp_path / f"workspace-{round_index}"
+        workspace.mkdir()
+        command = ["pack", "install", str(source), "--workspace", str(workspace)]
+
+        results = _two_processes([command, command], data_root)
+
+        assert [code for code, _body in results] == [0, 0], results
+        registry = load_installed_registry(data_root, SCHEMAS, workspace_root=workspace)
+        assert len(registry["entries"]) == 1
+
+
+def test_a_workspace_removal_on_a_lived_in_root_reads_references_once(
+    rin_verified_release: dict[str, Any],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The removal's own lock and registry kept every audit on the slow path."""
+
+    import os
+    import time
+
+    from kokorox.state.store import SessionStore
+
+    source = tmp_path / "rin-aster.karc"
+    source.write_bytes(build_private_archive(rin_verified_release))
+    data_root = tmp_path / "data"
+    target = tmp_path / "target"
+    target.mkdir()
+    install_karc_archive(source, data_root, SCHEMAS, workspace_root=target)
+    workspaces = data_root / "registry" / "workspaces"
+    for index in range(20):
+        other = tmp_path / f"other-{index}"
+        other.mkdir()
+        scope = resolve_install_scope(other)
+        (workspaces / f"{scope.workspace_id}.json").write_bytes(
+            canonical_bytes(empty_installed_registry(scope))
+        )
+    store = SessionStore(data_root)
+    for index in range(20):
+        store.start(f"old-{index}", "someone-else", "1.0.0", "a" * 64)
+        store.end(f"old-{index}")
+    an_hour_ago = time.time() - 3600
+    for path in data_root.rglob("*"):
+        os.utime(path, (an_hour_ago, an_hour_ago))
+
+    reads = [0]
+    real_read = installer_module._read_optional_recovery_file
+    real_match = installer_module._regular_file_matches
+
+    def counting_read(path: Path, limit: int) -> bytes | None:
+        reads[0] += 1
+        return real_read(path, limit)
+
+    def counting_match(path: Path, expected: bytes) -> bool:
+        reads[0] += 1
+        return real_match(path, expected)
+
+    monkeypatch.setattr(installer_module, "_read_optional_recovery_file", counting_read)
+    monkeypatch.setattr(installer_module, "_regular_file_matches", counting_match)
+
+    remove_installed_pack(
+        data_root, "original", "rin-aster", "1.0.0", SCHEMAS, workspace_root=target
+    )
+
+    # Two captures of forty references and the documents themselves; before,
+    # every validation re-read all of them and the installed tree.
+    # Forty references read twice per scan, twice over; the audits used to
+    # re-read all of them after every validation, above two thousand reads.
+    assert reads[0] < 600, reads[0]
+
+
+def test_a_reference_changed_by_another_command_is_a_retryable_refusal(
+    rin_verified_release: dict[str, Any],
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "rin-aster.karc"
+    source.write_bytes(build_private_archive(rin_verified_release))
+    data_root = tmp_path / "data"
+    install_karc_archive(source, data_root, SCHEMAS)
+    other = tmp_path / "other-workspace"
+    other.mkdir()
+    registry = (
+        data_root / "registry" / "workspaces" / f"{resolve_install_scope(other).workspace_id}.json"
+    )
+    registry.parent.mkdir(parents=True, exist_ok=True)
+    registry.write_bytes(canonical_bytes(empty_installed_registry(resolve_install_scope(other))))
+    changed = dict(empty_installed_registry(resolve_install_scope(other)))
+    changed["revision"] = 1
+    published = []
+
+    def install_elsewhere(_call: int, _name: str) -> None:
+        if not published:
+            registry.write_bytes(canonical_bytes(changed))
+            published.append(True)
+
+    with pytest.raises(KokoroError) as caught:
+        remove_installed_pack(
+            data_root, "original", "rin-aster", "1.0.0", _CallbackSchemas(install_elsewhere)
+        )
+
+    assert caught.value.code == "KARC_REMOVE_REFERENCE_SCAN_INVALID"
+    assert caught.value.retryable is True
+    assert caught.value.details == {"reason": "concurrent_change"}
+    remove_installed_pack(data_root, "original", "rin-aster", "1.0.0", SCHEMAS)
+    assert load_installed_registry(data_root, SCHEMAS)["entries"] == {}
+
+
+def test_a_directory_another_command_just_created_is_accepted(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Two installs into a fresh data root raced to mkdir; the loser read it as unsafe."""
+
+    target = tmp_path / "registry"
+    real_mkdir = registry_module.os.mkdir
+
+    def someone_else_first(path: object, mode: int = 0o777) -> None:
+        real_mkdir(path, mode)
+        raise FileExistsError(path)
+
+    monkeypatch.setattr(registry_module.os, "mkdir", someone_else_first)
+
+    registry_module._ensure_directory(target)
+
+    assert target.is_dir()
+
+
+def test_a_link_created_in_the_race_is_still_refused(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    target = tmp_path / "registry"
+    elsewhere = tmp_path / "elsewhere"
+    elsewhere.mkdir()
+
+    def link_first(path: object, mode: int = 0o777) -> None:
+        try:
+            Path(str(path)).symlink_to(elsewhere, target_is_directory=True)
+        except OSError:
+            pytest.skip("symlink creation is unavailable")
+        raise FileExistsError(path)
+
+    monkeypatch.setattr(registry_module.os, "mkdir", link_first)
+
+    with pytest.raises(KokoroError) as caught:
+        registry_module._ensure_directory(target)
+
+    assert caught.value.code == "KARC_REGISTRY_PATH_INVALID"

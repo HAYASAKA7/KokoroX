@@ -23,7 +23,9 @@ _MAX_REGISTRY_BYTES = 2 * 1024 * 1024
 # An install holds the scope lock for the length of its transaction -- about
 # half a second on a loaded host -- so a 150 ms wait made the second of two
 # concurrent installs lose every time. About two seconds, backing off.
-_LOCK_RETRY_DELAYS = (0.0, 0.01, 0.02, 0.04, 0.08, 0.16, 0.32, 0.5, 0.5, 0.5)
+# Six installs queued on one scope each hold it for about half a second on
+# a loaded host, so the last waits several seconds: about six in total.
+_LOCK_RETRY_DELAYS = (0.0, 0.01, 0.02, 0.04, 0.08, 0.16, 0.32) + (0.5,) * 11
 _LOCK_CONTENTION_ERRNOS = frozenset(
     value
     for value in (
@@ -615,8 +617,14 @@ def _ensure_directory(path: Path) -> None:
         path_stat = path.lstat()
     except FileNotFoundError:
         try:
-            os.mkdir(path, 0o700)
-            _fsync_directory(path.parent)
+            try:
+                os.mkdir(path, 0o700)
+                _fsync_directory(path.parent)
+            except FileExistsError:
+                # Another command created it between the two calls -- two
+                # installs into a fresh data root. The checks below still
+                # refuse anything but a plain directory.
+                pass
             path_stat = path.lstat()
         except OSError as error:
             raise _error(

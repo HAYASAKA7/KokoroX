@@ -230,7 +230,9 @@ _PUBLIC_MESSAGES = {
         "lists any active sessions to end first."
     ),
     "KARC_REMOVE_REFERENCE_SCAN_INVALID": (
-        "Reference scanning failed during removal."
+        "Reference scanning failed during removal. With reason "
+        "concurrent_change, another command changed a reference while the "
+        "removal ran; run the removal again."
     ),
     "KARC_REMOVE_STORAGE_INVALID": "Installation storage is invalid.",
     "KARC_RUNTIME_VERSION_UNSUPPORTED": (
@@ -3418,6 +3420,12 @@ def _public_error_envelope(error: KokoroError) -> dict[str, Any]:
         details = _workspace_invalid_details(error.details)
     if code == "KARC_REMOVE_REFERENCED":
         details = _removal_referenced_details(error.details)
+    if code == "KARC_REMOVE_REFERENCE_SCAN_INVALID":
+        details = (
+            {"reason": "concurrent_change"}
+            if error.details.get("reason") == "concurrent_change"
+            else {}
+        )
     if code == "UNKNOWN_SCENARIO":
         details = _available_scenarios_details(error.details)
     if code == "INVALID_RENDER_PLAN_INPUT":

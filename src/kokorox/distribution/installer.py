@@ -122,12 +122,18 @@ class _CapturedInstalledTree:
     path: Path
     identity: _NodeIdentity
     members: dict[str, bytes]
+    fingerprints: dict[str, tuple[int, ...]] = field(
+        default_factory=dict, compare=False
+    )
+    captured_at_ns: int = field(default=0, compare=False)
 
 
 @dataclass(frozen=True, slots=True)
 class _CapturedOptionalFile:
     path: Path
     payload: bytes | None
+    fingerprint: tuple[int, ...] | None = field(default=None, compare=False)
+    captured_at_ns: int = field(default=0, compare=False)
 
 
 @dataclass(frozen=True, slots=True)
@@ -260,7 +266,14 @@ def install_karc_archive(
             audited.assert_clean()
             return preview
         with _acquire_registry_lock(root, scope) as lock:
+            # The baseline an install is audited against is taken once the
+            # lock is held. Captured before it, a registry another install
+            # published while this one waited read as a conflict -- still, when
+            # the other install had not published by the time of a re-read
+            # before the lock. Nothing decided before the lock is used here.
             data_boundary = _capture_data_root(root)
+            registry_payload = _read_optional_regular_file(registry_path)
+            audited = boundary()
             result = _install_under_lock(
                 source,
                 root,
@@ -2242,6 +2255,19 @@ def _reference_scan_error(message: str, **details: Any) -> KokoroError:
     return _error("KARC_REMOVE_REFERENCE_SCAN_INVALID", message, **details)
 
 
+def _concurrent_reference_change(message: str) -> KokoroError:
+    # Readable references that another command changed while this removal
+    # ran: an install into another workspace, a session starting. The scan
+    # still refuses to decide on them, but nothing is corrupt, and the same
+    # removal run again answers correctly.
+    return KokoroError(
+        "KARC_REMOVE_REFERENCE_SCAN_INVALID",
+        message,
+        retryable=True,
+        details={"reason": "concurrent_change"},
+    )
+
+
 def _recovery_result(
     scope: InstallScope,
     registry_revision: int,
@@ -2655,19 +2681,38 @@ def _require_recovery_lock(lock: _RegistryLock) -> None:
 
 
 def _capture_optional_reference_file(path: Path) -> _CapturedOptionalFile:
+    captured_at_ns = time.time_ns()
     try:
+        linked = _lstat_optional(path)
+        fingerprint = None if linked is None else _stat_fingerprint(linked)
         payload = _read_optional_recovery_file(path, _MAX_REFERENCE_BYTES)
     except KokoroError as error:
         raise _reference_scan_error(
             "Reference artifact could not be captured safely.",
             reason=error.code,
         ) from error
-    return _CapturedOptionalFile(path, payload)
+    return _CapturedOptionalFile(path, payload, fingerprint, captured_at_ns)
 
 
 def _require_optional_reference_file(
     captured: _CapturedOptionalFile,
 ) -> None:
+    if captured.captured_at_ns > 0:
+        try:
+            linked = _lstat_optional(captured.path)
+        except (KokoroError, OSError):
+            linked = None
+        if captured.payload is None and captured.fingerprint is None and linked is None:
+            return
+        if (
+            linked is not None
+            and captured.fingerprint is not None
+            and _stat_fingerprint(linked) == captured.fingerprint
+            and captured.fingerprint[2] < captured.captured_at_ns - _RACY_WINDOW_NS
+            and stat.S_ISREG(linked.st_mode)
+            and not _is_redirect(captured.path, linked)
+        ):
+            return
     try:
         payload = _read_optional_recovery_file(
             captured.path,
@@ -2679,7 +2724,7 @@ def _require_optional_reference_file(
             reason=error.code,
         ) from error
     if payload != captured.payload:
-        raise _reference_scan_error(
+        raise _concurrent_reference_change(
             "Reference artifact changed across a validation callback."
         )
 
@@ -2706,6 +2751,7 @@ def _listing_unchanged(
     identity: _NodeIdentity | None,
     fingerprints: dict[str, tuple[int, ...]],
     captured_at_ns: int,
+    ignored: Callable[[str], bool] | None = None,
 ) -> bool:
     """Prove a captured listing unchanged from metadata alone, or answer False.
 
@@ -2720,7 +2766,7 @@ def _listing_unchanged(
     try:
         if identity is None:
             return _lstat_optional(path) is None
-        if not fingerprints or captured_at_ns <= 0:
+        if captured_at_ns <= 0:
             return False
         if _capture_node_identity(path, directory=True) != identity:
             return False
@@ -2728,9 +2774,17 @@ def _listing_unchanged(
         current: dict[str, tuple[int, ...]] = {}
         with os.scandir(path) as scanned:
             for entry in scanned:
+                entry_stat = os.lstat(entry.path)
+                if ignored is not None and ignored(entry.name):
+                    # Not compared by content either; still must be a plain file.
+                    if not stat.S_ISREG(entry_stat.st_mode) or _is_redirect(
+                        Path(entry.path), entry_stat
+                    ):
+                        return False
+                    continue
                 if len(current) >= len(fingerprints):
                     return False
-                current[entry.name] = _stat_fingerprint(os.lstat(entry.path))
+                current[entry.name] = _stat_fingerprint(entry_stat)
         # Content writes move the modification time on every platform; the
         # change time is the creation time on Windows and cannot age.
         return current == fingerprints and all(
@@ -2813,9 +2867,33 @@ def _require_reference_directory(
             reason=error.code,
         ) from error
     if current != captured:
-        raise _reference_scan_error(
+        raise _concurrent_reference_change(
             "Reference directory changed across a validation callback."
         )
+
+
+def _workspace_registry_ignored(name: str, excluded_name: str | None) -> bool:
+    """Entries a workspace-registry capture never compares by content.
+
+    Scope locks, the selected scope's staging file, and the selected
+    scope's own registry. A removal writes its own lock and registry in this
+    same directory, so fingerprinting them kept every audit on the slow path.
+    """
+
+    lock_scope = name[1:-5]
+    return (
+        (
+            name.startswith(".")
+            and name.endswith(".lock")
+            and _HEX_SHA256.fullmatch(lock_scope) is not None
+        )
+        or (
+            excluded_name is not None
+            and name.startswith(f".{excluded_name}.")
+            and name.endswith(".tmp")
+        )
+        or name == excluded_name
+    )
 
 
 def _selected_workspace_registry_name(scope: InstallScope) -> str | None:
@@ -2850,7 +2928,8 @@ def _capture_workspace_registries(
                         "Workspace registry directory has an unsafe entry."
                     )
                 member_stat = member.lstat()
-                fingerprints[member.name] = _stat_fingerprint(member_stat)
+                if not _workspace_registry_ignored(member.name, excluded_name):
+                    fingerprints[member.name] = _stat_fingerprint(member_stat)
                 safe_regular = stat.S_ISREG(
                     member_stat.st_mode
                 ) and not _is_redirect(member, member_stat)
@@ -2917,6 +2996,7 @@ def _require_workspace_registries(
         captured.identity,
         captured.fingerprints,
         captured.captured_at_ns,
+        lambda name: _workspace_registry_ignored(name, captured.excluded_name),
     ):
         return
     try:
@@ -2930,7 +3010,7 @@ def _require_workspace_registries(
             reason=error.code,
         ) from error
     if current != captured:
-        raise _reference_scan_error(
+        raise _concurrent_reference_change(
             "Workspace registries changed across a validation callback."
         )
 
@@ -2941,6 +3021,7 @@ def _capture_installed_tree(
     *,
     optional: bool = False,
 ) -> _CapturedInstalledTree | None:
+    captured_at_ns = time.time_ns()
     linked = _lstat_optional(path)
     if linked is None and optional:
         return None
@@ -2950,8 +3031,10 @@ def _capture_installed_tree(
         if files is None:
             raise ValueError("unsafe installed tree")
         members: dict[str, bytes] = {}
+        fingerprints: dict[str, tuple[int, ...]] = {}
         total = 0
         for relative, member_path in sorted(files.items()):
+            fingerprints[relative] = _stat_fingerprint(member_path.lstat())
             payload = _read_optional_recovery_file(
                 member_path,
                 limits.max_member_bytes,
@@ -2967,7 +3050,40 @@ def _capture_installed_tree(
             "KARC_REMOVE_STORAGE_INVALID",
             "Installed member tree could not be captured safely.",
         ) from error
-    return _CapturedInstalledTree(path, identity, members)
+    return _CapturedInstalledTree(
+        path, identity, members, fingerprints, captured_at_ns
+    )
+
+
+def _installed_tree_unchanged(captured: _CapturedInstalledTree) -> bool:
+    """Prove an old installed tree unchanged from metadata, or answer False.
+
+    The removal audit re-read every installed file after each validation.
+    False only means the byte comparison must run.
+    """
+
+    if captured.captured_at_ns <= 0 or not captured.fingerprints:
+        return False
+    try:
+        if _capture_node_identity(captured.path, directory=True) != captured.identity:
+            return False
+        files = _installed_files(captured.path)
+        if files is None or set(files) != set(captured.fingerprints):
+            return False
+        threshold = captured.captured_at_ns - _RACY_WINDOW_NS
+        for relative, member_path in files.items():
+            member_stat = member_path.lstat()
+            print_ = _stat_fingerprint(member_stat)
+            if (
+                print_ != captured.fingerprints[relative]
+                or print_[2] >= threshold
+                or int(member_stat.st_nlink) != 1
+                or _is_redirect(member_path, member_stat)
+            ):
+                return False
+        return True
+    except (KokoroError, OSError, ValueError):
+        return False
 
 
 def _require_installed_tree_unchanged(
@@ -2980,6 +3096,8 @@ def _require_installed_tree_unchanged(
             "KARC_REMOVE_PATH_CHANGED",
             "Installed tree identity changed across a validation callback.",
         ) from error
+    if _installed_tree_unchanged(captured):
+        return
     if not _installation_tree_matches(captured.path, captured.members):
         raise _error(
             "KARC_REMOVE_PATH_CHANGED",

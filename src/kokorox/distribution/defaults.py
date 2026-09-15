@@ -994,8 +994,12 @@ def _ensure_directory(path: Path) -> None:
         value = path.lstat()
     except FileNotFoundError:
         try:
-            os.mkdir(path, 0o700)
-            _fsync_directory(path.parent)
+            try:
+                os.mkdir(path, 0o700)
+                _fsync_directory(path.parent)
+            except FileExistsError:
+                # Created by a concurrent command; still checked below.
+                pass
             value = path.lstat()
         except OSError as error:
             raise KokoroError(
