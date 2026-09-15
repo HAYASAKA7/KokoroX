@@ -109,6 +109,20 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- Removal no longer compares every session manifest and workspace registry
+  after each document it reads. A directory's own timestamps move whenever
+  an entry is created, removed, or atomically replaced, so an old, unchanged
+  directory skips its entries; one full comparison runs just before the
+  removal commits, where an in-place edit is still caught. One removal in a
+  long-lived data root had held its lock for about half a minute.
+- A removal that has committed no longer reports failure. A session starting
+  or an install elsewhere during its last steps made it answer
+  `KARC_REMOVE_REFERENCE_SCAN_INVALID` after the installation was already
+  gone, with its journal left behind; the reference checks stop at the commit
+  point, the shared archive is kept when other registries cannot be read, and
+  any other late failure says `KARC_INSTALL_RECOVERY_REQUIRED`. `pack list`
+  and `pack install --dry-run` now report `pending_recovery` with the advisory
+  `KARC_RECOVERY_PENDING` when a scope holds an unfinished journal.
 - A session start racing a default clear now answers
   `KARC_DEFAULT_NOT_CONFIGURED`: the race usually hit the default lookup,
   outside the earlier retry, and answered `KARC_DEFAULT_INPUT_MUTATION` or

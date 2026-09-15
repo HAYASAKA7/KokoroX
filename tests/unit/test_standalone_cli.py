@@ -1736,3 +1736,43 @@ def test_consent_grant_names_what_a_replacement_withdrew(
         "PERSISTENCE_STATE_NOT_CONNECTED",
     ]
     assert advisories[1]["permissions"] == ["mood_state"]
+
+
+def test_pack_list_says_when_a_journal_is_waiting_for_recovery(
+    rin_verified_release: dict[str, Any],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """An interrupted removal left a journal that pack list and install never mentioned."""
+
+    import kokorox.distribution.installer as installer_module
+    from kokorox.distribution.installer import install_karc_archive, remove_installed_pack
+    from kokorox.schemas import SchemaRegistry
+
+    schemas = SchemaRegistry(Path("schemas/v1"))
+    source = tmp_path / "rin.karc"
+    source.write_bytes(build_private_archive(rin_verified_release))
+    data_root = tmp_path / "data"
+    install_karc_archive(source, data_root, schemas)
+    monkeypatch.setenv("KOKOROX_DATA_DIR", str(data_root))
+
+    code, clean = _cli_json(["pack", "list", "--json"], capsys)
+    assert code == 0
+    assert "pending_recovery" not in clean
+
+    def interrupt(name: str) -> None:
+        if name == "removal_installation_renamed":
+            raise RuntimeError("injected")
+
+    monkeypatch.setattr(installer_module, "_install_failure_point", interrupt)
+    with pytest.raises(RuntimeError):
+        remove_installed_pack(data_root, "original", "rin-aster", "1.0.0", schemas)
+    monkeypatch.setattr(installer_module, "_install_failure_point", lambda _name: None)
+
+    code, listed = _cli_json(["pack", "list", "--json"], capsys)
+    code_dry, dry = _cli_json(["pack", "install", str(source), "--dry-run", "--json"], capsys)
+
+    assert listed["pending_recovery"] is True
+    assert [item["code"] for item in listed["advisories"]] == ["KARC_RECOVERY_PENDING"]
+    assert dry.get("pending_recovery") is True

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from contextlib import contextmanager
+import contextvars
 from dataclasses import dataclass, field
 import ctypes
 import errno
@@ -146,6 +148,7 @@ class _CapturedReferenceDirectory:
         default_factory=dict, compare=False
     )
     captured_at_ns: int = field(default=0, compare=False)
+    directory_print: tuple[int, ...] | None = field(default=None, compare=False)
 
 
 @dataclass(frozen=True, slots=True)
@@ -158,6 +161,7 @@ class _CapturedWorkspaceRegistries:
         default_factory=dict, compare=False
     )
     captured_at_ns: int = field(default=0, compare=False)
+    directory_print: tuple[int, ...] | None = field(default=None, compare=False)
 
 
 class _BoundarySchemas:
@@ -190,6 +194,13 @@ class _BoundarySchemas:
     def raise_if_failed(self) -> None:
         if self._violation is not None:
             raise self._violation
+
+
+def recovery_pending(data_root: Path, workspace_root: Path | None = None) -> bool:
+    """Whether the scope holds an unfinished install or removal journal."""
+
+    scope = resolve_install_scope(workspace_root)
+    return _lstat_optional(_journal_path(_absolute_path(data_root), scope)) is not None
 
 
 def install_karc_archive(
@@ -1305,6 +1316,9 @@ def _remove_under_lock(
         removal_staging,
         installation_identity,
     )
+    if boundary is not None:
+        with _full_listing_audit():
+            boundary.assert_clean()
     journal_identity = _write_journal(journal_path, journal, create=True)
     if boundary is not None:
         boundary.set_audit(
@@ -1337,6 +1351,55 @@ def _remove_under_lock(
     journal_identity = _write_journal(journal_path, journal)
     _install_failure_point("removal_registry_phase_recorded")
 
+    # Committed: the registry no longer lists the installation. The reference
+    # audits guarded that decision; after it, a session starting or an install
+    # elsewhere made a finished removal report failure and leave its journal.
+    if boundary is not None:
+        for name in (
+            "reference_config",
+            "reference_sessions",
+            "reference_session_bindings",
+            "reference_migrations",
+            "workspace_registries",
+        ):
+            boundary.remove_audit(name)
+    try:
+        return _finish_committed_removal(
+            root,
+            plan,
+            container,
+            installation,
+            installation_identity,
+            removal_staging,
+            journal_path,
+            journal,
+            schemas,
+            boundary,
+            limits,
+        )
+    except KokoroError as error:
+        if error.code == "KARC_INSTALL_RECOVERY_REQUIRED":
+            raise
+        raise KokoroError(
+            "KARC_INSTALL_RECOVERY_REQUIRED",
+            "The removal was recorded but not finished; run pack recover to finish it.",
+            details={"reason": error.code},
+        ) from error
+
+
+def _finish_committed_removal(
+    root: Path,
+    plan: dict[str, Any],
+    container: Any,
+    installation: Path,
+    installation_identity: _NodeIdentity,
+    removal_staging: Path,
+    journal_path: Path,
+    journal: dict[str, Any],
+    schemas: _SchemaValidator,
+    boundary: _BoundarySchemas | None,
+    limits: KarcLimits,
+) -> dict[str, Any]:
     _require_node_identity(installation, installation_identity)
     if not _installation_tree_matches(installation, container.member_payloads):
         raise _error(
@@ -1351,6 +1414,12 @@ def _remove_under_lock(
     _install_failure_point("removal_installation_renamed")
     journal["phase"] = "installation_removed"
     journal_identity = _write_journal(journal_path, journal)
+    if boundary is not None:
+        # The audit set before the commit bound the earlier journal identity.
+        boundary.set_audit(
+            "journal",
+            lambda: _audit_journal(journal_path, journal_identity, journal),
+        )
 
     _remove_recovery_tree(
         removal_staging,
@@ -1358,7 +1427,16 @@ def _remove_under_lock(
     )
     _install_failure_point("removal_tree_cleaned")
     archive_removed = False
-    if not _archive_is_referenced(root, plan["archive_sha256"], schemas):
+    try:
+        referenced = _archive_is_referenced(root, plan["archive_sha256"], schemas)
+    except KokoroError as error:
+        if error.code != "KARC_REMOVE_REFERENCE_SCAN_INVALID":
+            raise
+        # Another scope's registries could not be read right now. Keep the
+        # shared archive: an unreferenced archive is harmless, a missing one
+        # breaks the installation that still uses it.
+        referenced = True
+    if not referenced:
         archive_path = root / "archives" / f"{plan['archive_sha256']}.karc"
         if boundary is not None:
             boundary.remove_audit("removal_archive")
@@ -2780,12 +2858,29 @@ def _stat_fingerprint(path_stat: os.stat_result) -> tuple[int, ...]:
     )
 
 
+# Set while a removal takes its last look before committing: every entry is
+# compared then, whatever the directory's own timestamps say.
+_FULL_LISTING_AUDIT: contextvars.ContextVar[bool] = contextvars.ContextVar(
+    "kokorox_full_listing_audit", default=False
+)
+
+
+@contextmanager
+def _full_listing_audit() -> Any:
+    token = _FULL_LISTING_AUDIT.set(True)
+    try:
+        yield
+    finally:
+        _FULL_LISTING_AUDIT.reset(token)
+
+
 def _listing_unchanged(
     path: Path,
     identity: _NodeIdentity | None,
     fingerprints: dict[str, tuple[int, ...]],
     captured_at_ns: int,
     ignored: Callable[[str], bool] | None = None,
+    directory_print: tuple[int, ...] | None = None,
 ) -> bool:
     """Prove a captured listing unchanged from metadata alone, or answer False.
 
@@ -2805,6 +2900,19 @@ def _listing_unchanged(
         if _capture_node_identity(path, directory=True) != identity:
             return False
         threshold = captured_at_ns - _RACY_WINDOW_NS
+        # A directory's own timestamps move whenever an entry is created,
+        # removed, or atomically replaced -- how every KokoroX writer
+        # publishes. Comparing each entry on every validation still cost a
+        # removal about half a minute in a long-lived data root. An unchanged,
+        # old directory skips its entries; an in-place edit, which leaves the
+        # directory alone, is caught by the full comparison before commit.
+        if (
+            not _FULL_LISTING_AUDIT.get()
+            and directory_print is not None
+            and directory_print[2] < threshold
+            and _stat_fingerprint(os.lstat(path)) == directory_print
+        ):
+            return True
         current: dict[str, tuple[int, ...]] = {}
         with os.scandir(path) as scanned:
             for entry in scanned:
@@ -2836,6 +2944,8 @@ def _capture_reference_directory(
     linked = _lstat_optional(path)
     if linked is None:
         return _CapturedReferenceDirectory(path, limit, None, {})
+    # Taken before the scan, so an entry that changes during it shows here.
+    directory_print = _stat_fingerprint(linked)
     try:
         identity = _capture_node_identity(path, directory=True)
         entries: dict[str, bytes] = {}
@@ -2880,7 +2990,7 @@ def _capture_reference_directory(
             reason=type(error).__name__,
         ) from error
     return _CapturedReferenceDirectory(
-        path, limit, identity, entries, fingerprints, captured_at_ns
+        path, limit, identity, entries, fingerprints, captured_at_ns, directory_print
     )
 
 
@@ -2893,6 +3003,7 @@ def _require_reference_directory(
         captured.fingerprints,
         captured.captured_at_ns,
         _is_transient_staging,
+        captured.directory_print,
     ):
         return
     try:
@@ -2950,6 +3061,7 @@ def _capture_workspace_registries(
     linked = _lstat_optional(path)
     if linked is None:
         return _CapturedWorkspaceRegistries(path, excluded_name, None, {})
+    directory_print = _stat_fingerprint(linked)
     try:
         identity = _capture_node_identity(path, directory=True)
         entries: dict[str, bytes] = {}
@@ -3025,6 +3137,7 @@ def _capture_workspace_registries(
         entries,
         fingerprints,
         captured_at_ns,
+        directory_print,
     )
 
 
@@ -3037,6 +3150,7 @@ def _require_workspace_registries(
         captured.fingerprints,
         captured.captured_at_ns,
         lambda name: _workspace_registry_ignored(name, captured.excluded_name),
+        captured.directory_print,
     ):
         return
     try:
@@ -4455,6 +4569,7 @@ def _install_failure_point(_name: str) -> None:
 
 __all__ = [
     "install_karc_archive",
+    "recovery_pending",
     "preview_karc_install",
     "recover_karc_installations",
     "remove_installed_pack",

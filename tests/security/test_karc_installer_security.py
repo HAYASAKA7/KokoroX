@@ -3200,3 +3200,100 @@ def test_a_concurrent_change_reported_inside_a_reference_read_stays_retryable(
 
     assert caught.value.retryable is True
     assert caught.value.details == {"reason": "concurrent_change"}
+
+
+def test_an_unchanged_directory_skips_its_entries_until_the_commit_check(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Every validation compared every entry: half a minute for one removal."""
+
+    import os
+    import time
+
+    directory = tmp_path / "sessions"
+    directory.mkdir()
+    for index in range(5):
+        (directory / f"s{index}.json").write_bytes(b"{}")
+    an_hour_ago = time.time() - 3600
+    for path in (*directory.iterdir(), directory):
+        os.utime(path, (an_hour_ago, an_hour_ago))
+    captured = installer_module._capture_reference_directory(directory, 16)
+    entry_checks = [0]
+    real_fingerprint = installer_module._stat_fingerprint
+
+    def counting(path_stat: os.stat_result) -> tuple[int, ...]:
+        entry_checks[0] += 1
+        return real_fingerprint(path_stat)
+
+    monkeypatch.setattr(installer_module, "_stat_fingerprint", counting)
+
+    installer_module._require_reference_directory(captured)
+    skipped = entry_checks[0]
+    with installer_module._full_listing_audit():
+        installer_module._require_reference_directory(captured)
+
+    assert skipped == 1  # the directory itself
+    assert entry_checks[0] - skipped >= 5
+
+
+def test_an_in_place_edit_is_caught_by_the_check_before_commit(tmp_path: Path) -> None:
+    import os
+    import time
+
+    directory = tmp_path / "sessions"
+    directory.mkdir()
+    target = directory / "s0.json"
+    target.write_bytes(b"{}")
+    an_hour_ago = time.time() - 3600
+    os.utime(target, (an_hour_ago, an_hour_ago))
+    os.utime(directory, (an_hour_ago, an_hour_ago))
+    captured = installer_module._capture_reference_directory(directory, 16)
+    target.write_bytes(b"[]")
+    os.utime(directory, (an_hour_ago, an_hour_ago))
+
+    installer_module._require_reference_directory(captured)
+    with pytest.raises(KokoroError) as caught:
+        with installer_module._full_listing_audit():
+            installer_module._require_reference_directory(captured)
+
+    assert caught.value.code == "KARC_REMOVE_REFERENCE_SCAN_INVALID"
+
+
+def test_a_change_after_commit_does_not_fail_a_finished_removal(
+    rin_verified_release: dict[str, Any],
+    tmp_path: Path,
+) -> None:
+    """A removal answered SCAN_INVALID after it happened, and left its journal."""
+
+    source = tmp_path / "rin-aster.karc"
+    source.write_bytes(build_private_archive(rin_verified_release))
+    data_root = tmp_path / "data"
+    install_karc_archive(source, data_root, SCHEMAS)
+    other = tmp_path / "other"
+    other.mkdir()
+    registry = data_root / "registry" / "workspaces" / f"{resolve_install_scope(other).workspace_id}.json"
+    registry.parent.mkdir(parents=True, exist_ok=True)
+    registry.write_bytes(canonical_bytes(empty_installed_registry(resolve_install_scope(other))))
+    changed = dict(empty_installed_registry(resolve_install_scope(other)))
+    changed["revision"] = 1
+    committed = []
+
+    def publish_elsewhere_after_commit(_call: int, _name: str) -> None:
+        journal = data_root / "registry" / "journals" / "global.json"
+        if (
+            journal.exists()
+            and b"installation_removed" in journal.read_bytes()
+            and not committed
+        ):
+            registry.write_bytes(canonical_bytes(changed))
+            committed.append(True)
+
+    result = remove_installed_pack(
+        data_root, "original", "rin-aster", "1.0.0", _CallbackSchemas(publish_elsewhere_after_commit)
+    )
+
+    assert committed
+    assert load_installed_registry(data_root, SCHEMAS)["entries"] == {}
+    assert not (data_root / "registry" / "journals" / "global.json").exists()
+    assert result["archive_removed"] in {True, False}

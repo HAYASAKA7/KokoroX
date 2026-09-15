@@ -17,6 +17,7 @@ from kokorox.distribution.defaults import installed_release_problem
 from kokorox.distribution.installer import (
     install_karc_archive,
     recover_karc_installations,
+    recovery_pending,
     remove_installed_pack,
 )
 from kokorox.distribution.migrations import (
@@ -1106,12 +1107,33 @@ def _handle_pack_install(
         workspace_root=_workspace_root(args),
         dry_run=args.dry_run,
     )
-    return {
+    result = {
         "ok": True,
         "dry_run": bool(args.dry_run),
         "plan": plan,
         "activates_character": False,
     }
+    if args.dry_run:
+        _advise_pending_recovery(result, _require_data_root(data_root), _workspace_root(args))
+    return result
+
+
+def _advise_pending_recovery(
+    result: dict[str, Any], root: Path, workspace: Path | None
+) -> None:
+    # An interrupted install or removal leaves a journal that blocks the
+    # scope until `pack recover` finishes it; nothing used to say so.
+    if recovery_pending(root, workspace):
+        result["pending_recovery"] = True
+        result["advisories"] = [
+            {
+                "code": "KARC_RECOVERY_PENDING",
+                "message": (
+                    "An unfinished install or removal journal blocks this scope; "
+                    "run pack recover to finish it."
+                ),
+            }
+        ]
 
 
 def _handle_pack_list(
@@ -1138,13 +1160,15 @@ def _handle_pack_list(
         if problem is not None:
             annotated["unusable_reason"] = problem
         installed.append(annotated)
-    return {
+    result = {
         "ok": True,
         "scope": scope.kind,
         "workspace_id": scope.workspace_id,
         "installed": installed,
         "activates_character": False,
     }
+    _advise_pending_recovery(result, root, workspace)
+    return result
 
 
 def _handle_pack_recover(
