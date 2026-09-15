@@ -3238,6 +3238,12 @@ def test_an_unchanged_directory_skips_its_entries_until_the_commit_check(
 
 
 def test_an_in_place_edit_is_caught_by_the_check_before_commit(tmp_path: Path) -> None:
+    """An in-place edit leaves the directory alone, so only the pre-commit check sees it.
+
+    The directory is not touched after capture: on Linux and macOS `utime`
+    itself moves a directory's change time, which is part of its fingerprint.
+    """
+
     import os
     import time
 
@@ -3250,7 +3256,6 @@ def test_an_in_place_edit_is_caught_by_the_check_before_commit(tmp_path: Path) -
     os.utime(directory, (an_hour_ago, an_hour_ago))
     captured = installer_module._capture_reference_directory(directory, 16)
     target.write_bytes(b"[]")
-    os.utime(directory, (an_hour_ago, an_hour_ago))
 
     installer_module._require_reference_directory(captured)
     with pytest.raises(KokoroError) as caught:
